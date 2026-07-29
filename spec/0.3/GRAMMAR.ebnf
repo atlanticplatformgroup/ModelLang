@@ -1,0 +1,16 @@
+query_decl       = "query", IDENT, "(", [ parameter_list ], ")",
+                   "from", IDENT, "as", IDENT, "{",
+                   authorize_stmt,
+                   where_stmt,
+                   order_by_stmt,
+                   limit_stmt,
+                   "}" ;
+
+where_stmt       = "where", expression, ";" ;
+order_by_stmt    = "orderBy", path, order_direction, ";" ;
+order_direction = "asc" | "desc" ;
+limit_stmt       = "limit", NUMBER, ";" ;
+
+declaration      = enum_decl | entity_decl | action_decl | query_decl ;
+
+All productions not replaced above are inherited from the ModelLang 0.2 grammar.
