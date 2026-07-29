@@ -113,12 +113,28 @@ describe("backends", () => {
     expect(output["typescript/client.ts"]).toContain("async myRequests(input: MyRequestsInput): Promise<PurchaseRequest[]>");
   });
 
+  it("enforces enum sets and lowers membership and snapshot copies", async () => {
+    const output = generateAll(await procurement());
+    const schema = output["postgres/002_schema.sql"];
+    const actions = output["postgres/003_actions.sql"];
+    expect(schema).toContain('"roles" text[] NOT NULL');
+    expect(schema).toContain('CONSTRAINT "ck_user_roles_enum_set"');
+    expect(schema).toContain('"roles" <@ ARRAY[\'EMPLOYEE\', \'MANAGER\', \'FINANCE\']::text[]');
+    expect(schema).toContain('array_position("roles", NULL::text) IS NULL');
+    expect(schema).toContain("array_positions(\"roles\", 'MANAGER')");
+    expect(actions).toContain("'EMPLOYEE' = ANY(v_actor.\"roles\")");
+    expect(actions).toContain('"approved_by_roles" = v_actor."roles"');
+    expect(output["typescript/types.ts"]).toContain("roles: Role[];");
+    expect(output["typescript/types.ts"]).toContain("approvedByRoles: Role[] | null;");
+    expect(output["enforcement.md"]).toContain("enum-set:User.roles");
+  });
+
   it("explains identity, locks, invariants, guards, effects, and privilege boundaries", async () => {
     const markdown = generateAll(await procurement())["enforcement.md"];
     for (const expected of [
       "boundary:principal_binding",
       "invariant:PurchaseRequest.approval_fields_match_status",
-      "snapshot:PurchaseRequest.approvedByRole",
+      "snapshot:PurchaseRequest.approvedByRoles",
       "authorize:approveRequest",
       "require:approveRequest.is_submitted",
       "lock:approveRequest.request",

@@ -19,7 +19,7 @@ export type IRExpression =
   | { kind: "fieldAccess"; source: string; parameter?: string; fieldId: string; fieldName: string; type: string; nullable: boolean }
   | { kind: "enumLiteral"; enumId: string; member: string; type: string; nullable: false }
   | { kind: "unary"; operator: "not"; operand: IRExpression; type: "Boolean"; nullable: boolean }
-  | { kind: "binary"; operator: "and" | "or" | "==" | "!=" | "<" | "<=" | ">" | ">="; left: IRExpression; right: IRExpression; type: "Boolean"; nullable: boolean; comparisonSemantics?: "entityIdentity" }
+  | { kind: "binary"; operator: "and" | "or" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: IRExpression; right: IRExpression; type: "Boolean"; nullable: boolean; comparisonSemantics?: "entityIdentity" | "setMembership" }
   | { kind: "nullComparison"; operator: "isNull" | "isNotNull"; operand: IRExpression; type: "Boolean"; nullable: false };
 
 export interface IREnum {
@@ -156,7 +156,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 3;
+  irVersion: 4;
   model: {
     id: string;
     name: string;

@@ -121,7 +121,7 @@ describe("semantic analysis", () => {
   });
 });
 
-describe("ModelLang 0.2 temporal exclusions", () => {
+describe("ModelLang temporal exclusions", () => {
   const reservationSource = (exclusion: string) => `model Reservations version "0.2.0";
     entity User { id: UUID @id; }
     entity Resource { id: UUID @id; }
@@ -138,9 +138,9 @@ describe("ModelLang 0.2 temporal exclusions", () => {
       create Reservation { id = id; resource = resource; startsAt = startsAt; endsAt = endsAt; }
     }`;
 
-  it("preserves half-open no-overlap rules in IR version 3", () => {
+  it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(3);
+    expect(ir.irVersion).toBe(4);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -162,7 +162,7 @@ describe("ModelLang 0.2 temporal exclusions", () => {
   });
 });
 
-describe("ModelLang 0.3 authenticated queries", () => {
+describe("ModelLang authenticated queries", () => {
   const query = (body: string) => minimal(body);
 
   it("lowers a bounded caller-scoped query and keeps the caller out of its ABI", () => {
@@ -173,7 +173,7 @@ describe("ModelLang 0.3 authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(3);
+    expect(ir.irVersion).toBe(4);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:owned.actor",
@@ -237,5 +237,91 @@ describe("ModelLang 0.3 authenticated queries", () => {
     ["alias collision", `query q(caller item: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 10; }`, "E2605"],
   ])("rejects %s", (_name, body, code) => {
     expect(failure(query(body)).code).toBe(code);
+  });
+});
+
+describe("ModelLang 0.4 enum sets", () => {
+  const setModel = (userField: string, body: string) => `model Sets version "0.4.0";
+    enum Role { EMPLOYEE, MANAGER, FINANCE }
+    enum Permission { READ, WRITE }
+    entity User { id: UUID @id; ${userField} }
+    entity Record { id: UUID @id; rolesAtWrite: Set<Role>? @snapshot; }
+    ${body}`;
+
+  it("parses Set<Enum> fields and membership with comparison precedence", () => {
+    const program = parse(setModel("roles: Set<Role>;", `action record(caller actor: User, record: Record) -> Record {
+      authorize Role.EMPLOYEE in actor.roles or Role.MANAGER in actor.roles and not Role.FINANCE in actor.roles;
+      update record { rolesAtWrite = actor.roles; }
+    }`));
+    const user = program.declarations.find((declaration) => declaration.kind === "entity" && declaration.name === "User");
+    if (!user || user.kind !== "entity") throw new Error("Expected User entity");
+    expect(user.members.find((member) => member.kind === "field" && member.name === "roles")).toMatchObject({
+      type: { name: "Role", collection: "set" },
+    });
+    const action = program.declarations.find((declaration) => declaration.kind === "action")!;
+    expect(action.authorize).toMatchObject({
+      kind: "binary",
+      operator: "or",
+      left: { kind: "binary", operator: "in" },
+      right: {
+        kind: "binary",
+        operator: "and",
+        left: { kind: "binary", operator: "in" },
+        right: { kind: "unary", operand: { kind: "binary", operator: "in" } },
+      },
+    });
+  });
+
+  it("lowers membership and full-set snapshots into IR version 4", () => {
+    const ir = compileText(setModel("roles: Set<Role>;", `action record(caller actor: User, record: Record) -> Record {
+      authorize Role.MANAGER in actor.roles;
+      update record { rolesAtWrite = actor.roles; }
+    }`), "sets.model");
+    expect(ir.irVersion).toBe(4);
+    expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
+      .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
+    expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
+      .toMatchObject({ type: "set:enum:Role", optional: true, storage: "snapshot" });
+    expect(ir.actions[0]!.authorization.expression).toMatchObject({
+      kind: "binary",
+      operator: "in",
+      comparisonSemantics: "setMembership",
+      nullable: false,
+      left: { kind: "enumLiteral", enumId: "enum:Role", member: "MANAGER" },
+      right: { kind: "fieldAccess", fieldId: "field:User.roles", type: "set:enum:Role" },
+    });
+    expect(ir.enforcement.some((entry) => entry.id === "enum-set:User.roles")).toBe(true);
+    expect(ir.enforcement.some((entry) => entry.id === "snapshot:Record.rolesAtWrite")).toBe(true);
+  });
+
+  it("preserves nullable membership for fail-closed Boolean boundaries", () => {
+    const ir = compileText(setModel("roles: Set<Role>?;", `action record(caller actor: User, record: Record) -> Record {
+      authorize Role.MANAGER in actor.roles;
+      update record { rolesAtWrite = actor.roles; }
+    }`));
+    expect(ir.actions[0]!.authorization.expression).toMatchObject({
+      kind: "binary",
+      operator: "in",
+      type: "Boolean",
+      nullable: true,
+    });
+  });
+
+  it.each([
+    ["scalar element type", "roles: Set<String>;", "authorize true;", "E2701", undefined],
+    ["entity element type", "roles: Set<User>;", "authorize true;", "E2701", undefined],
+    ["unsupported annotation", "roles: Set<Role> @unique;", "authorize true;", "E2702", undefined],
+    ["unsupported default", "roles: Set<Role> = Role.EMPLOYEE;", "authorize true;", "E2703", undefined],
+    ["set-valued parameter", "roles: Set<Role>;", "authorize true;", "E2704", "roles: Set<Role>"],
+    ["mismatched membership", "roles: Set<Role>;", "authorize Permission.READ in actor.roles;", "E2705", undefined],
+    ["set equality", "roles: Set<Role>;", "authorize actor.roles == actor.roles;", "E2706", undefined],
+    ["set ordering", "roles: Set<Role>;", "authorize actor.roles < actor.roles;", "E2706", undefined],
+  ])("rejects %s", (_name, userField, authorization, code, extraParameter) => {
+    const parameters = extraParameter ? `, ${extraParameter}` : "";
+    const source = setModel(userField, `action record(caller actor: User, record: Record${parameters}) -> Record {
+      ${authorization}
+      update record { rolesAtWrite = actor.roles; }
+    }`);
+    expect(failure(source).code).toBe(code);
   });
 });

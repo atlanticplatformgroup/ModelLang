@@ -34,7 +34,7 @@ Fields may be optional (`Set<Role>?`). A required set may be empty. Enum-set fie
 
 An enum set is unordered and contains each enum member at most once. It cannot contain null or an undeclared enum member.
 
-Set equality and ordering are undefined in 0.4. The only set operation is membership:
+Set equality and ordering are undefined in 0.4. Apart from optional-set null checks, the only set operation is membership:
 
 ```modellang
 Role.MANAGER in actor.roles

@@ -49,7 +49,9 @@ function expressionText(expression: Expression): string {
 
 function isEntityType(type: string): boolean { return type.startsWith("entity:"); }
 function isEnumType(type: string): boolean { return type.startsWith("enum:"); }
+function isEnumSetType(type: string): boolean { return type.startsWith("set:enum:"); }
 function entityName(type: string): string { return type.slice("entity:".length); }
+function enumSetName(type: string): string { return type.slice("set:enum:".length); }
 function isNumeric(type: string): boolean { return type === "Int" || type === "Decimal"; }
 
 export function analyze(program: Program, source: string, file: string): ModelIR {
@@ -88,7 +90,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const enforcement = buildEnforcement(entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 3,
+    irVersion: 4,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -153,15 +155,21 @@ function validateEntities(symbols: Symbols, file: string): void {
     const ids = fields.filter((field) => field.annotations.some((annotation) => annotation.name === "id"));
     if (ids.length !== 1) throw new ModelError("E2201", `Entity '${entity.name}' must have exactly one @id field.`, entity.span, file);
     const id = ids[0]!;
-    if (id.type.name !== "UUID" || id.optional) throw new ModelError("E2202", `The @id field '${entity.name}.${id.name}' must be required UUID.`, id.span, file);
+    if (id.type.name !== "UUID" || id.type.collection || id.optional) throw new ModelError("E2202", `The @id field '${entity.name}.${id.name}' must be required UUID.`, id.span, file);
     for (const field of fields) {
-      if (!scalars.has(field.type.name) && !symbols.enums.has(field.type.name) && !symbols.entities.has(field.type.name)) {
+      if (field.type.collection === "set" && !symbols.enums.has(field.type.name)) {
+        throw new ModelError("E2701", `Set element type '${field.type.name}' must be a declared enum.`, field.type.span, file);
+      }
+      if (!field.type.collection && !scalars.has(field.type.name) && !symbols.enums.has(field.type.name) && !symbols.entities.has(field.type.name)) {
         throw new ModelError("E2005", `Unknown type '${field.type.name}'.`, field.type.span, file);
       }
       const annotationNames = new Set<string>();
       for (const annotation of field.annotations) {
         if (annotationNames.has(annotation.name)) throw new ModelError("E2203", `Duplicate @${annotation.name} annotation.`, annotation.span, file);
         annotationNames.add(annotation.name);
+        if (field.type.collection === "set" && annotation.name !== "snapshot") {
+          throw new ModelError("E2702", `@${annotation.name} is not supported on enum-set fields in 0.4.`, annotation.span, file);
+        }
         if ((annotation.name === "min" || annotation.name === "minExclusive" || annotation.name === "max") && !["Int", "Decimal"].includes(field.type.name)) {
           throw new ModelError("E2204", `@${annotation.name} is valid only on Int and Decimal fields.`, annotation.span, file);
         }
@@ -171,9 +179,10 @@ function validateEntities(symbols: Symbols, file: string): void {
         }
       }
       if (field.default) {
+        if (field.type.collection === "set") throw new ModelError("E2703", "Enum-set defaults are not supported in 0.4.", field.default.span, file);
         if (!isCompileTimeConstant(field.default, symbols)) throw new ModelError("E2206", "Field defaults must be compile-time constants.", field.default.span, file);
         const typed = typeExpression(field.default, { kind: "invariant", entity }, symbols, file);
-        ensureAssignable(field, typed, field.default.span, file);
+        ensureAssignable(field, typed, symbols, field.default.span, file);
       }
     }
     for (const exclusion of entity.members.filter((member) => member.kind === "exclusion")) {
@@ -203,6 +212,7 @@ function isCompileTimeConstant(expression: Expression, symbols: Symbols): boolea
 }
 
 function fieldType(field: FieldDecl, symbols: Symbols): string {
+  if (field.type.collection === "set") return `set:enum:${field.type.name}`;
   if (symbols.entities.has(field.type.name)) return `entity:${field.type.name}`;
   if (symbols.enums.has(field.type.name)) return `enum:${field.type.name}`;
   return field.type.name;
@@ -265,6 +275,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     const previous = seen.get(parameter.name);
     if (previous) throw new ModelError("E2305", `Duplicate parameter '${parameter.name}'.`, parameter.span, file, { message: "First declared here.", span: previous });
     seen.set(parameter.name, parameter.span);
+    if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
     if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
@@ -319,7 +330,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
       throw new ModelError("E2314", "An update may not change an @id field.", assignment.span, file);
     }
     const expression = typeExpression(assignment.expression, scope, symbols, file);
-    ensureAssignable(field, expression, assignment.expression.span, file);
+    ensureAssignable(field, expression, symbols, assignment.expression.span, file);
     if (field.annotations.some((annotation) => annotation.name === "snapshot")
       && expression.kind !== "nullLiteral"
       && expression.kind !== "fieldAccess") {
@@ -378,6 +389,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     const previous = seen.get(parameter.name);
     if (previous) throw new ModelError("E2604", `Duplicate query parameter '${parameter.name}'.`, parameter.span, file, { message: "First declared here.", span: previous });
     seen.set(parameter.name, parameter.span);
+    if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
     if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
@@ -495,11 +507,28 @@ function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, 
     requireBoolean(right, expression.right.span, file, `'${expression.operator}'`);
     return { kind: "binary", operator: expression.operator, left, right, type: "Boolean", nullable: left.nullable || right.nullable };
   }
+  if (expression.operator === "in") {
+    if (!isEnumSetType(right.type) || left.type !== `enum:${enumSetName(right.type)}`) {
+      throw new ModelError("E2705", `Set membership requires a matching enum member and enum set, not ${left.type} in ${right.type}.`, expression.span, file);
+    }
+    return {
+      kind: "binary",
+      operator: "in",
+      left,
+      right,
+      type: "Boolean",
+      nullable: left.nullable || right.nullable,
+      comparisonSemantics: "setMembership",
+    };
+  }
   if (left.kind === "nullLiteral" || right.kind === "nullLiteral") {
     const operand = left.kind === "nullLiteral" ? right : left;
     if (!["==", "!="].includes(expression.operator)) throw new ModelError("E2401", "null may only be used with == or !=.", expression.span, file);
     if (!operand.nullable) throw new ModelError("E2402", "null may only be compared with an optional value.", expression.span, file);
     return { kind: "nullComparison", operator: expression.operator === "==" ? "isNull" : "isNotNull", operand, type: "Boolean", nullable: false };
+  }
+  if (isEnumSetType(left.type) || isEnumSetType(right.type)) {
+    throw new ModelError("E2706", "Enum sets support membership and null checks only; set equality and ordering are undefined in 0.4.", expression.span, file);
   }
   if (["<", "<=", ">", ">="].includes(expression.operator)) {
     const compatibleOrdering = (isNumeric(left.type) && isNumeric(right.type))
@@ -576,14 +605,13 @@ function compatibleTypes(left: string, right: string): boolean {
   return left === right || (isNumeric(left) && isNumeric(right));
 }
 
-function ensureAssignable(field: FieldDecl, expression: IRExpression, span: Span, file: string): void {
+function ensureAssignable(field: FieldDecl, expression: IRExpression, symbols: Symbols, span: Span, file: string): void {
   if (expression.kind === "nullLiteral") {
     if (!field.optional) throw new ModelError("E2411", `Cannot assign null to required field '${field.name}'.`, span, file);
     return;
   }
-  const expected = field.type.name;
-  const actual = isEntityType(expression.type) ? entityName(expression.type) : isEnumType(expression.type) ? expression.type.slice(5) : expression.type;
-  if (expected !== actual && !(["Int", "Decimal"].includes(expected) && isNumeric(expression.type))) {
+  const expected = fieldType(field, symbols);
+  if (expected !== expression.type && !([expected, expression.type].every(isNumeric))) {
     throw new ModelError("E2412", `Cannot assign ${expression.type} to field '${field.name}' of type ${expected}.`, span, file);
   }
   if (!field.optional && expression.nullable) throw new ModelError("E2413", `Cannot assign nullable expression to required field '${field.name}'.`, span, file);
@@ -629,6 +657,7 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IR
       if (!field.optional) entries.push({ id: `required:${entity.name}.${field.name}`, purpose: `${field.name} is required.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn} NOT NULL`, source: field.span });
       if (isEntityType(field.type)) entries.push({ id: `reference:${entity.name}.${field.name}`, purpose: `${field.name} references ${entityName(field.type)}.`, layer: "PostgreSQL foreign key", artifact: "postgres/002_schema.sql", objectName: `fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`, source: field.span });
       if (isEnumType(field.type)) entries.push({ id: `enum-membership:${entity.name}.${field.name}`, purpose: `${field.name} must be a declared ${field.type.slice(5)} member.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`, source: field.span });
+      if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${entity.name}.${field.name}`, purpose: `${field.name} is a duplicate-free set of declared ${enumSetName(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
       if (field.default) entries.push({ id: `default:${entity.name}.${field.name}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
       if (field.storage === "snapshot") entries.push({ id: `snapshot:${entity.name}.${field.name}`, purpose: `${field.name} is a stored point-in-time audit snapshot, not a live relationship-derived value.`, layer: "ModelLang storage semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
       for (const annotation of field.annotations) {

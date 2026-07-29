@@ -26,6 +26,7 @@ export interface EnumDecl {
 
 export interface TypeRef {
   name: string;
+  collection?: "set";
   span: Span;
 }
 
@@ -127,4 +128,4 @@ export type Expression =
   | { kind: "literal"; value: string | number | boolean | null; literalKind: "string" | "number" | "boolean" | "null"; span: Span }
   | { kind: "path"; parts: string[]; span: Span }
   | { kind: "unary"; operator: "not"; operand: Expression; span: Span }
-  | { kind: "binary"; operator: "or" | "and" | "==" | "!=" | "<" | "<=" | ">" | ">="; left: Expression; right: Expression; span: Span };
+  | { kind: "binary"; operator: "or" | "and" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: Expression; right: Expression; span: Span };

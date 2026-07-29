@@ -66,6 +66,7 @@ export function assertEnforceable(ir: ModelIR): void {
       if (!field.optional) requireEntry(ir, `required:${entity.name}.${field.name}`, field.span);
       if (field.type.startsWith("entity:")) requireEntry(ir, `reference:${entity.name}.${field.name}`, field.span);
       if (field.type.startsWith("enum:")) requireEntry(ir, `enum-membership:${entity.name}.${field.name}`, field.span);
+      if (field.type.startsWith("set:enum:")) requireEntry(ir, `enum-set:${entity.name}.${field.name}`, field.span);
       if (field.default) requireEntry(ir, `default:${entity.name}.${field.name}`, field.span);
       if (field.storage === "snapshot") requireEntry(ir, `snapshot:${entity.name}.${field.name}`, field.span);
       for (const annotation of field.annotations) {

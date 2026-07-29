@@ -10,6 +10,7 @@ export interface TypeScriptOutput {
 function tsType(field: IRField): string {
   let type: string;
   if (field.type.startsWith("entity:")) type = "string";
+  else if (field.type.startsWith("set:enum:")) type = `${field.type.slice("set:enum:".length)}[]`;
   else if (field.type.startsWith("enum:")) type = field.type.slice(5);
   else type = ({ String: "string", Int: "number", Decimal: "string", Boolean: "boolean", UUID: "string", DateTime: "string" } as Record<string, string>)[field.type] ?? "never";
   return field.optional ? `${type} | null` : type;
@@ -17,6 +18,7 @@ function tsType(field: IRField): string {
 
 function parameterType(type: string): string {
   if (type.startsWith("entity:")) return "string";
+  if (type.startsWith("set:enum:")) return `${type.slice("set:enum:".length)}[]`;
   if (type.startsWith("enum:")) return type.slice(5);
   return ({ String: "string", Int: "number", Decimal: "string", Boolean: "boolean", UUID: "string", DateTime: "string" } as Record<string, string>)[type] ?? "never";
 }

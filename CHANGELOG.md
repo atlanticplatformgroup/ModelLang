@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Added normative stored `Set<Enum>` fields and membership expressions.
+- Added canonical IR version 4 with explicit enum-set types and `setMembership` semantics.
+- Added PostgreSQL `text[]` storage with constraints rejecting undeclared, null, and duplicate members.
+- Added fail-closed `member in set` lowering to PostgreSQL array membership.
+- Extended `@snapshot` to copy complete enum sets as point-in-time audit context.
+- Generated enum-union arrays in TypeScript entity types.
+- Migrated Procurement from one mutually exclusive role to multi-role principals.
+- Added compiler, codegen, database-constraint, multi-role authorization, and set-snapshot tests.
+
 ## 0.3.0
 
 - Added normative authenticated query syntax and canonical IR version 3.

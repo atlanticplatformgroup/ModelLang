@@ -1,4 +1,4 @@
--- source sha256:3fdd77cdaa2d3b126da0af6ea47f93751c7944bf6e25a65dd90005db6f079261
+-- source sha256:223f7dedd038f85bf47df46127438b5fd6a3795e5195532524fd240955437c97
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -8,8 +8,8 @@ REVOKE ALL ON SCHEMA "model_procurement_internal" FROM PUBLIC;
 CREATE TABLE "model_procurement"."user" (
   "id" uuid NOT NULL PRIMARY KEY,
   "name" text NOT NULL,
-  "role" text NOT NULL,
-  CONSTRAINT "ck_user_role_enum" CHECK (("role" IN ('EMPLOYEE', 'MANAGER', 'FINANCE')) IS TRUE)
+  "roles" text[] NOT NULL,
+  CONSTRAINT "ck_user_roles_enum_set" CHECK (("roles" <@ ARRAY['EMPLOYEE', 'MANAGER', 'FINANCE']::text[] AND pg_catalog.array_position("roles", NULL::text) IS NULL AND pg_catalog.cardinality(pg_catalog.array_positions("roles", 'EMPLOYEE')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("roles", 'MANAGER')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("roles", 'FINANCE')) <= 1) IS TRUE)
 );
 
 CREATE TABLE "model_procurement"."purchase_request" (
@@ -18,11 +18,11 @@ CREATE TABLE "model_procurement"."purchase_request" (
   "amount" numeric NOT NULL,
   "status" text NOT NULL DEFAULT 'DRAFT',
   "approved_by_id" uuid,
-  "approved_by_role" text,
+  "approved_by_roles" text[],
   CONSTRAINT "ck_purchase_request_amount_min_exclusive" CHECK (("amount" > 0) IS TRUE),
   CONSTRAINT "ck_purchase_request_status_enum" CHECK (("status" IN ('DRAFT', 'SUBMITTED', 'APPROVED')) IS TRUE),
-  CONSTRAINT "ck_purchase_request_approved_by_role_enum" CHECK ((("approved_by_role" IS NULL OR "approved_by_role" IN ('EMPLOYEE', 'MANAGER', 'FINANCE'))) IS TRUE),
-  CONSTRAINT "ck_purchase_request_approval_fields_match_status" CHECK (((((("status" = 'APPROVED') AND ("approved_by_id" IS NOT NULL)) AND ("approved_by_role" IS NOT NULL)) OR ((("status" <> 'APPROVED') AND ("approved_by_id" IS NULL)) AND ("approved_by_role" IS NULL)))) IS TRUE)
+  CONSTRAINT "ck_purchase_request_approved_by_roles_enum_set" CHECK (("approved_by_roles" IS NULL OR ("approved_by_roles" <@ ARRAY['EMPLOYEE', 'MANAGER', 'FINANCE']::text[] AND pg_catalog.array_position("approved_by_roles", NULL::text) IS NULL AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'EMPLOYEE')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'MANAGER')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'FINANCE')) <= 1)) IS TRUE),
+  CONSTRAINT "ck_purchase_request_approval_fields_match_status" CHECK (((((("status" = 'APPROVED') AND ("approved_by_id" IS NOT NULL)) AND ("approved_by_roles" IS NOT NULL)) OR ((("status" <> 'APPROVED') AND ("approved_by_id" IS NULL)) AND ("approved_by_roles" IS NULL)))) IS TRUE)
 );
 
 ALTER TABLE "model_procurement"."purchase_request"

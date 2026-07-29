@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.3.0",
-    "sourceHash": "sha256:3fdd77cdaa2d3b126da0af6ea47f93751c7944bf6e25a65dd90005db6f079261",
+    "version": "0.4.0",
+    "sourceHash": "sha256:223f7dedd038f85bf47df46127438b5fd6a3795e5195532524fd240955437c97",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -75,31 +75,31 @@
       }
     },
     {
-      "id": "required:User.role",
-      "purpose": "role is required.",
+      "id": "required:User.roles",
+      "purpose": "roles is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
-      "objectName": "model_procurement.user.role NOT NULL",
+      "objectName": "model_procurement.user.roles NOT NULL",
       "source": {
         "file": "examples/procurement.model",
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 14
+        "endColumn": 20
       }
     },
     {
-      "id": "enum-membership:User.role",
-      "purpose": "role must be a declared Role member.",
+      "id": "enum-set:User.roles",
+      "purpose": "roles is a duplicate-free set of declared Role members.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
-      "objectName": "ck_user_role_enum",
+      "objectName": "ck_user_roles_enum_set",
       "source": {
         "file": "examples/procurement.model",
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 14
+        "endColumn": 20
       }
     },
     {
@@ -271,36 +271,36 @@
       }
     },
     {
-      "id": "enum-membership:PurchaseRequest.approvedByRole",
-      "purpose": "approvedByRole must be a declared Role member.",
+      "id": "enum-set:PurchaseRequest.approvedByRoles",
+      "purpose": "approvedByRoles is a duplicate-free set of declared Role members.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
-      "objectName": "ck_purchase_request_approved_by_role_enum",
+      "objectName": "ck_purchase_request_approved_by_roles_enum_set",
       "source": {
         "file": "examples/procurement.model",
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 35
+        "endColumn": 41
       }
     },
     {
-      "id": "snapshot:PurchaseRequest.approvedByRole",
-      "purpose": "approvedByRole is a stored point-in-time audit snapshot, not a live relationship-derived value.",
+      "id": "snapshot:PurchaseRequest.approvedByRoles",
+      "purpose": "approvedByRoles is a stored point-in-time audit snapshot, not a live relationship-derived value.",
       "layer": "ModelLang storage semantics",
       "artifact": "model.ir.json",
-      "objectName": "field:PurchaseRequest.approvedByRole",
+      "objectName": "field:PurchaseRequest.approvedByRoles",
       "source": {
         "file": "examples/procurement.model",
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 35
+        "endColumn": 41
       }
     },
     {
       "id": "invariant:PurchaseRequest.approval_fields_match_status",
-      "purpose": "((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRole != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRole == null)))",
+      "purpose": "((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRoles != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRoles == null)))",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
       "objectName": "ck_purchase_request_approval_fields_match_status",
@@ -363,7 +363,7 @@
     },
     {
       "id": "authorize:openRequest",
-      "purpose": "(actor.role == Role.EMPLOYEE)",
+      "purpose": "(Role.EMPLOYEE in actor.roles)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
@@ -372,7 +372,7 @@
         "line": 50,
         "column": 13,
         "endLine": 50,
-        "endColumn": 40
+        "endColumn": 41
       }
     },
     {
@@ -510,7 +510,7 @@
     },
     {
       "id": "authorize:approveRequest",
-      "purpose": "(((request.amount <= 10000) and (actor.role == Role.MANAGER)) or ((request.amount > 10000) and (actor.role == Role.FINANCE)))",
+      "purpose": "(((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles)))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
@@ -519,7 +519,7 @@
         "line": 80,
         "column": 6,
         "endLine": 82,
-        "endColumn": 59
+        "endColumn": 60
       }
     },
     {

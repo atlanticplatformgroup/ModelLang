@@ -79,7 +79,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(approvedLow).toMatchObject({
       status: "APPROVED",
       approvedBy: "00000000-0000-4000-8000-000000000003",
-      approvedByRole: "MANAGER",
+      approvedByRoles: ["EMPLOYEE", "MANAGER"],
     });
 
     const high = await submittedRequest("25000");
@@ -88,8 +88,15 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(approvedHigh).toMatchObject({
       status: "APPROVED",
       approvedBy: "00000000-0000-4000-8000-000000000004",
-      approvedByRole: "FINANCE",
+      approvedByRoles: ["EMPLOYEE", "FINANCE"],
     });
+
+    const managerRequest = randomUUID();
+    await expect(clients.manager.openRequest({ id: managerRequest, amount: "25" })).resolves.toMatchObject({
+      id: managerRequest,
+      requester: "00000000-0000-4000-8000-000000000003",
+    });
+    expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest)).toBe(true);
   });
 
   it("returns only the authenticated caller's requests through the generated read boundary", async () => {
@@ -156,20 +163,20 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   it("uses the bidirectional approval invariant as a final backstop and audits successes", async () => {
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
-       (id, requester_id, amount, status, approved_by_id, approved_by_role)
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
        VALUES ($1, '00000000-0000-4000-8000-000000000001', 0, 'DRAFT', NULL, NULL)`,
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_amount_min_exclusive" });
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
-       (id, requester_id, amount, status, approved_by_id, approved_by_role)
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
        VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'APPROVED', NULL, NULL)`,
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_fields_match_status" });
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
-       (id, requester_id, amount, status, approved_by_id, approved_by_role)
-       VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'DRAFT', '00000000-0000-4000-8000-000000000003', 'MANAGER')`,
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
+       VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'DRAFT', '00000000-0000-4000-8000-000000000003', ARRAY['EMPLOYEE', 'MANAGER']::text[])`,
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_fields_match_status" });
 
@@ -189,18 +196,37 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     }]);
   });
 
-  it("persists an approval role snapshot after the source user role changes", async () => {
+  it("enforces valid duplicate-free enum sets while permitting an empty set", async () => {
+    for (const roles of [
+      ["EMPLOYEE", "EMPLOYEE"],
+      ["EMPLOYEE", "UNKNOWN"],
+      [null],
+    ]) {
+      await expect(admin.query(
+        `INSERT INTO model_procurement.user (id, name, roles) VALUES ($1, 'Invalid roles', $2::text[])`,
+        [randomUUID(), roles],
+      )).rejects.toMatchObject({ code: "23514", constraint: "ck_user_roles_enum_set" });
+    }
+    const emptyId = randomUUID();
+    await expect(admin.query(
+      `INSERT INTO model_procurement.user (id, name, roles) VALUES ($1, 'No roles', ARRAY[]::text[])`,
+      [emptyId],
+    )).resolves.toMatchObject({ rowCount: 1 });
+    await admin.query("DELETE FROM model_procurement.user WHERE id = $1", [emptyId]);
+  });
+
+  it("persists an approval role-set snapshot after the source user roles change", async () => {
     const request = await submittedRequest("5000");
     await clients.manager.approveRequest({ request });
     try {
-      await admin.query("UPDATE model_procurement.user SET role = 'EMPLOYEE' WHERE id = '00000000-0000-4000-8000-000000000003'");
-      const row = await admin.query<{ approved_by_role: string }>(
-        "SELECT approved_by_role FROM model_procurement.purchase_request WHERE id = $1",
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
+      const row = await admin.query<{ approved_by_roles: string[] }>(
+        "SELECT approved_by_roles FROM model_procurement.purchase_request WHERE id = $1",
         [request],
       );
-      expect(row.rows[0]!.approved_by_role).toBe("MANAGER");
+      expect(row.rows[0]!.approved_by_roles).toEqual(["EMPLOYEE", "MANAGER"]);
     } finally {
-      await admin.query("UPDATE model_procurement.user SET role = 'MANAGER' WHERE id = '00000000-0000-4000-8000-000000000003'");
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE', 'MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
     }
   });
 
@@ -234,7 +260,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     await manager.connect();
     try {
       await blocker.query("BEGIN");
-      await blocker.query("UPDATE model_procurement.user SET role = 'EMPLOYEE' WHERE id = '00000000-0000-4000-8000-000000000003'");
+      await blocker.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
       const pid = (await manager.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
       const approval = new ProcurementClient(manager).approveRequest({ request });
       await waitUntilLockWaiting([pid]);
@@ -244,7 +270,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await blocker.query("ROLLBACK").catch(() => undefined);
       blocker.release();
       await manager.end();
-      await admin.query("UPDATE model_procurement.user SET role = 'MANAGER' WHERE id = '00000000-0000-4000-8000-000000000003'");
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE', 'MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
     }
   });
 

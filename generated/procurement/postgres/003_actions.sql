@@ -34,7 +34,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
   END IF;
 
-  IF NOT (((v_actor."role" = 'EMPLOYEE')) IS TRUE) THEN
+  IF NOT ((('EMPLOYEE' = ANY(v_actor."roles"))) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:openRequest';
   END IF;
 
@@ -42,14 +42,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:openRequest.positive_amount';
   END IF;
 
-  INSERT INTO "model_procurement"."purchase_request" ("id", "requester_id", "amount", "status", "approved_by_id", "approved_by_role")
+  INSERT INTO "model_procurement"."purchase_request" ("id", "requester_id", "amount", "status", "approved_by_id", "approved_by_roles")
   VALUES ("p_id", v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
   RETURNING * INTO v_result;
 
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:openRequest', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 
@@ -118,7 +118,7 @@ BEGIN
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:submitRequest', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 
@@ -171,7 +171,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
   END IF;
 
-  IF NOT (((((v_request."amount" <= 10000) AND (v_actor."role" = 'MANAGER')) OR ((v_request."amount" > 10000) AND (v_actor."role" = 'FINANCE')))) IS TRUE) THEN
+  IF NOT (((((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles"))) OR ((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles"))))) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:approveRequest';
   END IF;
 
@@ -182,14 +182,14 @@ BEGIN
   UPDATE "model_procurement"."purchase_request"
   SET "status" = 'APPROVED',
       "approved_by_id" = v_actor."id",
-      "approved_by_role" = v_actor."role"
+      "approved_by_roles" = v_actor."roles"
   WHERE "id" = v_request."id"
   RETURNING * INTO v_result;
 
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:approveRequest', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 

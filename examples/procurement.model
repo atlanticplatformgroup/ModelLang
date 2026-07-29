@@ -1,4 +1,4 @@
-model Procurement version "0.3.0";
+model Procurement version "0.4.0";
 
 enum Role {
   EMPLOYEE,
@@ -15,7 +15,7 @@ enum RequestStatus {
 entity User {
   id: UUID @id;
   name: String;
-  role: Role;
+  roles: Set<Role>;
 }
 
 entity PurchaseRequest {
@@ -24,30 +24,30 @@ entity PurchaseRequest {
   amount: Decimal @minExclusive(0);
   status: RequestStatus = RequestStatus.DRAFT;
   approvedBy: User?;
-  approvedByRole: Role? @snapshot;
+  approvedByRoles: Set<Role>? @snapshot;
 
   invariant approval_fields_match_status:
     (
       status == RequestStatus.APPROVED
       and approvedBy != null
-      and approvedByRole != null
+      and approvedByRoles != null
     )
     or
     (
       status != RequestStatus.APPROVED
       and approvedBy == null
-      and approvedByRole == null
+      and approvedByRoles == null
     );
 }
 
-// Role is a single, mutually exclusive authorization role in this PoC.
-// Only EMPLOYEE principals may open requests; managers and finance users approve instead.
+// Roles are a set. Managers and finance users are also employees in the seed data,
+// so they may open requests and exercise their additional approval authority.
 action openRequest(
   caller actor: User,
   id: UUID,
   amount: Decimal
 ) -> PurchaseRequest {
-  authorize actor.role == Role.EMPLOYEE;
+  authorize Role.EMPLOYEE in actor.roles;
   require positive_amount: amount > 0;
 
   create PurchaseRequest {
@@ -56,7 +56,7 @@ action openRequest(
     amount = amount;
     status = RequestStatus.DRAFT;
     approvedBy = null;
-    approvedByRole = null;
+    approvedByRoles = null;
   }
 }
 
@@ -77,16 +77,16 @@ action approveRequest(
   request: PurchaseRequest
 ) -> PurchaseRequest {
   authorize
-    (request.amount <= 10000 and actor.role == Role.MANAGER)
+    (request.amount <= 10000 and Role.MANAGER in actor.roles)
     or
-    (request.amount > 10000 and actor.role == Role.FINANCE);
+    (request.amount > 10000 and Role.FINANCE in actor.roles);
 
   require is_submitted: request.status == RequestStatus.SUBMITTED;
 
   update request {
     status = RequestStatus.APPROVED;
     approvedBy = actor;
-    approvedByRole = actor.role;
+    approvedByRoles = actor.roles;
   }
 }
 

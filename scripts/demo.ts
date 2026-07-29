@@ -62,40 +62,46 @@ async function main(): Promise<void> {
     await manager.approveRequest({ request: low });
     line(7, "Manager login approves the 5,000 request", "PASS");
 
+    const managerOwned = randomUUID();
+    await manager.openRequest({ id: managerOwned, amount: "50" });
+    line(8, "Multi-role manager opens an employee request", "PASS");
+
     const high = randomUUID();
     await employee.openRequest({ id: high, amount: "25000" });
-    line(8, "Employee login opens a 25,000 request", "PASS");
+    line(9, "Employee login opens a 25,000 request", "PASS");
     await employee.submitRequest({ request: high });
-    line(9, "Owner employee login submits the request", "PASS");
+    line(10, "Owner employee login submits the request", "PASS");
     await expectError(manager.approveRequest({ request: high }), AuthorizationError);
-    line(10, "Manager login attempts to approve 25,000", "REJECTED as designed");
+    line(11, "Manager login attempts to approve 25,000", "REJECTED as designed");
     await finance.approveRequest({ request: high });
-    line(11, "Finance login approves 25,000", "PASS");
+    line(12, "Finance login approves 25,000", "PASS");
 
     const visible = await employee.myRequests({});
-    if (!visible.some((request) => request.id === low) || !visible.some((request) => request.id === high)) {
+    if (!visible.some((request) => request.id === low)
+      || !visible.some((request) => request.id === high)
+      || visible.some((request) => request.id === managerOwned)) {
       throw new Error("Caller-scoped query did not return the employee's requests");
     }
-    line(12, "Employee reads only through declared myRequests query", "PASS");
+    line(13, "Employee query excludes the manager's request", "PASS");
 
     await expectError(unbound.openRequest({ id: randomUUID(), amount: "10" }), IdentityBindingError);
-    line(13, "Unbound login attempts an action", "REJECTED as designed");
+    line(14, "Unbound login attempts an action", "REJECTED as designed");
     try {
       await employeePool.query("SELECT * FROM model_procurement.purchase_request");
       throw new Error("Direct select unexpectedly succeeded");
     } catch (error) {
       if ((error as { code?: string }).code !== "42501") throw error;
     }
-    line(14, "Application login attempts direct table SELECT", "REJECTED as designed");
+    line(15, "Application login attempts direct table SELECT", "REJECTED as designed");
     try {
       await employeePool.query("UPDATE model_procurement.purchase_request SET amount = 1 WHERE id = $1", [low]);
       throw new Error("Direct update unexpectedly succeeded");
     } catch (error) {
       if ((error as { code?: string }).code !== "42501") throw error;
     }
-    line(15, "Application login attempts direct table UPDATE", "REJECTED as designed");
+    line(16, "Application login attempts direct table UPDATE", "REJECTED as designed");
 
-    line(16, "Ontology rule -> identity/lock/enforcement mapping");
+    line(17, "Ontology rule -> identity/lock/enforcement mapping");
     process.stdout.write(`\n${enforcementText(ir)}\n`);
   } finally {
     await Promise.all([employeePool.end(), managerPool.end(), financePool.end(), unboundPool.end()]);

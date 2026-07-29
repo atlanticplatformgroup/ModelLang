@@ -7,7 +7,7 @@ export type RequestStatus = "DRAFT" | "SUBMITTED" | "APPROVED";
 export interface User {
   id: string;
   name: string;
-  role: Role;
+  roles: Role[];
 }
 
 export interface PurchaseRequest {
@@ -17,7 +17,7 @@ export interface PurchaseRequest {
   status: RequestStatus;
   approvedBy: string | null;
   /** Stored point-in-time snapshot; it is not re-derived from a related entity. */
-  approvedByRole: Role | null;
+  approvedByRoles: Role[] | null;
 }
 
 export interface OpenRequestInput {

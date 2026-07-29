@@ -37,13 +37,19 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
   for (const declaration of program.declarations) {
     if (declaration.kind === "entity") {
       for (const member of declaration.members) {
-        if (member.kind === "field" && !typeNames.has(member.type.name)) {
-          throw new ModelError("E2005", `Unknown type '${member.type.name}'.`, member.type.span, file);
+        if (member.kind === "field") {
+          if (member.type.collection === "set" && !program.declarations.some((candidate) => candidate.kind === "enum" && candidate.name === member.type.name)) {
+            throw new ModelError("E2701", `Set element type '${member.type.name}' must be a declared enum.`, member.type.span, file);
+          }
+          if (!typeNames.has(member.type.name)) {
+            throw new ModelError("E2005", `Unknown type '${member.type.name}'.`, member.type.span, file);
+          }
         }
       }
     }
     if (declaration.kind === "action") {
       for (const parameter of declaration.parameters) {
+        if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
         if (!typeNames.has(parameter.type.name)) throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
       }
       if (!entities.has(declaration.returnType.name)) {
@@ -52,6 +58,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     }
     if (declaration.kind === "query") {
       for (const parameter of declaration.parameters) {
+        if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
         if (!typeNames.has(parameter.type.name)) throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
       }
       if (!entities.has(declaration.sourceType.name)) {

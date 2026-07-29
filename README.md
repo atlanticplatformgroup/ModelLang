@@ -1,10 +1,10 @@
-# ModelLang 0.3 reference compiler
+# ModelLang 0.4 reference compiler
 
-ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR, constrained tables, authenticated actions, bounded authenticated queries, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR, constrained tables, authenticated actions, bounded authenticated queries, enum-set permissions, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
-- Procurement proves authenticated callers, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
+- Procurement proves authenticated callers, multi-role authorization, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
 - Reservations proves parameterized reads, temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
 
 ## Quick start
@@ -57,7 +57,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 3 retains qualified semantic IDs, typed expression trees, nullability, source spans, caller metadata, callable parameters, canonical lock plans, snapshot storage semantics, temporal exclusions, query policies, deterministic ordering, and result limits. Both committed subtrees are golden fixtures.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 4 retains qualified semantic IDs, typed expression trees, nullability, source spans, caller metadata, callable parameters, canonical lock plans, snapshot storage semantics, enum sets and membership, temporal exclusions, query policies, deterministic ordering, and result limits. Both committed subtrees are golden fixtures.
 
 The PostgreSQL backend emits:
 
@@ -79,9 +79,10 @@ Each generated subtree contains `model.mmd`, `enforcement.json`, and `enforcemen
 - A query declares one source entity, query-level authorization, a per-row `where` policy, a required direct ordering field, and a fixed limit from 1 through 1000. The compiler adds ascending primary-key order as a deterministic tie-breaker. Authorization and filtering both use `IS TRUE`, so false and SQL unknown fail closed.
 - Query entity parameters are callable UUIDs but must resolve to existing rows. Query functions use a statement-level MVCC snapshot and do not lock result rows or write action-audit records.
 - Invariants are exactly directional as written. The Procurement model uses `approval_fields_match_status`, which requires approval fields to be both populated exactly when a request is `APPROVED` and null for every other status.
-- `@snapshot` is valid only on stored scalar or enum entity fields and marks a point-in-time audit copy. The compiler never auto-populates it: an action must explicitly assign either `null` or a direct field value such as `actor.role`. That value is copied into the row; later changes to the source field do not propagate. ModelLang deliberately has no relationship traversal or computed relationship field syntax.
+- `@snapshot` is valid on stored scalar, enum, and enum-set entity fields and marks a point-in-time audit copy. The compiler never auto-populates it: an action must explicitly assign either `null` or a compatible direct field value such as `actor.roles`. That value is copied into the row; later changes to the source field do not propagate.
 - `PurchaseRequest.amount` uses `@minExclusive(0)`, so zero is never valid in storage. `openRequest` retains `positive_amount` as an action-level, named guard and clearer diagnostic; the two layers are intentionally defense in depth.
-- `Role` is a single, mutually exclusive authorization role in this proof of concept, not a job-title hierarchy. Therefore only `EMPLOYEE` principals may open requests. Supporting employees who also hold manager or finance permissions requires the next language boundary: role sets or a dedicated permission relation.
+- `Set<Role>` stores multiple duplicate-free enum members. `Role.EMPLOYEE in actor.roles` is a typed membership policy that lowers to fail-closed database enforcement. Managers and finance users in the canonical seed are also employees, so they may open requests while retaining their approval permissions.
+- Enum sets are unordered domain values represented as constrained PostgreSQL `text[]` and generated TypeScript enum arrays. Unknown, null, and duplicate members are rejected by named constraints.
 - `noOverlap(resource, startsAt, endsAt)` defines required half-open intervals `[start, end)`. Adjacent reservations are legal; overlapping intervals for the same entity identity are rejected atomically. The PostgreSQL backend emits a strict interval check and GiST exclusion constraint.
 
 ## Security guarantee and trust boundary
@@ -112,7 +113,7 @@ Read queries evaluate authorization before scanning result rows, apply their row
 The integration suite proves concurrency with transaction barriers and observed `pg_stat_activity` lock waits:
 
 - a request amount changed while approval waits is re-read and re-authorized;
-- a manager role changed while approval waits is re-read and re-authorized;
+- a manager role set changed while approval waits is re-read and re-authorized;
 - two concurrent approvals yield exactly one success, one failed precondition, and one audit record.
 - a concurrent overlapping reservation waits on PostgreSQL’s exclusion constraint, then exactly one reservation and audit record survive.
 
@@ -139,6 +140,7 @@ The full suite validates parsing and spans, duplicate and unknown declarations, 
 - One PostgreSQL login per demo user is the identity adapter. A production gateway may replace it only if callers still cannot choose arbitrary principal IDs.
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
+- Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.3 language is in [spec/0.3/LANGUAGE.md](./spec/0.3/LANGUAGE.md), with its [query semantics](./spec/0.3/QUERIES.md), [grammar](./spec/0.3/GRAMMAR.ebnf), [conformance requirements](./spec/0.3/CONFORMANCE.md), and [unstable boundaries](./spec/0.3/UNSTABLE.md). The [0.2 core](./spec/0.2/LANGUAGE.md) remains normative where 0.3 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.4 language is in [spec/0.4/LANGUAGE.md](./spec/0.4/LANGUAGE.md), with its [enum-set semantics](./spec/0.4/SETS.md), [grammar](./spec/0.4/GRAMMAR.ebnf), [conformance requirements](./spec/0.4/CONFORMANCE.md), and [unstable boundaries](./spec/0.4/UNSTABLE.md). The [0.3 language](./spec/0.3/LANGUAGE.md) remains normative where 0.4 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

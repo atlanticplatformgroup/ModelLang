@@ -30,6 +30,7 @@ function fieldById(ir: ModelIR, id: string): { entity: IREntity; field: IRField 
 
 function sqlType(type: string): string {
   if (type.startsWith("entity:")) return "uuid";
+  if (type.startsWith("set:enum:")) return "text[]";
   if (type.startsWith("enum:")) return "text";
   const types: Record<string, string> = {
     String: "text", Int: "bigint", Decimal: "numeric", Boolean: "boolean", UUID: "uuid", DateTime: "timestamptz",
@@ -81,13 +82,16 @@ function lowerExpression(expression: IRExpression, context: ExpressionContext): 
     }
     case "unary": return `(NOT ${lowerExpression(expression.operand, context)})`;
     case "binary":
+      if (expression.operator === "in") {
+        return `(${lowerExpression(expression.left, context)} = ANY(${lowerExpression(expression.right, context)}))`;
+      }
       return `(${lowerExpression(expression.left, context)} ${sqlOperator(expression.operator)} ${lowerExpression(expression.right, context)})`;
     case "nullComparison":
       return `(${lowerExpression(expression.operand, context)} ${expression.operator === "isNull" ? "IS NULL" : "IS NOT NULL"})`;
   }
 }
 
-function sqlOperator(operator: Extract<IRExpression, { kind: "binary" }>["operator"]): string {
+function sqlOperator(operator: Exclude<Extract<IRExpression, { kind: "binary" }>["operator"], "in">): string {
   return ({ and: "AND", or: "OR", "==": "=", "!=": "<>", "<": "<", "<=": "<=", ">": ">", ">=": ">=" } as const)[operator];
 }
 
@@ -135,6 +139,19 @@ function generateSchema(ir: ModelIR): string {
     });
     const constraints: string[] = [];
     for (const field of entity.fields) {
+      if (field.type.startsWith("set:enum:")) {
+        const enumId = `enum:${field.type.slice("set:enum:".length)}`;
+        const enumeration = ir.enums.find((candidate) => candidate.id === enumId)!;
+        const column = quoteIdent(field.naming.sqlColumn);
+        const members = enumeration.members.map((member) => `'${member.replaceAll("'", "''")}'`);
+        const tests = [
+          `${column} <@ ARRAY[${members.join(", ")}]::text[]`,
+          `pg_catalog.array_position(${column}, NULL::text) IS NULL`,
+          ...members.map((member) => `pg_catalog.cardinality(pg_catalog.array_positions(${column}, ${member})) <= 1`),
+        ];
+        const test = tests.join(" AND ");
+        constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
+      }
       if (field.type.startsWith("enum:")) {
         const enumeration = ir.enums.find((candidate) => candidate.id === field.type)!;
         const members = enumeration.members.map((member) => `'${member.replaceAll("'", "''")}'`).join(", ");
@@ -513,11 +530,11 @@ RESET ROLE;
   return `-- Example-only deterministic seed. Demo login roles must exist before applying this file.
 SET ROLE modellang_owner;
 
-INSERT INTO ${qname(schema, "user")} (${quoteIdent("id")}, ${quoteIdent("name")}, ${quoteIdent("role")}) VALUES
-  ('00000000-0000-4000-8000-000000000001', 'Employee One', 'EMPLOYEE'),
-  ('00000000-0000-4000-8000-000000000002', 'Employee Two', 'EMPLOYEE'),
-  ('00000000-0000-4000-8000-000000000003', 'Manager', 'MANAGER'),
-  ('00000000-0000-4000-8000-000000000004', 'Finance', 'FINANCE');
+INSERT INTO ${qname(schema, "user")} (${quoteIdent("id")}, ${quoteIdent("name")}, ${quoteIdent("roles")}) VALUES
+  ('00000000-0000-4000-8000-000000000001', 'Employee One', ARRAY['EMPLOYEE']::text[]),
+  ('00000000-0000-4000-8000-000000000002', 'Employee Two', ARRAY['EMPLOYEE']::text[]),
+  ('00000000-0000-4000-8000-000000000003', 'Manager', ARRAY['EMPLOYEE', 'MANAGER']::text[]),
+  ('00000000-0000-4000-8000-000000000004', 'Finance', ARRAY['EMPLOYEE', 'FINANCE']::text[]);
 
 INSERT INTO ${qname(internal, "principal_binding")} (${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}) VALUES
   ('ml_employee_one', '00000000-0000-4000-8000-000000000001'),

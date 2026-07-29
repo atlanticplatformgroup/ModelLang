@@ -6,7 +6,7 @@ import type {
 } from "./syntax-ast.js";
 
 const binaryPrecedence: Partial<Record<string, number>> = {
-  or: 1, and: 2, "==": 3, "!=": 3, "<": 3, "<=": 3, ">": 3, ">=": 3,
+  or: 1, and: 2, "==": 3, "!=": 3, "<": 3, "<=": 3, ">": 3, ">=": 3, in: 3,
 };
 
 export function parse(source: string, file = "<source>"): Program {
@@ -96,6 +96,13 @@ class Parser {
   }
 
   private parseTypeRef(): TypeRef {
+    if (this.atWord("Set")) {
+      const start = this.take();
+      this.expect("<");
+      const element = this.identifier("Expected an enum type inside Set<...>.");
+      const end = this.expect(">");
+      return { name: element.text, collection: "set", span: this.span(start, end) };
+    }
     const token = this.identifier("Expected a type name.");
     return { name: token.text, span: token.span };
   }
@@ -297,7 +304,7 @@ class Parser {
   private parseUnary(): Expression {
     if (this.atWord("not")) {
       const start = this.take();
-      const operand = this.parseUnary();
+      const operand = this.parseExpression(3);
       return { kind: "unary", operator: "not", operand, span: this.span(start, operand.span) };
     }
     return this.parsePrimary();
