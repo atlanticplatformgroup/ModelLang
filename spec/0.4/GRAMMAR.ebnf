@@ -1,0 +1,7 @@
+type_ref         = scalar_type | IDENT | set_type ;
+set_type         = "Set", "<", IDENT, ">" ;
+
+comparison       = primary, [ comparison_op, primary ] ;
+comparison_op    = "==" | "!=" | "<" | "<=" | ">" | ">=" | "in" ;
+
+All productions not replaced above are inherited from the ModelLang 0.3 grammar.
