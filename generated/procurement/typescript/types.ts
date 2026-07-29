@@ -33,3 +33,6 @@ export interface ApproveRequestInput {
   request: string;
 }
 
+export interface MyRequestsInput {
+}
+

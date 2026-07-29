@@ -138,9 +138,9 @@ describe("ModelLang 0.2 temporal exclusions", () => {
       create Reservation { id = id; resource = resource; startsAt = startsAt; endsAt = endsAt; }
     }`;
 
-  it("lowers a half-open no-overlap rule into IR version 2", () => {
+  it("preserves half-open no-overlap rules in IR version 3", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(2);
+    expect(ir.irVersion).toBe(3);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -159,5 +159,83 @@ describe("ModelLang 0.2 temporal exclusions", () => {
     ["reused interval field", "exclusion no_overlap: noOverlap(resource, startsAt, startsAt);", "E2504"],
   ])("rejects %s", (_name, exclusion, code) => {
     expect(failure(reservationSource(exclusion)).code).toBe(code);
+  });
+});
+
+describe("ModelLang 0.3 authenticated queries", () => {
+  const query = (body: string) => minimal(body);
+
+  it("lowers a bounded caller-scoped query and keeps the caller out of its ABI", () => {
+    const ir = compileText(query(`query owned(caller actor: User) from Item as item {
+      authorize true;
+      where item.owner == actor;
+      orderBy item.id desc;
+      limit 25;
+    }`), "query.model");
+    const resolved = ir.queries[0]!;
+    expect(ir.irVersion).toBe(3);
+    expect(resolved).toMatchObject({
+      id: "query:owned",
+      callerParameterId: "parameter:owned.actor",
+      callableParameters: [],
+      sourceEntityId: "entity:Item",
+      rowAlias: "item",
+      limit: 25,
+      orderBy: {
+        fieldId: "field:Item.id",
+        direction: "desc",
+        identityTieBreaker: true,
+      },
+      rowPolicy: {
+        expression: {
+          kind: "binary",
+          comparisonSemantics: "entityIdentity",
+          left: { kind: "fieldAccess", source: "queryRow" },
+          right: { kind: "entityValue", entityId: "entity:User" },
+        },
+      },
+    });
+    expect(resolved.parameters[0]).toMatchObject({ caller: true, binding: "session_user" });
+    for (const id of [
+      "caller:owned.actor",
+      "authorize:owned",
+      "where:owned",
+      "order:owned",
+      "limit:owned",
+      "read:owned",
+      "boundary:Item.direct_read",
+    ]) expect(ir.enforcement.some((entry) => entry.id === id), id).toBe(true);
+  });
+
+  it("parses query clauses in their required order", () => {
+    const program = parse(query(`query all(caller actor: User) from Item as item {
+      authorize true;
+      where item.value > 0;
+      orderBy item.value asc;
+      limit 10;
+    }`));
+    expect(program.declarations.find((declaration) => declaration.kind === "query")).toMatchObject({
+      kind: "query",
+      name: "all",
+      sourceType: { name: "Item" },
+      rowAlias: { name: "item" },
+      orderBy: { path: ["item", "value"], direction: "asc" },
+      limit: 10,
+    });
+  });
+
+  it.each([
+    ["missing caller", `query q(actor: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 10; }`, "E2602"],
+    ["scalar caller", `query q(caller actor: UUID) from Item as item { authorize true; where true; orderBy item.id asc; limit 10; }`, "E2603"],
+    ["row-dependent authorization", `query q(caller actor: User) from Item as item { authorize item.owner == actor; where true; orderBy item.id asc; limit 10; }`, "E2610"],
+    ["non-Boolean row policy", `query q(caller actor: User) from Item as item { authorize true; where item.value; orderBy item.id asc; limit 10; }`, "E2414"],
+    ["optional ordering", `query q(caller actor: User) from Item as item { authorize true; where true; orderBy item.optionalFlag asc; limit 10; }`, "E2608"],
+    ["wrong ordering alias", `query q(caller actor: User) from Item as item { authorize true; where true; orderBy actor.id asc; limit 10; }`, "E2606"],
+    ["zero limit", `query q(caller actor: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 0; }`, "E2609"],
+    ["fractional limit", `query q(caller actor: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 1.5; }`, "E2609"],
+    ["excessive limit", `query q(caller actor: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 1001; }`, "E2609"],
+    ["alias collision", `query q(caller item: User) from Item as item { authorize true; where true; orderBy item.id asc; limit 10; }`, "E2605"],
+  ])("rejects %s", (_name, body, code) => {
+    expect(failure(query(body)).code).toBe(code);
   });
 });

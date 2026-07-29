@@ -34,7 +34,7 @@ export async function resetGeneratedSchemas(): Promise<void> {
 
 export async function applyGeneratedSql(options: { includeSeed?: boolean; directory?: string } = {}): Promise<void> {
   const directory = resolve(options.directory ?? "generated/procurement/postgres");
-  const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "004_grants.sql"];
+  const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "003_queries.sql", "004_grants.sql"];
   if (options.includeSeed) files.push("005_seed.sql");
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();

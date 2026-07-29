@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04377aa`
+Source hash: `sha256:3fdd77cdaa2d3b126da0af6ea47f93751c7944bf6e25a65dd90005db6f079261`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -13,6 +13,7 @@ Source hash: `sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04
 | `required:User.role` | role is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_procurement.user.role NOT NULL` | examples/procurement.model:18:3 |
 | `enum-membership:User.role` | role must be a declared Role member. | PostgreSQL constraint | `postgres/002_schema.sql`: `ck_user_role_enum` | examples/procurement.model:18:3 |
 | `boundary:User.direct_write` | Application principals cannot directly mutate entity rows. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.user` | examples/procurement.model:15:1 |
+| `boundary:User.direct_read` | Application principals cannot directly read entity rows outside generated queries. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.user` | examples/procurement.model:15:1 |
 | `required:PurchaseRequest.id` | id is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_procurement.purchase_request.id NOT NULL` | examples/procurement.model:22:3 |
 | `annotation:PurchaseRequest.id.id` | Enforce @id. | PostgreSQL primary key | `postgres/002_schema.sql`: `purchase_request_pkey` | examples/procurement.model:22:3 |
 | `required:PurchaseRequest.requester` | requester is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_procurement.purchase_request.requester_id NOT NULL` | examples/procurement.model:23:3 |
@@ -27,6 +28,7 @@ Source hash: `sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04
 | `snapshot:PurchaseRequest.approvedByRole` | approvedByRole is a stored point-in-time audit snapshot, not a live relationship-derived value. | ModelLang storage semantics | `model.ir.json`: `field:PurchaseRequest.approvedByRole` | examples/procurement.model:27:3 |
 | `invariant:PurchaseRequest.approval_fields_match_status` | ((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRole != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRole == null))) | PostgreSQL constraint | `postgres/002_schema.sql`: `ck_purchase_request_approval_fields_match_status` | examples/procurement.model:29:3 |
 | `boundary:PurchaseRequest.direct_write` | Application principals cannot directly mutate entity rows. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.purchase_request` | examples/procurement.model:21:1 |
+| `boundary:PurchaseRequest.direct_read` | Application principals cannot directly read entity rows outside generated queries. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.purchase_request` | examples/procurement.model:21:1 |
 | `caller:openRequest.actor` | Derive the semantic caller from session_user; no caller UUID is accepted. | PostgreSQL session identity | `postgres/003_actions.sql`: `model_procurement.open_request` | examples/procurement.model:46:3 |
 | `boundary:openRequest.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_actions.sql`: `model_procurement.open_request search_path=pg_catalog,pg_temp` | compiler-derived |
 | `authorize:openRequest` | (actor.role == Role.EMPLOYEE) | PostgreSQL action guard | `postgres/003_actions.sql`: `model_procurement.open_request` | examples/procurement.model:50:13 |
@@ -47,4 +49,11 @@ Source hash: `sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04
 | `effect:approveRequest` | update entity:PurchaseRequest. | PostgreSQL action function | `postgres/003_actions.sql`: `model_procurement.approve_request` | examples/procurement.model:75:1 |
 | `lock:approveRequest.request` | Stabilize parameter:approveRequest.request before evaluating guards and effects. | PostgreSQL row lock | `postgres/003_actions.sql`: `FOR UPDATE in model_procurement.approve_request` | compiler-derived |
 | `lock:approveRequest.actor` | Stabilize caller before evaluating guards and effects. | PostgreSQL row lock | `postgres/003_actions.sql`: `FOR SHARE in model_procurement.approve_request` | compiler-derived |
+| `caller:myRequests.actor` | Derive the semantic caller from session_user; no caller UUID is accepted. | PostgreSQL session identity | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:94:3 |
+| `boundary:myRequests.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_procurement.my_requests search_path=pg_catalog,pg_temp` | compiler-derived |
+| `authorize:myRequests` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:96:13 |
+| `where:myRequests` | (request.requester == actor) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:97:9 |
+| `order:myRequests` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:93:1 |
+| `limit:myRequests` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:93:1 |
+| `read:myRequests` | Read entity:PurchaseRequest through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:93:1 |
 | `boundary:audit` | Record each successful action with database and model principal identities. | PostgreSQL audit | `postgres/003_actions.sql`: `model_procurement_internal.action_audit` | compiler-derived |

@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const file = resolve(fileArg);
   const ir = await compileFile(file);
   if (command === "check") {
-    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions)\n`);
+    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions, ${ir.queries.length} queries)\n`);
     return;
   }
   if (command === "print-ir") {

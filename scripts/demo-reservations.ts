@@ -43,7 +43,12 @@ async function main(): Promise<void> {
     }).catch((error: unknown) => error);
     if (!(conflict instanceof ConflictError)) throw new Error("Overlapping reservation unexpectedly succeeded");
     line(5, "Attempt overlapping reservation from 10:30 to 11:30", "REJECTED as designed");
-    line(6, "Temporal rule -> PostgreSQL enforcement mapping");
+    const visible = await first.reservationsForResource({ resource });
+    if (visible.length !== 2 || visible.some((reservation) => reservation.resource !== resource)) {
+      throw new Error("Resource-scoped query returned an unexpected result");
+    }
+    line(6, "Read Conference Room A through declared resource query", "PASS");
+    line(7, "Temporal/read rules -> PostgreSQL enforcement mapping");
     process.stdout.write(`\n${enforcementText(ir)}\n`);
   } finally {
     await Promise.all([firstPool.end(), secondPool.end()]);

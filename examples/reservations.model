@@ -1,4 +1,4 @@
-model Reservations version "0.2.0";
+model Reservations version "0.3.0";
 
 entity User {
   id: UUID @id;
@@ -38,4 +38,14 @@ action reserve(
     startsAt = startsAt;
     endsAt = endsAt;
   }
+}
+
+query reservationsForResource(
+  caller actor: User,
+  resource: Resource
+) from Reservation as reservation {
+  authorize true;
+  where reservation.resource == resource;
+  orderBy reservation.startsAt asc;
+  limit 100;
 }

@@ -126,6 +126,26 @@ export interface IRAction {
   naming: { sqlFunction: string; typescriptMethod: string };
 }
 
+export interface IRQuery {
+  id: string;
+  name: string;
+  parameters: IRParameter[];
+  callerParameterId: string;
+  callableParameters: string[];
+  sourceEntityId: string;
+  rowAlias: string;
+  authorization: IRRule;
+  rowPolicy: IRRule;
+  orderBy: {
+    fieldId: string;
+    direction: "asc" | "desc";
+    identityTieBreaker: true;
+  };
+  limit: number;
+  span: IRSpan;
+  naming: { sqlFunction: string; typescriptMethod: string };
+}
+
 export interface EnforcementEntry {
   id: string;
   purpose: string;
@@ -136,7 +156,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 2;
+  irVersion: 3;
   model: {
     id: string;
     name: string;
@@ -149,6 +169,7 @@ export interface ModelIR {
   enums: IREnum[];
   entities: IREntity[];
   actions: IRAction[];
+  queries: IRQuery[];
   enforcement: EnforcementEntry[];
 }
 

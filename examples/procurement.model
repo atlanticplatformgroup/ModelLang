@@ -1,4 +1,4 @@
-model Procurement version "0.1.0";
+model Procurement version "0.3.0";
 
 enum Role {
   EMPLOYEE,
@@ -88,4 +88,13 @@ action approveRequest(
     approvedBy = actor;
     approvedByRole = actor.role;
   }
+}
+
+query myRequests(
+  caller actor: User
+) from PurchaseRequest as request {
+  authorize true;
+  where request.requester == actor;
+  orderBy request.id asc;
+  limit 100;
 }

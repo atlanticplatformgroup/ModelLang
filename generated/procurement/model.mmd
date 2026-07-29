@@ -27,3 +27,8 @@ flowchart LR
   require_approveRequest_is_submitted["Require: is_submitted"] -->|guards| action_approveRequest
   action_approveRequest -->|locks update| entity_PurchaseRequest
   action_approveRequest -->|locks share| entity_User
+  query_myRequests["Query: myRequests"]
+  principal -->|authenticated caller| query_myRequests
+  query_myRequests -->|reads| entity_PurchaseRequest
+  authorize_myRequests["Authorize"] -->|guards| query_myRequests
+  where_myRequests["Where"] -->|filters rows| query_myRequests

@@ -1,10 +1,10 @@
 {
-  "irVersion": 2,
+  "irVersion": 3,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.2.0",
-    "sourceHash": "sha256:386da6e420628329e1e9d39ef20fe2ba412f2a6bc7291517e7a7cbff44b7aad5",
+    "version": "0.3.0",
+    "sourceHash": "sha256:12cb8d05abda4323a27b8dc9ccf8eaad692e95e651b05fb4f094d1a00261c509",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -524,6 +524,126 @@
       }
     }
   ],
+  "queries": [
+    {
+      "id": "query:reservationsForResource",
+      "name": "reservationsForResource",
+      "parameters": [
+        {
+          "id": "parameter:reservationsForResource.actor",
+          "name": "actor",
+          "type": "entity:User",
+          "caller": true,
+          "binding": "session_user",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 44,
+            "column": 3,
+            "endLine": 44,
+            "endColumn": 21
+          },
+          "naming": {
+            "sqlParameter": "p_actor",
+            "typescriptProperty": "actor"
+          }
+        },
+        {
+          "id": "parameter:reservationsForResource.resource",
+          "name": "resource",
+          "type": "entity:Resource",
+          "caller": false,
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 45,
+            "column": 3,
+            "endLine": 45,
+            "endColumn": 21
+          },
+          "naming": {
+            "sqlParameter": "p_resource",
+            "typescriptProperty": "resource"
+          }
+        }
+      ],
+      "callerParameterId": "parameter:reservationsForResource.actor",
+      "callableParameters": [
+        "parameter:reservationsForResource.resource"
+      ],
+      "sourceEntityId": "entity:Reservation",
+      "rowAlias": "reservation",
+      "authorization": {
+        "id": "authorize:reservationsForResource",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "span": {
+          "file": "examples/reservations.model",
+          "line": 47,
+          "column": 13,
+          "endLine": 47,
+          "endColumn": 17
+        }
+      },
+      "rowPolicy": {
+        "id": "where:reservationsForResource",
+        "name": "where",
+        "expression": {
+          "kind": "binary",
+          "operator": "==",
+          "left": {
+            "kind": "fieldAccess",
+            "source": "queryRow",
+            "parameter": "reservation",
+            "fieldId": "field:Reservation.resource",
+            "fieldName": "resource",
+            "type": "entity:Resource",
+            "nullable": false
+          },
+          "right": {
+            "kind": "entityValue",
+            "parameterId": "parameter:reservationsForResource.resource",
+            "name": "resource",
+            "entityId": "entity:Resource",
+            "type": "entity:Resource",
+            "nullable": false
+          },
+          "type": "Boolean",
+          "nullable": false,
+          "comparisonSemantics": "entityIdentity"
+        },
+        "sourceExpression": "(reservation.resource == resource)",
+        "span": {
+          "file": "examples/reservations.model",
+          "line": 48,
+          "column": 9,
+          "endLine": 48,
+          "endColumn": 41
+        }
+      },
+      "orderBy": {
+        "fieldId": "field:Reservation.startsAt",
+        "direction": "asc",
+        "identityTieBreaker": true
+      },
+      "limit": 100,
+      "span": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      },
+      "naming": {
+        "sqlFunction": "reservations_for_resource",
+        "typescriptMethod": "reservationsForResource"
+      }
+    }
+  ],
   "enforcement": [
     {
       "id": "boundary:principal_binding",
@@ -603,6 +723,20 @@
       }
     },
     {
+      "id": "boundary:User.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.user",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 3,
+        "column": 1,
+        "endLine": 6,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "required:Resource.id",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
@@ -661,6 +795,20 @@
     {
       "id": "boundary:Resource.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 8,
+        "column": 1,
+        "endLine": 11,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "boundary:Resource.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_reservations.resource",
@@ -827,6 +975,20 @@
       }
     },
     {
+      "id": "boundary:Reservation.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.reservation",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 13,
+        "column": 1,
+        "endLine": 22,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "caller:reserve.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
@@ -902,6 +1064,97 @@
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_reservations.reserve"
+    },
+    {
+      "id": "caller:reservationsForResource.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 44,
+        "column": 3,
+        "endLine": 44,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:reservationsForResource.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:reservationsForResource",
+      "purpose": "true",
+      "layer": "PostgreSQL query guard",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 13,
+        "endLine": 47,
+        "endColumn": 17
+      }
+    },
+    {
+      "id": "where:reservationsForResource",
+      "purpose": "(reservation.resource == resource)",
+      "layer": "PostgreSQL row policy",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 48,
+        "column": 9,
+        "endLine": 48,
+        "endColumn": 41
+      }
+    },
+    {
+      "id": "order:reservationsForResource",
+      "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "limit:reservationsForResource",
+      "purpose": "Return at most 100 rows.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "read:reservationsForResource",
+      "purpose": "Read entity:Reservation through the generated query boundary.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
     },
     {
       "id": "boundary:audit",

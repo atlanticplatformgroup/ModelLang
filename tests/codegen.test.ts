@@ -76,21 +76,41 @@ describe("backends", () => {
   it("never exposes an actor argument in SQL or TypeScript callable APIs", async () => {
     const output = generateAll(await procurement());
     const actions = output["postgres/003_actions.sql"];
+    const queries = output["postgres/003_queries.sql"];
     const client = output["typescript/client.ts"];
     const types = output["typescript/types.ts"];
     expect(actions).not.toMatch(/"p_actor"/);
+    expect(queries).not.toMatch(/"p_actor"/);
     expect(client).not.toMatch(/input\.actor|actor:/);
     expect(types).not.toMatch(/\n  actor:/);
     expect(actions).toContain("session_user");
+    expect(queries).toContain("session_user");
     expect(actions).toContain('v_actor."id" = v_request."requester_id"');
   });
 
-  it("emits safe privileged functions and restricted grants", async () => {
+  it("emits safe privileged functions and an execute-only application boundary", async () => {
     const output = generateAll(await procurement());
     expect(output["postgres/003_actions.sql"]).toContain("SECURITY DEFINER");
     expect(output["postgres/003_actions.sql"]).toContain("SET search_path = pg_catalog, pg_temp");
     expect(output["postgres/003_actions.sql"]).not.toContain("EXECUTE ");
-    expect(output["postgres/004_grants.sql"]).toContain("REVOKE INSERT, UPDATE, DELETE, TRUNCATE");
+    expect(output["postgres/003_queries.sql"]).toContain("SECURITY DEFINER");
+    expect(output["postgres/003_queries.sql"]).toContain("SET search_path = pg_catalog, pg_temp");
+    expect(output["postgres/004_grants.sql"]).toContain('REVOKE ALL ON TABLE "model_procurement"."purchase_request"');
+    expect(output["postgres/004_grants.sql"]).not.toContain("GRANT SELECT");
+    expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement"."my_requests"()');
+  });
+
+  it("generates fail-closed, deterministic, bounded query SQL and typed clients", async () => {
+    const output = generateAll(await procurement());
+    const sql = output["postgres/003_queries.sql"];
+    expect(sql).toContain('CREATE FUNCTION "model_procurement"."my_requests"()');
+    expect(sql).toContain('WHERE (((v_row."requester_id" = v_actor."id")) IS TRUE)');
+    expect(sql).toContain('ORDER BY v_row."id" ASC, v_row."id" ASC');
+    expect(sql).toContain("LIMIT 100");
+    expect(sql).not.toMatch(/FOR (?:UPDATE|NO KEY UPDATE)/);
+    expect(output["typescript/types.ts"]).toContain("export interface MyRequestsInput");
+    expect(output["typescript/types.ts"]).not.toMatch(/interface MyRequestsInput \{\n  actor:/);
+    expect(output["typescript/client.ts"]).toContain("async myRequests(input: MyRequestsInput): Promise<PurchaseRequest[]>");
   });
 
   it("explains identity, locks, invariants, guards, effects, and privilege boundaries", async () => {
@@ -103,6 +123,11 @@ describe("backends", () => {
       "require:approveRequest.is_submitted",
       "lock:approveRequest.request",
       "boundary:PurchaseRequest.direct_write",
+      "boundary:PurchaseRequest.direct_read",
+      "where:myRequests",
+      "order:myRequests",
+      "limit:myRequests",
+      "read:myRequests",
       "boundary:audit",
     ]) expect(markdown).toContain(expected);
   });

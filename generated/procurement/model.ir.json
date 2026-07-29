@@ -1,10 +1,10 @@
 {
-  "irVersion": 2,
+  "irVersion": 3,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.1.0",
-    "sourceHash": "sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04377aa",
+    "version": "0.3.0",
+    "sourceHash": "sha256:3fdd77cdaa2d3b126da0af6ea47f93751c7944bf6e25a65dd90005db6f079261",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1088,6 +1088,107 @@
       }
     }
   ],
+  "queries": [
+    {
+      "id": "query:myRequests",
+      "name": "myRequests",
+      "parameters": [
+        {
+          "id": "parameter:myRequests.actor",
+          "name": "actor",
+          "type": "entity:User",
+          "caller": true,
+          "binding": "session_user",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 94,
+            "column": 3,
+            "endLine": 94,
+            "endColumn": 21
+          },
+          "naming": {
+            "sqlParameter": "p_actor",
+            "typescriptProperty": "actor"
+          }
+        }
+      ],
+      "callerParameterId": "parameter:myRequests.actor",
+      "callableParameters": [],
+      "sourceEntityId": "entity:PurchaseRequest",
+      "rowAlias": "request",
+      "authorization": {
+        "id": "authorize:myRequests",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "span": {
+          "file": "examples/procurement.model",
+          "line": 96,
+          "column": 13,
+          "endLine": 96,
+          "endColumn": 17
+        }
+      },
+      "rowPolicy": {
+        "id": "where:myRequests",
+        "name": "where",
+        "expression": {
+          "kind": "binary",
+          "operator": "==",
+          "left": {
+            "kind": "fieldAccess",
+            "source": "queryRow",
+            "parameter": "request",
+            "fieldId": "field:PurchaseRequest.requester",
+            "fieldName": "requester",
+            "type": "entity:User",
+            "nullable": false
+          },
+          "right": {
+            "kind": "entityValue",
+            "parameterId": "parameter:myRequests.actor",
+            "name": "actor",
+            "entityId": "entity:User",
+            "type": "entity:User",
+            "nullable": false
+          },
+          "type": "Boolean",
+          "nullable": false,
+          "comparisonSemantics": "entityIdentity"
+        },
+        "sourceExpression": "(request.requester == actor)",
+        "span": {
+          "file": "examples/procurement.model",
+          "line": 97,
+          "column": 9,
+          "endLine": 97,
+          "endColumn": 35
+        }
+      },
+      "orderBy": {
+        "fieldId": "field:PurchaseRequest.id",
+        "direction": "asc",
+        "identityTieBreaker": true
+      },
+      "limit": 100,
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 93,
+        "column": 1,
+        "endLine": 100,
+        "endColumn": 2
+      },
+      "naming": {
+        "sqlFunction": "my_requests",
+        "typescriptMethod": "myRequests"
+      }
+    }
+  ],
   "enforcement": [
     {
       "id": "boundary:principal_binding",
@@ -1183,6 +1284,20 @@
     {
       "id": "boundary:User.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_procurement.user",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 15,
+        "column": 1,
+        "endLine": 19,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "boundary:User.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_procurement.user",
@@ -1379,6 +1494,20 @@
     {
       "id": "boundary:PurchaseRequest.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_procurement.purchase_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 21,
+        "column": 1,
+        "endLine": 41,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "boundary:PurchaseRequest.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_procurement.purchase_request",
@@ -1613,6 +1742,97 @@
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.approve_request"
+    },
+    {
+      "id": "caller:myRequests.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 94,
+        "column": 3,
+        "endLine": 94,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:myRequests.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:myRequests",
+      "purpose": "true",
+      "layer": "PostgreSQL query guard",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 96,
+        "column": 13,
+        "endLine": 96,
+        "endColumn": 17
+      }
+    },
+    {
+      "id": "where:myRequests",
+      "purpose": "(request.requester == actor)",
+      "layer": "PostgreSQL row policy",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 97,
+        "column": 9,
+        "endLine": 97,
+        "endColumn": 35
+      }
+    },
+    {
+      "id": "order:myRequests",
+      "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 93,
+        "column": 1,
+        "endLine": 100,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "limit:myRequests",
+      "purpose": "Return at most 100 rows.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 93,
+        "column": 1,
+        "endLine": 100,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "read:myRequests",
+      "purpose": "Read entity:PurchaseRequest through the generated query boundary.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 93,
+        "column": 1,
+        "endLine": 100,
+        "endColumn": 2
+      }
     },
     {
       "id": "boundary:audit",

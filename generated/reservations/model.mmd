@@ -15,3 +15,8 @@ flowchart LR
   require_reserve_valid_interval["Require: valid_interval"] -->|guards| action_reserve
   action_reserve -->|locks share| entity_Resource
   action_reserve -->|locks share| entity_User
+  query_reservationsForResource["Query: reservationsForResource"]
+  principal -->|authenticated caller| query_reservationsForResource
+  query_reservationsForResource -->|reads| entity_Reservation
+  authorize_reservationsForResource["Authorize"] -->|guards| query_reservationsForResource
+  where_reservationsForResource["Where"] -->|filters rows| query_reservationsForResource

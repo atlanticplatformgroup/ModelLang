@@ -1,11 +1,12 @@
 import { ModelError } from "./diagnostics.js";
-import type { ActionDecl, Declaration, EntityDecl, Program } from "./syntax-ast.js";
+import type { ActionDecl, Declaration, EntityDecl, Program, QueryDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
   program: Program;
   declarations: ReadonlyMap<string, Declaration>;
   entities: ReadonlyMap<string, EntityDecl>;
   actions: ReadonlyMap<string, ActionDecl>;
+  queries: ReadonlyMap<string, QueryDecl>;
   typeNames: ReadonlySet<string>;
 }
 
@@ -15,6 +16,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
   const declarations = new Map<string, Declaration>();
   const entities = new Map<string, EntityDecl>();
   const actions = new Map<string, ActionDecl>();
+  const queries = new Map<string, QueryDecl>();
   for (const declaration of program.declarations) {
     const previous = declarations.get(declaration.name);
     if (previous) {
@@ -26,6 +28,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     declarations.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
+    if (declaration.kind === "query") queries.set(declaration.name, declaration);
   }
   const typeNames = new Set([
     ...scalarNames,
@@ -47,6 +50,14 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
         throw new ModelError("E2307", `Action return type '${declaration.returnType.name}' must be an entity.`, declaration.returnType.span, file);
       }
     }
+    if (declaration.kind === "query") {
+      for (const parameter of declaration.parameters) {
+        if (!typeNames.has(parameter.type.name)) throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
+      }
+      if (!entities.has(declaration.sourceType.name)) {
+        throw new ModelError("E2601", `Query source '${declaration.sourceType.name}' must be an entity.`, declaration.sourceType.span, file);
+      }
+    }
   }
-  return { program, declarations, entities, actions, typeNames };
+  return { program, declarations, entities, actions, queries, typeNames };
 }

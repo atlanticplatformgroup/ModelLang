@@ -3,13 +3,14 @@ import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ReservationsClient } from "../../generated/reservations/typescript/client.js";
 import {
-  ConflictError, PreconditionError,
+  ConflictError, NotFoundError, PreconditionError,
 } from "../../generated/reservations/typescript/errors.js";
 import {
   databaseUrl, installReservationsDatabase, loginUrl, poolFor,
 } from "../../scripts/database.js";
 
 const resource = "20000000-0000-4000-8000-000000000001";
+const otherResource = "20000000-0000-4000-8000-000000000002";
 let firstPool: Pool;
 let secondPool: Pool;
 let firstClient: ReservationsClient;
@@ -45,7 +46,7 @@ async function waitUntilLockWaiting(pid: number, timeoutMs = 5_000): Promise<voi
   throw new Error(`Backend ${pid} did not enter an observed PostgreSQL lock wait`);
 }
 
-describe.sequential("ModelLang 0.2 reservation exclusions", () => {
+describe.sequential("ModelLang reservation and query boundaries", () => {
   it("allows adjacent half-open intervals and rejects overlap", async () => {
     const first = await firstClient.reserve({
       id: randomUUID(),
@@ -96,6 +97,34 @@ describe.sequential("ModelLang 0.2 reservation exclusions", () => {
     });
   });
 
+  it("returns one resource's rows without leaking rows from another resource", async () => {
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+    await firstClient.reserve({
+      id: firstId,
+      resource,
+      startsAt: "2031-01-01T09:00:00.000Z",
+      endsAt: "2031-01-01T10:00:00.000Z",
+    });
+    await secondClient.reserve({
+      id: secondId,
+      resource: otherResource,
+      startsAt: "2031-01-01T09:00:00.000Z",
+      endsAt: "2031-01-01T10:00:00.000Z",
+    });
+
+    const firstRows = await firstClient.reservationsForResource({ resource });
+    const secondRows = await firstClient.reservationsForResource({ resource: otherResource });
+    expect(firstRows.some((reservation) => reservation.id === firstId)).toBe(true);
+    expect(secondRows.some((reservation) => reservation.id === secondId)).toBe(true);
+    expect(firstRows.every((reservation) => reservation.resource === resource)).toBe(true);
+    expect(secondRows.every((reservation) => reservation.resource === otherResource)).toBe(true);
+    expect(firstRows.some((reservation) => reservation.id === secondId)).toBe(false);
+    await expect(firstClient.reservationsForResource({
+      resource: "20000000-0000-4000-8000-000000000099",
+    })).rejects.toBeInstanceOf(NotFoundError);
+  });
+
   it("serializes concurrent conflicting reservations to exactly one row and audit record", async () => {
     const first = new Client({ connectionString: loginUrl("ml_reserver_one") });
     const second = new Client({ connectionString: loginUrl("ml_reserver_two") });
@@ -144,6 +173,9 @@ describe.sequential("ModelLang 0.2 reservation exclusions", () => {
     const application = new Client({ connectionString: loginUrl("ml_reserver_one") });
     await application.connect();
     try {
+      await expect(application.query(
+        "SELECT * FROM model_reservations.reservation",
+      )).rejects.toMatchObject({ code: "42501" });
       await expect(application.query(
         "UPDATE model_reservations.reservation SET ends_at = ends_at WHERE false",
       )).rejects.toMatchObject({ code: "42501" });

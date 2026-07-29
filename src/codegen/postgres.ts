@@ -1,10 +1,11 @@
-import type { IRAction, IREntity, IRExpression, IRField, IRParameter, ModelIR } from "../ir.js";
+import type { IRAction, IREntity, IRExpression, IRField, IRParameter, IRQuery, ModelIR } from "../ir.js";
 import { quoteIdent, snakeCase } from "../naming.js";
 
 export interface PostgresOutput {
   "001_roles.sql": string;
   "002_schema.sql": string;
   "003_actions.sql": string;
+  "003_queries.sql": string;
   "004_grants.sql": string;
   "005_seed.sql": string;
 }
@@ -50,6 +51,7 @@ function sqlLiteral(expression: IRExpression): string {
 interface ExpressionContext {
   ir: ModelIR;
   action?: IRAction;
+  query?: IRQuery;
   selfEntity?: IREntity;
   recordNames?: Map<string, string>;
 }
@@ -60,7 +62,8 @@ function lowerExpression(expression: IRExpression, context: ExpressionContext): 
     case "nullLiteral": return "NULL";
     case "enumLiteral": return `'${expression.member.replaceAll("'", "''")}'`;
     case "parameter": {
-      const parameter = context.action?.parameters.find((candidate) => candidate.id === expression.parameterId);
+      const parameter = context.action?.parameters.find((candidate) => candidate.id === expression.parameterId)
+        ?? context.query?.parameters.find((candidate) => candidate.id === expression.parameterId);
       if (!parameter) throw new Error(`E4005 Missing parameter ${expression.parameterId}`);
       return quoteIdent(parameter.naming.sqlParameter);
     }
@@ -202,9 +205,9 @@ function parameterSql(parameter: IRParameter): string {
   return `${quoteIdent(parameter.naming.sqlParameter)} ${sqlType(parameter.type)}`;
 }
 
-function functionSignature(ir: ModelIR, action: IRAction): string {
-  const callable = action.parameters.filter((parameter) => action.callableParameters.includes(parameter.id));
-  return `${qname(ir.model.naming.sqlSchema, action.naming.sqlFunction)}(${callable.map((parameter) => sqlType(parameter.type)).join(", ")})`;
+function functionSignature(ir: ModelIR, operation: IRAction | IRQuery): string {
+  const callable = operation.parameters.filter((parameter) => operation.callableParameters.includes(parameter.id));
+  return `${qname(ir.model.naming.sqlSchema, operation.naming.sqlFunction)}(${callable.map((parameter) => sqlType(parameter.type)).join(", ")})`;
 }
 
 function rowJson(entity: IREntity, record: string): string {
@@ -348,6 +351,99 @@ RESET ROLE;
 `;
 }
 
+function generateQuery(ir: ModelIR, query: IRQuery): string {
+  const schema = ir.model.naming.sqlSchema;
+  const internal = ir.model.naming.internalSchema;
+  const callable = query.parameters.filter((parameter) => query.callableParameters.includes(parameter.id));
+  const sourceEntity = entityById(ir, query.sourceEntityId);
+  const orderField = fieldById(ir, query.orderBy.fieldId).field;
+  const idField = fieldById(ir, sourceEntity.idFieldId).field;
+  const recordNames = new Map<string, string>([["queryRow", "v_row"]]);
+  for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
+    recordNames.set(parameter.id, `v_${snakeCase(parameter.name)}`);
+  }
+  const declarations = [
+    "  v_principal_id uuid;",
+    "  v_result jsonb;",
+  ];
+  for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
+    const entity = entityById(ir, parameter.type);
+    declarations.push(`  ${recordNames.get(parameter.id)} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`);
+  }
+  const body: string[] = [
+    `  SELECT ${quoteIdent("principal_id")} INTO v_principal_id`,
+    `  FROM ${qname(internal, "principal_binding")}`,
+    `  WHERE ${quoteIdent("database_principal")} = session_user`,
+    "  FOR SHARE;",
+    "",
+    "  IF NOT FOUND THEN",
+    "    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';",
+    "  END IF;",
+    "",
+  ];
+  for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
+    const entity = entityById(ir, parameter.type);
+    const idFieldForParameter = fieldById(ir, entity.idFieldId).field;
+    const idValue = parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
+    body.push(
+      `  SELECT * INTO ${recordNames.get(parameter.id)}`,
+      `  FROM ${qname(schema, entity.naming.sqlTable)}`,
+      `  WHERE ${quoteIdent(idFieldForParameter.naming.sqlColumn)} = ${idValue};`,
+      "",
+      "  IF NOT FOUND THEN",
+      `    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:${parameter.name}';`,
+      "  END IF;",
+      "",
+    );
+  }
+  const context = { ir, query, recordNames };
+  body.push(
+    `  IF NOT ((${lowerExpression(query.authorization.expression, context)}) IS TRUE) THEN`,
+    `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${query.authorization.id}';`,
+    "  END IF;",
+    "",
+    "  SELECT COALESCE(",
+    `    pg_catalog.jsonb_agg(v_query.${quoteIdent("item")} ORDER BY v_query.${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, v_query.${quoteIdent("identity")} ASC),`,
+    "    '[]'::jsonb",
+    "  ) INTO v_result",
+    "  FROM (",
+    `    SELECT ${rowJson(sourceEntity, "v_row")} AS ${quoteIdent("item")},`,
+    `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
+    `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
+    `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
+    `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
+    `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
+    `    LIMIT ${query.limit}`,
+    "  ) AS v_query;",
+    "",
+    "  RETURN v_result;",
+  );
+  return `CREATE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+${declarations.join("\n")}
+BEGIN
+${body.join("\n")}
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION ${functionSignature(ir, query)} FROM PUBLIC;
+`;
+}
+
+function generateQueries(ir: ModelIR): string {
+  return `-- Generated guarded query functions. Caller identity is always session_user.
+SET ROLE modellang_owner;
+
+${ir.queries.map((query) => generateQuery(ir, query)).join("\n")}
+RESET ROLE;
+`;
+}
+
 function generateGrants(ir: ModelIR): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
@@ -361,8 +457,7 @@ function generateGrants(ir: ModelIR): string {
   for (const entity of ir.entities) {
     const table = qname(schema, entity.naming.sqlTable);
     lines.push(
-      `GRANT SELECT ON TABLE ${table} TO modellang_app;`,
-      `REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE ${table} FROM PUBLIC, modellang_app;`,
+      `REVOKE ALL ON TABLE ${table} FROM PUBLIC, modellang_app;`,
     );
   }
   lines.push("");
@@ -370,6 +465,12 @@ function generateGrants(ir: ModelIR): string {
     lines.push(
       `REVOKE ALL ON FUNCTION ${functionSignature(ir, action)} FROM PUBLIC;`,
       `GRANT EXECUTE ON FUNCTION ${functionSignature(ir, action)} TO modellang_app;`,
+    );
+  }
+  for (const query of ir.queries) {
+    lines.push(
+      `REVOKE ALL ON FUNCTION ${functionSignature(ir, query)} FROM PUBLIC;`,
+      `GRANT EXECUTE ON FUNCTION ${functionSignature(ir, query)} TO modellang_app;`,
     );
   }
   lines.push(
@@ -394,7 +495,8 @@ INSERT INTO ${qname(schema, "user")} (${quoteIdent("id")}, ${quoteIdent("name")}
   ('10000000-0000-4000-8000-000000000002', 'Reserver Two');
 
 INSERT INTO ${qname(schema, "resource")} (${quoteIdent("id")}, ${quoteIdent("name")}) VALUES
-  ('20000000-0000-4000-8000-000000000001', 'Conference Room A');
+  ('20000000-0000-4000-8000-000000000001', 'Conference Room A'),
+  ('20000000-0000-4000-8000-000000000002', 'Conference Room B');
 
 INSERT INTO ${qname(internal, "principal_binding")} (${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}) VALUES
   ('ml_reserver_one', '10000000-0000-4000-8000-000000000001'),
@@ -432,6 +534,7 @@ export function generatePostgres(ir: ModelIR): PostgresOutput {
     "001_roles.sql": generateRoles(),
     "002_schema.sql": generateSchema(ir),
     "003_actions.sql": generateActions(ir),
+    "003_queries.sql": generateQueries(ir),
     "004_grants.sql": generateGrants(ir),
     "005_seed.sql": generateSeed(ir),
   };

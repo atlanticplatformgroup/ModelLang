@@ -2,7 +2,7 @@ import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
   ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, ExclusionDecl,
-  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, RequireDecl, TypeRef,
+  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
 } from "./syntax-ast.js";
 
 const binaryPrecedence: Partial<Record<string, number>> = {
@@ -55,7 +55,8 @@ class Parser {
       if (this.atWord("enum")) declarations.push(this.parseEnum());
       else if (this.atWord("entity")) declarations.push(this.parseEntity());
       else if (this.atWord("action")) declarations.push(this.parseAction());
-      else this.fail("E1103", "Expected enum, entity, or action declaration.");
+      else if (this.atWord("query")) declarations.push(this.parseQuery());
+      else this.fail("E1103", "Expected enum, entity, action, or query declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -194,6 +195,75 @@ class Parser {
     return { kind: "action", name: name.text, parameters, returnType, authorize, requires, effect, span: this.span(start, end) };
   }
 
+  private parseQuery(): QueryDecl {
+    const start = this.expectWord("query");
+    const name = this.identifier();
+    this.expect("(");
+    const parameters: ParameterDecl[] = [];
+    if (!this.at(")")) {
+      do {
+        const parameterStart = this.current();
+        const caller = this.atWord("caller") ? (this.take(), true) : false;
+        const parameterName = this.identifier("Expected parameter name.");
+        this.expect(":");
+        const type = this.parseTypeRef();
+        parameters.push({ name: parameterName.text, type, caller, span: this.span(parameterStart, type.span) });
+        if (!this.at(",")) break;
+        this.take();
+      } while (!this.at(")"));
+    }
+    this.expect(")");
+    this.expectWord("from");
+    const sourceType = this.parseTypeRef();
+    this.expectWord("as");
+    const alias = this.identifier("Expected query row alias.");
+    this.expect("{");
+    this.expectWord("authorize");
+    const authorize = this.parseExpression();
+    this.expect(";");
+    this.expectWord("where");
+    const where = this.parseExpression();
+    this.expect(";");
+    const orderStart = this.expectWord("orderBy");
+    const orderPath = this.parsePath();
+    if (!this.atWord("asc") && !this.atWord("desc")) this.fail("E1110", "Expected query order direction 'asc' or 'desc'.");
+    const direction = this.take();
+    const orderEnd = this.expect(";");
+    this.expectWord("limit");
+    const limit = this.expect("number", "Expected an integer query limit.");
+    const limitEnd = this.expect(";");
+    const end = this.expect("}");
+    return {
+      kind: "query",
+      name: name.text,
+      parameters,
+      sourceType,
+      rowAlias: { name: alias.text, span: alias.span },
+      authorize,
+      where,
+      orderBy: {
+        path: orderPath.parts,
+        direction: direction.text as "asc" | "desc",
+        span: this.span(orderStart, orderEnd),
+      },
+      limit: Number(limit.value),
+      limitSpan: this.span(limit, limitEnd),
+      span: this.span(start, end),
+    };
+  }
+
+  private parsePath(): Extract<Expression, { kind: "path" }> {
+    const start = this.identifier("Expected a path.");
+    const parts = [start.text];
+    let end = start;
+    while (this.at(".")) {
+      this.take();
+      end = this.identifier("Expected identifier after '.'.");
+      parts.push(end.text);
+    }
+    return { kind: "path", parts, span: this.span(start, end) };
+  }
+
   private parseEffect(): Effect {
     if (!this.atWord("create") && !this.atWord("update")) this.fail("E1107", "Expected create or update effect.");
     const start = this.take();
@@ -255,15 +325,7 @@ class Parser {
       return { kind: "literal", value: token.text === "true", literalKind: "boolean", span: token.span };
     }
     if (this.at("identifier")) {
-      const start = this.take();
-      const parts = [start.text];
-      let end = start;
-      while (this.at(".")) {
-        this.take();
-        end = this.identifier("Expected identifier after '.'.");
-        parts.push(end.text);
-      }
-      return { kind: "path", parts, span: this.span(start, end) };
+      return this.parsePath();
     }
     this.fail("E1108", "Expected expression.");
   }

@@ -24,5 +24,12 @@ export function generateMermaid(ir: ModelIR): string {
     for (const precondition of action.preconditions) lines.push(`  ${safe(precondition.id)}["Require: ${precondition.name}"] -->|guards| ${safe(action.id)}`);
     for (const lock of action.lockPlan) lines.push(`  ${safe(action.id)} -->|locks ${lock.mode}| ${safe(lock.entityId)}`);
   }
+  for (const query of ir.queries) {
+    lines.push(`  ${safe(query.id)}["Query: ${query.name}"]`);
+    lines.push(`  principal -->|authenticated caller| ${safe(query.id)}`);
+    lines.push(`  ${safe(query.id)} -->|reads| ${safe(query.sourceEntityId)}`);
+    lines.push(`  ${safe(query.authorization.id)}["Authorize"] -->|guards| ${safe(query.id)}`);
+    lines.push(`  ${safe(query.rowPolicy.id)}["Where"] -->|filters rows| ${safe(query.id)}`);
+  }
   return `${lines.join("\n")}\n`;
 }

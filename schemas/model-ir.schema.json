@@ -3,9 +3,9 @@
   "$id": "https://modellang.dev/schemas/model-ir.schema.json",
   "title": "ModelLang canonical IR",
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "queries", "enforcement"],
   "properties": {
-    "irVersion": { "const": 2 },
+    "irVersion": { "const": 3 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -39,6 +39,7 @@
     "enums": { "type": "array" },
     "entities": { "type": "array" },
     "actions": { "type": "array" },
+    "queries": { "type": "array" },
     "enforcement": { "type": "array" }
   },
   "additionalProperties": false

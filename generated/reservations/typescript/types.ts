@@ -25,3 +25,7 @@ export interface ReserveInput {
   endsAt: string;
 }
 
+export interface ReservationsForResourceInput {
+  resource: string;
+}
+

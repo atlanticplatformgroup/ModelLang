@@ -1,5 +1,5 @@
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IRSpan, ModelIR } from "./ir.js";
+import type { IRAction, IRQuery, IRSpan, ModelIR } from "./ir.js";
 
 function sourceSpan(span: IRSpan): Span {
   return {
@@ -39,6 +39,23 @@ function checkAction(ir: ModelIR, action: IRAction): void {
   }
 }
 
+function checkQuery(ir: ModelIR, query: IRQuery): void {
+  const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId);
+  if (!caller || !caller.caller) fail(ir, `Query '${query.name}' has no resolved semantic caller.`, query.span);
+  if (query.callableParameters.includes(query.callerParameterId)) fail(ir, `Query '${query.name}' exposes its caller in the callable ABI.`, query.span);
+  const expectedCallable = query.parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id);
+  if (JSON.stringify(query.callableParameters) !== JSON.stringify(expectedCallable)) {
+    fail(ir, `Query '${query.name}' callable parameters are not an exact caller-free signature.`, query.span);
+  }
+  requireEntry(ir, `caller:${query.name}.${caller.name}`, caller.span);
+  requireEntry(ir, `boundary:${query.name}.safe_search_path`, query.span);
+  requireEntry(ir, query.authorization.id, query.authorization.span);
+  requireEntry(ir, query.rowPolicy.id, query.rowPolicy.span);
+  requireEntry(ir, `order:${query.name}`, query.span);
+  requireEntry(ir, `limit:${query.name}`, query.span);
+  requireEntry(ir, `read:${query.name}`, query.span);
+}
+
 export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:principal_binding");
   requireEntry(ir, "boundary:owner_role");
@@ -61,6 +78,8 @@ export function assertEnforceable(ir: ModelIR): void {
       requireEntry(ir, `derived:${exclusion.id}.valid_interval`, exclusion.span);
     }
     requireEntry(ir, `boundary:${entity.name}.direct_write`, entity.span);
+    requireEntry(ir, `boundary:${entity.name}.direct_read`, entity.span);
   }
   for (const action of ir.actions) checkAction(ir, action);
+  for (const query of ir.queries) checkQuery(ir, query);
 }

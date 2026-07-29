@@ -1,17 +1,21 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IRExpression, IRField, IRLock, IRParameter, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IREntity, IRExpression, IRField, IRLock, IRParameter, IRQuery, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
 import { snakeCase } from "./naming.js";
 import type {
-  ActionDecl, Declaration, EntityDecl, Expression, FieldDecl, Program,
+  ActionDecl, Declaration, EntityDecl, Expression, FieldDecl, Program, QueryDecl,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
 
 interface Scope {
-  kind: "invariant" | "action";
+  kind: "invariant" | "action" | "query";
   entity?: EntityDecl;
   action?: ActionDecl;
+  query?: QueryDecl;
+  queryEntity?: EntityDecl;
+  rowAlias?: string;
+  allowQueryRow?: boolean;
   parameters?: Map<string, IRParameter>;
 }
 
@@ -19,6 +23,7 @@ interface Symbols {
   enums: Map<string, Extract<Declaration, { kind: "enum" }>>;
   entities: Map<string, EntityDecl>;
   actions: Map<string, ActionDecl>;
+  queries: Map<string, QueryDecl>;
   fields: Map<string, Map<string, FieldDecl>>;
 }
 
@@ -58,8 +63,15 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     if (!symbols.entities.has(caller.type.name)) throw new ModelError("E2302", `Caller '${caller.name}' must have an entity type.`, caller.type.span, file);
     principalNames.add(caller.type.name);
   }
-  if (symbols.actions.size === 0) throw new ModelError("E2303", "A model must declare at least one action to establish its principal type.", program.model.span, file);
-  if (principalNames.size !== 1) throw new ModelError("E2304", "All actions must use the same principal entity type.", program.model.span, file);
+  for (const query of symbols.queries.values()) {
+    const callers = query.parameters.filter((parameter) => parameter.caller);
+    if (callers.length !== 1) throw new ModelError("E2602", `Query '${query.name}' must declare exactly one caller parameter.`, query.span, file);
+    const caller = callers[0]!;
+    if (!symbols.entities.has(caller.type.name)) throw new ModelError("E2603", `Query caller '${caller.name}' must have an entity type.`, caller.type.span, file);
+    principalNames.add(caller.type.name);
+  }
+  if (symbols.actions.size === 0 && symbols.queries.size === 0) throw new ModelError("E2303", "A model must declare at least one action or query to establish its principal type.", program.model.span, file);
+  if (principalNames.size !== 1) throw new ModelError("E2304", "All actions and queries must use the same principal entity type.", program.model.span, file);
   const principalName = [...principalNames][0]!;
   const schema = `model_${snakeCase(program.model.name)}`;
   const internalSchema = `${schema}_internal`;
@@ -73,9 +85,10 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
-  const enforcement = buildEnforcement(entities, actions, schema, internalSchema);
+  const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
+  const enforcement = buildEnforcement(entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 2,
+    irVersion: 3,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -88,6 +101,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     enums,
     entities,
     actions,
+    queries,
     enforcement,
   };
 }
@@ -96,6 +110,7 @@ function collectSymbols(program: Program, file: string): Symbols {
   const enums = new Map<string, Extract<Declaration, { kind: "enum" }>>();
   const entities = new Map<string, EntityDecl>();
   const actions = new Map<string, ActionDecl>();
+  const queries = new Map<string, QueryDecl>();
   const top = new Map<string, Declaration>();
   for (const declaration of program.declarations) {
     const previous = top.get(declaration.name);
@@ -104,6 +119,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     if (declaration.kind === "enum") enums.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
+    if (declaration.kind === "query") queries.set(declaration.name, declaration);
   }
   for (const enumeration of enums.values()) {
     const seen = new Set<string>();
@@ -128,7 +144,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, actions, fields };
+  return { enums, entities, actions, queries, fields };
 }
 
 function validateEntities(symbols: Symbols, file: string): void {
@@ -356,6 +372,109 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   };
 }
 
+function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, file: string): IRQuery {
+  const seen = new Map<string, Span>();
+  const parameters: IRParameter[] = query.parameters.map((parameter) => {
+    const previous = seen.get(parameter.name);
+    if (previous) throw new ModelError("E2604", `Duplicate query parameter '${parameter.name}'.`, parameter.span, file, { message: "First declared here.", span: previous });
+    seen.set(parameter.name, parameter.span);
+    if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
+      throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
+    }
+    const type = symbols.entities.has(parameter.type.name)
+      ? `entity:${parameter.type.name}`
+      : symbols.enums.has(parameter.type.name)
+        ? `enum:${parameter.type.name}`
+        : parameter.type.name;
+    return {
+      id: `parameter:${query.name}.${parameter.name}`,
+      name: parameter.name,
+      type,
+      caller: parameter.caller,
+      ...(parameter.caller ? { binding: "session_user" as const } : {}),
+      span: irSpan(parameter.span, file),
+      naming: { sqlParameter: `p_${snakeCase(parameter.name)}`, typescriptProperty: parameter.name },
+    };
+  });
+  if (seen.has(query.rowAlias.name)) {
+    throw new ModelError("E2605", `Query row alias '${query.rowAlias.name}' conflicts with a parameter.`, query.rowAlias.span, file);
+  }
+  const sourceEntity = symbols.entities.get(query.sourceType.name);
+  if (!sourceEntity) {
+    throw new ModelError("E2601", `Query source '${query.sourceType.name}' must be an entity.`, query.sourceType.span, file);
+  }
+  const parameterMap = new Map(parameters.map((parameter) => [parameter.name, parameter]));
+  const caller = parameters.find((parameter) => parameter.caller)!;
+  if (caller.type !== `entity:${principalName}`) {
+    throw new ModelError("E2304", "Caller principal type is inconsistent with the model.", query.span, file);
+  }
+  const authorization = typeExpression(query.authorize, {
+    kind: "query",
+    query,
+    queryEntity: sourceEntity,
+    rowAlias: query.rowAlias.name,
+    allowQueryRow: false,
+    parameters: parameterMap,
+  }, symbols, file);
+  requireBoolean(authorization, query.authorize.span, file, "Query authorization");
+  const rowPolicy = typeExpression(query.where, {
+    kind: "query",
+    query,
+    queryEntity: sourceEntity,
+    rowAlias: query.rowAlias.name,
+    allowQueryRow: true,
+    parameters: parameterMap,
+  }, symbols, file);
+  requireBoolean(rowPolicy, query.where.span, file, "Query row policy");
+
+  const [orderAlias, orderFieldName, extraOrderPart] = query.orderBy.path;
+  if (extraOrderPart || query.orderBy.path.length !== 2 || orderAlias !== query.rowAlias.name) {
+    throw new ModelError("E2606", `Query orderBy must be a direct field of row alias '${query.rowAlias.name}'.`, query.orderBy.span, file);
+  }
+  const orderField = symbols.fields.get(sourceEntity.name)!.get(orderFieldName!);
+  if (!orderField) {
+    throw new ModelError("E2607", `Unknown order field '${sourceEntity.name}.${orderFieldName}'.`, query.orderBy.span, file);
+  }
+  if (orderField.optional) {
+    throw new ModelError("E2608", `Query order field '${sourceEntity.name}.${orderField.name}' must be required.`, query.orderBy.span, file);
+  }
+  if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 1000) {
+    throw new ModelError("E2609", "Query limit must be an integer from 1 through 1000.", query.limitSpan, file);
+  }
+
+  return {
+    id: `query:${query.name}`,
+    name: query.name,
+    parameters,
+    callerParameterId: caller.id,
+    callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
+    sourceEntityId: `entity:${sourceEntity.name}`,
+    rowAlias: query.rowAlias.name,
+    authorization: {
+      id: `authorize:${query.name}`,
+      name: "authorize",
+      expression: authorization,
+      sourceExpression: expressionText(query.authorize),
+      span: irSpan(query.authorize.span, file),
+    },
+    rowPolicy: {
+      id: `where:${query.name}`,
+      name: "where",
+      expression: rowPolicy,
+      sourceExpression: expressionText(query.where),
+      span: irSpan(query.where.span, file),
+    },
+    orderBy: {
+      fieldId: `field:${sourceEntity.name}.${orderField.name}`,
+      direction: query.orderBy.direction,
+      identityTieBreaker: true,
+    },
+    limit: query.limit,
+    span: irSpan(query.span, file),
+    naming: { sqlFunction: snakeCase(query.name), typescriptMethod: query.name },
+  };
+}
+
 function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, file: string): IRExpression {
   if (expression.kind === "literal") {
     if (expression.literalKind === "null") return { kind: "nullLiteral", type: "null", nullable: true };
@@ -418,6 +537,25 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
     if (!field) throw new ModelError("E2007", `Unknown field '${scope.entity!.name}.${first}'.`, expression.span, file);
     return { kind: "fieldAccess", source: "self", fieldId: `field:${scope.entity!.name}.${field.name}`, fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
   }
+  if (scope.kind === "query" && first === scope.rowAlias) {
+    if (!scope.allowQueryRow) {
+      throw new ModelError("E2610", `Query authorization may not reference row alias '${scope.rowAlias}'.`, expression.span, file);
+    }
+    if (expression.parts.length !== 2) {
+      throw new ModelError("E2611", `Query row alias '${scope.rowAlias}' must be followed by a direct field.`, expression.span, file);
+    }
+    const field = symbols.fields.get(scope.queryEntity!.name)!.get(second!);
+    if (!field) throw new ModelError("E2007", `Unknown field '${scope.queryEntity!.name}.${second}'.`, expression.span, file);
+    return {
+      kind: "fieldAccess",
+      source: "queryRow",
+      parameter: scope.rowAlias,
+      fieldId: `field:${scope.queryEntity!.name}.${field.name}`,
+      fieldName: field.name,
+      type: fieldType(field, symbols),
+      nullable: field.optional,
+    };
+  }
   const parameter = scope.parameters!.get(first!);
   if (!parameter) {
     if (symbols.enums.has(first!)) throw new ModelError("E2008", "Enum members must be qualified.", expression.span, file);
@@ -466,7 +604,7 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
   if (expression.kind === "nullComparison") collectEntityParameters(expression.operand, found);
 }
 
-function buildEnforcement(entities: IREntity[], actions: IRAction[], schema: string, internalSchema: string): EnforcementEntry[] {
+function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IRQuery[], schema: string, internalSchema: string): EnforcementEntry[] {
   const entries: EnforcementEntry[] = [{
     id: "boundary:principal_binding",
     purpose: "Bind session_user to the model principal through an owner-controlled table.",
@@ -525,6 +663,7 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], schema: str
       });
     }
     entries.push({ id: `boundary:${entity.name}.direct_write`, purpose: "Application principals cannot directly mutate entity rows.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
+    entries.push({ id: `boundary:${entity.name}.direct_read`, purpose: "Application principals cannot directly read entity rows outside generated queries.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
   }
   for (const action of actions) {
     const fn = `${schema}.${action.naming.sqlFunction}`;
@@ -535,6 +674,17 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], schema: str
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
     entries.push({ id: `effect:${action.name}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     for (const lock of action.lockPlan) entries.push({ id: lock.id, purpose: `Stabilize ${lock.source} before evaluating guards and effects.`, layer: "PostgreSQL row lock", artifact: "postgres/003_actions.sql", objectName: `${lock.mode === "update" ? "FOR UPDATE" : "FOR SHARE"} in ${fn}` });
+  }
+  for (const query of queries) {
+    const fn = `${schema}.${query.naming.sqlFunction}`;
+    const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId)!;
+    entries.push({ id: `caller:${query.name}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
+    entries.push({ id: `boundary:${query.name}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
+    entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
+    entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
+    entries.push({ id: `order:${query.name}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `limit:${query.name}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `read:${query.name}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
   }
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   return entries;

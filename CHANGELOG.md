@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.0
+
+- Added normative authenticated query syntax and canonical IR version 3.
+- Added query authorization, fail-closed row filters, direct-field ordering, deterministic ID tie-breakers, and compile-time limits.
+- Added generated `SECURITY DEFINER` PostgreSQL query functions returning bounded JSON arrays.
+- Removed direct entity-table `SELECT` from the application role; generated actions and queries are now the complete runtime database boundary.
+- Added typed query inputs and array-returning methods to generated TypeScript clients.
+- Added query nodes and read-policy entries to Mermaid and enforcement artifacts.
+- Added caller-isolation, resource-isolation, missing-entity, direct-read denial, and query compiler conformance tests.
+
 ## 0.2.0
 
 - Added normative versioned language, grammar, conformance, and unstable-boundary documents.

@@ -5,7 +5,7 @@ async function main(): Promise<void> {
   const files = ["examples/procurement.model", "examples/reservations.model"];
   for (const file of files) {
     const ir = await compileFile(resolve(file));
-    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions)\n`);
+    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions, ${ir.queries.length} queries)\n`);
   }
 }
 

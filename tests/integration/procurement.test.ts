@@ -92,6 +92,23 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     });
   });
 
+  it("returns only the authenticated caller's requests through the generated read boundary", async () => {
+    const employeeOneId = randomUUID();
+    const employeeTwoId = randomUUID();
+    await clients.employeeOne.openRequest({ id: employeeOneId, amount: "11" });
+    await clients.employeeTwo.openRequest({ id: employeeTwoId, amount: "12" });
+
+    const employeeOneRows = await clients.employeeOne.myRequests({});
+    const employeeTwoRows = await clients.employeeTwo.myRequests({});
+    expect(employeeOneRows.some((request) => request.id === employeeOneId)).toBe(true);
+    expect(employeeTwoRows.some((request) => request.id === employeeTwoId)).toBe(true);
+    expect(employeeOneRows.every((request) => request.requester === "00000000-0000-4000-8000-000000000001")).toBe(true);
+    expect(employeeTwoRows.every((request) => request.requester === "00000000-0000-4000-8000-000000000002")).toBe(true);
+    expect(employeeOneRows.some((request) => request.id === employeeTwoId)).toBe(false);
+    expect(employeeTwoRows.some((request) => request.id === employeeOneId)).toBe(false);
+    await expect(clients.unbound.myRequests({})).rejects.toBeInstanceOf(IdentityBindingError);
+  });
+
   it("binds identity before authorization and exposes no actor function argument", async () => {
     await expect(clients.unbound.openRequest({ id: randomUUID(), amount: "10" })).rejects.toBeInstanceOf(IdentityBindingError);
     const functions = await admin.query<{ proname: string; pronargs: number; args: string }>(`
@@ -103,6 +120,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     `);
     expect(functions.rows).toEqual([
       expect.objectContaining({ proname: "approve_request", pronargs: 1 }),
+      expect.objectContaining({ proname: "my_requests", pronargs: 0 }),
       expect.objectContaining({ proname: "open_request", pronargs: 2 }),
       expect.objectContaining({ proname: "submit_request", pronargs: 1 }),
     ]);
@@ -114,6 +132,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     await application.connect();
     try {
       for (const sql of [
+        `SELECT * FROM model_procurement.purchase_request`,
         `INSERT INTO model_procurement.purchase_request (id, requester_id, amount, status) VALUES ('${randomUUID()}', '00000000-0000-4000-8000-000000000001', 1, 'DRAFT')`,
         `UPDATE model_procurement.purchase_request SET amount = 2 WHERE false`,
         `DELETE FROM model_procurement.purchase_request WHERE false`,

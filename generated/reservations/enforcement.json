@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.2.0",
-    "sourceHash": "sha256:386da6e420628329e1e9d39ef20fe2ba412f2a6bc7291517e7a7cbff44b7aad5",
+    "version": "0.3.0",
+    "sourceHash": "sha256:12cb8d05abda4323a27b8dc9ccf8eaad692e95e651b05fb4f094d1a00261c509",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -89,6 +89,20 @@
       }
     },
     {
+      "id": "boundary:User.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.user",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 3,
+        "column": 1,
+        "endLine": 6,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "required:Resource.id",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
@@ -147,6 +161,20 @@
     {
       "id": "boundary:Resource.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 8,
+        "column": 1,
+        "endLine": 11,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "boundary:Resource.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_reservations.resource",
@@ -313,6 +341,20 @@
       }
     },
     {
+      "id": "boundary:Reservation.direct_read",
+      "purpose": "Application principals cannot directly read entity rows outside generated queries.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.reservation",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 13,
+        "column": 1,
+        "endLine": 22,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "caller:reserve.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
@@ -388,6 +430,97 @@
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_reservations.reserve"
+    },
+    {
+      "id": "caller:reservationsForResource.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 44,
+        "column": 3,
+        "endLine": 44,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:reservationsForResource.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:reservationsForResource",
+      "purpose": "true",
+      "layer": "PostgreSQL query guard",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 13,
+        "endLine": 47,
+        "endColumn": 17
+      }
+    },
+    {
+      "id": "where:reservationsForResource",
+      "purpose": "(reservation.resource == resource)",
+      "layer": "PostgreSQL row policy",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 48,
+        "column": 9,
+        "endLine": 48,
+        "endColumn": 41
+      }
+    },
+    {
+      "id": "order:reservationsForResource",
+      "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "limit:reservationsForResource",
+      "purpose": "Return at most 100 rows.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "read:reservationsForResource",
+      "purpose": "Read entity:Reservation through the generated query boundary.",
+      "layer": "PostgreSQL query function",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 43,
+        "column": 1,
+        "endLine": 51,
+        "endColumn": 2
+      }
     },
     {
       "id": "boundary:audit",

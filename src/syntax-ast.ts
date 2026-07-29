@@ -15,7 +15,7 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | ActionDecl;
+export type Declaration = EnumDecl | EntityDecl | ActionDecl | QueryDecl;
 
 export interface EnumDecl {
   kind: "enum";
@@ -102,6 +102,24 @@ export interface ActionDecl {
   authorize: Expression;
   requires: RequireDecl[];
   effect: Effect;
+  span: Span;
+}
+
+export interface QueryDecl {
+  kind: "query";
+  name: string;
+  parameters: ParameterDecl[];
+  sourceType: TypeRef;
+  rowAlias: { name: string; span: Span };
+  authorize: Expression;
+  where: Expression;
+  orderBy: {
+    path: string[];
+    direction: "asc" | "desc";
+    span: Span;
+  };
+  limit: number;
+  limitSpan: Span;
   span: Span;
 }
 
