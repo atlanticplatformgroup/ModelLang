@@ -1,0 +1,198 @@
+-- Generated guarded action functions. Caller identity is always session_user.
+SET ROLE modellang_owner;
+
+CREATE FUNCTION "model_procurement"."open_request"("p_id" uuid, "p_amount" numeric)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_principal_id uuid;
+  v_result "model_procurement"."purchase_request"%ROWTYPE;
+  v_actor "model_procurement"."user"%ROWTYPE;
+BEGIN
+  SELECT "principal_id" INTO v_principal_id
+  FROM "model_procurement_internal"."principal_binding"
+  WHERE "database_principal" = session_user
+  FOR SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+
+  PERFORM "id" FROM "model_procurement"."user"
+  WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
+  ORDER BY "id" FOR SHARE;
+
+  SELECT * INTO v_actor
+  FROM "model_procurement"."user"
+  WHERE "id" = v_principal_id
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+  END IF;
+
+  IF NOT (((v_actor."role" = 'EMPLOYEE')) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:openRequest';
+  END IF;
+
+  IF NOT ((("p_amount" > 0)) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:openRequest.positive_amount';
+  END IF;
+
+  INSERT INTO "model_procurement"."purchase_request" ("id", "requester_id", "amount", "status", "approved_by_id", "approved_by_role")
+  VALUES ("p_id", v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
+  RETURNING * INTO v_result;
+
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
+  VALUES ('action:openRequest', session_user, v_principal_id, v_result."id");
+
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION "model_procurement"."open_request"(uuid, numeric) FROM PUBLIC;
+
+CREATE FUNCTION "model_procurement"."submit_request"("p_request" uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_principal_id uuid;
+  v_result "model_procurement"."purchase_request"%ROWTYPE;
+  v_actor "model_procurement"."user"%ROWTYPE;
+  v_request "model_procurement"."purchase_request"%ROWTYPE;
+BEGIN
+  SELECT "principal_id" INTO v_principal_id
+  FROM "model_procurement_internal"."principal_binding"
+  WHERE "database_principal" = session_user
+  FOR SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+
+  PERFORM "id" FROM "model_procurement"."purchase_request"
+  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
+  ORDER BY "id" FOR UPDATE;
+
+  PERFORM "id" FROM "model_procurement"."user"
+  WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
+  ORDER BY "id" FOR SHARE;
+
+  SELECT * INTO v_request
+  FROM "model_procurement"."purchase_request"
+  WHERE "id" = "p_request"
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
+  END IF;
+
+  SELECT * INTO v_actor
+  FROM "model_procurement"."user"
+  WHERE "id" = v_principal_id
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+  END IF;
+
+  IF NOT (((v_actor."id" = v_request."requester_id")) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:submitRequest';
+  END IF;
+
+  IF NOT (((v_request."status" = 'DRAFT')) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:submitRequest.is_draft';
+  END IF;
+
+  UPDATE "model_procurement"."purchase_request"
+  SET "status" = 'SUBMITTED'
+  WHERE "id" = v_request."id"
+  RETURNING * INTO v_result;
+
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
+  VALUES ('action:submitRequest', session_user, v_principal_id, v_result."id");
+
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION "model_procurement"."submit_request"(uuid) FROM PUBLIC;
+
+CREATE FUNCTION "model_procurement"."approve_request"("p_request" uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_principal_id uuid;
+  v_result "model_procurement"."purchase_request"%ROWTYPE;
+  v_actor "model_procurement"."user"%ROWTYPE;
+  v_request "model_procurement"."purchase_request"%ROWTYPE;
+BEGIN
+  SELECT "principal_id" INTO v_principal_id
+  FROM "model_procurement_internal"."principal_binding"
+  WHERE "database_principal" = session_user
+  FOR SHARE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+
+  PERFORM "id" FROM "model_procurement"."purchase_request"
+  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
+  ORDER BY "id" FOR UPDATE;
+
+  PERFORM "id" FROM "model_procurement"."user"
+  WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
+  ORDER BY "id" FOR SHARE;
+
+  SELECT * INTO v_request
+  FROM "model_procurement"."purchase_request"
+  WHERE "id" = "p_request"
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
+  END IF;
+
+  SELECT * INTO v_actor
+  FROM "model_procurement"."user"
+  WHERE "id" = v_principal_id
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+  END IF;
+
+  IF NOT (((((v_request."amount" <= 10000) AND (v_actor."role" = 'MANAGER')) OR ((v_request."amount" > 10000) AND (v_actor."role" = 'FINANCE')))) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:approveRequest';
+  END IF;
+
+  IF NOT (((v_request."status" = 'SUBMITTED')) IS TRUE) THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:approveRequest.is_submitted';
+  END IF;
+
+  UPDATE "model_procurement"."purchase_request"
+  SET "status" = 'APPROVED',
+      "approved_by_id" = v_actor."id",
+      "approved_by_role" = v_actor."role"
+  WHERE "id" = v_request."id"
+  RETURNING * INTO v_result;
+
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
+  VALUES ('action:approveRequest', session_user, v_principal_id, v_result."id");
+
+  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRole', v_result."approved_by_role");
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION "model_procurement"."approve_request"(uuid) FROM PUBLIC;
+
+RESET ROLE;

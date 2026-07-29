@@ -1,0 +1,91 @@
+model Procurement version "0.1.0";
+
+enum Role {
+  EMPLOYEE,
+  MANAGER,
+  FINANCE
+}
+
+enum RequestStatus {
+  DRAFT,
+  SUBMITTED,
+  APPROVED
+}
+
+entity User {
+  id: UUID @id;
+  name: String;
+  role: Role;
+}
+
+entity PurchaseRequest {
+  id: UUID @id;
+  requester: User;
+  amount: Decimal @minExclusive(0);
+  status: RequestStatus = RequestStatus.DRAFT;
+  approvedBy: User?;
+  approvedByRole: Role? @snapshot;
+
+  invariant approval_fields_match_status:
+    (
+      status == RequestStatus.APPROVED
+      and approvedBy != null
+      and approvedByRole != null
+    )
+    or
+    (
+      status != RequestStatus.APPROVED
+      and approvedBy == null
+      and approvedByRole == null
+    );
+}
+
+// Role is a single, mutually exclusive authorization role in this PoC.
+// Only EMPLOYEE principals may open requests; managers and finance users approve instead.
+action openRequest(
+  caller actor: User,
+  id: UUID,
+  amount: Decimal
+) -> PurchaseRequest {
+  authorize actor.role == Role.EMPLOYEE;
+  require positive_amount: amount > 0;
+
+  create PurchaseRequest {
+    id = id;
+    requester = actor;
+    amount = amount;
+    status = RequestStatus.DRAFT;
+    approvedBy = null;
+    approvedByRole = null;
+  }
+}
+
+action submitRequest(
+  caller actor: User,
+  request: PurchaseRequest
+) -> PurchaseRequest {
+  authorize actor == request.requester;
+  require is_draft: request.status == RequestStatus.DRAFT;
+
+  update request {
+    status = RequestStatus.SUBMITTED;
+  }
+}
+
+action approveRequest(
+  caller actor: User,
+  request: PurchaseRequest
+) -> PurchaseRequest {
+  authorize
+    (request.amount <= 10000 and actor.role == Role.MANAGER)
+    or
+    (request.amount > 10000 and actor.role == Role.FINANCE);
+
+  require is_submitted: request.status == RequestStatus.SUBMITTED;
+
+  update request {
+    status = RequestStatus.APPROVED;
+    approvedBy = actor;
+    approvedByRole = actor.role;
+  }
+}

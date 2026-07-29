@@ -1,0 +1,547 @@
+{
+  "model": {
+    "id": "model:Procurement",
+    "name": "Procurement",
+    "version": "0.1.0",
+    "sourceHash": "sha256:24fd2868fa8917ac17c9a9ca5b1f8e200a35defb3c2670c95d1bad8ad04377aa",
+    "sourceFile": "examples/procurement.model",
+    "naming": {
+      "sqlSchema": "model_procurement",
+      "internalSchema": "model_procurement_internal"
+    }
+  },
+  "enforcement": [
+    {
+      "id": "boundary:principal_binding",
+      "purpose": "Bind session_user to the model principal through an owner-controlled table.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.principal_binding"
+    },
+    {
+      "id": "boundary:owner_role",
+      "purpose": "Generated objects are owned by a non-login role that application principals cannot assume.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_owner NOLOGIN"
+    },
+    {
+      "id": "boundary:internal_schema",
+      "purpose": "Application principals cannot access principal bindings or audit storage.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_procurement_internal"
+    },
+    {
+      "id": "required:User.id",
+      "purpose": "id is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.user.id NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 16,
+        "column": 3,
+        "endLine": 16,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "annotation:User.id.id",
+      "purpose": "Enforce @id.",
+      "layer": "PostgreSQL primary key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "user_pkey",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 16,
+        "column": 3,
+        "endLine": 16,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:User.name",
+      "purpose": "name is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.user.name NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 17,
+        "column": 3,
+        "endLine": 17,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:User.role",
+      "purpose": "role is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.user.role NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 18,
+        "column": 3,
+        "endLine": 18,
+        "endColumn": 14
+      }
+    },
+    {
+      "id": "enum-membership:User.role",
+      "purpose": "role must be a declared Role member.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_user_role_enum",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 18,
+        "column": 3,
+        "endLine": 18,
+        "endColumn": 14
+      }
+    },
+    {
+      "id": "boundary:User.direct_write",
+      "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_procurement.user",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 15,
+        "column": 1,
+        "endLine": 19,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "required:PurchaseRequest.id",
+      "purpose": "id is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.id NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 22,
+        "column": 3,
+        "endLine": 22,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "annotation:PurchaseRequest.id.id",
+      "purpose": "Enforce @id.",
+      "layer": "PostgreSQL primary key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "purchase_request_pkey",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 22,
+        "column": 3,
+        "endLine": 22,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:PurchaseRequest.requester",
+      "purpose": "requester is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.requester_id NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 23,
+        "column": 3,
+        "endLine": 23,
+        "endColumn": 19
+      }
+    },
+    {
+      "id": "reference:PurchaseRequest.requester",
+      "purpose": "requester references User.",
+      "layer": "PostgreSQL foreign key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "fk_purchase_request_requester_id",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 23,
+        "column": 3,
+        "endLine": 23,
+        "endColumn": 19
+      }
+    },
+    {
+      "id": "required:PurchaseRequest.amount",
+      "purpose": "amount is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.amount NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 24,
+        "column": 3,
+        "endLine": 24,
+        "endColumn": 36
+      }
+    },
+    {
+      "id": "annotation:PurchaseRequest.amount.minExclusive",
+      "purpose": "Enforce @minExclusive(0).",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_amount_min_exclusive",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 24,
+        "column": 3,
+        "endLine": 24,
+        "endColumn": 36
+      }
+    },
+    {
+      "id": "required:PurchaseRequest.status",
+      "purpose": "status is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.status NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 25,
+        "column": 3,
+        "endLine": 25,
+        "endColumn": 47
+      }
+    },
+    {
+      "id": "enum-membership:PurchaseRequest.status",
+      "purpose": "status must be a declared RequestStatus member.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_status_enum",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 25,
+        "column": 3,
+        "endLine": 25,
+        "endColumn": 47
+      }
+    },
+    {
+      "id": "default:PurchaseRequest.status",
+      "purpose": "Apply the declared constant default for status.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.status",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 25,
+        "column": 3,
+        "endLine": 25,
+        "endColumn": 47
+      }
+    },
+    {
+      "id": "reference:PurchaseRequest.approvedBy",
+      "purpose": "approvedBy references User.",
+      "layer": "PostgreSQL foreign key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "fk_purchase_request_approved_by_id",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 26,
+        "column": 3,
+        "endLine": 26,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "enum-membership:PurchaseRequest.approvedByRole",
+      "purpose": "approvedByRole must be a declared Role member.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approved_by_role_enum",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 27,
+        "column": 3,
+        "endLine": 27,
+        "endColumn": 35
+      }
+    },
+    {
+      "id": "snapshot:PurchaseRequest.approvedByRole",
+      "purpose": "approvedByRole is a stored point-in-time audit snapshot, not a live relationship-derived value.",
+      "layer": "ModelLang storage semantics",
+      "artifact": "model.ir.json",
+      "objectName": "field:PurchaseRequest.approvedByRole",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 27,
+        "column": 3,
+        "endLine": 27,
+        "endColumn": 35
+      }
+    },
+    {
+      "id": "invariant:PurchaseRequest.approval_fields_match_status",
+      "purpose": "((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRole != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRole == null)))",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approval_fields_match_status",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 29,
+        "column": 3,
+        "endLine": 40,
+        "endColumn": 7
+      }
+    },
+    {
+      "id": "boundary:PurchaseRequest.direct_write",
+      "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_procurement.purchase_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 21,
+        "column": 1,
+        "endLine": 41,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "caller:openRequest.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 46,
+        "column": 3,
+        "endLine": 46,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:openRequest.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:openRequest",
+      "purpose": "(actor.role == Role.EMPLOYEE)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 50,
+        "column": 13,
+        "endLine": 50,
+        "endColumn": 40
+      }
+    },
+    {
+      "id": "require:openRequest.positive_amount",
+      "purpose": "(amount > 0)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 51,
+        "column": 3,
+        "endLine": 51,
+        "endColumn": 39
+      }
+    },
+    {
+      "id": "effect:openRequest",
+      "purpose": "create entity:PurchaseRequest.",
+      "layer": "PostgreSQL action function",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 45,
+        "column": 1,
+        "endLine": 61,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "lock:openRequest.actor",
+      "purpose": "Stabilize caller before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR SHARE in model_procurement.open_request"
+    },
+    {
+      "id": "caller:submitRequest.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 64,
+        "column": 3,
+        "endLine": 64,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:submitRequest.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:submitRequest",
+      "purpose": "(actor == request.requester)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 67,
+        "column": 13,
+        "endLine": 67,
+        "endColumn": 39
+      }
+    },
+    {
+      "id": "require:submitRequest.is_draft",
+      "purpose": "(request.status == RequestStatus.DRAFT)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 68,
+        "column": 3,
+        "endLine": 68,
+        "endColumn": 59
+      }
+    },
+    {
+      "id": "effect:submitRequest",
+      "purpose": "update entity:PurchaseRequest.",
+      "layer": "PostgreSQL action function",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 63,
+        "column": 1,
+        "endLine": 73,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "lock:submitRequest.request",
+      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.submit_request"
+    },
+    {
+      "id": "lock:submitRequest.actor",
+      "purpose": "Stabilize caller before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR SHARE in model_procurement.submit_request"
+    },
+    {
+      "id": "caller:approveRequest.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 76,
+        "column": 3,
+        "endLine": 76,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:approveRequest.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:approveRequest",
+      "purpose": "(((request.amount <= 10000) and (actor.role == Role.MANAGER)) or ((request.amount > 10000) and (actor.role == Role.FINANCE)))",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 80,
+        "column": 6,
+        "endLine": 82,
+        "endColumn": 59
+      }
+    },
+    {
+      "id": "require:approveRequest.is_submitted",
+      "purpose": "(request.status == RequestStatus.SUBMITTED)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 84,
+        "column": 3,
+        "endLine": 84,
+        "endColumn": 67
+      }
+    },
+    {
+      "id": "effect:approveRequest",
+      "purpose": "update entity:PurchaseRequest.",
+      "layer": "PostgreSQL action function",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 75,
+        "column": 1,
+        "endLine": 91,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "lock:approveRequest.request",
+      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.approve_request"
+    },
+    {
+      "id": "lock:approveRequest.actor",
+      "purpose": "Stabilize caller before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR SHARE in model_procurement.approve_request"
+    },
+    {
+      "id": "boundary:audit",
+      "purpose": "Record each successful action with database and model principal identities.",
+      "layer": "PostgreSQL audit",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.action_audit"
+    }
+  ]
+}

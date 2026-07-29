@@ -1,0 +1,77 @@
+import { readFile } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { Client, Pool } from "pg";
+
+export const databaseUrl = process.env.MODELLANG_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55432/modellang";
+export const demoPassword = process.env.MODELLANG_DEMO_PASSWORD ?? "modellang-demo-only";
+
+export const demoRoles = ["ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound"] as const;
+
+export function loginUrl(role: typeof demoRoles[number]): string {
+  const url = new URL(databaseUrl);
+  url.username = role;
+  url.password = demoPassword;
+  return url.toString();
+}
+
+export async function resetGeneratedSchemas(): Promise<void> {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    await client.query('DROP SCHEMA IF EXISTS "model_procurement_internal" CASCADE');
+    await client.query('DROP SCHEMA IF EXISTS "model_procurement" CASCADE');
+  } finally {
+    await client.end();
+  }
+}
+
+export async function applyGeneratedSql(options: { includeSeed?: boolean; directory?: string } = {}): Promise<void> {
+  const directory = resolve(options.directory ?? "generated/postgres");
+  const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "004_grants.sql"];
+  if (options.includeSeed) files.push("005_seed.sql");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    for (const file of files) {
+      const sql = await readFile(join(directory, file), "utf8");
+      await client.query(sql);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+export async function provisionDemoLogins(): Promise<void> {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    for (const role of demoRoles) {
+      await client.query(`DO $provision$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = '${role}') THEN
+    CREATE ROLE "${role}" LOGIN INHERIT;
+  END IF;
+END
+$provision$;`);
+      await client.query(`ALTER ROLE "${role}" LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${demoPassword.replaceAll("'", "''")}'`);
+      await client.query(`GRANT modellang_app TO "${role}"`);
+      await client.query(`REVOKE modellang_owner FROM "${role}"`);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+export async function installDemoDatabase(): Promise<void> {
+  await resetGeneratedSchemas();
+  await applyGeneratedSql();
+  await provisionDemoLogins();
+  const seed = await readFile(resolve("generated/postgres/005_seed.sql"), "utf8");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try { await client.query(seed); } finally { await client.end(); }
+}
+
+export function poolFor(role: typeof demoRoles[number]): Pool {
+  return new Pool({ connectionString: loginUrl(role), max: 2 });
+}

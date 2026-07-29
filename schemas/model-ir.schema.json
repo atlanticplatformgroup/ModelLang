@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/model-ir.schema.json",
+  "title": "ModelLang canonical IR",
+  "type": "object",
+  "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "enforcement"],
+  "properties": {
+    "irVersion": { "const": 1 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "sourceFile": { "type": "string" },
+        "naming": {
+          "type": "object",
+          "required": ["sqlSchema", "internalSchema"],
+          "properties": {
+            "sqlSchema": { "type": "string" },
+            "internalSchema": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "principal": {
+      "type": "object",
+      "required": ["entityId", "bindingMechanism"],
+      "properties": {
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "bindingMechanism": { "const": "session_user" }
+      },
+      "additionalProperties": false
+    },
+    "enums": { "type": "array" },
+    "entities": { "type": "array" },
+    "actions": { "type": "array" },
+    "enforcement": { "type": "array" }
+  },
+  "additionalProperties": false
+}

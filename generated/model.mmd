@@ -1,0 +1,29 @@
+flowchart LR
+  identity["session_user identity binding"]
+  principal["Principal: User"]
+  identity -->|binds| principal
+  entity_User["Entity: User"]
+  entity_PurchaseRequest["Entity: PurchaseRequest"]
+  entity_PurchaseRequest -->|requester| entity_User
+  entity_PurchaseRequest -->|approvedBy| entity_User
+  invariant_PurchaseRequest_approval_fields_match_status["Invariant: approval_fields_match_status"] -->|constrains| entity_PurchaseRequest
+  action_openRequest["Action: openRequest"]
+  principal -->|authenticated caller| action_openRequest
+  action_openRequest -->|creates| entity_PurchaseRequest
+  authorize_openRequest["Authorize"] -->|guards| action_openRequest
+  require_openRequest_positive_amount["Require: positive_amount"] -->|guards| action_openRequest
+  action_openRequest -->|locks share| entity_User
+  action_submitRequest["Action: submitRequest"]
+  principal -->|authenticated caller| action_submitRequest
+  action_submitRequest -->|updates| entity_PurchaseRequest
+  authorize_submitRequest["Authorize"] -->|guards| action_submitRequest
+  require_submitRequest_is_draft["Require: is_draft"] -->|guards| action_submitRequest
+  action_submitRequest -->|locks update| entity_PurchaseRequest
+  action_submitRequest -->|locks share| entity_User
+  action_approveRequest["Action: approveRequest"]
+  principal -->|authenticated caller| action_approveRequest
+  action_approveRequest -->|updates| entity_PurchaseRequest
+  authorize_approveRequest["Authorize"] -->|guards| action_approveRequest
+  require_approveRequest_is_submitted["Require: is_submitted"] -->|guards| action_approveRequest
+  action_approveRequest -->|locks update| entity_PurchaseRequest
+  action_approveRequest -->|locks share| entity_User

@@ -1,0 +1,34 @@
+{
+  "name": "modellang-poc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "modelc": "./dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run --exclude tests/integration/**",
+    "test:integration": "vitest run tests/integration",
+    "model:check": "tsx src/cli.ts check examples/procurement.model",
+    "model:generate": "tsx src/cli.ts build examples/procurement.model --out generated",
+    "db:up": "docker compose up -d --wait db",
+    "db:down": "docker compose down -v",
+    "demo": "tsx scripts/demo.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/pg": "^8.15.4",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
