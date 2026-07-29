@@ -120,3 +120,44 @@ describe("semantic analysis", () => {
     expect(failure(source).code).toBe(code);
   });
 });
+
+describe("ModelLang 0.2 temporal exclusions", () => {
+  const reservationSource = (exclusion: string) => `model Reservations version "0.2.0";
+    entity User { id: UUID @id; }
+    entity Resource { id: UUID @id; }
+    entity Reservation {
+      id: UUID @id;
+      resource: Resource;
+      startsAt: DateTime;
+      endsAt: DateTime;
+      ${exclusion}
+    }
+    action reserve(caller actor: User, id: UUID, resource: Resource, startsAt: DateTime, endsAt: DateTime) -> Reservation {
+      authorize true;
+      require valid: startsAt < endsAt;
+      create Reservation { id = id; resource = resource; startsAt = startsAt; endsAt = endsAt; }
+    }`;
+
+  it("lowers a half-open no-overlap rule into IR version 2", () => {
+    const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
+    expect(ir.irVersion).toBe(2);
+    expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
+      expect.objectContaining({
+        id: "exclusion:Reservation.no_overlap",
+        intervalBounds: "[)",
+        keyFieldId: "field:Reservation.resource",
+        startFieldId: "field:Reservation.startsAt",
+        endFieldId: "field:Reservation.endsAt",
+      }),
+    ]);
+  });
+
+  it.each([
+    ["unknown field", "exclusion no_overlap: noOverlap(room, startsAt, endsAt);", "E2501"],
+    ["optional key", "optionalResource: Resource?; exclusion no_overlap: noOverlap(optionalResource, startsAt, endsAt);", "E2502"],
+    ["non-DateTime interval", "bad: String; exclusion no_overlap: noOverlap(resource, bad, endsAt);", "E2503"],
+    ["reused interval field", "exclusion no_overlap: noOverlap(resource, startsAt, startsAt);", "E2504"],
+  ])("rejects %s", (_name, exclusion, code) => {
+    expect(failure(reservationSource(exclusion)).code).toBe(code);
+  });
+});

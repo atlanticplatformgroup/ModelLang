@@ -8,6 +8,11 @@ async function procurement() {
   return compileText(source, "examples/procurement.model");
 }
 
+async function reservations() {
+  const source = await readFile("examples/reservations.model", "utf8");
+  return compileText(source, "examples/reservations.model");
+}
+
 describe("backends", () => {
   it("generates deterministic output from IR only", async () => {
     const ir = await procurement();
@@ -17,8 +22,25 @@ describe("backends", () => {
   it("matches every committed golden artifact byte-for-byte", async () => {
     const output = generateAll(await procurement());
     for (const [path, expected] of Object.entries(output)) {
-      expect(await readFile(`generated/${path}`, "utf8"), path).toBe(expected);
+      expect(await readFile(`generated/procurement/${path}`, "utf8"), path).toBe(expected);
     }
+    const reservationOutput = generateAll(await reservations());
+    for (const [path, expected] of Object.entries(reservationOutput)) {
+      expect(await readFile(`generated/reservations/${path}`, "utf8"), `reservations/${path}`).toBe(expected);
+    }
+  });
+
+  it("emits atomic half-open temporal exclusion enforcement", async () => {
+    const output = generateAll(await reservations());
+    const schema = output["postgres/002_schema.sql"];
+    expect(schema).toContain("CREATE EXTENSION IF NOT EXISTS btree_gist");
+    expect(schema).toContain('CHECK (("starts_at" < "ends_at") IS TRUE)');
+    expect(schema).toContain("EXCLUDE USING gist");
+    expect(schema).toContain("tstzrange(\"starts_at\", \"ends_at\", '[)')");
+    expect(output["typescript/errors.ts"]).toContain('value?.code === "23P01"');
+    expect(output["typescript/errors.ts"]).toContain("class ConflictError");
+    expect(output["enforcement.md"]).toContain("exclusion:Reservation.no_overlapping_reservations");
+    expect(output["model.mmd"]).toContain("Temporal exclusion: no_overlapping_reservations");
   });
 
   it("lowers null checks as IS NULL and never = NULL", () => {

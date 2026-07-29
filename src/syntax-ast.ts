@@ -52,10 +52,19 @@ export interface InvariantDecl {
   span: Span;
 }
 
+export interface ExclusionDecl {
+  kind: "exclusion";
+  name: string;
+  keyField: string;
+  startField: string;
+  endField: string;
+  span: Span;
+}
+
 export interface EntityDecl {
   kind: "entity";
   name: string;
-  members: (FieldDecl | InvariantDecl)[];
+  members: (FieldDecl | InvariantDecl | ExclusionDecl)[];
   span: Span;
 }
 

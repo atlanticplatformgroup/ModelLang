@@ -56,6 +56,10 @@ export function assertEnforceable(ir: ModelIR): void {
       }
     }
     for (const invariant of entity.invariants) requireEntry(ir, invariant.id, invariant.span);
+    for (const exclusion of entity.temporalExclusions) {
+      requireEntry(ir, exclusion.id, exclusion.span);
+      requireEntry(ir, `derived:${exclusion.id}.valid_interval`, exclusion.span);
+    }
     requireEntry(ir, `boundary:${entity.name}.direct_write`, entity.span);
   }
   for (const action of ir.actions) checkAction(ir, action);

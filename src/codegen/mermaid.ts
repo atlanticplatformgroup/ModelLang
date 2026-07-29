@@ -12,6 +12,9 @@ export function generateMermaid(ir: ModelIR): string {
     for (const invariant of entity.invariants) {
       lines.push(`  ${safe(invariant.id)}["Invariant: ${invariant.name}"] -->|constrains| ${safe(entity.id)}`);
     }
+    for (const exclusion of entity.temporalExclusions) {
+      lines.push(`  ${safe(exclusion.id)}["Temporal exclusion: ${exclusion.name}"] -->|prevents overlap| ${safe(entity.id)}`);
+    }
   }
   for (const action of ir.actions) {
     lines.push(`  ${safe(action.id)}["Action: ${action.name}"]`);

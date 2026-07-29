@@ -5,10 +5,10 @@ import { Client } from "pg";
 import { compileFile } from "../src/compiler.js";
 import { writeGeneratedAtomically } from "../src/build.js";
 import { enforcementText } from "../src/codegen/enforcement.js";
-import { ProcurementClient } from "../generated/typescript/client.js";
+import { ProcurementClient } from "../generated/procurement/typescript/client.js";
 import {
   AuthorizationError, IdentityBindingError, PreconditionError,
-} from "../generated/typescript/errors.js";
+} from "../generated/procurement/typescript/errors.js";
 import {
   applyGeneratedSql, databaseUrl, poolFor, provisionDemoLogins, resetGeneratedSchemas,
 } from "./database.js";
@@ -31,7 +31,7 @@ async function expectError(operation: Promise<unknown>, type: new (...args: neve
 async function main(): Promise<void> {
   line(1, "Compile Procurement.model");
   const ir = await compileFile(resolve("examples/procurement.model"));
-  await writeGeneratedAtomically(ir, resolve("generated"));
+  await writeGeneratedAtomically(ir, resolve("generated/procurement"));
 
   line(2, "Apply generated SQL");
   await resetGeneratedSchemas();
@@ -39,7 +39,7 @@ async function main(): Promise<void> {
 
   line(3, "Create local demo login roles");
   await provisionDemoLogins();
-  const seed = await readFile(resolve("generated/postgres/005_seed.sql"), "utf8");
+  const seed = await readFile(resolve("generated/procurement/postgres/005_seed.sql"), "utf8");
   const admin = new Client({ connectionString: databaseUrl });
   await admin.connect();
   await admin.query(seed);

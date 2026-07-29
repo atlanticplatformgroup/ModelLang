@@ -75,7 +75,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const enforcement = buildEnforcement(entities, actions, schema, internalSchema);
   return {
-    irVersion: 1,
+    irVersion: 2,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -115,15 +115,15 @@ function collectSymbols(program: Program, file: string): Symbols {
   const fields = new Map<string, Map<string, FieldDecl>>();
   for (const entity of entities.values()) {
     const entityFields = new Map<string, FieldDecl>();
-    const invariantNames = new Set<string>();
+    const ruleNames = new Set<string>();
     for (const member of entity.members) {
       if (member.kind === "field") {
         const previous = entityFields.get(member.name);
         if (previous) throw new ModelError("E2003", `Duplicate field '${entity.name}.${member.name}'.`, member.span, file, { message: "First declared here.", span: previous.span });
         entityFields.set(member.name, member);
       } else {
-        if (invariantNames.has(member.name)) throw new ModelError("E2004", `Duplicate invariant '${entity.name}.${member.name}'.`, member.span, file);
-        invariantNames.add(member.name);
+        if (ruleNames.has(member.name)) throw new ModelError("E2004", `Duplicate entity rule '${entity.name}.${member.name}'.`, member.span, file);
+        ruleNames.add(member.name);
       }
     }
     fields.set(entity.name, entityFields);
@@ -158,6 +158,24 @@ function validateEntities(symbols: Symbols, file: string): void {
         if (!isCompileTimeConstant(field.default, symbols)) throw new ModelError("E2206", "Field defaults must be compile-time constants.", field.default.span, file);
         const typed = typeExpression(field.default, { kind: "invariant", entity }, symbols, file);
         ensureAssignable(field, typed, field.default.span, file);
+      }
+    }
+    for (const exclusion of entity.members.filter((member) => member.kind === "exclusion")) {
+      const key = symbols.fields.get(entity.name)!.get(exclusion.keyField);
+      const start = symbols.fields.get(entity.name)!.get(exclusion.startField);
+      const end = symbols.fields.get(entity.name)!.get(exclusion.endField);
+      if (!key || !start || !end) {
+        const missing = !key ? exclusion.keyField : !start ? exclusion.startField : exclusion.endField;
+        throw new ModelError("E2501", `Temporal exclusion '${exclusion.name}' references unknown field '${entity.name}.${missing}'.`, exclusion.span, file);
+      }
+      if (key.optional || !symbols.entities.has(key.type.name)) {
+        throw new ModelError("E2502", `Temporal exclusion key '${entity.name}.${key.name}' must be a required entity reference.`, key.span, file);
+      }
+      if (start.optional || end.optional || start.type.name !== "DateTime" || end.type.name !== "DateTime") {
+        throw new ModelError("E2503", `Temporal exclusion interval fields must be required DateTime fields.`, exclusion.span, file);
+      }
+      if (new Set([exclusion.keyField, exclusion.startField, exclusion.endField]).size !== 3) {
+        throw new ModelError("E2504", "Temporal exclusion key, start, and end fields must be distinct.", exclusion.span, file);
       }
     }
   }
@@ -199,11 +217,26 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
       naming: { sqlConstraint: `ck_${snakeCase(entity.name)}_${snakeCase(invariant.name)}` },
     };
   });
+  const temporalExclusions = entity.members.filter((member) => member.kind === "exclusion").map((exclusion) => ({
+    id: `exclusion:${entity.name}.${exclusion.name}`,
+    name: exclusion.name,
+    keyFieldId: `field:${entity.name}.${exclusion.keyField}`,
+    startFieldId: `field:${entity.name}.${exclusion.startField}`,
+    endFieldId: `field:${entity.name}.${exclusion.endField}`,
+    intervalBounds: "[)" as const,
+    sourceExpression: `noOverlap(${exclusion.keyField}, ${exclusion.startField}, ${exclusion.endField})`,
+    span: irSpan(exclusion.span, file),
+    naming: {
+      sqlExclusionConstraint: `ex_${snakeCase(entity.name)}_${snakeCase(exclusion.name)}`,
+      sqlValidIntervalConstraint: `ck_${snakeCase(entity.name)}_${snakeCase(exclusion.name)}_valid_interval`,
+    },
+  }));
   return {
     id: `entity:${entity.name}`,
     name: entity.name,
     fields,
     invariants,
+    temporalExclusions,
     idFieldId: id.id,
     span: irSpan(entity.span, file),
     naming: { sqlTable: snakeCase(entity.name), typescriptName: entity.name },
@@ -350,7 +383,9 @@ function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, 
     return { kind: "nullComparison", operator: expression.operator === "==" ? "isNull" : "isNotNull", operand, type: "Boolean", nullable: false };
   }
   if (["<", "<=", ">", ">="].includes(expression.operator)) {
-    if (!isNumeric(left.type) || !isNumeric(right.type)) throw new ModelError("E2403", "Ordering comparisons require numeric operands.", expression.span, file);
+    const compatibleOrdering = (isNumeric(left.type) && isNumeric(right.type))
+      || (left.type === "DateTime" && right.type === "DateTime");
+    if (!compatibleOrdering) throw new ModelError("E2403", "Ordering comparisons require compatible numeric or DateTime operands.", expression.span, file);
   } else if (!compatibleTypes(left.type, right.type)) {
     throw new ModelError("E2404", `Cannot compare ${left.type} to ${right.type}.`, expression.span, file);
   }
@@ -471,6 +506,24 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], schema: str
       }
     }
     for (const invariant of entity.invariants) entries.push({ id: invariant.id, purpose: invariant.sourceExpression, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: invariant.naming.sqlConstraint, source: invariant.span });
+    for (const exclusion of entity.temporalExclusions) {
+      entries.push({
+        id: exclusion.id,
+        purpose: `${exclusion.sourceExpression} rejects overlapping half-open intervals for the same key.`,
+        layer: "PostgreSQL exclusion constraint",
+        artifact: "postgres/002_schema.sql",
+        objectName: exclusion.naming.sqlExclusionConstraint,
+        source: exclusion.span,
+      });
+      entries.push({
+        id: `derived:${exclusion.id}.valid_interval`,
+        purpose: "Require interval start to be strictly before interval end.",
+        layer: "PostgreSQL check constraint",
+        artifact: "postgres/002_schema.sql",
+        objectName: exclusion.naming.sqlValidIntervalConstraint,
+        source: exclusion.span,
+      });
+    }
     entries.push({ id: `boundary:${entity.name}.direct_write`, purpose: "Application principals cannot directly mutate entity rows.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
   }
   for (const action of actions) {

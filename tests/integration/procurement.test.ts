@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ProcurementClient } from "../../generated/typescript/client.js";
+import { ProcurementClient } from "../../generated/procurement/typescript/client.js";
 import {
   AuthorizationError, IdentityBindingError, PreconditionError,
-} from "../../generated/typescript/errors.js";
+} from "../../generated/procurement/typescript/errors.js";
 import {
   databaseUrl, installDemoDatabase, loginUrl, poolFor,
 } from "../../scripts/database.js";

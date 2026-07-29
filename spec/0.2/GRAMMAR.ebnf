@@ -1,0 +1,43 @@
+program          = model_decl, { declaration } ;
+model_decl       = "model", IDENT, "version", STRING, ";" ;
+declaration      = enum_decl | entity_decl | action_decl ;
+
+enum_decl        = "enum", IDENT, "{", IDENT, { ",", IDENT }, [ "," ], "}" ;
+entity_decl      = "entity", IDENT, "{",
+                   { field_decl | invariant_decl | exclusion_decl }, "}" ;
+field_decl       = IDENT, ":", type_ref, [ "?" ],
+                   [ "=", expression ], { annotation }, ";" ;
+annotation       = "@id"
+                 | "@unique"
+                 | "@min", "(", NUMBER, ")"
+                 | "@minExclusive", "(", NUMBER, ")"
+                 | "@max", "(", NUMBER, ")"
+                 | "@snapshot" ;
+invariant_decl   = "invariant", IDENT, ":", expression, ";" ;
+exclusion_decl   = "exclusion", IDENT, ":",
+                   "noOverlap", "(", IDENT, ",", IDENT, ",", IDENT, ")", ";" ;
+
+action_decl      = "action", IDENT, "(", [ parameter_list ], ")",
+                   "->", IDENT, "{", authorize_stmt,
+                   { require_stmt }, effect_stmt, "}" ;
+parameter_list   = parameter, { ",", parameter } ;
+parameter        = [ "caller" ], IDENT, ":", type_ref ;
+authorize_stmt   = "authorize", expression, ";" ;
+require_stmt     = "require", IDENT, ":", expression, ";" ;
+effect_stmt      = create_stmt | update_stmt ;
+create_stmt      = "create", IDENT, "{", { assignment }, "}" ;
+update_stmt      = "update", IDENT, "{", { assignment }, "}" ;
+assignment       = IDENT, "=", expression, ";" ;
+
+type_ref         = scalar_type | IDENT ;
+scalar_type      = "String" | "Int" | "Decimal" | "Boolean"
+                 | "UUID" | "DateTime" ;
+expression       = or_expr ;
+or_expr          = and_expr, { "or", and_expr } ;
+and_expr         = unary_expr, { "and", unary_expr } ;
+unary_expr       = [ "not" ], comparison ;
+comparison       = primary, [ comparison_op, primary ] ;
+comparison_op    = "==" | "!=" | "<" | "<=" | ">" | ">=" ;
+primary          = literal | path | "(", expression, ")" ;
+path             = IDENT, { ".", IDENT } ;
+literal          = STRING | NUMBER | "true" | "false" | "null" ;

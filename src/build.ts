@@ -24,14 +24,14 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   return files;
 }
 
-export async function writeGeneratedAtomically(ir: ModelIR, outputDirectory: string): Promise<void> {
+async function writeFilesAtomically(files: GeneratedFiles, outputDirectory: string): Promise<void> {
   const output = resolve(outputDirectory);
   const parent = dirname(output);
   const temporary = join(parent, `.modellang-${randomUUID()}`);
   const backup = join(parent, `.modellang-backup-${randomUUID()}`);
   await mkdir(temporary, { recursive: true });
   try {
-    for (const [relative, content] of Object.entries(generateAll(ir))) {
+    for (const [relative, content] of Object.entries(files)) {
       const path = join(temporary, relative);
       await mkdir(dirname(path), { recursive: true });
       await writeFile(path, content, "utf8");
@@ -54,4 +54,17 @@ export async function writeGeneratedAtomically(ir: ModelIR, outputDirectory: str
     await rm(temporary, { recursive: true, force: true });
     throw error;
   }
+}
+
+export async function writeGeneratedAtomically(ir: ModelIR, outputDirectory: string): Promise<void> {
+  await writeFilesAtomically(generateAll(ir), outputDirectory);
+}
+
+export async function writeGeneratedModelsAtomically(models: Readonly<Record<string, ModelIR>>, outputDirectory: string): Promise<void> {
+  const files: GeneratedFiles = {};
+  for (const [modelName, ir] of Object.entries(models)) {
+    if (!/^[a-z][a-z0-9_-]*$/.test(modelName)) throw new Error(`E5002 Invalid generated model directory '${modelName}'.`);
+    for (const [path, content] of Object.entries(generateAll(ir))) files[`${modelName}/${path}`] = content;
+  }
+  await writeFilesAtomically(files, outputDirectory);
 }

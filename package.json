@@ -1,6 +1,6 @@
 {
   "name": "modellang-poc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -9,13 +9,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:unit": "vitest run --exclude tests/integration/**",
+    "test:unit": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "vitest run tests/integration",
-    "model:check": "tsx src/cli.ts check examples/procurement.model",
-    "model:generate": "tsx src/cli.ts build examples/procurement.model --out generated",
+    "model:check": "tsx scripts/check-models.ts",
+    "model:generate": "tsx scripts/generate-models.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down -v",
-    "demo": "tsx scripts/demo.ts"
+    "demo": "tsx scripts/demo.ts",
+    "demo:reservations": "tsx scripts/demo-reservations.ts"
   },
   "dependencies": {
     "ajv": "^8.20.0",

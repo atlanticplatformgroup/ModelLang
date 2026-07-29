@@ -112,6 +112,9 @@ function generateSchema(ir: ModelIR): string {
   const internal = ir.model.naming.internalSchema;
   const lines = [
     `-- source ${ir.model.sourceHash}`,
+    ...(ir.entities.some((entity) => entity.temporalExclusions.length > 0)
+      ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;", ""]
+      : []),
     `CREATE SCHEMA ${quoteIdent(schema)} AUTHORIZATION modellang_owner;`,
     `CREATE SCHEMA ${quoteIdent(internal)} AUTHORIZATION modellang_owner;`,
     "SET ROLE modellang_owner;",
@@ -151,6 +154,15 @@ function generateSchema(ir: ModelIR): string {
     }
     for (const invariant of entity.invariants) {
       constraints.push(`  CONSTRAINT ${quoteIdent(invariant.naming.sqlConstraint)} CHECK ((${lowerExpression(invariant.expression, { ir, selfEntity: entity })}) IS TRUE)`);
+    }
+    for (const exclusion of entity.temporalExclusions) {
+      const key = fieldById(ir, exclusion.keyFieldId).field;
+      const start = fieldById(ir, exclusion.startFieldId).field;
+      const end = fieldById(ir, exclusion.endFieldId).field;
+      constraints.push(
+        `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlValidIntervalConstraint)} CHECK ((${quoteIdent(start.naming.sqlColumn)} < ${quoteIdent(end.naming.sqlColumn)}) IS TRUE)`,
+        `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlExclusionConstraint)} EXCLUDE USING gist (${quoteIdent(key.naming.sqlColumn)} WITH =, pg_catalog.tstzrange(${quoteIdent(start.naming.sqlColumn)}, ${quoteIdent(end.naming.sqlColumn)}, '${exclusion.intervalBounds}') WITH &&)`,
+      );
     }
     lines.push(`CREATE TABLE ${qname(schema, entity.naming.sqlTable)} (\n${[...columns, ...constraints].join(",\n")}\n);`, "");
   }
@@ -371,6 +383,26 @@ function generateGrants(ir: ModelIR): string {
 }
 
 function generateSeed(ir: ModelIR): string {
+  if (ir.model.name === "Reservations") {
+    const schema = ir.model.naming.sqlSchema;
+    const internal = ir.model.naming.internalSchema;
+    return `-- Example-only deterministic seed. Demo login roles must exist before applying this file.
+SET ROLE modellang_owner;
+
+INSERT INTO ${qname(schema, "user")} (${quoteIdent("id")}, ${quoteIdent("name")}) VALUES
+  ('10000000-0000-4000-8000-000000000001', 'Reserver One'),
+  ('10000000-0000-4000-8000-000000000002', 'Reserver Two');
+
+INSERT INTO ${qname(schema, "resource")} (${quoteIdent("id")}, ${quoteIdent("name")}) VALUES
+  ('20000000-0000-4000-8000-000000000001', 'Conference Room A');
+
+INSERT INTO ${qname(internal, "principal_binding")} (${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}) VALUES
+  ('ml_reserver_one', '10000000-0000-4000-8000-000000000001'),
+  ('ml_reserver_two', '10000000-0000-4000-8000-000000000002');
+
+RESET ROLE;
+`;
+  }
   if (ir.model.name !== "Procurement") {
     return "-- Example seed data is defined only for the Procurement demonstration model.\n";
   }

@@ -1,0 +1,17 @@
+flowchart LR
+  identity["session_user identity binding"]
+  principal["Principal: User"]
+  identity -->|binds| principal
+  entity_User["Entity: User"]
+  entity_Resource["Entity: Resource"]
+  entity_Reservation["Entity: Reservation"]
+  entity_Reservation -->|resource| entity_Resource
+  entity_Reservation -->|reservedBy| entity_User
+  exclusion_Reservation_no_overlapping_reservations["Temporal exclusion: no_overlapping_reservations"] -->|prevents overlap| entity_Reservation
+  action_reserve["Action: reserve"]
+  principal -->|authenticated caller| action_reserve
+  action_reserve -->|creates| entity_Reservation
+  authorize_reserve["Authorize"] -->|guards| action_reserve
+  require_reserve_valid_interval["Require: valid_interval"] -->|guards| action_reserve
+  action_reserve -->|locks share| entity_Resource
+  action_reserve -->|locks share| entity_User

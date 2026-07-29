@@ -51,11 +51,27 @@ export interface IRInvariant {
   naming: { sqlConstraint: string };
 }
 
+export interface IRTemporalExclusion {
+  id: string;
+  name: string;
+  keyFieldId: string;
+  startFieldId: string;
+  endFieldId: string;
+  intervalBounds: "[)";
+  sourceExpression: string;
+  span: IRSpan;
+  naming: {
+    sqlExclusionConstraint: string;
+    sqlValidIntervalConstraint: string;
+  };
+}
+
 export interface IREntity {
   id: string;
   name: string;
   fields: IRField[];
   invariants: IRInvariant[];
+  temporalExclusions: IRTemporalExclusion[];
   idFieldId: string;
   span: IRSpan;
   naming: { sqlTable: string; typescriptName: string };
@@ -120,7 +136,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 1;
+  irVersion: 2;
   model: {
     id: string;
     name: string;

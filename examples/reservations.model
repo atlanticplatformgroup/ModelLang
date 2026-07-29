@@ -1,0 +1,41 @@
+model Reservations version "0.2.0";
+
+entity User {
+  id: UUID @id;
+  name: String;
+}
+
+entity Resource {
+  id: UUID @id;
+  name: String @unique;
+}
+
+entity Reservation {
+  id: UUID @id;
+  resource: Resource;
+  reservedBy: User;
+  startsAt: DateTime;
+  endsAt: DateTime;
+
+  exclusion no_overlapping_reservations:
+    noOverlap(resource, startsAt, endsAt);
+}
+
+action reserve(
+  caller actor: User,
+  id: UUID,
+  resource: Resource,
+  startsAt: DateTime,
+  endsAt: DateTime
+) -> Reservation {
+  authorize true;
+  require valid_interval: startsAt < endsAt;
+
+  create Reservation {
+    id = id;
+    resource = resource;
+    reservedBy = actor;
+    startsAt = startsAt;
+    endsAt = endsAt;
+  }
+}

@@ -1,8 +1,8 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
-  ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, Expression,
-  FieldDecl, InvariantDecl, ParameterDecl, Program, RequireDecl, TypeRef,
+  ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, ExclusionDecl,
+  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, RequireDecl, TypeRef,
 } from "./syntax-ast.js";
 
 const binaryPrecedence: Partial<Record<string, number>> = {
@@ -84,9 +84,11 @@ class Parser {
     const start = this.expectWord("entity");
     const name = this.identifier();
     this.expect("{");
-    const members: (FieldDecl | InvariantDecl)[] = [];
+    const members: EntityDecl["members"] = [];
     while (!this.at("}")) {
-      members.push(this.atWord("invariant") ? this.parseInvariant() : this.parseField());
+      if (this.atWord("invariant")) members.push(this.parseInvariant());
+      else if (this.atWord("exclusion")) members.push(this.parseExclusion());
+      else members.push(this.parseField());
     }
     const end = this.expect("}");
     return { kind: "entity", name: name.text, members, span: this.span(start, end) };
@@ -129,6 +131,29 @@ class Parser {
     const expression = this.parseExpression();
     const end = this.expect(";");
     return { kind: "invariant", name: name.text, expression, span: this.span(start, end) };
+  }
+
+  private parseExclusion(): ExclusionDecl {
+    const start = this.expectWord("exclusion");
+    const name = this.identifier();
+    this.expect(":");
+    this.expectWord("noOverlap");
+    this.expect("(");
+    const keyField = this.identifier("Expected exclusion key field.");
+    this.expect(",");
+    const startField = this.identifier("Expected exclusion interval start field.");
+    this.expect(",");
+    const endField = this.identifier("Expected exclusion interval end field.");
+    this.expect(")");
+    const end = this.expect(";");
+    return {
+      kind: "exclusion",
+      name: name.text,
+      keyField: keyField.text,
+      startField: startField.text,
+      endField: endField.text,
+      span: this.span(start, end),
+    };
   }
 
   private parseAction(): ActionDecl {

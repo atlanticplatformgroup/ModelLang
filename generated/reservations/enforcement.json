@@ -1,0 +1,400 @@
+{
+  "model": {
+    "id": "model:Reservations",
+    "name": "Reservations",
+    "version": "0.2.0",
+    "sourceHash": "sha256:386da6e420628329e1e9d39ef20fe2ba412f2a6bc7291517e7a7cbff44b7aad5",
+    "sourceFile": "examples/reservations.model",
+    "naming": {
+      "sqlSchema": "model_reservations",
+      "internalSchema": "model_reservations_internal"
+    }
+  },
+  "enforcement": [
+    {
+      "id": "boundary:principal_binding",
+      "purpose": "Bind session_user to the model principal through an owner-controlled table.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.principal_binding"
+    },
+    {
+      "id": "boundary:owner_role",
+      "purpose": "Generated objects are owned by a non-login role that application principals cannot assume.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_owner NOLOGIN"
+    },
+    {
+      "id": "boundary:internal_schema",
+      "purpose": "Application principals cannot access principal bindings or audit storage.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations_internal"
+    },
+    {
+      "id": "required:User.id",
+      "purpose": "id is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.user.id NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 4,
+        "column": 3,
+        "endLine": 4,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "annotation:User.id.id",
+      "purpose": "Enforce @id.",
+      "layer": "PostgreSQL primary key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "user_pkey",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 4,
+        "column": 3,
+        "endLine": 4,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:User.name",
+      "purpose": "name is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.user.name NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 5,
+        "column": 3,
+        "endLine": 5,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "boundary:User.direct_write",
+      "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.user",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 3,
+        "column": 1,
+        "endLine": 6,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "required:Resource.id",
+      "purpose": "id is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.resource.id NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 9,
+        "column": 3,
+        "endLine": 9,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "annotation:Resource.id.id",
+      "purpose": "Enforce @id.",
+      "layer": "PostgreSQL primary key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "resource_pkey",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 9,
+        "column": 3,
+        "endLine": 9,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:Resource.name",
+      "purpose": "name is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.resource.name NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 10,
+        "column": 3,
+        "endLine": 10,
+        "endColumn": 24
+      }
+    },
+    {
+      "id": "annotation:Resource.name.unique",
+      "purpose": "Enforce @unique.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "uq_resource_name_unique",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 10,
+        "column": 3,
+        "endLine": 10,
+        "endColumn": 24
+      }
+    },
+    {
+      "id": "boundary:Resource.direct_write",
+      "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 8,
+        "column": 1,
+        "endLine": 11,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "required:Reservation.id",
+      "purpose": "id is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.id NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 14,
+        "column": 3,
+        "endLine": 14,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "annotation:Reservation.id.id",
+      "purpose": "Enforce @id.",
+      "layer": "PostgreSQL primary key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "reservation_pkey",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 14,
+        "column": 3,
+        "endLine": 14,
+        "endColumn": 16
+      }
+    },
+    {
+      "id": "required:Reservation.resource",
+      "purpose": "resource is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.resource_id NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 15,
+        "column": 3,
+        "endLine": 15,
+        "endColumn": 22
+      }
+    },
+    {
+      "id": "reference:Reservation.resource",
+      "purpose": "resource references Resource.",
+      "layer": "PostgreSQL foreign key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "fk_reservation_resource_id",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 15,
+        "column": 3,
+        "endLine": 15,
+        "endColumn": 22
+      }
+    },
+    {
+      "id": "required:Reservation.reservedBy",
+      "purpose": "reservedBy is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.reserved_by_id NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 16,
+        "column": 3,
+        "endLine": 16,
+        "endColumn": 20
+      }
+    },
+    {
+      "id": "reference:Reservation.reservedBy",
+      "purpose": "reservedBy references User.",
+      "layer": "PostgreSQL foreign key",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "fk_reservation_reserved_by_id",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 16,
+        "column": 3,
+        "endLine": 16,
+        "endColumn": 20
+      }
+    },
+    {
+      "id": "required:Reservation.startsAt",
+      "purpose": "startsAt is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.starts_at NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 17,
+        "column": 3,
+        "endLine": 17,
+        "endColumn": 22
+      }
+    },
+    {
+      "id": "required:Reservation.endsAt",
+      "purpose": "endsAt is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.ends_at NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 18,
+        "column": 3,
+        "endLine": 18,
+        "endColumn": 20
+      }
+    },
+    {
+      "id": "exclusion:Reservation.no_overlapping_reservations",
+      "purpose": "noOverlap(resource, startsAt, endsAt) rejects overlapping half-open intervals for the same key.",
+      "layer": "PostgreSQL exclusion constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ex_reservation_no_overlapping_reservations",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 21,
+        "endColumn": 43
+      }
+    },
+    {
+      "id": "derived:exclusion:Reservation.no_overlapping_reservations.valid_interval",
+      "purpose": "Require interval start to be strictly before interval end.",
+      "layer": "PostgreSQL check constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_reservation_no_overlapping_reservations_valid_interval",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 21,
+        "endColumn": 43
+      }
+    },
+    {
+      "id": "boundary:Reservation.direct_write",
+      "purpose": "Application principals cannot directly mutate entity rows.",
+      "layer": "PostgreSQL privilege",
+      "artifact": "postgres/004_grants.sql",
+      "objectName": "model_reservations.reservation",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 13,
+        "column": 1,
+        "endLine": 22,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "caller:reserve.actor",
+      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
+      "layer": "PostgreSQL session identity",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 25,
+        "column": 3,
+        "endLine": 25,
+        "endColumn": 21
+      }
+    },
+    {
+      "id": "boundary:reserve.safe_search_path",
+      "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
+      "layer": "PostgreSQL function configuration",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "authorize:reserve",
+      "purpose": "true",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 31,
+        "column": 13,
+        "endLine": 31,
+        "endColumn": 17
+      }
+    },
+    {
+      "id": "require:reserve.valid_interval",
+      "purpose": "(startsAt < endsAt)",
+      "layer": "PostgreSQL action guard",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 32,
+        "column": 3,
+        "endLine": 32,
+        "endColumn": 45
+      }
+    },
+    {
+      "id": "effect:reserve",
+      "purpose": "create entity:Reservation.",
+      "layer": "PostgreSQL action function",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 24,
+        "column": 1,
+        "endLine": 41,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "lock:reserve.resource",
+      "purpose": "Stabilize parameter:reserve.resource before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR SHARE in model_reservations.reserve"
+    },
+    {
+      "id": "lock:reserve.actor",
+      "purpose": "Stabilize caller before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR SHARE in model_reservations.reserve"
+    },
+    {
+      "id": "boundary:audit",
+      "purpose": "Record each successful action with database and model principal identities.",
+      "layer": "PostgreSQL audit",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations_internal.action_audit"
+    }
+  ]
+}

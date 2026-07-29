@@ -1,8 +1,11 @@
-# ModelLang proof of concept
+# ModelLang 0.2 reference compiler
 
 ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR, constrained tables, authenticated and concurrency-safe action functions, an action-only TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
 
-The included Procurement model proves that permitted transitions succeed while caller impersonation, stale authorization, invalid transitions, and direct application-table mutation fail.
+Two canonical applications drive the language:
+
+- Procurement proves authenticated callers, guarded state transitions, audit snapshots, stale-read prevention, and restricted mutation authority.
+- Reservations proves temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
 
 ## Quick start
 
@@ -16,6 +19,7 @@ npm run model:generate
 npm run db:up
 npm test
 npm run demo
+npm run demo:reservations
 ```
 
 Stop and delete the local demo database with:
@@ -38,7 +42,7 @@ During development, invoke the compiler through the package scripts or `tsx`:
 
 ```bash
 npx tsx src/cli.ts check examples/procurement.model
-npx tsx src/cli.ts build examples/procurement.model --out generated
+npx tsx src/cli.ts build examples/procurement.model --out generated/scratch
 npx tsx src/cli.ts print-ir examples/procurement.model
 npx tsx src/cli.ts explain examples/procurement.model
 ```
@@ -53,19 +57,19 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-`generated/model.ir.json` is the only backend input. It retains qualified semantic IDs, typed expression trees, nullability, source spans, caller metadata, callable parameters, and canonical lock plans. The committed `generated/` tree is also the golden fixture for the Procurement example.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 2 retains qualified semantic IDs, typed expression trees, nullability, source spans, caller metadata, callable parameters, canonical lock plans, snapshot storage semantics, and temporal exclusions. Both committed subtrees are golden fixtures.
 
 The PostgreSQL backend emits:
 
 - roles and ownership;
-- entity tables, foreign keys, enum checks, annotations, and invariants;
+- entity tables, foreign keys, enum checks, annotations, invariants, and temporal exclusion constraints;
 - `SECURITY DEFINER` action functions;
 - least-privilege grants;
 - example-only deterministic seed data.
 
-The TypeScript backend exposes only `openRequest`, `submitRequest`, and `approveRequest`. It has no generic mutation API. Caller identity is not an input field and is never forwarded as a SQL argument.
+The generated TypeScript clients expose only declared actions. They have no generic mutation API. Caller identity is not an input field and is never forwarded as a SQL argument. PostgreSQL exclusion failures map to typed `ConflictError`.
 
-`generated/model.mmd`, `generated/enforcement.json`, and `generated/enforcement.md` make the relationship between declarations and executable enforcement visible.
+Each generated subtree contains `model.mmd`, `enforcement.json`, and `enforcement.md`, making the relationship between declarations and executable enforcement visible.
 
 ## Explicit language semantics
 
@@ -75,6 +79,7 @@ The TypeScript backend exposes only `openRequest`, `submitRequest`, and `approve
 - `@snapshot` is valid only on stored scalar or enum entity fields and marks a point-in-time audit copy. The compiler never auto-populates it: an action must explicitly assign either `null` or a direct field value such as `actor.role`. That value is copied into the row; later changes to the source field do not propagate. ModelLang deliberately has no relationship traversal or computed relationship field syntax.
 - `PurchaseRequest.amount` uses `@minExclusive(0)`, so zero is never valid in storage. `openRequest` retains `positive_amount` as an action-level, named guard and clearer diagnostic; the two layers are intentionally defense in depth.
 - `Role` is a single, mutually exclusive authorization role in this proof of concept, not a job-title hierarchy. Therefore only `EMPLOYEE` principals may open requests. Supporting employees who also hold manager or finance permissions requires the next language boundary: role sets or a dedicated permission relation.
+- `noOverlap(resource, startsAt, endsAt)` defines required half-open intervals `[start, end)`. Adjacent reservations are legal; overlapping intervals for the same entity identity are rejected atomically. The PostgreSQL backend emits a strict interval check and GiST exclusion constraint.
 
 ## Security guarantee and trust boundary
 
@@ -104,6 +109,7 @@ The integration suite proves concurrency with transaction barriers and observed 
 - a request amount changed while approval waits is re-read and re-authorized;
 - a manager role changed while approval waits is re-read and re-authorized;
 - two concurrent approvals yield exactly one success, one failed precondition, and one audit record.
+- a concurrent overlapping reservation waits on PostgreSQL’s exclusion constraint, then exactly one reservation and audit record survive.
 
 ## Tests
 
@@ -119,14 +125,14 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, duplicate and unknown declarations, IDs and annotations, caller rules, type/null semantics, disallowed traversal, action targets and assignments, lock planning, deterministic IR/output, SQL null lowering, callable identity omission, privileges, typed client errors, auditing, invariants, and real races.
+The full suite validates parsing and spans, duplicate and unknown declarations, IDs and annotations, caller rules, type/null semantics, DateTime ordering, temporal exclusion definitions, disallowed traversal, action targets and assignments, lock planning, deterministic IR/output, SQL null lowering, callable identity omission, privileges, typed client errors, auditing, invariants, half-open adjacency, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
 - Enums use text plus named `CHECK` constraints for deterministic DDL and explicit migration control.
 - Expressions support literals, paths, Boolean operators, and comparisons only. Arithmetic, string operations, aggregates, and computed values require explicit future semantics.
 - One PostgreSQL login per demo user is the identity adapter. A production gateway may replace it only if callers still cannot choose arbitrary principal IDs.
-- Lock planning is sound for finite entity rows identified by action parameters. Collection predicates, aggregates, absence checks, and phantom-sensitive rules need a stronger isolation design.
+- Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The language and acceptance criteria are in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.2 language is in [spec/0.2/LANGUAGE.md](./spec/0.2/LANGUAGE.md), with its [grammar](./spec/0.2/GRAMMAR.ebnf), [conformance requirements](./spec/0.2/CONFORMANCE.md), and [unstable boundaries](./spec/0.2/UNSTABLE.md). The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

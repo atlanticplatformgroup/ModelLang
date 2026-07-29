@@ -5,7 +5,10 @@ import { Client, Pool } from "pg";
 export const databaseUrl = process.env.MODELLANG_DATABASE_URL ?? "postgresql://postgres:postgres@127.0.0.1:55432/modellang";
 export const demoPassword = process.env.MODELLANG_DEMO_PASSWORD ?? "modellang-demo-only";
 
-export const demoRoles = ["ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound"] as const;
+export const demoRoles = [
+  "ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound",
+  "ml_reserver_one", "ml_reserver_two",
+] as const;
 
 export function loginUrl(role: typeof demoRoles[number]): string {
   const url = new URL(databaseUrl);
@@ -14,19 +17,23 @@ export function loginUrl(role: typeof demoRoles[number]): string {
   return url.toString();
 }
 
-export async function resetGeneratedSchemas(): Promise<void> {
+export async function resetModelSchemas(modelName: "procurement" | "reservations"): Promise<void> {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try {
-    await client.query('DROP SCHEMA IF EXISTS "model_procurement_internal" CASCADE');
-    await client.query('DROP SCHEMA IF EXISTS "model_procurement" CASCADE');
+    await client.query(`DROP SCHEMA IF EXISTS "model_${modelName}_internal" CASCADE`);
+    await client.query(`DROP SCHEMA IF EXISTS "model_${modelName}" CASCADE`);
   } finally {
     await client.end();
   }
 }
 
+export async function resetGeneratedSchemas(): Promise<void> {
+  await resetModelSchemas("procurement");
+}
+
 export async function applyGeneratedSql(options: { includeSeed?: boolean; directory?: string } = {}): Promise<void> {
-  const directory = resolve(options.directory ?? "generated/postgres");
+  const directory = resolve(options.directory ?? "generated/procurement/postgres");
   const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "004_grants.sql"];
   if (options.includeSeed) files.push("005_seed.sql");
   const client = new Client({ connectionString: databaseUrl });
@@ -66,7 +73,17 @@ export async function installDemoDatabase(): Promise<void> {
   await resetGeneratedSchemas();
   await applyGeneratedSql();
   await provisionDemoLogins();
-  const seed = await readFile(resolve("generated/postgres/005_seed.sql"), "utf8");
+  const seed = await readFile(resolve("generated/procurement/postgres/005_seed.sql"), "utf8");
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try { await client.query(seed); } finally { await client.end(); }
+}
+
+export async function installReservationsDatabase(): Promise<void> {
+  await resetModelSchemas("reservations");
+  await applyGeneratedSql({ directory: "generated/reservations/postgres" });
+  await provisionDemoLogins();
+  const seed = await readFile(resolve("generated/reservations/postgres/005_seed.sql"), "utf8");
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
   try { await client.query(seed); } finally { await client.end(); }
