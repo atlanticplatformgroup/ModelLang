@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
 import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
+import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import type {
-  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl,
+  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl, TypeRef,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
@@ -41,6 +42,7 @@ function expressionText(expression: Expression): string {
   switch (expression.kind) {
     case "literal":
       return expression.literalKind === "string" ? JSON.stringify(expression.value) : String(expression.value);
+    case "moneyLiteral": return `${expression.currency} ${expression.amount}`;
     case "path": return expression.parts.join(".");
     case "unary": return `not ${expressionText(expression.operand)}`;
     case "binary": return `(${expressionText(expression.left)} ${expression.operator} ${expressionText(expression.right)})`;
@@ -146,7 +148,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const enforcement = buildEnforcement(enums, entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 7,
+    irVersion: 8,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -234,7 +236,7 @@ function validateEntities(symbols: Symbols, stableIds: Map<string, Span>, file: 
       if (field.type.collection === "set" && !symbols.enums.has(field.type.name)) {
         throw new ModelError("E2701", `Set element type '${field.type.name}' must be a declared enum.`, field.type.span, file);
       }
-      if (!field.type.collection && !scalars.has(field.type.name) && !symbols.enums.has(field.type.name) && !symbols.entities.has(field.type.name)) {
+      if (!field.type.moneyCurrency && !field.type.collection && !scalars.has(field.type.name) && !symbols.enums.has(field.type.name) && !symbols.entities.has(field.type.name)) {
         throw new ModelError("E2005", `Unknown type '${field.type.name}'.`, field.type.span, file);
       }
       const annotationNames = new Set<string>();
@@ -248,8 +250,16 @@ function validateEntities(symbols: Symbols, stableIds: Map<string, Span>, file: 
         if (field.type.collection === "set" && annotation.name !== "snapshot" && annotation.name !== "immutable") {
           throw new ModelError("E2702", `@${annotation.name} is not supported on enum-set fields in 0.4.`, annotation.span, file);
         }
-        if ((annotation.name === "min" || annotation.name === "minExclusive" || annotation.name === "max") && !["Int", "Decimal"].includes(field.type.name)) {
-          throw new ModelError("E2204", `@${annotation.name} is valid only on Int and Decimal fields.`, annotation.span, file);
+        if ((annotation.name === "min" || annotation.name === "minExclusive" || annotation.name === "max")
+          && !["Int", "Decimal"].includes(field.type.name) && !field.type.moneyCurrency) {
+          throw new ModelError("E2204", `@${annotation.name} is valid only on Int, Decimal, and Money fields.`, annotation.span, file);
+        }
+        if ((annotation.name === "min" || annotation.name === "minExclusive" || annotation.name === "max") && field.type.moneyCurrency) {
+          const profile = moneyProfile(field.type.moneyCurrency)!;
+          const invalid = validateMoneyAmount(String(annotation.value), profile);
+          if (invalid) {
+            throw new ModelError("E2902", `Invalid ${profile.currency} value in @${annotation.name}: ${invalid}.`, annotation.span, file);
+          }
         }
         if (annotation.name === "unique" && field.optional) throw new ModelError("E2205", "@unique is not supported on optional fields.", annotation.span, file);
         if (annotation.name === "snapshot" && symbols.entities.has(field.type.name)) {
@@ -326,15 +336,20 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
 }
 
 function isCompileTimeConstant(expression: Expression, symbols: Symbols): boolean {
-  return expression.kind === "literal"
+  return expression.kind === "literal" || expression.kind === "moneyLiteral"
     || (expression.kind === "path" && expression.parts.length === 2 && Boolean(symbols.enums.get(expression.parts[0]!)?.members.some((member) => member.name === expression.parts[1])));
 }
 
+function resolvedType(type: TypeRef, symbols: Symbols): string {
+  if (type.moneyCurrency) return moneyType(moneyProfile(type.moneyCurrency)!);
+  if (type.collection === "set") return `set:${enumId(symbols.enums.get(type.name)!)}`;
+  if (symbols.entities.has(type.name)) return entityId(symbols.entities.get(type.name)!);
+  if (symbols.enums.has(type.name)) return enumId(symbols.enums.get(type.name)!);
+  return type.name;
+}
+
 function fieldType(field: FieldDecl, symbols: Symbols): string {
-  if (field.type.collection === "set") return `set:${enumId(symbols.enums.get(field.type.name)!)}`;
-  if (symbols.entities.has(field.type.name)) return entityId(symbols.entities.get(field.type.name)!);
-  if (symbols.enums.has(field.type.name)) return enumId(symbols.enums.get(field.type.name)!);
-  return field.type.name;
+  return resolvedType(field.type, symbols);
 }
 
 function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREntity {
@@ -414,14 +429,10 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     if (previous) throw new ModelError("E2305", `Duplicate parameter '${parameter.name}'.`, parameter.span, file, { message: "First declared here.", span: previous });
     seen.set(parameter.name, parameter.span);
     if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
-    if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
+    if (!parameter.type.moneyCurrency && !scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
-    const type = symbols.entities.has(parameter.type.name)
-      ? entityId(symbols.entities.get(parameter.type.name)!)
-      : symbols.enums.has(parameter.type.name)
-        ? enumId(symbols.enums.get(parameter.type.name)!)
-        : parameter.type.name;
+    const type = resolvedType(parameter.type, symbols);
     return {
       id: `parameter:${semanticId}.${parameter.name}`,
       name: parameter.name,
@@ -542,14 +553,10 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     if (previous) throw new ModelError("E2604", `Duplicate query parameter '${parameter.name}'.`, parameter.span, file, { message: "First declared here.", span: previous });
     seen.set(parameter.name, parameter.span);
     if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
-    if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
+    if (!parameter.type.moneyCurrency && !scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
-    const type = symbols.entities.has(parameter.type.name)
-      ? entityId(symbols.entities.get(parameter.type.name)!)
-      : symbols.enums.has(parameter.type.name)
-        ? enumId(symbols.enums.get(parameter.type.name)!)
-        : parameter.type.name;
+    const type = resolvedType(parameter.type, symbols);
     return {
       id: `parameter:${semanticId}.${parameter.name}`,
       name: parameter.name,
@@ -641,6 +648,21 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
 }
 
 function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, file: string): IRExpression {
+  if (expression.kind === "moneyLiteral") {
+    const profile = moneyProfile(expression.currency);
+    if (!profile) throw new ModelError("E2901", `Unsupported money currency '${expression.currency}'.`, expression.span, file);
+    const invalid = validateMoneyAmount(expression.amount, profile);
+    if (invalid) throw new ModelError("E2902", `Invalid ${expression.currency} money literal '${expression.amount}': ${invalid}.`, expression.span, file);
+    return {
+      kind: "moneyLiteral",
+      currency: profile.currency,
+      amount: expression.amount,
+      precision: profile.precision,
+      scale: profile.scale,
+      type: moneyType(profile),
+      nullable: false,
+    };
+  }
   if (expression.kind === "literal") {
     if (expression.literalKind === "null") return { kind: "nullLiteral", type: "null", nullable: true };
     const type = expression.literalKind === "number" ? (Number.isInteger(expression.value) ? "Int" : "Decimal")
@@ -685,8 +707,9 @@ function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, 
   }
   if (["<", "<=", ">", ">="].includes(expression.operator)) {
     const compatibleOrdering = (isNumeric(left.type) && isNumeric(right.type))
-      || (left.type === "DateTime" && right.type === "DateTime");
-    if (!compatibleOrdering) throw new ModelError("E2403", "Ordering comparisons require compatible numeric or DateTime operands.", expression.span, file);
+      || (left.type === "DateTime" && right.type === "DateTime")
+      || (isMoneyType(left.type) && left.type === right.type);
+    if (!compatibleOrdering) throw new ModelError("E2403", "Ordering comparisons require compatible numeric, DateTime, or same-currency Money operands.", expression.span, file);
   } else if (!compatibleTypes(left.type, right.type)) {
     throw new ModelError("E2404", `Cannot compare ${left.type} to ${right.type}.`, expression.span, file);
   }
@@ -820,6 +843,7 @@ function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRActi
       if (isEnumType(field.type)) entries.push({ id: `enum-membership:${field.id}`, purpose: `${field.name} must be a declared ${enums.find((candidate) => candidate.id === field.type)?.name ?? field.type} member.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`, source: field.span });
       if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${field.id}`, purpose: `${field.name} is a duplicate-free set of declared ${enums.find((candidate) => candidate.id === enumSetId(field.type))?.name ?? enumSetId(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
       if (field.default) entries.push({ id: `default:${field.id}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
+      if (isMoneyType(field.type)) entries.push({ id: `money:${field.id}`, purpose: `Store ${field.name} as exact ${field.type.split(":")[1]} money within its declared precision and scale.`, layer: "PostgreSQL money constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_money`, source: field.span });
       if (field.storage === "snapshot") entries.push({ id: `snapshot:${field.id}`, purpose: `${field.name} is a stored point-in-time audit snapshot, not a live relationship-derived value.`, layer: "ModelLang storage semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
       if (field.generation) entries.push({ id: `generated:${field.id}`, purpose: `Generate ${field.name} with ${field.generation.strategy} under database authority.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
       if (field.mutability === "immutable") entries.push({ id: `immutable:${field.id}`, purpose: `Prevent action updates to immutable field ${field.name}.`, layer: "ModelLang action semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
@@ -861,6 +885,9 @@ function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRActi
     const fn = `${schema}.${action.naming.sqlFunction}`;
     const caller = action.parameters.find((parameter) => parameter.id === action.callerParameterId)!;
     entries.push({ id: `caller:${action.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_actions.sql", objectName: fn, source: caller.span });
+    for (const parameter of action.parameters.filter((candidate) => isMoneyType(candidate.type))) {
+      entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL action input validation", artifact: "postgres/003_actions.sql", objectName: fn, source: parameter.span });
+    }
     entries.push({ id: `boundary:${action.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_actions.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
@@ -871,6 +898,9 @@ function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRActi
     const fn = `${schema}.${query.naming.sqlFunction}`;
     const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId)!;
     entries.push({ id: `caller:${query.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
+    for (const parameter of query.parameters.filter((candidate) => isMoneyType(candidate.type))) {
+      entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL query input validation", artifact: "postgres/003_queries.sql", objectName: fn, source: parameter.span });
+    }
     entries.push({ id: `boundary:${query.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });

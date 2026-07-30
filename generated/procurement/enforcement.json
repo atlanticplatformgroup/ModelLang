@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.7.0",
-    "sourceHash": "sha256:18655980cb9f031745a4b452ac891af15856fdde7440d3df5414057674989aa9",
+    "version": "0.8.0",
+    "sourceHash": "sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3febe7",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -267,7 +267,21 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 86
+        "endColumn": 89
+      }
+    },
+    {
+      "id": "money:field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+      "purpose": "Store amount as exact USD money within its declared precision and scale.",
+      "layer": "PostgreSQL money constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_amount_money",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 25,
+        "column": 3,
+        "endLine": 25,
+        "endColumn": 89
       }
     },
     {
@@ -281,7 +295,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 86
+        "endColumn": 89
       }
     },
     {
@@ -384,7 +398,7 @@
     },
     {
       "id": "invariant:inv_91184dc547c24978a48362a679eeb836",
-      "purpose": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
+      "purpose": "((status != RequestStatus.APPROVED) or (((amount <= USD 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > USD 10000) and (Role.FINANCE in approvedByRoles))))",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
       "objectName": "ck_purchase_request_approval_authority_matches_amount",
@@ -453,6 +467,20 @@
       }
     },
     {
+      "id": "money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
+      "purpose": "Validate amount against its exact currency, precision, and scale contract.",
+      "layer": "PostgreSQL action input validation",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 61,
+        "column": 3,
+        "endLine": 61,
+        "endColumn": 21
+      }
+    },
+    {
       "id": "boundary:action:act_1e35db0451b1461e941af6283d86dca2.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
@@ -475,7 +503,7 @@
     },
     {
       "id": "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount",
-      "purpose": "(amount > 0)",
+      "purpose": "(amount > USD 0)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
@@ -484,7 +512,7 @@
         "line": 67,
         "column": 3,
         "endLine": 67,
-        "endColumn": 39
+        "endColumn": 43
       }
     },
     {
@@ -608,7 +636,7 @@
     },
     {
       "id": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
-      "purpose": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
+      "purpose": "((actor != request.requester) and (((request.amount <= USD 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > USD 10000) and (Role.FINANCE in actor.roles))))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
@@ -617,7 +645,7 @@
         "line": 95,
         "column": 5,
         "endLine": 100,
-        "endColumn": 62
+        "endColumn": 66
       }
     },
     {

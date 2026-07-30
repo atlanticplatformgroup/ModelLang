@@ -18,6 +18,7 @@ export interface IRIdentity {
 
 export type IRExpression =
   | { kind: "literal"; value: string | number | boolean; type: string; nullable: false }
+  | { kind: "moneyLiteral"; currency: string; amount: string; precision: number; scale: number; type: string; nullable: false }
   | { kind: "nullLiteral"; type: "null"; nullable: true }
   | { kind: "parameter"; parameterId: string; name: string; type: string; nullable: false }
   | { kind: "entityValue"; parameterId: string; name: string; entityId: string; type: string; nullable: false }
@@ -178,7 +179,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 7;
+  irVersion: 8;
   model: {
     id: string;
     name: string;

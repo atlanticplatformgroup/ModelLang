@@ -6,6 +6,7 @@ export interface QueryAdapter {
   query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
 }
 
+
 export class ReservationsClient {
   constructor(private readonly adapter: QueryAdapter) {}
 

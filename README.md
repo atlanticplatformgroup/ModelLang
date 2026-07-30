@@ -1,6 +1,6 @@
-# ModelLang 0.7 reference compiler
+# ModelLang 0.8 reference compiler
 
-ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, database-owned generated values, constrained tables, authenticated actions, bounded queries, enum-set permissions, safe rename migrations, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, exact currency-typed money, database-owned generated values, constrained tables, authenticated actions, bounded queries, enum-set permissions, safe rename migrations, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -59,7 +59,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 7 separates persistent semantic identity from editable names and represents database generation and mutability independently from ordinary defaults. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 8 separates persistent semantic identity from editable names, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 The PostgreSQL backend emits:
 
@@ -109,12 +109,13 @@ The ID is semantic identity; the name is an editable source, API, and physical l
 
 The migration command compares a released IR with current source exclusively by ID. The rename planner introduced in 0.6 emits transactional renames for tables, columns, invariant constraints, temporal-exclusion constraints, and action/query functions. Enum declaration renames are semantic-only because the PostgreSQL backend stores constrained text values. Enum-member renames are recognized by ID and refused until the compiler can migrate every stored scalar, array, default, and dependent expression safely.
 
-Version 0.7 still refuses additions, removals, semantic changes, collisions, rename cycles, or models without complete explicit IDs. After the structural migration, the current generated `003_actions.sql`, `003_queries.sql`, and `004_grants.sql` redeploy replaceable routines and grants.
+Version 0.8 still refuses additions, removals, semantic changes, collisions, rename cycles, or models without complete explicit IDs. After the structural migration, the current generated `003_actions.sql`, `003_queries.sql`, and `004_grants.sql` redeploy replaceable routines and grants.
 
 ## Explicit language semantics
 
 - Entity equality is identity equality. `actor == request.requester` compares the two `User` primary keys, never every field on the two rows. The canonical IR marks this as `entityIdentity`, and PostgreSQL lowers it to UUID comparison.
 - `caller actor: User` is semantic context, not a user-supplied action or query argument. It is omitted from both the generated SQL and TypeScript callable signatures, then resolved from `session_user` through the owner-controlled principal-binding table.
+- `Money<USD>` is an exact nominal type, distinct from `Money<EUR>`, `Decimal`, and JavaScript numbers. Currency literals are explicit (`USD 10000`), PostgreSQL stores exact `numeric` values behind profile constraints, and TypeScript uses `{ currency: "USD", amount: "10000.00" }`.
 - `@generated(uuid)` and `@generated(now)` are valid only on required `UUID` and `DateTime` stored fields respectively. Actions cannot assign them. PostgreSQL supplies qualified column defaults and returns the values from the same create statement.
 - Generated fields are implicitly immutable. `@immutable` also prevents update effects from assigning ordinary stored fields while still allowing their explicit initial assignment during creation.
 - A query declares one source entity, query-level authorization, a per-row `where` policy, a required direct ordering field, and a fixed limit from 1 through 1000. The compiler adds ascending primary-key order as a deterministic tie-breaker. Authorization and filtering both use `IS TRUE`, so false and SQL unknown fail closed.
@@ -122,7 +123,7 @@ Version 0.7 still refuses additions, removals, semantic changes, collisions, ren
 - Invariants are exactly directional as written. The Procurement model uses `approval_fields_match_status`, which requires approval fields to be both populated exactly when a request is `APPROVED` and null for every other status.
 - Procurement also uses durable audit backstops: an approved request must snapshot `MANAGER` authority at or below 10,000 or `FINANCE` authority above 10,000, and its approver must differ from its requester.
 - `@snapshot` is valid on stored scalar, enum, and enum-set entity fields and marks a point-in-time audit copy. The compiler never auto-populates it: an action must explicitly assign either `null` or a compatible direct field value such as `actor.roles`. That value is copied into the row; later changes to the source field do not propagate.
-- `PurchaseRequest.amount` uses `@minExclusive(0)`, so zero is never valid in storage. `openRequest` retains `positive_amount` as an action-level, named guard and clearer diagnostic; the two layers are intentionally defense in depth.
+- `PurchaseRequest.amount` is `Money<USD> @minExclusive(0)`, so its currency is fixed and zero is never valid in storage. `openRequest` retains `positive_amount` as an action-level, named guard and clearer diagnostic; the two layers are intentionally defense in depth.
 - `Set<Role>` stores multiple duplicate-free enum members. Enum-set membership policies lower to fail-closed database enforcement. Procurement explicitly permits `EMPLOYEE`, `MANAGER`, or `FINANCE` to open requests instead of deriving that permission from seed-data role combinations.
 - Procurement approval requires an authorized role and a different requester identity. Managers and finance users cannot approve requests they opened themselves.
 - Enum sets are unordered domain values represented as constrained PostgreSQL `text[]` and generated TypeScript enum arrays. Unknown, null, and duplicate members are rejected by named constraints.
@@ -174,17 +175,17 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, stable-ID assignment and validation, generated-value authority and immutability, deterministic rename planning, PostgreSQL data preservation across renames, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
+The full suite validates parsing and spans, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, PostgreSQL data preservation across renames, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
 - Enums use text plus named `CHECK` constraints for deterministic DDL and explicit migration control.
-- Expressions support literals, paths, Boolean operators, and comparisons only. Arithmetic, string operations, aggregates, and computed values require explicit future semantics.
+- Expressions support literals, paths, Boolean operators, and comparisons only. Money is exact and currency-typed, but arithmetic, allocation, tax, exchange, rounding, string operations, aggregates, and computed values require explicit future semantics.
 - One PostgreSQL login per demo user is the identity adapter. A production gateway may replace it only if callers still cannot choose arbitrary principal IDs.
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
-- Rename migration planning intentionally omits additions, removals, type changes, generation or mutability changes, enum-member value migration, backfills, rename cycles, and deployment orchestration in 0.7.
+- Rename migration planning intentionally omits additions, removals, type changes including `Decimal` to `Money<C>`, generation or mutability changes, enum-member value migration, backfills, rename cycles, and deployment orchestration in 0.8.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.7 language is in [spec/0.7/LANGUAGE.md](./spec/0.7/LANGUAGE.md), with its [generated-value semantics](./spec/0.7/GENERATED_VALUES.md), [grammar](./spec/0.7/GRAMMAR.ebnf), [conformance requirements](./spec/0.7/CONFORMANCE.md), and [unstable boundaries](./spec/0.7/UNSTABLE.md). The [0.6 language](./spec/0.6/LANGUAGE.md) remains normative where 0.7 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.8 language is in [spec/0.8/LANGUAGE.md](./spec/0.8/LANGUAGE.md), with its [exact-money semantics](./spec/0.8/MONEY.md), [grammar](./spec/0.8/GRAMMAR.ebnf), [conformance requirements](./spec/0.8/CONFORMANCE.md), and [unstable boundaries](./spec/0.8/UNSTABLE.md). The [0.7 language](./spec/0.7/LANGUAGE.md) remains normative where 0.8 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

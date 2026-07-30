@@ -56,7 +56,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(7);
+    expect(ir.irVersion).toBe(8);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -160,6 +160,73 @@ describe("semantic analysis", () => {
   });
 });
 
+describe("ModelLang exact money", () => {
+  const moneyModel = (comparison: string, assignment = "amount") => `model MoneyProof version "0.8.0";
+    entity User { id: UUID @id; }
+    entity Invoice {
+      id: UUID @id;
+      amount: Money<USD> @minExclusive(0);
+    }
+    action issue(caller actor: User, id: UUID, amount: Money<USD>) -> Invoice {
+      authorize true;
+      require money_rule: ${comparison};
+      create Invoice { id = id; amount = ${assignment}; }
+    }`;
+
+  it("preserves currency, precision, scale, and exact literals in IR v8", () => {
+    const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
+    const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
+    expect(ir.irVersion).toBe(8);
+    expect(amount.type).toBe("money:USD:20:2");
+    expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
+    expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
+    expect(ir.actions[0]!.preconditions[0]!.expression).toMatchObject({
+      kind: "binary",
+      operator: "<=",
+      left: { kind: "parameter", type: "money:USD:20:2" },
+      right: {
+        kind: "moneyLiteral",
+        currency: "USD",
+        amount: "10000.25",
+        precision: 20,
+        scale: 2,
+        type: "money:USD:20:2",
+      },
+    });
+    expect(ir.enforcement.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "money:field:Invoice.amount",
+      "money-parameter:parameter:action:issue.amount",
+    ]));
+  });
+
+  it("supports different built-in scales without treating currencies as interchangeable", () => {
+    const ir = compileText(`model CurrencyScales version "0.8.0";
+      entity User { id: UUID @id; }
+      entity Ledger { id: UUID @id; yen: Money<JPY>; dinar: Money<KWD>; }
+      action record(caller actor: User, id: UUID, yen: Money<JPY>, dinar: Money<KWD>) -> Ledger {
+        authorize true;
+        require exact_scales: yen == JPY 100 and dinar == KWD 1.234 and dinar > KWD -1.000;
+        create Ledger { id = id; yen = yen; dinar = dinar; }
+      }`);
+    expect(ir.entities[1]!.fields.map((field) => field.type)).toEqual([
+      "UUID", "money:JPY:20:0", "money:KWD:20:3",
+    ]);
+  });
+
+  it.each([
+    ["unsupported currency", moneyModel("amount > AUD 0"), "E2901"],
+    ["excess literal scale", moneyModel("amount > USD 0.001"), "E2902"],
+    ["out-of-range literal", moneyModel("amount < USD 1000000000000000000"), "E2902"],
+    ["excess annotation scale", moneyModel("amount > USD 0").replace("@minExclusive(0)", "@minExclusive(0.001)"), "E2902"],
+    ["cross-currency ordering", moneyModel("amount > EUR 0"), "E2403"],
+    ["cross-currency equality", moneyModel("amount == EUR 1"), "E2404"],
+    ["bare numeric comparison", moneyModel("amount > 0"), "E2403"],
+    ["cross-currency assignment", moneyModel("amount > USD 0", "EUR 1"), "E2412"],
+  ])("rejects %s", (_name, source, code) => {
+    expect(failure(source).code).toBe(code);
+  });
+});
+
 describe("ModelLang temporal exclusions", () => {
   const reservationSource = (exclusion: string) => `model Reservations version "0.2.0";
     entity User { id: UUID @id; }
@@ -179,7 +246,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(7);
+    expect(ir.irVersion).toBe(8);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -212,7 +279,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(7);
+    expect(ir.irVersion).toBe(8);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -316,7 +383,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(7);
+    expect(ir.irVersion).toBe(8);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))

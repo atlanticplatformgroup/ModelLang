@@ -1,4 +1,4 @@
-model Procurement version "0.7.0";
+model Procurement version "0.8.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -22,7 +22,7 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
   id: UUID @id @generated(uuid) @immutable @stableId("fld_af918d24406040619a77b244a81ca5d3");
   createdAt: DateTime @generated(now) @immutable @stableId("fld_b425073719d6446b9859fe6ca97b0ffe");
   requester: User @stableId("fld_04d9bc06877d4ec38a98196239c949b5");
-  amount: Decimal @minExclusive(0) @stableId("fld_9810e7598584487ea4a883e3c1c3f8d1");
+  amount: Money<USD> @minExclusive(0) @stableId("fld_9810e7598584487ea4a883e3c1c3f8d1");
   status: RequestStatus = RequestStatus.DRAFT @stableId("fld_afb1dee14dfa48c98961fdb40e2b0be2");
   approvedBy: User? @stableId("fld_5da56f04460f4deba9ccda4f552c2b97");
   approvedByRoles: Set<Role>? @snapshot @stableId("fld_577b4c94c9cd4b469aded37614712fba");
@@ -44,9 +44,9 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
     status != RequestStatus.APPROVED
     or
     (
-      (amount <= 10000 and Role.MANAGER in approvedByRoles)
+      (amount <= USD 10000 and Role.MANAGER in approvedByRoles)
       or
-      (amount > 10000 and Role.FINANCE in approvedByRoles)
+      (amount > USD 10000 and Role.FINANCE in approvedByRoles)
     );
 
   invariant approver_differs_from_requester @stableId("inv_f8c6cf86f9d64874ac4159766e522cb8"):
@@ -58,13 +58,13 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
 // It does not depend on managers or finance users also carrying EMPLOYEE in seed data.
 action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
   caller actor: User,
-  amount: Decimal
+  amount: Money<USD>
 ) -> PurchaseRequest {
   authorize
     Role.EMPLOYEE in actor.roles
     or Role.MANAGER in actor.roles
     or Role.FINANCE in actor.roles;
-  require positive_amount: amount > 0;
+  require positive_amount: amount > USD 0;
 
   create PurchaseRequest {
     requester = actor;
@@ -95,9 +95,9 @@ action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
     actor != request.requester
     and
     (
-      (request.amount <= 10000 and Role.MANAGER in actor.roles)
+      (request.amount <= USD 10000 and Role.MANAGER in actor.roles)
       or
-      (request.amount > 10000 and Role.FINANCE in actor.roles)
+      (request.amount > USD 10000 and Role.FINANCE in actor.roles)
     );
 
   require is_submitted: request.status == RequestStatus.SUBMITTED;

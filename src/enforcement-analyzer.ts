@@ -1,5 +1,6 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import type { IRAction, IRQuery, IRSpan, ModelIR } from "./ir.js";
+import { isMoneyType, moneyProfileFromType } from "./money.js";
 
 function sourceSpan(span: IRSpan): Span {
   return {
@@ -28,6 +29,10 @@ function checkAction(ir: ModelIR, action: IRAction): void {
     fail(ir, `Action '${action.name}' callable parameters are not an exact caller-free signature.`, action.span);
   }
   requireEntry(ir, `caller:${action.id}.${caller.name}`, caller.span);
+  for (const parameter of action.parameters.filter((candidate) => isMoneyType(candidate.type))) {
+    if (!moneyProfileFromType(parameter.type)) fail(ir, `Action '${action.name}' has an invalid money parameter type.`, parameter.span);
+    requireEntry(ir, `money-parameter:${parameter.id}`, parameter.span);
+  }
   requireEntry(ir, action.authorization.id, action.authorization.span);
   for (const precondition of action.preconditions) requireEntry(ir, precondition.id, precondition.span);
   requireEntry(ir, `effect:${action.id}`, action.span);
@@ -58,6 +63,10 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
     fail(ir, `Query '${query.name}' callable parameters are not an exact caller-free signature.`, query.span);
   }
   requireEntry(ir, `caller:${query.id}.${caller.name}`, caller.span);
+  for (const parameter of query.parameters.filter((candidate) => isMoneyType(candidate.type))) {
+    if (!moneyProfileFromType(parameter.type)) fail(ir, `Query '${query.name}' has an invalid money parameter type.`, parameter.span);
+    requireEntry(ir, `money-parameter:${parameter.id}`, parameter.span);
+  }
   requireEntry(ir, `boundary:${query.id}.safe_search_path`, query.span);
   requireEntry(ir, query.authorization.id, query.authorization.span);
   requireEntry(ir, query.rowPolicy.id, query.rowPolicy.span);
@@ -73,6 +82,10 @@ export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:audit");
   for (const entity of ir.entities) {
     for (const field of entity.fields) {
+      if (isMoneyType(field.type)) {
+        if (!moneyProfileFromType(field.type)) fail(ir, `Field '${entity.name}.${field.name}' has an invalid money type.`, field.span);
+        requireEntry(ir, `money:${field.id}`, field.span);
+      }
       if (field.generation) {
         if (field.optional || field.default || field.storage !== "ordinary" || field.mutability !== "immutable") {
           fail(ir, `Generated field '${entity.name}.${field.name}' has an invalid storage contract.`, field.span);

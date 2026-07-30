@@ -3,7 +3,7 @@ import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProcurementClient } from "../../generated/procurement/typescript/client.js";
 import {
-  AuthorizationError, IdentityBindingError, PreconditionError,
+  AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
 import {
   databaseUrl, installDemoDatabase, loginUrl, poolFor,
@@ -18,6 +18,10 @@ const clients = {
   unbound: undefined as unknown as ProcurementClient,
 };
 let admin: Pool;
+
+function usd(amount: string): { currency: "USD"; amount: string } {
+  return { currency: "USD", amount };
+}
 
 beforeAll(async () => {
   await installDemoDatabase();
@@ -41,7 +45,7 @@ afterAll(async () => {
 });
 
 async function submittedRequest(amount: string): Promise<string> {
-  const opened = await clients.employeeOne.openRequest({ amount });
+  const opened = await clients.employeeOne.openRequest({ amount: usd(amount) });
   await clients.employeeOne.submitRequest({ request: opened.id });
   return opened.id;
 }
@@ -62,12 +66,12 @@ async function waitUntilLockWaiting(pids: number[], timeoutMs = 5_000): Promise<
 
 describe.sequential("PostgreSQL enforcement boundary", () => {
   it("allows the procurement workflow and rejects invalid actors and transitions", async () => {
-    await expect(clients.employeeOne.openRequest({ amount: "0" })).rejects.toBeInstanceOf(PreconditionError);
-    const opened = await clients.employeeOne.openRequest({ amount: "5000" });
+    await expect(clients.employeeOne.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
+    const opened = await clients.employeeOne.openRequest({ amount: usd("5000") });
     const low = opened.id;
     expect(opened).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000001",
-      amount: "5000",
+      amount: { currency: "USD", amount: "5000.00" },
       status: "DRAFT",
       approvedBy: null,
     });
@@ -91,19 +95,46 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       approvedByRoles: ["EMPLOYEE", "FINANCE"],
     });
 
-    const managerRequest = await clients.manager.openRequest({ amount: "25" });
+    const managerRequest = await clients.manager.openRequest({ amount: usd("25") });
     expect(managerRequest).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000003",
     });
     expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest.id)).toBe(true);
   });
 
+  it("rejects malformed, wrong-currency, and out-of-profile money at every public boundary", async () => {
+    await expect(clients.employeeOne.openRequest({
+      amount: { currency: "EUR", amount: "1.00" } as unknown as ReturnType<typeof usd>,
+    })).rejects.toMatchObject({
+      name: ValidationError.name,
+      ruleId: "money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
+    });
+    await expect(clients.employeeOne.openRequest({ amount: usd("1.001") })).rejects.toBeInstanceOf(ValidationError);
+    await expect(clients.employeeOne.openRequest({ amount: usd("1e3") })).rejects.toBeInstanceOf(ValidationError);
+
+    await expect(pools[0]!.query(
+      `SELECT model_procurement.open_request($1::numeric)`,
+      ["1.001"],
+    )).rejects.toMatchObject({
+      code: "22023",
+      message: expect.stringContaining("ML_VALIDATION:money-parameter:"),
+    });
+
+    await expect(admin.query(
+      `INSERT INTO model_procurement.purchase_request (requester_id, amount, status)
+       VALUES ('00000000-0000-4000-8000-000000000001', 1.001, 'DRAFT')`,
+    )).rejects.toMatchObject({
+      code: "23514",
+      constraint: "ck_purchase_request_amount_money",
+    });
+  });
+
   it("prevents self-approval for every approval tier", async () => {
-    const managerRequest = await clients.manager.openRequest({ amount: "5000" });
+    const managerRequest = await clients.manager.openRequest({ amount: usd("5000") });
     await clients.manager.submitRequest({ request: managerRequest.id });
     await expect(clients.manager.approveRequest({ request: managerRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
 
-    const financeRequest = await clients.finance.openRequest({ amount: "25000" });
+    const financeRequest = await clients.finance.openRequest({ amount: usd("25000") });
     await clients.finance.submitRequest({ request: financeRequest.id });
     await expect(clients.finance.approveRequest({ request: financeRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
   });
@@ -112,10 +143,10 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     try {
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['FINANCE']::text[] WHERE id = '00000000-0000-4000-8000-000000000004'");
-      await expect(clients.manager.openRequest({ amount: "10" })).resolves.toMatchObject({
+      await expect(clients.manager.openRequest({ amount: usd("10") })).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000003",
       });
-      await expect(clients.finance.openRequest({ amount: "10" })).resolves.toMatchObject({
+      await expect(clients.finance.openRequest({ amount: usd("10") })).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000004",
       });
     } finally {
@@ -125,8 +156,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("returns only the authenticated caller's requests through the generated read boundary", async () => {
-    const employeeOneId = (await clients.employeeOne.openRequest({ amount: "11" })).id;
-    const employeeTwoId = (await clients.employeeTwo.openRequest({ amount: "12" })).id;
+    const employeeOneId = (await clients.employeeOne.openRequest({ amount: usd("11") })).id;
+    const employeeTwoId = (await clients.employeeTwo.openRequest({ amount: usd("12") })).id;
 
     const employeeOneRows = await clients.employeeOne.myRequests({});
     const employeeTwoRows = await clients.employeeTwo.myRequests({});
@@ -140,7 +171,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("binds identity before authorization and exposes no actor function argument", async () => {
-    await expect(clients.unbound.openRequest({ amount: "10" })).rejects.toBeInstanceOf(IdentityBindingError);
+    await expect(clients.unbound.openRequest({ amount: usd("10") })).rejects.toBeInstanceOf(IdentityBindingError);
     const functions = await admin.query<{ proname: string; pronargs: number; args: string }>(`
       SELECT p.proname, p.pronargs, pg_catalog.pg_get_function_arguments(p.oid) AS args
       FROM pg_catalog.pg_proc p
@@ -223,7 +254,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approver_differs_from_requester" });
 
-    const id = (await clients.employeeOne.openRequest({ amount: "3" })).id;
+    const id = (await clients.employeeOne.openRequest({ amount: usd("3") })).id;
     const audit = await admin.query<{ database_principal: string; principal_id: string; count: string }>(
       `SELECT database_principal, principal_id, count(*)::text AS count
        FROM model_procurement_internal.action_audit

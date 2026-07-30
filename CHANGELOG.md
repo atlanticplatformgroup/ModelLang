@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0
+
+- Added exact nominal `Money<C>` types and explicit currency literals such as `USD 10000`.
+- Added built-in USD, EUR, GBP, JPY, and KWD profiles with fixed precision and scale.
+- Added canonical IR version 8 with currency, precision, scale, and exact literal text.
+- Rejected implicit cross-currency operations and mixing Money with untyped numeric values.
+- Added PostgreSQL exact-numeric storage, named money constraints, callable-parameter validation, and currency-bearing JSON results.
+- Added generated TypeScript `Money<"C">`, runtime currency/decimal validation, and typed `ValidationError`.
+- Migrated Procurement amounts, thresholds, invariants, actions, demos, and tests from `Decimal` to `Money<USD>`.
+- Added compiler, code-generation, client, enforcement, and live PostgreSQL conformance tests.
+
 ## 0.7.0
 
 - Added `@generated(uuid)`, `@generated(now)`, and `@immutable` stored-field semantics.

@@ -1,4 +1,5 @@
 import type { IRAction, IREntity, IREnumMember, IRExpression, IRField, IRParameter, IRQuery, ModelIR } from "../ir.js";
+import { isMoneyType, moneyMagnitudeLimit, moneyProfileFromType } from "../money.js";
 import { quoteIdent, snakeCase } from "../naming.js";
 
 export interface PostgresOutput {
@@ -38,6 +39,7 @@ function sqlType(type: string): string {
   if (type.startsWith("entity:")) return "uuid";
   if (type.startsWith("set:enum:")) return "text[]";
   if (type.startsWith("enum:")) return "text";
+  if (isMoneyType(type)) return "numeric";
   const types: Record<string, string> = {
     String: "text", Int: "bigint", Decimal: "numeric", Boolean: "boolean", UUID: "uuid", DateTime: "timestamptz",
   };
@@ -48,6 +50,7 @@ function sqlType(type: string): string {
 
 function sqlLiteral(expression: IRExpression, ir: ModelIR): string {
   if (expression.kind === "nullLiteral") return "NULL";
+  if (expression.kind === "moneyLiteral") return expression.amount;
   if (expression.kind === "enumLiteral") {
     const value = enumMemberById(ir, expression.enumId, expression.memberId).naming.sqlValue;
     return `'${value.replaceAll("'", "''")}'`;
@@ -69,6 +72,7 @@ interface ExpressionContext {
 function lowerExpression(expression: IRExpression, context: ExpressionContext): string {
   switch (expression.kind) {
     case "literal": return sqlLiteral(expression, context.ir);
+    case "moneyLiteral": return sqlLiteral(expression, context.ir);
     case "nullLiteral": return "NULL";
     case "enumLiteral": return sqlLiteral(expression, context.ir);
     case "parameter": {
@@ -170,6 +174,12 @@ function generateSchema(ir: ModelIR): string {
         const optionalTest = field.optional ? `(${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test})` : test;
         constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`)} CHECK ((${optionalTest}) IS TRUE)`);
       }
+      if (isMoneyType(field.type)) {
+        const profile = moneyProfileFromType(field.type)!;
+        const column = quoteIdent(field.naming.sqlColumn);
+        const test = `${column} <> 'NaN'::numeric AND pg_catalog.scale(${column}) <= ${profile.scale} AND pg_catalog.abs(${column}) < ${moneyMagnitudeLimit(profile)}`;
+        constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_money`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
+      }
       for (const annotation of field.annotations) {
         if (annotation.name === "unique") constraints.push(`  CONSTRAINT ${quoteIdent(`uq_${entity.naming.sqlTable}_${field.naming.sqlColumn}_unique`)} UNIQUE (${quoteIdent(field.naming.sqlColumn)})`);
         if (annotation.name === "min" || annotation.name === "minExclusive") {
@@ -240,10 +250,28 @@ function functionSignature(ir: ModelIR, operation: IRAction | IRQuery): string {
 
 function rowJson(entity: IREntity, record: string): string {
   const values = entity.fields.flatMap((field) => {
-    const value = `${record}.${quoteIdent(field.naming.sqlColumn)}${field.type === "Decimal" ? "::text" : ""}`;
+    const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
+    let value = `${column}${field.type === "Decimal" ? "::text" : ""}`;
+    if (isMoneyType(field.type)) {
+      const profile = moneyProfileFromType(field.type)!;
+      const encoded = `jsonb_build_object('currency', '${profile.currency}', 'amount', (${column}::numeric(${profile.precision}, ${profile.scale}))::text)`;
+      value = field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${encoded} END` : encoded;
+    }
     return [`'${field.name.replaceAll("'", "''")}'`, value];
   });
   return `jsonb_build_object(${values.join(", ")})`;
+}
+
+function moneyParameterValidation(parameter: IRParameter): string[] {
+  const profile = moneyProfileFromType(parameter.type)!;
+  const value = quoteIdent(parameter.naming.sqlParameter);
+  const ruleId = `money-parameter:${parameter.id}`;
+  return [
+    `  IF NOT ((${value} <> 'NaN'::numeric AND pg_catalog.scale(${value}) <= ${profile.scale} AND pg_catalog.abs(${value}) < ${moneyMagnitudeLimit(profile)}) IS TRUE) THEN`,
+    `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:${ruleId}';`,
+    "  END IF;",
+    "",
+  ];
 }
 
 function generateAction(ir: ModelIR, action: IRAction): string {
@@ -274,6 +302,9 @@ function generateAction(ir: ModelIR, action: IRAction): string {
     "  END IF;",
     "",
   ];
+  for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
+    body.push(...moneyParameterValidation(parameter));
+  }
   const lockGroups = new Map<string, typeof action.lockPlan>();
   for (const lock of action.lockPlan) {
     const group = lockGroups.get(lock.entityId) ?? [];
@@ -417,6 +448,9 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "  END IF;",
     "",
   ];
+  for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
+    body.push(...moneyParameterValidation(parameter));
+  }
   for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     const entity = entityById(ir, parameter.type);
     const idFieldForParameter = fieldById(ir, entity.idFieldId).field;

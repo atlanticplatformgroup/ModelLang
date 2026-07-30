@@ -1,4 +1,4 @@
--- source sha256:18655980cb9f031745a4b452ac891af15856fdde7440d3df5414057674989aa9
+-- source sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3febe7
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -20,6 +20,7 @@ CREATE TABLE "model_procurement"."purchase_request" (
   "status" text NOT NULL DEFAULT 'DRAFT',
   "approved_by_id" uuid,
   "approved_by_roles" text[],
+  CONSTRAINT "ck_purchase_request_amount_money" CHECK (("amount" <> 'NaN'::numeric AND pg_catalog.scale("amount") <= 2 AND pg_catalog.abs("amount") < 1000000000000000000) IS TRUE),
   CONSTRAINT "ck_purchase_request_amount_min_exclusive" CHECK (("amount" > 0) IS TRUE),
   CONSTRAINT "ck_purchase_request_status_enum" CHECK (("status" IN ('DRAFT', 'SUBMITTED', 'APPROVED')) IS TRUE),
   CONSTRAINT "ck_purchase_request_approved_by_roles_enum_set" CHECK (("approved_by_roles" IS NULL OR ("approved_by_roles" <@ ARRAY['EMPLOYEE', 'MANAGER', 'FINANCE']::text[] AND pg_catalog.array_position("approved_by_roles", NULL::text) IS NULL AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'EMPLOYEE')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'MANAGER')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'FINANCE')) <= 1)) IS TRUE),

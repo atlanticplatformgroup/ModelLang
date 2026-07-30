@@ -1,0 +1,7 @@
+type_ref       = inherited_type_ref | money_type ;
+money_type     = "Money", "<", CURRENCY, ">" ;
+money_literal  = CURRENCY, [ "-" ], NUMBER ;
+primary        = inherited_primary | money_literal ;
+CURRENCY       = UPPERCASE_LETTER, UPPERCASE_LETTER, UPPERCASE_LETTER ;
+
+All productions not replaced above are inherited from the ModelLang 0.7 grammar.

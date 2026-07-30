@@ -34,6 +34,43 @@
         "identity": { "$ref": "#/$defs/identity" },
         "span": { "type": "object" },
         "naming": { "type": "object" }
+      }
+    },
+    "enum": {
+      "type": "object",
+      "required": ["id", "name", "identity", "members", "span", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^enum:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "members": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/enumMember" } },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["id", "name", "identity", "type", "optional", "annotations", "storage", "mutability", "span", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^field:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "type": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "annotations": { "type": "array" },
+        "storage": { "enum": ["ordinary", "snapshot"] },
+        "generation": {
+          "type": "object",
+          "required": ["strategy", "authority"],
+          "properties": {
+            "strategy": { "enum": ["uuid", "now"] },
+            "authority": { "const": "database" }
+          },
+          "additionalProperties": false
+        },
+        "mutability": { "enum": ["mutable", "immutable"] },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
       },
       "allOf": [
         {
@@ -80,43 +117,6 @@
           "then": { "properties": { "type": { "const": "DateTime" } } }
         }
       ]
-    },
-    "enum": {
-      "type": "object",
-      "required": ["id", "name", "identity", "members", "span", "naming"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^enum:" },
-        "name": { "type": "string" },
-        "identity": { "$ref": "#/$defs/identity" },
-        "members": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/enumMember" } },
-        "span": { "type": "object" },
-        "naming": { "type": "object" }
-      }
-    },
-    "field": {
-      "type": "object",
-      "required": ["id", "name", "identity", "type", "optional", "annotations", "storage", "mutability", "span", "naming"],
-      "properties": {
-        "id": { "type": "string", "pattern": "^field:" },
-        "name": { "type": "string" },
-        "identity": { "$ref": "#/$defs/identity" },
-        "type": { "type": "string" },
-        "optional": { "type": "boolean" },
-        "annotations": { "type": "array" },
-        "storage": { "enum": ["ordinary", "snapshot"] },
-        "generation": {
-          "type": "object",
-          "required": ["strategy", "authority"],
-          "properties": {
-            "strategy": { "enum": ["uuid", "now"] },
-            "authority": { "const": "database" }
-          },
-          "additionalProperties": false
-        },
-        "mutability": { "enum": ["mutable", "immutable"] },
-        "span": { "type": "object" },
-        "naming": { "type": "object" }
-      }
     },
     "invariant": {
       "type": "object",
@@ -170,7 +170,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "queries", "enforcement"],
   "properties": {
-    "irVersion": { "const": 7 },
+    "irVersion": { "const": 8 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

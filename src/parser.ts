@@ -17,6 +17,7 @@ class Parser {
   private index = 0;
   constructor(private readonly tokens: Token[], private readonly file: string) {}
   private current(): Token { return this.tokens[this.index]!; }
+  private lookahead(offset: number): Token { return this.tokens[this.index + offset]!; }
   private previous(): Token { return this.tokens[this.index - 1]!; }
   private at(kind: TokenKind): boolean { return this.current().kind === kind; }
   private atWord(word: string): boolean { return this.current().kind === "identifier" && this.current().text === word; }
@@ -122,6 +123,13 @@ class Parser {
       const end = this.expect(">");
       return { name: element.text, collection: "set", span: this.span(start, end) };
     }
+    if (this.atWord("Money")) {
+      const start = this.take();
+      this.expect("<");
+      const currency = this.identifier("Expected a currency code inside Money<...>.");
+      const end = this.expect(">");
+      return { name: "Money", moneyCurrency: currency.text, span: this.span(start, end) };
+    }
     const token = this.identifier("Expected a type name.");
     return { name: token.text, span: token.span };
   }
@@ -142,7 +150,7 @@ class Parser {
       if (name.text === "min" || name.text === "minExclusive" || name.text === "max") {
         this.expect("(");
         const number = this.expect("number", `Expected numeric value for @${name.text}.`);
-        value = Number(number.value);
+        value = type.moneyCurrency ? number.text : Number(number.value);
         end = this.expect(")");
       } else if (name.text === "stableId") {
         this.expect("(");
@@ -367,6 +375,19 @@ class Parser {
       this.take();
       if (token.text === "null") return { kind: "literal", value: null, literalKind: "null", span: token.span };
       return { kind: "literal", value: token.text === "true", literalKind: "boolean", span: token.span };
+    }
+    if (this.at("identifier") && /^[A-Z]{3}$/.test(token.text)
+      && (this.lookahead(1).kind === "number"
+        || (this.lookahead(1).kind === "-" && this.lookahead(2).kind === "number"))) {
+      const currency = this.take();
+      const negative = this.at("-") ? (this.take(), true) : false;
+      const amount = this.take();
+      return {
+        kind: "moneyLiteral",
+        currency: currency.text,
+        amount: `${negative ? "-" : ""}${amount.text}`,
+        span: this.span(currency, amount),
+      };
     }
     if (this.at("identifier")) {
       return this.parsePath();

@@ -3,7 +3,7 @@ import { ModelError, type Position, type Span } from "./diagnostics.js";
 export type TokenKind =
   | "identifier" | "string" | "number"
   | "{" | "}" | "(" | ")" | ":" | ";" | "," | "." | "?" | "@"
-  | "=" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "->"
+  | "=" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "-" | "->"
   | "eof";
 
 export interface Token {
@@ -90,7 +90,7 @@ export function lex(source: string, file = "<source>"): Token[] {
       emit(two as TokenKind, two, start);
       continue;
     }
-    if ("{}():;,.?@=<>".includes(char)) {
+    if ("{}():;,.?@=<>-".includes(char)) {
       advance();
       emit(char as TokenKind, char, start);
       continue;

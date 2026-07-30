@@ -1,4 +1,5 @@
-import { ModelError } from "./diagnostics.js";
+import { ModelError, type Span } from "./diagnostics.js";
+import { moneyProfile } from "./money.js";
 import type { ActionDecl, Declaration, EntityDecl, Program, QueryDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
@@ -11,6 +12,16 @@ export interface ResolvedProgram {
 }
 
 const scalarNames = ["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"];
+
+function validateType(type: { name: string; moneyCurrency?: string; span: Span }, typeNames: Set<string>, file: string): void {
+  if (type.moneyCurrency) {
+    if (!moneyProfile(type.moneyCurrency)) {
+      throw new ModelError("E2901", `Unsupported money currency '${type.moneyCurrency}'.`, type.span, file);
+    }
+    return;
+  }
+  if (!typeNames.has(type.name)) throw new ModelError("E2005", `Unknown type '${type.name}'.`, type.span, file);
+}
 
 export function resolveProgram(program: Program, file: string): ResolvedProgram {
   const declarations = new Map<string, Declaration>();
@@ -41,16 +52,14 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
           if (member.type.collection === "set" && !program.declarations.some((candidate) => candidate.kind === "enum" && candidate.name === member.type.name)) {
             throw new ModelError("E2701", `Set element type '${member.type.name}' must be a declared enum.`, member.type.span, file);
           }
-          if (!typeNames.has(member.type.name)) {
-            throw new ModelError("E2005", `Unknown type '${member.type.name}'.`, member.type.span, file);
-          }
+          validateType(member.type, typeNames, file);
         }
       }
     }
     if (declaration.kind === "action") {
       for (const parameter of declaration.parameters) {
         if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
-        if (!typeNames.has(parameter.type.name)) throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
+        validateType(parameter.type, typeNames, file);
       }
       if (!entities.has(declaration.returnType.name)) {
         throw new ModelError("E2307", `Action return type '${declaration.returnType.name}' must be an entity.`, declaration.returnType.span, file);
@@ -59,7 +68,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     if (declaration.kind === "query") {
       for (const parameter of declaration.parameters) {
         if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
-        if (!typeNames.has(parameter.type.name)) throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
+        validateType(parameter.type, typeNames, file);
       }
       if (!entities.has(declaration.sourceType.name)) {
         throw new ModelError("E2601", `Query source '${declaration.sourceType.name}' must be an entity.`, declaration.sourceType.span, file);

@@ -29,6 +29,7 @@ export interface EnumDecl {
 export interface TypeRef {
   name: string;
   collection?: "set";
+  moneyCurrency?: string;
   span: Span;
 }
 
@@ -138,6 +139,7 @@ export interface QueryDecl {
 
 export type Expression =
   | { kind: "literal"; value: string | number | boolean | null; literalKind: "string" | "number" | "boolean" | "null"; span: Span }
+  | { kind: "moneyLiteral"; currency: string; amount: string; span: Span }
   | { kind: "path"; parts: string[]; span: Span }
   | { kind: "unary"; operator: "not"; operand: Expression; span: Span }
   | { kind: "binary"; operator: "or" | "and" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: Expression; right: Expression; span: Span };

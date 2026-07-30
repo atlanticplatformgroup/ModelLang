@@ -11,9 +11,11 @@ export class PreconditionError extends ModelDatabaseError {}
 export class InvariantError extends ModelDatabaseError {}
 export class ConflictError extends ModelDatabaseError {}
 export class NotFoundError extends ModelDatabaseError {}
+export class ValidationError extends ModelDatabaseError {}
 
 interface DatabaseFailure { code?: string; message?: string; constraint?: string }
 export function mapDatabaseError(error: unknown): ModelDatabaseError {
+  if (error instanceof ModelDatabaseError) return error;
   const value = error as DatabaseFailure;
   const message = value?.message ?? "Model database operation failed";
   const suffix = message.includes(":") ? message.slice(message.indexOf(":") + 1) : undefined;
@@ -21,6 +23,7 @@ export function mapDatabaseError(error: unknown): ModelDatabaseError {
   if (message.startsWith("ML_AUTHORIZATION:")) return new AuthorizationError(message, value.code, suffix, error);
   if (message.startsWith("ML_PRECONDITION:")) return new PreconditionError(message, value.code, suffix, error);
   if (message.startsWith("ML_NOT_FOUND:")) return new NotFoundError(message, value.code, suffix, error);
+  if (message.startsWith("ML_VALIDATION:")) return new ValidationError(message, value.code, suffix, error);
   if (value?.code === "23P01") return new ConflictError(message, value.code, value.constraint, error);
   if (value?.code === "23514" || value?.code === "23502" || value?.code === "23503" || value?.code === "23505") {
     return new InvariantError(message, value.code, value.constraint, error);

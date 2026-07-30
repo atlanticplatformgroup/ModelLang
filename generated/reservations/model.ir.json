@@ -1,10 +1,10 @@
 {
-  "irVersion": 7,
+  "irVersion": 8,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.7.0",
-    "sourceHash": "sha256:d7fa777b326ecd4a5e83a5084a4fa86fdd25012b0754eafabaaec2b2db3284fd",
+    "version": "0.8.0",
+    "sourceHash": "sha256:061bd13811ace67636aefd3956e5b5265593f1511b4adb3cd86397c5c860e044",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
