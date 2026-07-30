@@ -1,10 +1,10 @@
 {
-  "irVersion": 4,
+  "irVersion": 5,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.4.0",
-    "sourceHash": "sha256:223f7dedd038f85bf47df46127438b5fd6a3795e5195532524fd240955437c97",
+    "version": "0.5.0",
+    "sourceHash": "sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -12,7 +12,7 @@
     }
   },
   "principal": {
-    "entityId": "entity:User",
+    "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
     "bindingMechanism": "session_user"
   },
   "enums": [
@@ -59,12 +59,20 @@
   ],
   "entities": [
     {
-      "id": "entity:User",
+      "id": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
       "name": "User",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ent_66c16684f17e4b4ca79eb7d916cbf725"
+      },
       "fields": [
         {
-          "id": "field:User.id",
+          "id": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
           "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_fe4c8fe8243b456eadeefb42b0bd7097"
+          },
           "type": "UUID",
           "optional": false,
           "annotations": [
@@ -78,15 +86,19 @@
             "line": 16,
             "column": 3,
             "endLine": 16,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "id"
           }
         },
         {
-          "id": "field:User.name",
+          "id": "field:fld_a261560f630d4e818f8f099868078535",
           "name": "name",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_a261560f630d4e818f8f099868078535"
+          },
           "type": "String",
           "optional": false,
           "annotations": [],
@@ -96,15 +108,19 @@
             "line": 17,
             "column": 3,
             "endLine": 17,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "name"
           }
         },
         {
-          "id": "field:User.roles",
+          "id": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
           "name": "roles",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_b4b29a4d0d914ec0913e578da89e5dcb"
+          },
           "type": "set:enum:Role",
           "optional": false,
           "annotations": [],
@@ -114,7 +130,7 @@
             "line": 18,
             "column": 3,
             "endLine": 18,
-            "endColumn": 20
+            "endColumn": 70
           },
           "naming": {
             "sqlColumn": "roles"
@@ -123,7 +139,7 @@
       ],
       "invariants": [],
       "temporalExclusions": [],
-      "idFieldId": "field:User.id",
+      "idFieldId": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
       "span": {
         "file": "examples/procurement.model",
         "line": 15,
@@ -137,12 +153,20 @@
       }
     },
     {
-      "id": "entity:PurchaseRequest",
+      "id": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "name": "PurchaseRequest",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ent_9bc680209327484c8e98f5f740bcc702"
+      },
       "fields": [
         {
-          "id": "field:PurchaseRequest.id",
+          "id": "field:fld_af918d24406040619a77b244a81ca5d3",
           "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_af918d24406040619a77b244a81ca5d3"
+          },
           "type": "UUID",
           "optional": false,
           "annotations": [
@@ -156,16 +180,20 @@
             "line": 22,
             "column": 3,
             "endLine": 22,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "id"
           }
         },
         {
-          "id": "field:PurchaseRequest.requester",
+          "id": "field:fld_04d9bc06877d4ec38a98196239c949b5",
           "name": "requester",
-          "type": "entity:User",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_04d9bc06877d4ec38a98196239c949b5"
+          },
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
@@ -174,15 +202,19 @@
             "line": 23,
             "column": 3,
             "endLine": 23,
-            "endColumn": 19
+            "endColumn": 69
           },
           "naming": {
             "sqlColumn": "requester_id"
           }
         },
         {
-          "id": "field:PurchaseRequest.amount",
+          "id": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
           "name": "amount",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_9810e7598584487ea4a883e3c1c3f8d1"
+          },
           "type": "Decimal",
           "optional": false,
           "annotations": [
@@ -197,15 +229,19 @@
             "line": 24,
             "column": 3,
             "endLine": 24,
-            "endColumn": 36
+            "endColumn": 86
           },
           "naming": {
             "sqlColumn": "amount"
           }
         },
         {
-          "id": "field:PurchaseRequest.status",
+          "id": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
           "name": "status",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_afb1dee14dfa48c98961fdb40e2b0be2"
+          },
           "type": "enum:RequestStatus",
           "optional": false,
           "default": {
@@ -222,16 +258,20 @@
             "line": 25,
             "column": 3,
             "endLine": 25,
-            "endColumn": 47
+            "endColumn": 97
           },
           "naming": {
             "sqlColumn": "status"
           }
         },
         {
-          "id": "field:PurchaseRequest.approvedBy",
+          "id": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
           "name": "approvedBy",
-          "type": "entity:User",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_5da56f04460f4deba9ccda4f552c2b97"
+          },
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "optional": true,
           "annotations": [],
           "storage": "ordinary",
@@ -240,15 +280,19 @@
             "line": 26,
             "column": 3,
             "endLine": 26,
-            "endColumn": 21
+            "endColumn": 71
           },
           "naming": {
             "sqlColumn": "approved_by_id"
           }
         },
         {
-          "id": "field:PurchaseRequest.approvedByRoles",
+          "id": "field:fld_577b4c94c9cd4b469aded37614712fba",
           "name": "approvedByRoles",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_577b4c94c9cd4b469aded37614712fba"
+          },
           "type": "set:enum:Role",
           "optional": true,
           "annotations": [
@@ -262,7 +306,7 @@
             "line": 27,
             "column": 3,
             "endLine": 27,
-            "endColumn": 41
+            "endColumn": 91
           },
           "naming": {
             "sqlColumn": "approved_by_roles"
@@ -288,7 +332,7 @@
                   "left": {
                     "kind": "fieldAccess",
                     "source": "self",
-                    "fieldId": "field:PurchaseRequest.status",
+                    "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                     "fieldName": "status",
                     "type": "enum:RequestStatus",
                     "nullable": false
@@ -309,9 +353,9 @@
                   "operand": {
                     "kind": "fieldAccess",
                     "source": "self",
-                    "fieldId": "field:PurchaseRequest.approvedBy",
+                    "fieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
                     "fieldName": "approvedBy",
-                    "type": "entity:User",
+                    "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
                     "nullable": true
                   },
                   "type": "Boolean",
@@ -326,7 +370,7 @@
                 "operand": {
                   "kind": "fieldAccess",
                   "source": "self",
-                  "fieldId": "field:PurchaseRequest.approvedByRoles",
+                  "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                   "fieldName": "approvedByRoles",
                   "type": "set:enum:Role",
                   "nullable": true
@@ -349,7 +393,7 @@
                   "left": {
                     "kind": "fieldAccess",
                     "source": "self",
-                    "fieldId": "field:PurchaseRequest.status",
+                    "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                     "fieldName": "status",
                     "type": "enum:RequestStatus",
                     "nullable": false
@@ -370,9 +414,9 @@
                   "operand": {
                     "kind": "fieldAccess",
                     "source": "self",
-                    "fieldId": "field:PurchaseRequest.approvedBy",
+                    "fieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
                     "fieldName": "approvedBy",
-                    "type": "entity:User",
+                    "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
                     "nullable": true
                   },
                   "type": "Boolean",
@@ -387,7 +431,7 @@
                 "operand": {
                   "kind": "fieldAccess",
                   "source": "self",
-                  "fieldId": "field:PurchaseRequest.approvedByRoles",
+                  "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                   "fieldName": "approvedByRoles",
                   "type": "set:enum:Role",
                   "nullable": true
@@ -415,7 +459,7 @@
         }
       ],
       "temporalExclusions": [],
-      "idFieldId": "field:PurchaseRequest.id",
+      "idFieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
       "span": {
         "file": "examples/procurement.model",
         "line": 21,
@@ -437,7 +481,7 @@
         {
           "id": "parameter:openRequest.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -492,7 +536,7 @@
         "parameter:openRequest.id",
         "parameter:openRequest.amount"
       ],
-      "returnEntityId": "entity:PurchaseRequest",
+      "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
         "id": "authorize:openRequest",
         "name": "authorize",
@@ -510,7 +554,7 @@
             "kind": "fieldAccess",
             "source": "parameter:openRequest.actor",
             "parameter": "actor",
-            "fieldId": "field:User.roles",
+            "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
             "fieldName": "roles",
             "type": "set:enum:Role",
             "nullable": false
@@ -564,10 +608,10 @@
       "effect": {
         "kind": "create",
         "target": "PurchaseRequest",
-        "entityId": "entity:PurchaseRequest",
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "assignments": [
           {
-            "fieldId": "field:PurchaseRequest.id",
+            "fieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
             "fieldName": "id",
             "expression": {
               "kind": "parameter",
@@ -578,19 +622,19 @@
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.requester",
+            "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
             "fieldName": "requester",
             "expression": {
               "kind": "entityValue",
               "parameterId": "parameter:openRequest.actor",
               "name": "actor",
-              "entityId": "entity:User",
-              "type": "entity:User",
+              "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+              "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "nullable": false
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.amount",
+            "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
             "fieldName": "amount",
             "expression": {
               "kind": "parameter",
@@ -601,7 +645,7 @@
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.status",
+            "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
@@ -612,7 +656,7 @@
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.approvedBy",
+            "fieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
             "fieldName": "approvedBy",
             "expression": {
               "kind": "nullLiteral",
@@ -621,7 +665,7 @@
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.approvedByRoles",
+            "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
             "fieldName": "approvedByRoles",
             "expression": {
               "kind": "nullLiteral",
@@ -636,7 +680,7 @@
           "id": "lock:openRequest.actor",
           "source": "caller",
           "parameterId": "parameter:openRequest.actor",
-          "entityId": "entity:User",
+          "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
           "order": 0
         }
@@ -660,7 +704,7 @@
         {
           "id": "parameter:submitRequest.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -678,7 +722,7 @@
         {
           "id": "parameter:submitRequest.request",
           "name": "request",
-          "type": "entity:PurchaseRequest",
+          "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
@@ -697,7 +741,7 @@
       "callableParameters": [
         "parameter:submitRequest.request"
       ],
-      "returnEntityId": "entity:PurchaseRequest",
+      "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
         "id": "authorize:submitRequest",
         "name": "authorize",
@@ -708,17 +752,17 @@
             "kind": "entityValue",
             "parameterId": "parameter:submitRequest.actor",
             "name": "actor",
-            "entityId": "entity:User",
-            "type": "entity:User",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+            "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "nullable": false
           },
           "right": {
             "kind": "fieldAccess",
             "source": "parameter:submitRequest.request",
             "parameter": "request",
-            "fieldId": "field:PurchaseRequest.requester",
+            "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
             "fieldName": "requester",
-            "type": "entity:User",
+            "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "nullable": false
           },
           "type": "Boolean",
@@ -745,7 +789,7 @@
               "kind": "fieldAccess",
               "source": "parameter:submitRequest.request",
               "parameter": "request",
-              "fieldId": "field:PurchaseRequest.status",
+              "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
               "fieldName": "status",
               "type": "enum:RequestStatus",
               "nullable": false
@@ -773,10 +817,10 @@
       "effect": {
         "kind": "update",
         "target": "request",
-        "entityId": "entity:PurchaseRequest",
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "assignments": [
           {
-            "fieldId": "field:PurchaseRequest.status",
+            "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
@@ -790,19 +834,19 @@
       },
       "lockPlan": [
         {
-          "id": "lock:submitRequest.request",
-          "source": "parameter:submitRequest.request",
-          "parameterId": "parameter:submitRequest.request",
-          "entityId": "entity:PurchaseRequest",
-          "mode": "update",
-          "order": 0
-        },
-        {
           "id": "lock:submitRequest.actor",
           "source": "caller",
           "parameterId": "parameter:submitRequest.actor",
-          "entityId": "entity:User",
+          "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
+          "order": 0
+        },
+        {
+          "id": "lock:submitRequest.request",
+          "source": "parameter:submitRequest.request",
+          "parameterId": "parameter:submitRequest.request",
+          "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+          "mode": "update",
           "order": 1
         }
       ],
@@ -825,7 +869,7 @@
         {
           "id": "parameter:approveRequest.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -843,7 +887,7 @@
         {
           "id": "parameter:approveRequest.request",
           "name": "request",
-          "type": "entity:PurchaseRequest",
+          "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
@@ -862,7 +906,7 @@
       "callableParameters": [
         "parameter:approveRequest.request"
       ],
-      "returnEntityId": "entity:PurchaseRequest",
+      "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
         "id": "authorize:approveRequest",
         "name": "authorize",
@@ -879,7 +923,7 @@
                 "kind": "fieldAccess",
                 "source": "parameter:approveRequest.request",
                 "parameter": "request",
-                "fieldId": "field:PurchaseRequest.amount",
+                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
                 "fieldName": "amount",
                 "type": "Decimal",
                 "nullable": false
@@ -907,7 +951,7 @@
                 "kind": "fieldAccess",
                 "source": "parameter:approveRequest.actor",
                 "parameter": "actor",
-                "fieldId": "field:User.roles",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                 "fieldName": "roles",
                 "type": "set:enum:Role",
                 "nullable": false
@@ -929,7 +973,7 @@
                 "kind": "fieldAccess",
                 "source": "parameter:approveRequest.request",
                 "parameter": "request",
-                "fieldId": "field:PurchaseRequest.amount",
+                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
                 "fieldName": "amount",
                 "type": "Decimal",
                 "nullable": false
@@ -957,7 +1001,7 @@
                 "kind": "fieldAccess",
                 "source": "parameter:approveRequest.actor",
                 "parameter": "actor",
-                "fieldId": "field:User.roles",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                 "fieldName": "roles",
                 "type": "set:enum:Role",
                 "nullable": false
@@ -992,7 +1036,7 @@
               "kind": "fieldAccess",
               "source": "parameter:approveRequest.request",
               "parameter": "request",
-              "fieldId": "field:PurchaseRequest.status",
+              "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
               "fieldName": "status",
               "type": "enum:RequestStatus",
               "nullable": false
@@ -1020,10 +1064,10 @@
       "effect": {
         "kind": "update",
         "target": "request",
-        "entityId": "entity:PurchaseRequest",
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "assignments": [
           {
-            "fieldId": "field:PurchaseRequest.status",
+            "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
@@ -1034,25 +1078,25 @@
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.approvedBy",
+            "fieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
             "fieldName": "approvedBy",
             "expression": {
               "kind": "entityValue",
               "parameterId": "parameter:approveRequest.actor",
               "name": "actor",
-              "entityId": "entity:User",
-              "type": "entity:User",
+              "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+              "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "nullable": false
             }
           },
           {
-            "fieldId": "field:PurchaseRequest.approvedByRoles",
+            "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
             "fieldName": "approvedByRoles",
             "expression": {
               "kind": "fieldAccess",
               "source": "parameter:approveRequest.actor",
               "parameter": "actor",
-              "fieldId": "field:User.roles",
+              "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
               "fieldName": "roles",
               "type": "set:enum:Role",
               "nullable": false
@@ -1062,19 +1106,19 @@
       },
       "lockPlan": [
         {
-          "id": "lock:approveRequest.request",
-          "source": "parameter:approveRequest.request",
-          "parameterId": "parameter:approveRequest.request",
-          "entityId": "entity:PurchaseRequest",
-          "mode": "update",
-          "order": 0
-        },
-        {
           "id": "lock:approveRequest.actor",
           "source": "caller",
           "parameterId": "parameter:approveRequest.actor",
-          "entityId": "entity:User",
+          "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
+          "order": 0
+        },
+        {
+          "id": "lock:approveRequest.request",
+          "source": "parameter:approveRequest.request",
+          "parameterId": "parameter:approveRequest.request",
+          "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+          "mode": "update",
           "order": 1
         }
       ],
@@ -1099,7 +1143,7 @@
         {
           "id": "parameter:myRequests.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -1117,7 +1161,7 @@
       ],
       "callerParameterId": "parameter:myRequests.actor",
       "callableParameters": [],
-      "sourceEntityId": "entity:PurchaseRequest",
+      "sourceEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "rowAlias": "request",
       "authorization": {
         "id": "authorize:myRequests",
@@ -1147,17 +1191,17 @@
             "kind": "fieldAccess",
             "source": "queryRow",
             "parameter": "request",
-            "fieldId": "field:PurchaseRequest.requester",
+            "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
             "fieldName": "requester",
-            "type": "entity:User",
+            "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "nullable": false
           },
           "right": {
             "kind": "entityValue",
             "parameterId": "parameter:myRequests.actor",
             "name": "actor",
-            "entityId": "entity:User",
-            "type": "entity:User",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+            "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "nullable": false
           },
           "type": "Boolean",
@@ -1174,7 +1218,7 @@
         }
       },
       "orderBy": {
-        "fieldId": "field:PurchaseRequest.id",
+        "fieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
         "direction": "asc",
         "identityTieBreaker": true
       },
@@ -1225,7 +1269,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -1239,7 +1283,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -1253,7 +1297,7 @@
         "line": 17,
         "column": 3,
         "endLine": 17,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -1267,7 +1311,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -1281,7 +1325,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -1323,7 +1367,7 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -1337,7 +1381,7 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -1351,7 +1395,7 @@
         "line": 23,
         "column": 3,
         "endLine": 23,
-        "endColumn": 19
+        "endColumn": 69
       }
     },
     {
@@ -1365,7 +1409,7 @@
         "line": 23,
         "column": 3,
         "endLine": 23,
-        "endColumn": 19
+        "endColumn": 69
       }
     },
     {
@@ -1379,7 +1423,7 @@
         "line": 24,
         "column": 3,
         "endLine": 24,
-        "endColumn": 36
+        "endColumn": 86
       }
     },
     {
@@ -1393,7 +1437,7 @@
         "line": 24,
         "column": 3,
         "endLine": 24,
-        "endColumn": 36
+        "endColumn": 86
       }
     },
     {
@@ -1407,7 +1451,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -1421,7 +1465,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -1435,7 +1479,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -1449,7 +1493,7 @@
         "line": 26,
         "column": 3,
         "endLine": 26,
-        "endColumn": 21
+        "endColumn": 71
       }
     },
     {
@@ -1463,7 +1507,7 @@
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 41
+        "endColumn": 91
       }
     },
     {
@@ -1471,13 +1515,13 @@
       "purpose": "approvedByRoles is a stored point-in-time audit snapshot, not a live relationship-derived value.",
       "layer": "ModelLang storage semantics",
       "artifact": "model.ir.json",
-      "objectName": "field:PurchaseRequest.approvedByRoles",
+      "objectName": "field:fld_577b4c94c9cd4b469aded37614712fba",
       "source": {
         "file": "examples/procurement.model",
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 41
+        "endColumn": 91
       }
     },
     {
@@ -1573,7 +1617,7 @@
     },
     {
       "id": "effect:openRequest",
-      "purpose": "create entity:PurchaseRequest.",
+      "purpose": "create entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
@@ -1643,7 +1687,7 @@
     },
     {
       "id": "effect:submitRequest",
-      "purpose": "update entity:PurchaseRequest.",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.submit_request",
@@ -1656,18 +1700,18 @@
       }
     },
     {
-      "id": "lock:submitRequest.request",
-      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
-      "layer": "PostgreSQL row lock",
-      "artifact": "postgres/003_actions.sql",
-      "objectName": "FOR UPDATE in model_procurement.submit_request"
-    },
-    {
       "id": "lock:submitRequest.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.submit_request"
+    },
+    {
+      "id": "lock:submitRequest.request",
+      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.submit_request"
     },
     {
       "id": "caller:approveRequest.actor",
@@ -1720,7 +1764,7 @@
     },
     {
       "id": "effect:approveRequest",
-      "purpose": "update entity:PurchaseRequest.",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
@@ -1733,18 +1777,18 @@
       }
     },
     {
-      "id": "lock:approveRequest.request",
-      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
-      "layer": "PostgreSQL row lock",
-      "artifact": "postgres/003_actions.sql",
-      "objectName": "FOR UPDATE in model_procurement.approve_request"
-    },
-    {
       "id": "lock:approveRequest.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.approve_request"
+    },
+    {
+      "id": "lock:approveRequest.request",
+      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.approve_request"
     },
     {
       "id": "caller:myRequests.actor",
@@ -1825,7 +1869,7 @@
     },
     {
       "id": "read:myRequests",
-      "purpose": "Read entity:PurchaseRequest through the generated query boundary.",
+      "purpose": "Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests",

@@ -342,7 +342,7 @@ function generateAction(ir: ModelIR, action: IRAction): string {
     "",
     `  RETURN ${rowJson(returnEntity, "v_result")};`,
   );
-  return `CREATE FUNCTION ${qname(schema, action.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
+  return `CREATE OR REPLACE FUNCTION ${qname(schema, action.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -435,7 +435,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "",
     "  RETURN v_result;",
   );
-  return `CREATE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
+  return `CREATE OR REPLACE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

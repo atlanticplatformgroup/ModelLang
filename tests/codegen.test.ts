@@ -103,7 +103,7 @@ describe("backends", () => {
   it("generates fail-closed, deterministic, bounded query SQL and typed clients", async () => {
     const output = generateAll(await procurement());
     const sql = output["postgres/003_queries.sql"];
-    expect(sql).toContain('CREATE FUNCTION "model_procurement"."my_requests"()');
+    expect(sql).toContain('CREATE OR REPLACE FUNCTION "model_procurement"."my_requests"()');
     expect(sql).toContain('WHERE (((v_row."requester_id" = v_actor."id")) IS TRUE)');
     expect(sql).toContain('ORDER BY v_row."id" ASC, v_row."id" ASC');
     expect(sql).toContain("LIMIT 100");

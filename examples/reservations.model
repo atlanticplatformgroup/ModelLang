@@ -1,21 +1,21 @@
-model Reservations version "0.4.0";
+model Reservations version "0.5.0";
 
-entity User {
-  id: UUID @id;
-  name: String;
+entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
+  id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
+  name: String @stableId("fld_c5d58534769747848252b806b96ade1d");
 }
 
-entity Resource {
-  id: UUID @id;
-  name: String @unique;
+entity Resource @stableId("ent_7cb2307972954d83a6f344764faaae39") {
+  id: UUID @id @stableId("fld_8a690418c88c4400b88b6efca8eaa752");
+  name: String @unique @stableId("fld_41fd1b66c84441519c8ff1e4db72d145");
 }
 
-entity Reservation {
-  id: UUID @id;
-  resource: Resource;
-  reservedBy: User;
-  startsAt: DateTime;
-  endsAt: DateTime;
+entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
+  id: UUID @id @stableId("fld_066660fbd78d479084a9db613ee746ae");
+  resource: Resource @stableId("fld_8df4f409794e4c66acdbb162b6063d57");
+  reservedBy: User @stableId("fld_8380b65e5a2a4c399a2743cee1a3a93a");
+  startsAt: DateTime @stableId("fld_59e1f90fae57481f921c5a81dfd3a234");
+  endsAt: DateTime @stableId("fld_fd818707952f4b388baea4c3132bce63");
 
   exclusion no_overlapping_reservations:
     noOverlap(resource, startsAt, endsAt);

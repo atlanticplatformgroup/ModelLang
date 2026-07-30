@@ -31,8 +31,8 @@ export interface TypeRef {
 }
 
 export interface Annotation {
-  name: "id" | "unique" | "min" | "minExclusive" | "max" | "snapshot";
-  value?: number;
+  name: "id" | "unique" | "min" | "minExclusive" | "max" | "snapshot" | "stableId";
+  value?: number | string;
   span: Span;
 }
 
@@ -65,6 +65,8 @@ export interface ExclusionDecl {
 export interface EntityDecl {
   kind: "entity";
   name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
   members: (FieldDecl | InvariantDecl | ExclusionDecl)[];
   span: Span;
 }

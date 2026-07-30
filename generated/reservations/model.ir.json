@@ -1,10 +1,10 @@
 {
-  "irVersion": 4,
+  "irVersion": 5,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.4.0",
-    "sourceHash": "sha256:d198253cc61f662997e38107cd468f196669d7a2099391b409fe6baf85ce4a4f",
+    "version": "0.5.0",
+    "sourceHash": "sha256:eeb50dd0a2f3ed123611862ccac57371f6a734dd287ac2fe9d62d8eb50030710",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -12,18 +12,26 @@
     }
   },
   "principal": {
-    "entityId": "entity:User",
+    "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
     "bindingMechanism": "session_user"
   },
   "enums": [],
   "entities": [
     {
-      "id": "entity:User",
+      "id": "entity:ent_82878bde58d948d4a84d85d01279e01d",
       "name": "User",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ent_82878bde58d948d4a84d85d01279e01d"
+      },
       "fields": [
         {
-          "id": "field:User.id",
+          "id": "field:fld_968ff16b1c28419d9f2f7833635e5653",
           "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_968ff16b1c28419d9f2f7833635e5653"
+          },
           "type": "UUID",
           "optional": false,
           "annotations": [
@@ -37,15 +45,19 @@
             "line": 4,
             "column": 3,
             "endLine": 4,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "id"
           }
         },
         {
-          "id": "field:User.name",
+          "id": "field:fld_c5d58534769747848252b806b96ade1d",
           "name": "name",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_c5d58534769747848252b806b96ade1d"
+          },
           "type": "String",
           "optional": false,
           "annotations": [],
@@ -55,7 +67,7 @@
             "line": 5,
             "column": 3,
             "endLine": 5,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "name"
@@ -64,7 +76,7 @@
       ],
       "invariants": [],
       "temporalExclusions": [],
-      "idFieldId": "field:User.id",
+      "idFieldId": "field:fld_968ff16b1c28419d9f2f7833635e5653",
       "span": {
         "file": "examples/reservations.model",
         "line": 3,
@@ -78,12 +90,20 @@
       }
     },
     {
-      "id": "entity:Resource",
+      "id": "entity:ent_7cb2307972954d83a6f344764faaae39",
       "name": "Resource",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ent_7cb2307972954d83a6f344764faaae39"
+      },
       "fields": [
         {
-          "id": "field:Resource.id",
+          "id": "field:fld_8a690418c88c4400b88b6efca8eaa752",
           "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_8a690418c88c4400b88b6efca8eaa752"
+          },
           "type": "UUID",
           "optional": false,
           "annotations": [
@@ -97,15 +117,19 @@
             "line": 9,
             "column": 3,
             "endLine": 9,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "id"
           }
         },
         {
-          "id": "field:Resource.name",
+          "id": "field:fld_41fd1b66c84441519c8ff1e4db72d145",
           "name": "name",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_41fd1b66c84441519c8ff1e4db72d145"
+          },
           "type": "String",
           "optional": false,
           "annotations": [
@@ -119,7 +143,7 @@
             "line": 10,
             "column": 3,
             "endLine": 10,
-            "endColumn": 24
+            "endColumn": 74
           },
           "naming": {
             "sqlColumn": "name"
@@ -128,7 +152,7 @@
       ],
       "invariants": [],
       "temporalExclusions": [],
-      "idFieldId": "field:Resource.id",
+      "idFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
       "span": {
         "file": "examples/reservations.model",
         "line": 8,
@@ -142,12 +166,20 @@
       }
     },
     {
-      "id": "entity:Reservation",
+      "id": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "name": "Reservation",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ent_ba2d028e915841d1ab90adfa40d38404"
+      },
       "fields": [
         {
-          "id": "field:Reservation.id",
+          "id": "field:fld_066660fbd78d479084a9db613ee746ae",
           "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_066660fbd78d479084a9db613ee746ae"
+          },
           "type": "UUID",
           "optional": false,
           "annotations": [
@@ -161,16 +193,20 @@
             "line": 14,
             "column": 3,
             "endLine": 14,
-            "endColumn": 16
+            "endColumn": 66
           },
           "naming": {
             "sqlColumn": "id"
           }
         },
         {
-          "id": "field:Reservation.resource",
+          "id": "field:fld_8df4f409794e4c66acdbb162b6063d57",
           "name": "resource",
-          "type": "entity:Resource",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_8df4f409794e4c66acdbb162b6063d57"
+          },
+          "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
@@ -179,16 +215,20 @@
             "line": 15,
             "column": 3,
             "endLine": 15,
-            "endColumn": 22
+            "endColumn": 72
           },
           "naming": {
             "sqlColumn": "resource_id"
           }
         },
         {
-          "id": "field:Reservation.reservedBy",
+          "id": "field:fld_8380b65e5a2a4c399a2743cee1a3a93a",
           "name": "reservedBy",
-          "type": "entity:User",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_8380b65e5a2a4c399a2743cee1a3a93a"
+          },
+          "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
@@ -197,15 +237,19 @@
             "line": 16,
             "column": 3,
             "endLine": 16,
-            "endColumn": 20
+            "endColumn": 70
           },
           "naming": {
             "sqlColumn": "reserved_by_id"
           }
         },
         {
-          "id": "field:Reservation.startsAt",
+          "id": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
           "name": "startsAt",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_59e1f90fae57481f921c5a81dfd3a234"
+          },
           "type": "DateTime",
           "optional": false,
           "annotations": [],
@@ -215,15 +259,19 @@
             "line": 17,
             "column": 3,
             "endLine": 17,
-            "endColumn": 22
+            "endColumn": 72
           },
           "naming": {
             "sqlColumn": "starts_at"
           }
         },
         {
-          "id": "field:Reservation.endsAt",
+          "id": "field:fld_fd818707952f4b388baea4c3132bce63",
           "name": "endsAt",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_fd818707952f4b388baea4c3132bce63"
+          },
           "type": "DateTime",
           "optional": false,
           "annotations": [],
@@ -233,7 +281,7 @@
             "line": 18,
             "column": 3,
             "endLine": 18,
-            "endColumn": 20
+            "endColumn": 70
           },
           "naming": {
             "sqlColumn": "ends_at"
@@ -245,9 +293,9 @@
         {
           "id": "exclusion:Reservation.no_overlapping_reservations",
           "name": "no_overlapping_reservations",
-          "keyFieldId": "field:Reservation.resource",
-          "startFieldId": "field:Reservation.startsAt",
-          "endFieldId": "field:Reservation.endsAt",
+          "keyFieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "startFieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "endFieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
           "intervalBounds": "[)",
           "sourceExpression": "noOverlap(resource, startsAt, endsAt)",
           "span": {
@@ -263,7 +311,7 @@
           }
         }
       ],
-      "idFieldId": "field:Reservation.id",
+      "idFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
       "span": {
         "file": "examples/reservations.model",
         "line": 13,
@@ -285,7 +333,7 @@
         {
           "id": "parameter:reserve.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -320,7 +368,7 @@
         {
           "id": "parameter:reserve.resource",
           "name": "resource",
-          "type": "entity:Resource",
+          "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
@@ -376,7 +424,7 @@
         "parameter:reserve.startsAt",
         "parameter:reserve.endsAt"
       ],
-      "returnEntityId": "entity:Reservation",
+      "returnEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "authorization": {
         "id": "authorize:reserve",
         "name": "authorize",
@@ -432,10 +480,10 @@
       "effect": {
         "kind": "create",
         "target": "Reservation",
-        "entityId": "entity:Reservation",
+        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
         "assignments": [
           {
-            "fieldId": "field:Reservation.id",
+            "fieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
             "fieldName": "id",
             "expression": {
               "kind": "parameter",
@@ -446,31 +494,31 @@
             }
           },
           {
-            "fieldId": "field:Reservation.resource",
+            "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
             "fieldName": "resource",
             "expression": {
               "kind": "entityValue",
               "parameterId": "parameter:reserve.resource",
               "name": "resource",
-              "entityId": "entity:Resource",
-              "type": "entity:Resource",
+              "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
               "nullable": false
             }
           },
           {
-            "fieldId": "field:Reservation.reservedBy",
+            "fieldId": "field:fld_8380b65e5a2a4c399a2743cee1a3a93a",
             "fieldName": "reservedBy",
             "expression": {
               "kind": "entityValue",
               "parameterId": "parameter:reserve.actor",
               "name": "actor",
-              "entityId": "entity:User",
-              "type": "entity:User",
+              "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+              "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
               "nullable": false
             }
           },
           {
-            "fieldId": "field:Reservation.startsAt",
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
             "fieldName": "startsAt",
             "expression": {
               "kind": "parameter",
@@ -481,7 +529,7 @@
             }
           },
           {
-            "fieldId": "field:Reservation.endsAt",
+            "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
             "fieldName": "endsAt",
             "expression": {
               "kind": "parameter",
@@ -498,7 +546,7 @@
           "id": "lock:reserve.resource",
           "source": "parameter:reserve.resource",
           "parameterId": "parameter:reserve.resource",
-          "entityId": "entity:Resource",
+          "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "mode": "share",
           "order": 0
         },
@@ -506,7 +554,7 @@
           "id": "lock:reserve.actor",
           "source": "caller",
           "parameterId": "parameter:reserve.actor",
-          "entityId": "entity:User",
+          "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "mode": "share",
           "order": 1
         }
@@ -532,7 +580,7 @@
         {
           "id": "parameter:reservationsForResource.actor",
           "name": "actor",
-          "type": "entity:User",
+          "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "caller": true,
           "binding": "session_user",
           "span": {
@@ -550,7 +598,7 @@
         {
           "id": "parameter:reservationsForResource.resource",
           "name": "resource",
-          "type": "entity:Resource",
+          "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
@@ -569,7 +617,7 @@
       "callableParameters": [
         "parameter:reservationsForResource.resource"
       ],
-      "sourceEntityId": "entity:Reservation",
+      "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "rowAlias": "reservation",
       "authorization": {
         "id": "authorize:reservationsForResource",
@@ -599,17 +647,17 @@
             "kind": "fieldAccess",
             "source": "queryRow",
             "parameter": "reservation",
-            "fieldId": "field:Reservation.resource",
+            "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
             "fieldName": "resource",
-            "type": "entity:Resource",
+            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
             "nullable": false
           },
           "right": {
             "kind": "entityValue",
             "parameterId": "parameter:reservationsForResource.resource",
             "name": "resource",
-            "entityId": "entity:Resource",
-            "type": "entity:Resource",
+            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
             "nullable": false
           },
           "type": "Boolean",
@@ -626,7 +674,7 @@
         }
       },
       "orderBy": {
-        "fieldId": "field:Reservation.startsAt",
+        "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
         "direction": "asc",
         "identityTieBreaker": true
       },
@@ -677,7 +725,7 @@
         "line": 4,
         "column": 3,
         "endLine": 4,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -691,7 +739,7 @@
         "line": 4,
         "column": 3,
         "endLine": 4,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -705,7 +753,7 @@
         "line": 5,
         "column": 3,
         "endLine": 5,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -747,7 +795,7 @@
         "line": 9,
         "column": 3,
         "endLine": 9,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -761,7 +809,7 @@
         "line": 9,
         "column": 3,
         "endLine": 9,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -775,7 +823,7 @@
         "line": 10,
         "column": 3,
         "endLine": 10,
-        "endColumn": 24
+        "endColumn": 74
       }
     },
     {
@@ -789,7 +837,7 @@
         "line": 10,
         "column": 3,
         "endLine": 10,
-        "endColumn": 24
+        "endColumn": 74
       }
     },
     {
@@ -831,7 +879,7 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -845,7 +893,7 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -859,7 +907,7 @@
         "line": 15,
         "column": 3,
         "endLine": 15,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -873,7 +921,7 @@
         "line": 15,
         "column": 3,
         "endLine": 15,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -887,7 +935,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -901,7 +949,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -915,7 +963,7 @@
         "line": 17,
         "column": 3,
         "endLine": 17,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -929,7 +977,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -1039,7 +1087,7 @@
     },
     {
       "id": "effect:reserve",
-      "purpose": "create entity:Reservation.",
+      "purpose": "create entity:ent_ba2d028e915841d1ab90adfa40d38404.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations.reserve",
@@ -1144,7 +1192,7 @@
     },
     {
       "id": "read:reservationsForResource",
-      "purpose": "Read entity:Reservation through the generated query boundary.",
+      "purpose": "Read entity:ent_ba2d028e915841d1ab90adfa40d38404 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",

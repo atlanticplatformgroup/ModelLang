@@ -140,7 +140,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(4);
+    expect(ir.irVersion).toBe(5);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -173,7 +173,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(4);
+    expect(ir.irVersion).toBe(5);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:owned.actor",
@@ -272,12 +272,12 @@ describe("ModelLang 0.4 enum sets", () => {
     });
   });
 
-  it("lowers membership and full-set snapshots into IR version 4", () => {
+  it("lowers membership and full-set snapshots into the current IR", () => {
     const ir = compileText(setModel("roles: Set<Role>;", `action record(caller actor: User, record: Record) -> Record {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(4);
+    expect(ir.irVersion).toBe(5);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))

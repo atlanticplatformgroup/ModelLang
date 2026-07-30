@@ -1,22 +1,22 @@
 flowchart LR
   identity["session_user identity binding"]
-  principal["Principal: User"]
+  principal["Principal: ent_82878bde58d948d4a84d85d01279e01d"]
   identity -->|binds| principal
-  entity_User["Entity: User"]
-  entity_Resource["Entity: Resource"]
-  entity_Reservation["Entity: Reservation"]
-  entity_Reservation -->|resource| entity_Resource
-  entity_Reservation -->|reservedBy| entity_User
-  exclusion_Reservation_no_overlapping_reservations["Temporal exclusion: no_overlapping_reservations"] -->|prevents overlap| entity_Reservation
+  entity_ent_82878bde58d948d4a84d85d01279e01d["Entity: User"]
+  entity_ent_7cb2307972954d83a6f344764faaae39["Entity: Resource"]
+  entity_ent_ba2d028e915841d1ab90adfa40d38404["Entity: Reservation"]
+  entity_ent_ba2d028e915841d1ab90adfa40d38404 -->|resource| entity_ent_7cb2307972954d83a6f344764faaae39
+  entity_ent_ba2d028e915841d1ab90adfa40d38404 -->|reservedBy| entity_ent_82878bde58d948d4a84d85d01279e01d
+  exclusion_Reservation_no_overlapping_reservations["Temporal exclusion: no_overlapping_reservations"] -->|prevents overlap| entity_ent_ba2d028e915841d1ab90adfa40d38404
   action_reserve["Action: reserve"]
   principal -->|authenticated caller| action_reserve
-  action_reserve -->|creates| entity_Reservation
+  action_reserve -->|creates| entity_ent_ba2d028e915841d1ab90adfa40d38404
   authorize_reserve["Authorize"] -->|guards| action_reserve
   require_reserve_valid_interval["Require: valid_interval"] -->|guards| action_reserve
-  action_reserve -->|locks share| entity_Resource
-  action_reserve -->|locks share| entity_User
+  action_reserve -->|locks share| entity_ent_7cb2307972954d83a6f344764faaae39
+  action_reserve -->|locks share| entity_ent_82878bde58d948d4a84d85d01279e01d
   query_reservationsForResource["Query: reservationsForResource"]
   principal -->|authenticated caller| query_reservationsForResource
-  query_reservationsForResource -->|reads| entity_Reservation
+  query_reservationsForResource -->|reads| entity_ent_ba2d028e915841d1ab90adfa40d38404
   authorize_reservationsForResource["Authorize"] -->|guards| query_reservationsForResource
   where_reservationsForResource["Where"] -->|filters rows| query_reservationsForResource

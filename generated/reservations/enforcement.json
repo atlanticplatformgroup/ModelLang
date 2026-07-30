@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.4.0",
-    "sourceHash": "sha256:d198253cc61f662997e38107cd468f196669d7a2099391b409fe6baf85ce4a4f",
+    "version": "0.5.0",
+    "sourceHash": "sha256:eeb50dd0a2f3ed123611862ccac57371f6a734dd287ac2fe9d62d8eb50030710",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -43,7 +43,7 @@
         "line": 4,
         "column": 3,
         "endLine": 4,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -57,7 +57,7 @@
         "line": 4,
         "column": 3,
         "endLine": 4,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -71,7 +71,7 @@
         "line": 5,
         "column": 3,
         "endLine": 5,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -113,7 +113,7 @@
         "line": 9,
         "column": 3,
         "endLine": 9,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -127,7 +127,7 @@
         "line": 9,
         "column": 3,
         "endLine": 9,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -141,7 +141,7 @@
         "line": 10,
         "column": 3,
         "endLine": 10,
-        "endColumn": 24
+        "endColumn": 74
       }
     },
     {
@@ -155,7 +155,7 @@
         "line": 10,
         "column": 3,
         "endLine": 10,
-        "endColumn": 24
+        "endColumn": 74
       }
     },
     {
@@ -197,7 +197,7 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -211,7 +211,7 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -225,7 +225,7 @@
         "line": 15,
         "column": 3,
         "endLine": 15,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -239,7 +239,7 @@
         "line": 15,
         "column": 3,
         "endLine": 15,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -253,7 +253,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -267,7 +267,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -281,7 +281,7 @@
         "line": 17,
         "column": 3,
         "endLine": 17,
-        "endColumn": 22
+        "endColumn": 72
       }
     },
     {
@@ -295,7 +295,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -405,7 +405,7 @@
     },
     {
       "id": "effect:reserve",
-      "purpose": "create entity:Reservation.",
+      "purpose": "create entity:ent_ba2d028e915841d1ab90adfa40d38404.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations.reserve",
@@ -510,7 +510,7 @@
     },
     {
       "id": "read:reservationsForResource",
-      "purpose": "Read entity:Reservation through the generated query boundary.",
+      "purpose": "Read entity:ent_ba2d028e915841d1ab90adfa40d38404 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",

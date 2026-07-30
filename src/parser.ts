@@ -84,6 +84,8 @@ class Parser {
   private parseEntity(): EntityDecl {
     const start = this.expectWord("entity");
     const name = this.identifier();
+    let stableId: Annotation | undefined;
+    if (this.at("@")) stableId = this.parseStableId();
     this.expect("{");
     const members: EntityDecl["members"] = [];
     while (!this.at("}")) {
@@ -92,7 +94,17 @@ class Parser {
       else members.push(this.parseField());
     }
     const end = this.expect("}");
-    return { kind: "entity", name: name.text, members, span: this.span(start, end) };
+    return { kind: "entity", name: name.text, nameSpan: name.span, stableId, members, span: this.span(start, end) };
+  }
+
+  private parseStableId(): Annotation {
+    const start = this.expect("@");
+    const name = this.identifier("Expected stableId annotation.");
+    if (name.text !== "stableId") this.fail("E1111", "Only @stableId is valid on an entity declaration.");
+    this.expect("(");
+    const value = this.expect("string", "Expected a stable ID string.");
+    const end = this.expect(")");
+    return { name: "stableId", value: String(value.value), span: this.span(start, end) };
   }
 
   private parseTypeRef(): TypeRef {
@@ -117,13 +129,18 @@ class Parser {
     while (this.at("@")) {
       const at = this.take();
       const name = this.identifier("Expected annotation name.");
-      if (!["id", "unique", "min", "minExclusive", "max", "snapshot"].includes(name.text)) this.fail("E1106", `Unknown annotation @${name.text}.`);
-      let value: number | undefined;
+      if (!["id", "unique", "min", "minExclusive", "max", "snapshot", "stableId"].includes(name.text)) this.fail("E1106", `Unknown annotation @${name.text}.`);
+      let value: number | string | undefined;
       let end: Token = name;
       if (name.text === "min" || name.text === "minExclusive" || name.text === "max") {
         this.expect("(");
         const number = this.expect("number", `Expected numeric value for @${name.text}.`);
         value = Number(number.value);
+        end = this.expect(")");
+      } else if (name.text === "stableId") {
+        this.expect("(");
+        const id = this.expect("string", "Expected a stable ID string.");
+        value = String(id.value);
         end = this.expect(")");
       }
       annotations.push({ name: name.text as Annotation["name"], value, span: this.span(at, end) });

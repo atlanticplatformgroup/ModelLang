@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.4.0",
-    "sourceHash": "sha256:223f7dedd038f85bf47df46127438b5fd6a3795e5195532524fd240955437c97",
+    "version": "0.5.0",
+    "sourceHash": "sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -43,7 +43,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -57,7 +57,7 @@
         "line": 16,
         "column": 3,
         "endLine": 16,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -71,7 +71,7 @@
         "line": 17,
         "column": 3,
         "endLine": 17,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -85,7 +85,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -99,7 +99,7 @@
         "line": 18,
         "column": 3,
         "endLine": 18,
-        "endColumn": 20
+        "endColumn": 70
       }
     },
     {
@@ -141,7 +141,7 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -155,7 +155,7 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 16
+        "endColumn": 66
       }
     },
     {
@@ -169,7 +169,7 @@
         "line": 23,
         "column": 3,
         "endLine": 23,
-        "endColumn": 19
+        "endColumn": 69
       }
     },
     {
@@ -183,7 +183,7 @@
         "line": 23,
         "column": 3,
         "endLine": 23,
-        "endColumn": 19
+        "endColumn": 69
       }
     },
     {
@@ -197,7 +197,7 @@
         "line": 24,
         "column": 3,
         "endLine": 24,
-        "endColumn": 36
+        "endColumn": 86
       }
     },
     {
@@ -211,7 +211,7 @@
         "line": 24,
         "column": 3,
         "endLine": 24,
-        "endColumn": 36
+        "endColumn": 86
       }
     },
     {
@@ -225,7 +225,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -239,7 +239,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -253,7 +253,7 @@
         "line": 25,
         "column": 3,
         "endLine": 25,
-        "endColumn": 47
+        "endColumn": 97
       }
     },
     {
@@ -267,7 +267,7 @@
         "line": 26,
         "column": 3,
         "endLine": 26,
-        "endColumn": 21
+        "endColumn": 71
       }
     },
     {
@@ -281,7 +281,7 @@
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 41
+        "endColumn": 91
       }
     },
     {
@@ -289,13 +289,13 @@
       "purpose": "approvedByRoles is a stored point-in-time audit snapshot, not a live relationship-derived value.",
       "layer": "ModelLang storage semantics",
       "artifact": "model.ir.json",
-      "objectName": "field:PurchaseRequest.approvedByRoles",
+      "objectName": "field:fld_577b4c94c9cd4b469aded37614712fba",
       "source": {
         "file": "examples/procurement.model",
         "line": 27,
         "column": 3,
         "endLine": 27,
-        "endColumn": 41
+        "endColumn": 91
       }
     },
     {
@@ -391,7 +391,7 @@
     },
     {
       "id": "effect:openRequest",
-      "purpose": "create entity:PurchaseRequest.",
+      "purpose": "create entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
@@ -461,7 +461,7 @@
     },
     {
       "id": "effect:submitRequest",
-      "purpose": "update entity:PurchaseRequest.",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.submit_request",
@@ -474,18 +474,18 @@
       }
     },
     {
-      "id": "lock:submitRequest.request",
-      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
-      "layer": "PostgreSQL row lock",
-      "artifact": "postgres/003_actions.sql",
-      "objectName": "FOR UPDATE in model_procurement.submit_request"
-    },
-    {
       "id": "lock:submitRequest.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.submit_request"
+    },
+    {
+      "id": "lock:submitRequest.request",
+      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.submit_request"
     },
     {
       "id": "caller:approveRequest.actor",
@@ -538,7 +538,7 @@
     },
     {
       "id": "effect:approveRequest",
-      "purpose": "update entity:PurchaseRequest.",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
@@ -551,18 +551,18 @@
       }
     },
     {
-      "id": "lock:approveRequest.request",
-      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
-      "layer": "PostgreSQL row lock",
-      "artifact": "postgres/003_actions.sql",
-      "objectName": "FOR UPDATE in model_procurement.approve_request"
-    },
-    {
       "id": "lock:approveRequest.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.approve_request"
+    },
+    {
+      "id": "lock:approveRequest.request",
+      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
+      "layer": "PostgreSQL row lock",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "FOR UPDATE in model_procurement.approve_request"
     },
     {
       "id": "caller:myRequests.actor",
@@ -643,7 +643,7 @@
     },
     {
       "id": "read:myRequests",
-      "purpose": "Read entity:PurchaseRequest through the generated query boundary.",
+      "purpose": "Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests",

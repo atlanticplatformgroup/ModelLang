@@ -1,7 +1,7 @@
 -- Generated guarded action functions. Caller identity is always session_user.
 SET ROLE modellang_owner;
 
-CREATE FUNCTION "model_reservations"."reserve"("p_id" uuid, "p_resource" uuid, "p_starts_at" timestamptz, "p_ends_at" timestamptz)
+CREATE OR REPLACE FUNCTION "model_reservations"."reserve"("p_id" uuid, "p_resource" uuid, "p_starts_at" timestamptz, "p_ends_at" timestamptz)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

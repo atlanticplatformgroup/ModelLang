@@ -1,4 +1,4 @@
-model Procurement version "0.4.0";
+model Procurement version "0.5.0";
 
 enum Role {
   EMPLOYEE,
@@ -12,19 +12,19 @@ enum RequestStatus {
   APPROVED
 }
 
-entity User {
-  id: UUID @id;
-  name: String;
-  roles: Set<Role>;
+entity User @stableId("ent_66c16684f17e4b4ca79eb7d916cbf725") {
+  id: UUID @id @stableId("fld_fe4c8fe8243b456eadeefb42b0bd7097");
+  name: String @stableId("fld_a261560f630d4e818f8f099868078535");
+  roles: Set<Role> @stableId("fld_b4b29a4d0d914ec0913e578da89e5dcb");
 }
 
-entity PurchaseRequest {
-  id: UUID @id;
-  requester: User;
-  amount: Decimal @minExclusive(0);
-  status: RequestStatus = RequestStatus.DRAFT;
-  approvedBy: User?;
-  approvedByRoles: Set<Role>? @snapshot;
+entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
+  id: UUID @id @stableId("fld_af918d24406040619a77b244a81ca5d3");
+  requester: User @stableId("fld_04d9bc06877d4ec38a98196239c949b5");
+  amount: Decimal @minExclusive(0) @stableId("fld_9810e7598584487ea4a883e3c1c3f8d1");
+  status: RequestStatus = RequestStatus.DRAFT @stableId("fld_afb1dee14dfa48c98961fdb40e2b0be2");
+  approvedBy: User? @stableId("fld_5da56f04460f4deba9ccda4f552c2b97");
+  approvedByRoles: Set<Role>? @snapshot @stableId("fld_577b4c94c9cd4b469aded37614712fba");
 
   invariant approval_fields_match_status:
     (

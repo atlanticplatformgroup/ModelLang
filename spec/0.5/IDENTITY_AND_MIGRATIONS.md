@@ -7,8 +7,8 @@ Status: normative design contract for the 0.5 reference compiler.
 Names are editable labels. Stable IDs identify declarations across model versions.
 
 ```modellang
-entity PurchaseRequest @stableId("ent_7d61...") {
-  requestedBy: User @stableId("fld_8a92...");
+entity PurchaseRequest @stableId("ent_7d617d617d617d617d617d617d617d61") {
+  requestedBy: User @stableId("fld_8a928a928a928a928a928a928a928a92");
 }
 ```
 
@@ -17,8 +17,8 @@ entity PurchaseRequest @stableId("ent_7d61...") {
 The canonical IR prefixes these values by declaration kind:
 
 ```text
-entity:ent_7d61...
-field:fld_8a92...
+entity:ent_7d617d617d617d617d617d617d617d61
+field:fld_8a928a928a928a928a928a928a928a92
 ```
 
 References in IR use these IDs. Current names remain in IR for diagnostics, generated API names, and physical SQL naming.
@@ -68,4 +68,4 @@ It never guesses that an unmatched deletion and addition are a rename.
 
 ## Deployment boundary
 
-The migration file handles table and column renames. Generated action/query functions and grants must then be redeployed from the current IR. Automated deployment orchestration and physical constraint renaming are outside 0.5; PostgreSQL preserves existing constraint enforcement across table and column renames.
+The migration file handles table and column renames. Generated action/query functions use `CREATE OR REPLACE` and, with grants, must then be redeployed from the current IR. Automated deployment orchestration and physical constraint renaming are outside 0.5; PostgreSQL preserves existing constraint enforcement across table and column renames.

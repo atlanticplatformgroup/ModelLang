@@ -50,9 +50,23 @@ function expressionText(expression: Expression): string {
 function isEntityType(type: string): boolean { return type.startsWith("entity:"); }
 function isEnumType(type: string): boolean { return type.startsWith("enum:"); }
 function isEnumSetType(type: string): boolean { return type.startsWith("set:enum:"); }
-function entityName(type: string): string { return type.slice("entity:".length); }
 function enumSetName(type: string): string { return type.slice("set:enum:".length); }
 function isNumeric(type: string): boolean { return type === "Int" || type === "Decimal"; }
+
+function entityId(entity: EntityDecl): string {
+  return `entity:${String(entity.stableId?.value ?? entity.name)}`;
+}
+
+function fieldId(entity: EntityDecl, field: FieldDecl): string {
+  const stableId = field.annotations.find((annotation) => annotation.name === "stableId")?.value;
+  return `field:${String(stableId ?? `${entity.name}.${field.name}`)}`;
+}
+
+function entityForType(symbols: Symbols, type: string): EntityDecl {
+  const entity = [...symbols.entities.values()].find((candidate) => entityId(candidate) === type);
+  if (!entity) throw new Error(`E2900 Unknown resolved entity type '${type}'.`);
+  return entity;
+}
 
 export function analyze(program: Program, source: string, file: string): ModelIR {
   const symbols = collectSymbols(program, file);
@@ -90,7 +104,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const enforcement = buildEnforcement(entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 4,
+    irVersion: 5,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -99,7 +113,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
       sourceFile: file,
       naming: { sqlSchema: schema, internalSchema },
     },
-    principal: { entityId: `entity:${principalName}`, bindingMechanism: "session_user" },
+    principal: { entityId: entityId(symbols.entities.get(principalName)!), bindingMechanism: "session_user" },
     enums,
     entities,
     actions,
@@ -150,7 +164,9 @@ function collectSymbols(program: Program, file: string): Symbols {
 }
 
 function validateEntities(symbols: Symbols, file: string): void {
+  const stableIds = new Map<string, Span>();
   for (const entity of symbols.entities.values()) {
+    if (entity.stableId) validateStableId(entity.stableId, "ent", stableIds, file);
     const fields = [...symbols.fields.get(entity.name)!.values()];
     const ids = fields.filter((field) => field.annotations.some((annotation) => annotation.name === "id"));
     if (ids.length !== 1) throw new ModelError("E2201", `Entity '${entity.name}' must have exactly one @id field.`, entity.span, file);
@@ -167,6 +183,10 @@ function validateEntities(symbols: Symbols, file: string): void {
       for (const annotation of field.annotations) {
         if (annotationNames.has(annotation.name)) throw new ModelError("E2203", `Duplicate @${annotation.name} annotation.`, annotation.span, file);
         annotationNames.add(annotation.name);
+        if (annotation.name === "stableId") {
+          validateStableId(annotation, "fld", stableIds, file);
+          continue;
+        }
         if (field.type.collection === "set" && annotation.name !== "snapshot") {
           throw new ModelError("E2702", `@${annotation.name} is not supported on enum-set fields in 0.4.`, annotation.span, file);
         }
@@ -206,6 +226,17 @@ function validateEntities(symbols: Symbols, file: string): void {
   }
 }
 
+function validateStableId(annotation: { value?: number | string; span: Span }, kind: "ent" | "fld", seen: Map<string, Span>, file: string): void {
+  const value = typeof annotation.value === "string" ? annotation.value : "";
+  const pattern = kind === "ent" ? /^ent_[0-9a-f]{32}$/ : /^fld_[0-9a-f]{32}$/;
+  if (!pattern.test(value)) {
+    throw new ModelError("E2801", `Stable ${kind === "ent" ? "entity" : "field"} ID must match ${kind}_[0-9a-f]{32}.`, annotation.span, file);
+  }
+  const previous = seen.get(value);
+  if (previous) throw new ModelError("E2802", `Duplicate stable ID '${value}'.`, annotation.span, file, { message: "First declared here.", span: previous });
+  seen.set(value, annotation.span);
+}
+
 function isCompileTimeConstant(expression: Expression, symbols: Symbols): boolean {
   return expression.kind === "literal"
     || (expression.kind === "path" && expression.parts.length === 2 && Boolean(symbols.enums.get(expression.parts[0]!)?.members.some((member) => member.name === expression.parts[1])));
@@ -213,19 +244,25 @@ function isCompileTimeConstant(expression: Expression, symbols: Symbols): boolea
 
 function fieldType(field: FieldDecl, symbols: Symbols): string {
   if (field.type.collection === "set") return `set:enum:${field.type.name}`;
-  if (symbols.entities.has(field.type.name)) return `entity:${field.type.name}`;
+  if (symbols.entities.has(field.type.name)) return entityId(symbols.entities.get(field.type.name)!);
   if (symbols.enums.has(field.type.name)) return `enum:${field.type.name}`;
   return field.type.name;
 }
 
 function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREntity {
   const fields: IRField[] = entity.members.filter((member): member is FieldDecl => member.kind === "field").map((field) => ({
-    id: `field:${entity.name}.${field.name}`,
+    id: fieldId(entity, field),
     name: field.name,
+    identity: field.annotations.some((annotation) => annotation.name === "stableId")
+      ? { strategy: "explicitStableId", stableId: String(field.annotations.find((annotation) => annotation.name === "stableId")!.value) }
+      : { strategy: "nameDerived" },
     type: fieldType(field, symbols),
     optional: field.optional,
     default: field.default ? typeExpression(field.default, { kind: "invariant", entity }, symbols, file) : undefined,
-    annotations: field.annotations.map(({ name, value }) => ({ name, ...(value === undefined ? {} : { value }) })),
+    annotations: field.annotations.filter((annotation) => annotation.name !== "stableId").map(({ name, value }) => ({
+      name,
+      ...(typeof value === "number" ? { value } : {}),
+    })),
     storage: field.annotations.some((annotation) => annotation.name === "snapshot") ? "snapshot" : "ordinary",
     span: irSpan(field.span, file),
     naming: { sqlColumn: isEntityType(fieldType(field, symbols)) ? `${snakeCase(field.name)}_id` : snakeCase(field.name) },
@@ -246,9 +283,9 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
   const temporalExclusions = entity.members.filter((member) => member.kind === "exclusion").map((exclusion) => ({
     id: `exclusion:${entity.name}.${exclusion.name}`,
     name: exclusion.name,
-    keyFieldId: `field:${entity.name}.${exclusion.keyField}`,
-    startFieldId: `field:${entity.name}.${exclusion.startField}`,
-    endFieldId: `field:${entity.name}.${exclusion.endField}`,
+    keyFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.keyField)!),
+    startFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.startField)!),
+    endFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.endField)!),
     intervalBounds: "[)" as const,
     sourceExpression: `noOverlap(${exclusion.keyField}, ${exclusion.startField}, ${exclusion.endField})`,
     span: irSpan(exclusion.span, file),
@@ -258,8 +295,11 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
     },
   }));
   return {
-    id: `entity:${entity.name}`,
+    id: entityId(entity),
     name: entity.name,
+    identity: entity.stableId
+      ? { strategy: "explicitStableId", stableId: String(entity.stableId.value) }
+      : { strategy: "nameDerived" },
     fields,
     invariants,
     temporalExclusions,
@@ -279,7 +319,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
-    const type = symbols.entities.has(parameter.type.name) ? `entity:${parameter.type.name}` : symbols.enums.has(parameter.type.name) ? `enum:${parameter.type.name}` : parameter.type.name;
+    const type = symbols.entities.has(parameter.type.name) ? entityId(symbols.entities.get(parameter.type.name)!) : symbols.enums.has(parameter.type.name) ? `enum:${parameter.type.name}` : parameter.type.name;
     return {
       id: `parameter:${action.name}.${parameter.name}`,
       name: parameter.name,
@@ -292,7 +332,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   });
   const parameterMap = new Map(parameters.map((parameter) => [parameter.name, parameter]));
   const caller = parameters.find((parameter) => parameter.caller)!;
-  if (caller.type !== `entity:${principalName}`) throw new ModelError("E2304", "Caller principal type is inconsistent with the model.", action.span, file);
+  if (caller.type !== entityId(symbols.entities.get(principalName)!)) throw new ModelError("E2304", "Caller principal type is inconsistent with the model.", action.span, file);
   const scope: Scope = { kind: "action", action, parameters: parameterMap };
   const authorization = typeExpression(action.authorize, scope, symbols, file);
   requireBoolean(authorization, action.authorize.span, file, "Authorization");
@@ -316,7 +356,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     targetParameter = parameterMap.get(action.effect.target);
     if (!targetParameter || !isEntityType(targetParameter.type)) throw new ModelError("E2309", `Update target '${action.effect.target}' must be an entity parameter.`, action.effect.span, file);
     if (targetParameter.caller) throw new ModelError("E2310", "The caller parameter may not be an update target.", action.effect.span, file);
-    effectEntity = symbols.entities.get(entityName(targetParameter.type))!;
+    effectEntity = entityForType(symbols, targetParameter.type);
   }
   if (returnEntity.name !== effectEntity.name) throw new ModelError("E2311", "Action return type must match the created or updated entity.", action.returnType.span, file);
   const effectFields = symbols.fields.get(effectEntity.name)!;
@@ -336,7 +376,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
       && expression.kind !== "fieldAccess") {
       throw new ModelError("E2415", `@snapshot field '${field.name}' must be assigned null or a direct field value.`, assignment.expression.span, file);
     }
-    return { fieldId: `field:${effectEntity.name}.${field.name}`, fieldName: field.name, expression };
+    return { fieldId: fieldId(effectEntity, field), fieldName: field.name, expression };
   });
   if (action.effect.kind === "create") {
     for (const field of effectFields.values()) {
@@ -373,10 +413,10 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     parameters,
     callerParameterId: caller.id,
     callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
-    returnEntityId: `entity:${returnEntity.name}`,
+    returnEntityId: entityId(returnEntity),
     authorization: { id: `authorize:${action.name}`, name: "authorize", expression: authorization, sourceExpression: expressionText(action.authorize), span: irSpan(action.authorize.span, file) },
     preconditions,
-    effect: { kind: action.effect.kind, target: action.effect.target, entityId: `entity:${effectEntity.name}`, assignments },
+    effect: { kind: action.effect.kind, target: action.effect.target, entityId: entityId(effectEntity), assignments },
     lockPlan,
     span: irSpan(action.span, file),
     naming: { sqlFunction: snakeCase(action.name), typescriptMethod: action.name },
@@ -394,7 +434,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
     const type = symbols.entities.has(parameter.type.name)
-      ? `entity:${parameter.type.name}`
+      ? entityId(symbols.entities.get(parameter.type.name)!)
       : symbols.enums.has(parameter.type.name)
         ? `enum:${parameter.type.name}`
         : parameter.type.name;
@@ -417,7 +457,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   }
   const parameterMap = new Map(parameters.map((parameter) => [parameter.name, parameter]));
   const caller = parameters.find((parameter) => parameter.caller)!;
-  if (caller.type !== `entity:${principalName}`) {
+  if (caller.type !== entityId(symbols.entities.get(principalName)!)) {
     throw new ModelError("E2304", "Caller principal type is inconsistent with the model.", query.span, file);
   }
   const authorization = typeExpression(query.authorize, {
@@ -460,7 +500,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     parameters,
     callerParameterId: caller.id,
     callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
-    sourceEntityId: `entity:${sourceEntity.name}`,
+    sourceEntityId: entityId(sourceEntity),
     rowAlias: query.rowAlias.name,
     authorization: {
       id: `authorize:${query.name}`,
@@ -477,7 +517,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       span: irSpan(query.where.span, file),
     },
     orderBy: {
-      fieldId: `field:${sourceEntity.name}.${orderField.name}`,
+      fieldId: fieldId(sourceEntity, orderField),
       direction: query.orderBy.direction,
       identityTieBreaker: true,
     },
@@ -564,7 +604,7 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
     if (expression.parts.length !== 1) throw new ModelError("E2406", "Entity invariants may not dereference related entities.", expression.span, file);
     const field = symbols.fields.get(scope.entity!.name)!.get(first!);
     if (!field) throw new ModelError("E2007", `Unknown field '${scope.entity!.name}.${first}'.`, expression.span, file);
-    return { kind: "fieldAccess", source: "self", fieldId: `field:${scope.entity!.name}.${field.name}`, fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
+    return { kind: "fieldAccess", source: "self", fieldId: fieldId(scope.entity!, field), fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
   }
   if (scope.kind === "query" && first === scope.rowAlias) {
     if (!scope.allowQueryRow) {
@@ -579,7 +619,7 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
       kind: "fieldAccess",
       source: "queryRow",
       parameter: scope.rowAlias,
-      fieldId: `field:${scope.queryEntity!.name}.${field.name}`,
+      fieldId: fieldId(scope.queryEntity!, field),
       fieldName: field.name,
       type: fieldType(field, symbols),
       nullable: field.optional,
@@ -595,10 +635,10 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
     return { kind: "parameter", parameterId: parameter.id, name: parameter.name, type: parameter.type, nullable: false };
   }
   if (!isEntityType(parameter.type)) throw new ModelError("E2410", `Cannot access a field on non-entity parameter '${parameter.name}'.`, expression.span, file);
-  const entity = entityName(parameter.type);
-  const field = symbols.fields.get(entity)!.get(second);
-  if (!field) throw new ModelError("E2007", `Unknown field '${entity}.${second}'.`, expression.span, file);
-  return { kind: "fieldAccess", source: parameter.id, parameter: parameter.name, fieldId: `field:${entity}.${field.name}`, fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
+  const entity = entityForType(symbols, parameter.type);
+  const field = symbols.fields.get(entity.name)!.get(second);
+  if (!field) throw new ModelError("E2007", `Unknown field '${entity.name}.${second}'.`, expression.span, file);
+  return { kind: "fieldAccess", source: parameter.id, parameter: parameter.name, fieldId: fieldId(entity, field), fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
 }
 
 function compatibleTypes(left: string, right: string): boolean {
@@ -655,7 +695,7 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IR
   for (const entity of entities) {
     for (const field of entity.fields) {
       if (!field.optional) entries.push({ id: `required:${entity.name}.${field.name}`, purpose: `${field.name} is required.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn} NOT NULL`, source: field.span });
-      if (isEntityType(field.type)) entries.push({ id: `reference:${entity.name}.${field.name}`, purpose: `${field.name} references ${entityName(field.type)}.`, layer: "PostgreSQL foreign key", artifact: "postgres/002_schema.sql", objectName: `fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`, source: field.span });
+      if (isEntityType(field.type)) entries.push({ id: `reference:${entity.name}.${field.name}`, purpose: `${field.name} references ${entities.find((candidate) => candidate.id === field.type)?.name ?? field.type}.`, layer: "PostgreSQL foreign key", artifact: "postgres/002_schema.sql", objectName: `fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`, source: field.span });
       if (isEnumType(field.type)) entries.push({ id: `enum-membership:${entity.name}.${field.name}`, purpose: `${field.name} must be a declared ${field.type.slice(5)} member.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`, source: field.span });
       if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${entity.name}.${field.name}`, purpose: `${field.name} is a duplicate-free set of declared ${enumSetName(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
       if (field.default) entries.push({ id: `default:${entity.name}.${field.name}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });

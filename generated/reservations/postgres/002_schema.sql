@@ -1,4 +1,4 @@
--- source sha256:d198253cc61f662997e38107cd468f196669d7a2099391b409fe6baf85ce4a4f
+-- source sha256:eeb50dd0a2f3ed123611862ccac57371f6a734dd287ac2fe9d62d8eb50030710
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;

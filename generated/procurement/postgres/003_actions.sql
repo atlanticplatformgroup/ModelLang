@@ -1,7 +1,7 @@
 -- Generated guarded action functions. Caller identity is always session_user.
 SET ROLE modellang_owner;
 
-CREATE FUNCTION "model_procurement"."open_request"("p_id" uuid, "p_amount" numeric)
+CREATE OR REPLACE FUNCTION "model_procurement"."open_request"("p_id" uuid, "p_amount" numeric)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -55,7 +55,7 @@ $modellang$;
 
 REVOKE ALL ON FUNCTION "model_procurement"."open_request"(uuid, numeric) FROM PUBLIC;
 
-CREATE FUNCTION "model_procurement"."submit_request"("p_request" uuid)
+CREATE OR REPLACE FUNCTION "model_procurement"."submit_request"("p_request" uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -76,22 +76,13 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
   END IF;
 
-  PERFORM "id" FROM "model_procurement"."purchase_request"
-  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
-  ORDER BY "id" FOR UPDATE;
-
   PERFORM "id" FROM "model_procurement"."user"
   WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
   ORDER BY "id" FOR SHARE;
 
-  SELECT * INTO v_request
-  FROM "model_procurement"."purchase_request"
-  WHERE "id" = "p_request"
-;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
-  END IF;
+  PERFORM "id" FROM "model_procurement"."purchase_request"
+  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
+  ORDER BY "id" FOR UPDATE;
 
   SELECT * INTO v_actor
   FROM "model_procurement"."user"
@@ -100,6 +91,15 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+  END IF;
+
+  SELECT * INTO v_request
+  FROM "model_procurement"."purchase_request"
+  WHERE "id" = "p_request"
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
   END IF;
 
   IF NOT (((v_actor."id" = v_request."requester_id")) IS TRUE) THEN
@@ -124,7 +124,7 @@ $modellang$;
 
 REVOKE ALL ON FUNCTION "model_procurement"."submit_request"(uuid) FROM PUBLIC;
 
-CREATE FUNCTION "model_procurement"."approve_request"("p_request" uuid)
+CREATE OR REPLACE FUNCTION "model_procurement"."approve_request"("p_request" uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -145,22 +145,13 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
   END IF;
 
-  PERFORM "id" FROM "model_procurement"."purchase_request"
-  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
-  ORDER BY "id" FOR UPDATE;
-
   PERFORM "id" FROM "model_procurement"."user"
   WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
   ORDER BY "id" FOR SHARE;
 
-  SELECT * INTO v_request
-  FROM "model_procurement"."purchase_request"
-  WHERE "id" = "p_request"
-;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
-  END IF;
+  PERFORM "id" FROM "model_procurement"."purchase_request"
+  WHERE "id" = ANY (ARRAY["p_request"]::uuid[])
+  ORDER BY "id" FOR UPDATE;
 
   SELECT * INTO v_actor
   FROM "model_procurement"."user"
@@ -169,6 +160,15 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+  END IF;
+
+  SELECT * INTO v_request
+  FROM "model_procurement"."purchase_request"
+  WHERE "id" = "p_request"
+;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:request';
   END IF;
 
   IF NOT (((((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles"))) OR ((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles"))))) IS TRUE) THEN

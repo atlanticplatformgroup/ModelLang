@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- Added persistent `@stableId(...)` identities for entities and stored fields.
+- Added canonical IR version 5 with identity strategy metadata and ID-based entity/field references.
+- Added `modelc assign-ids`, which assigns missing cryptographically random IDs in place and is idempotent.
+- Added deterministic previous-IR/current-source migration comparison.
+- Added transactional PostgreSQL table and column rename generation.
+- Made generated action and query routines replaceable for post-migration redeployment.
+- Added fail-closed migration refusal for name-derived IDs, additions, removals, structural changes, and collisions.
+- Migrated both canonical models to explicit stable IDs.
+- Added unit and live PostgreSQL tests proving a renamed table/foreign-key column preserves data and enforcement.
+
 ## 0.4.0
 
 - Added normative stored `Set<Enum>` fields and membership expressions.

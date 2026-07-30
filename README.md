@@ -1,6 +1,6 @@
-# ModelLang 0.4 reference compiler
+# ModelLang 0.5 reference compiler
 
-ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR, constrained tables, authenticated actions, bounded authenticated queries, enum-set permissions, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, constrained tables, authenticated actions, bounded queries, enum-set permissions, safe rename migrations, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -45,6 +45,8 @@ npx tsx src/cli.ts check examples/procurement.model
 npx tsx src/cli.ts build examples/procurement.model --out generated/scratch
 npx tsx src/cli.ts print-ir examples/procurement.model
 npx tsx src/cli.ts explain examples/procurement.model
+npx tsx src/cli.ts assign-ids examples/procurement.model
+npx tsx src/cli.ts migration previous-model.ir.json examples/procurement.model --out migration.sql
 ```
 
 After `npm run build`, the executable is available as:
@@ -57,7 +59,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 4 retains qualified semantic IDs, typed expression trees, nullability, source spans, caller metadata, callable parameters, canonical lock plans, snapshot storage semantics, enum sets and membership, temporal exclusions, query policies, deterministic ordering, and result limits. Both committed subtrees are golden fixtures.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 5 separates persistent entity/field identity from editable names while retaining typed expressions, nullability, source spans, caller metadata, callable parameters, lock plans, snapshots, enum sets, temporal exclusions, and queries. Both committed subtrees are golden fixtures and migration baselines.
 
 The PostgreSQL backend emits:
 
@@ -71,6 +73,20 @@ The PostgreSQL backend emits:
 The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field and is never forwarded as a SQL argument. Query methods return typed entity arrays. PostgreSQL exclusion failures map to typed `ConflictError`.
 
 Each generated subtree contains `model.mmd`, `enforcement.json`, and `enforcement.md`, making the relationship between declarations and executable enforcement visible.
+
+## Stable identity and rename migrations
+
+Entities and fields may carry opaque IDs:
+
+```modellang
+entity PurchaseRequest @stableId("ent_7d617d617d617d617d617d617d617d61") {
+  requester: User @stableId("fld_8a928a928a928a928a928a928a928a92");
+}
+```
+
+The ID is semantic identity; the name is an editable label and generated physical/API name. `assign-ids` adds missing IDs without changing existing ones. The migration command matches declarations only by ID, compares a released IR with current source, and emits transactional PostgreSQL `RENAME` statements for safe table and column renames.
+
+Version 0.5 intentionally refuses additions, removals, type/nullability changes, collisions, or models without complete explicit IDs. It never guesses that a similarly named deletion and addition are a rename. After the structural migration, the current generated `003_actions.sql`, `003_queries.sql`, and `004_grants.sql` redeploy replaceable routines and grants.
 
 ## Explicit language semantics
 
@@ -131,7 +147,7 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, duplicate and unknown declarations, IDs and annotations, caller rules, type/null semantics, query authorization and row policies, deterministic ordering and limits, DateTime ordering, temporal exclusion definitions, disallowed traversal, action targets and assignments, lock planning, deterministic IR/output, SQL null lowering, callable identity omission, execute-only privileges, cross-caller read isolation, cross-resource read isolation, typed client errors, auditing, invariants, half-open adjacency, conflicts, and real races.
+The full suite validates parsing and spans, stable-ID assignment and validation, deterministic rename planning, PostgreSQL data preservation across renames, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
@@ -141,6 +157,7 @@ The full suite validates parsing and spans, duplicate and unknown declarations, 
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
+- Rename migration planning intentionally omits additions, removals, type changes, enum evolution, backfills, constraint renaming, and deployment orchestration in 0.5.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.4 language is in [spec/0.4/LANGUAGE.md](./spec/0.4/LANGUAGE.md), with its [enum-set semantics](./spec/0.4/SETS.md), [grammar](./spec/0.4/GRAMMAR.ebnf), [conformance requirements](./spec/0.4/CONFORMANCE.md), and [unstable boundaries](./spec/0.4/UNSTABLE.md). The [0.3 language](./spec/0.3/LANGUAGE.md) remains normative where 0.4 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.5 language is in [spec/0.5/LANGUAGE.md](./spec/0.5/LANGUAGE.md), with its [identity and migration semantics](./spec/0.5/IDENTITY_AND_MIGRATIONS.md), [grammar](./spec/0.5/GRAMMAR.ebnf), [conformance requirements](./spec/0.5/CONFORMANCE.md), and [unstable boundaries](./spec/0.5/UNSTABLE.md). The [0.4 language](./spec/0.4/LANGUAGE.md) remains normative where 0.5 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

@@ -5,16 +5,47 @@ import { formatDiagnostic, ModelError } from "./diagnostics.js";
 import { stableJson } from "./ir.js";
 import { writeGeneratedAtomically } from "./build.js";
 import { enforcementText } from "./codegen/enforcement.js";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import type { ModelIR } from "./ir.js";
+import { validateIR } from "./validate-ir.js";
+import { assignStableIds } from "./stable-ids.js";
+import { planMigration } from "./migrations.js";
 
 function usage(): never {
-  process.stderr.write("Usage: modelc <check|build|print-ir|explain> <file> [--out <directory>] [--debug]\n");
+  process.stderr.write(`Usage:
+  modelc <check|build|print-ir|explain> <file> [--out <directory>] [--debug]
+  modelc assign-ids <file>
+  modelc migration <previous-ir.json> <current.model> --out <migration.sql>
+`);
   process.exit(2);
 }
 
 async function main(): Promise<void> {
   const [command, fileArg, ...rest] = process.argv.slice(2);
-  if (!command || !fileArg || !["check", "build", "print-ir", "explain"].includes(command)) usage();
+  if (!command || !fileArg) usage();
+  if (command === "assign-ids") {
+    const file = resolve(fileArg);
+    const source = await readFile(file, "utf8");
+    const assigned = assignStableIds(source, file);
+    if (assigned.assigned > 0) await writeFile(file, assigned.source, "utf8");
+    process.stdout.write(`${assigned.assigned > 0 ? `Assigned ${assigned.assigned} stable IDs` : "All stable IDs already assigned"} in ${file}\n`);
+    return;
+  }
+  if (command === "migration") {
+    const currentArg = rest[0];
+    const outIndex = rest.indexOf("--out");
+    if (!currentArg || outIndex < 0 || !rest[outIndex + 1]) usage();
+    const previousFile = resolve(fileArg);
+    const previous = JSON.parse(await readFile(previousFile, "utf8")) as ModelIR;
+    validateIR(previous);
+    const current = await compileFile(resolve(currentArg));
+    const plan = planMigration(previous, current);
+    const out = resolve(rest[outIndex + 1]!);
+    await writeFile(out, plan.sql, "utf8");
+    process.stdout.write(`Generated ${plan.operations.length} rename operation${plan.operations.length === 1 ? "" : "s"} into ${out}\n`);
+    return;
+  }
+  if (!["check", "build", "print-ir", "explain"].includes(command)) usage();
   const file = resolve(fileArg);
   const ir = await compileFile(file);
   if (command === "check") {

@@ -1,4 +1,4 @@
--- source sha256:223f7dedd038f85bf47df46127438b5fd6a3795e5195532524fd240955437c97
+-- source sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;

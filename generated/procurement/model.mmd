@@ -1,34 +1,34 @@
 flowchart LR
   identity["session_user identity binding"]
-  principal["Principal: User"]
+  principal["Principal: ent_66c16684f17e4b4ca79eb7d916cbf725"]
   identity -->|binds| principal
-  entity_User["Entity: User"]
-  entity_PurchaseRequest["Entity: PurchaseRequest"]
-  entity_PurchaseRequest -->|requester| entity_User
-  entity_PurchaseRequest -->|approvedBy| entity_User
-  invariant_PurchaseRequest_approval_fields_match_status["Invariant: approval_fields_match_status"] -->|constrains| entity_PurchaseRequest
+  entity_ent_66c16684f17e4b4ca79eb7d916cbf725["Entity: User"]
+  entity_ent_9bc680209327484c8e98f5f740bcc702["Entity: PurchaseRequest"]
+  entity_ent_9bc680209327484c8e98f5f740bcc702 -->|requester| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
+  entity_ent_9bc680209327484c8e98f5f740bcc702 -->|approvedBy| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
+  invariant_PurchaseRequest_approval_fields_match_status["Invariant: approval_fields_match_status"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_openRequest["Action: openRequest"]
   principal -->|authenticated caller| action_openRequest
-  action_openRequest -->|creates| entity_PurchaseRequest
+  action_openRequest -->|creates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_openRequest["Authorize"] -->|guards| action_openRequest
   require_openRequest_positive_amount["Require: positive_amount"] -->|guards| action_openRequest
-  action_openRequest -->|locks share| entity_User
+  action_openRequest -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   action_submitRequest["Action: submitRequest"]
   principal -->|authenticated caller| action_submitRequest
-  action_submitRequest -->|updates| entity_PurchaseRequest
+  action_submitRequest -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_submitRequest["Authorize"] -->|guards| action_submitRequest
   require_submitRequest_is_draft["Require: is_draft"] -->|guards| action_submitRequest
-  action_submitRequest -->|locks update| entity_PurchaseRequest
-  action_submitRequest -->|locks share| entity_User
+  action_submitRequest -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
+  action_submitRequest -->|locks update| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_approveRequest["Action: approveRequest"]
   principal -->|authenticated caller| action_approveRequest
-  action_approveRequest -->|updates| entity_PurchaseRequest
+  action_approveRequest -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_approveRequest["Authorize"] -->|guards| action_approveRequest
   require_approveRequest_is_submitted["Require: is_submitted"] -->|guards| action_approveRequest
-  action_approveRequest -->|locks update| entity_PurchaseRequest
-  action_approveRequest -->|locks share| entity_User
+  action_approveRequest -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
+  action_approveRequest -->|locks update| entity_ent_9bc680209327484c8e98f5f740bcc702
   query_myRequests["Query: myRequests"]
   principal -->|authenticated caller| query_myRequests
-  query_myRequests -->|reads| entity_PurchaseRequest
+  query_myRequests -->|reads| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_myRequests["Authorize"] -->|guards| query_myRequests
   where_myRequests["Where"] -->|filters rows| query_myRequests

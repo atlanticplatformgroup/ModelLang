@@ -1,7 +1,7 @@
 -- Generated guarded query functions. Caller identity is always session_user.
 SET ROLE modellang_owner;
 
-CREATE FUNCTION "model_procurement"."my_requests"()
+CREATE OR REPLACE FUNCTION "model_procurement"."my_requests"()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

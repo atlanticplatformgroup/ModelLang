@@ -33,6 +33,7 @@ export interface IREnum {
 export interface IRField {
   id: string;
   name: string;
+  identity: { strategy: "explicitStableId" | "nameDerived"; stableId?: string };
   type: string;
   optional: boolean;
   default?: IRExpression;
@@ -69,6 +70,7 @@ export interface IRTemporalExclusion {
 export interface IREntity {
   id: string;
   name: string;
+  identity: { strategy: "explicitStableId" | "nameDerived"; stableId?: string };
   fields: IRField[];
   invariants: IRInvariant[];
   temporalExclusions: IRTemporalExclusion[];
@@ -156,7 +158,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 4;
+  irVersion: 5;
   model: {
     id: string;
     name: string;
