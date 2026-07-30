@@ -12,8 +12,8 @@ export class ProcurementClient {
   async openRequest(input: OpenRequestInput): Promise<PurchaseRequest> {
     try {
       const result = await this.adapter.query<{ value: PurchaseRequest }>(
-        'SELECT "model_procurement"."open_request"($1, $2) AS value',
-        [input.id, input.amount],
+        'SELECT "model_procurement"."open_request"($1) AS value',
+        [input.amount],
       );
       return result.rows[0]!.value;
     } catch (error) {

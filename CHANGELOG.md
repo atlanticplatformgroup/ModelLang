@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.0
+
+- Added `@generated(uuid)`, `@generated(now)`, and `@immutable` stored-field semantics.
+- Added canonical IR version 7 with explicit database generation authority and field mutability.
+- Made generated fields required, database-owned, implicitly immutable, unassignable by actions, and distinct from source defaults and audit snapshots.
+- Added qualified PostgreSQL UUID and transaction-timestamp defaults, generated-column omission, `DEFAULT VALUES` support, and same-transaction result returns.
+- Removed caller-supplied IDs from the canonical Procurement and Reservations creation APIs and added database-generated creation timestamps.
+- Added compiler, code-generation, schema, enforcement, typed-client, and live PostgreSQL coverage for generated values.
+
 ## 0.6.0
 
 - Extended `@stableId(...)` to enums, enum members, invariants, temporal exclusions, actions, and queries.

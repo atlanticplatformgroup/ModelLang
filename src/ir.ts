@@ -51,8 +51,10 @@ export interface IRField {
   type: string;
   optional: boolean;
   default?: IRExpression;
-  annotations: { name: string; value?: number }[];
+  annotations: { name: string; value?: number | string }[];
   storage: "ordinary" | "snapshot";
+  generation?: { strategy: "uuid" | "now"; authority: "database" };
+  mutability: "mutable" | "immutable";
   span: IRSpan;
   naming: { sqlColumn: string };
 }
@@ -176,7 +178,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 6;
+  irVersion: 7;
   model: {
     id: string;
     name: string;

@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { compileFile } from "../src/compiler.js";
 import { writeGeneratedAtomically } from "../src/build.js";
@@ -25,19 +24,19 @@ async function main(): Promise<void> {
   const resource = "20000000-0000-4000-8000-000000000001";
   try {
     await first.reserve({
-      id: randomUUID(), resource,
+      resource,
       startsAt: "2031-01-10T10:00:00.000Z",
       endsAt: "2031-01-10T11:00:00.000Z",
     });
     line(3, "Reserve Conference Room A from 10:00 to 11:00", "PASS");
     await second.reserve({
-      id: randomUUID(), resource,
+      resource,
       startsAt: "2031-01-10T11:00:00.000Z",
       endsAt: "2031-01-10T12:00:00.000Z",
     });
     line(4, "Reserve adjacent half-open interval from 11:00 to 12:00", "PASS");
     const conflict = await second.reserve({
-      id: randomUUID(), resource,
+      resource,
       startsAt: "2031-01-10T10:30:00.000Z",
       endsAt: "2031-01-10T11:30:00.000Z",
     }).catch((error: unknown) => error);

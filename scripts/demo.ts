@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { Client } from "pg";
@@ -54,20 +53,17 @@ async function main(): Promise<void> {
   const finance = new ProcurementClient(financePool);
   const unbound = new ProcurementClient(unboundPool);
   try {
-    const low = randomUUID();
-    await employee.openRequest({ id: low, amount: "5000" });
+    const low = (await employee.openRequest({ amount: "5000" })).id;
     line(5, "Employee login opens a 5,000 request", "PASS");
     await employee.submitRequest({ request: low });
     line(6, "Owner employee login submits the request", "PASS");
     await manager.approveRequest({ request: low });
     line(7, "Manager login approves the 5,000 request", "PASS");
 
-    const managerOwned = randomUUID();
-    await manager.openRequest({ id: managerOwned, amount: "50" });
+    const managerOwned = (await manager.openRequest({ amount: "50" })).id;
     line(8, "Multi-role manager opens an employee request", "PASS");
 
-    const high = randomUUID();
-    await employee.openRequest({ id: high, amount: "25000" });
+    const high = (await employee.openRequest({ amount: "25000" })).id;
     line(9, "Employee login opens a 25,000 request", "PASS");
     await employee.submitRequest({ request: high });
     line(10, "Owner employee login submits the request", "PASS");
@@ -84,7 +80,7 @@ async function main(): Promise<void> {
     }
     line(13, "Employee query excludes the manager's request", "PASS");
 
-    await expectError(unbound.openRequest({ id: randomUUID(), amount: "10" }), IdentityBindingError);
+    await expectError(unbound.openRequest({ amount: "10" }), IdentityBindingError);
     line(14, "Unbound login attempts an action", "REJECTED as designed");
     try {
       await employeePool.query("SELECT * FROM model_procurement.purchase_request");

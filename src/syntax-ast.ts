@@ -33,7 +33,7 @@ export interface TypeRef {
 }
 
 export interface Annotation {
-  name: "id" | "unique" | "min" | "minExclusive" | "max" | "snapshot" | "stableId";
+  name: "id" | "unique" | "min" | "minExclusive" | "max" | "snapshot" | "generated" | "immutable" | "stableId";
   value?: number | string;
   span: Span;
 }

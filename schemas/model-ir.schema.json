@@ -34,7 +34,52 @@
         "identity": { "$ref": "#/$defs/identity" },
         "span": { "type": "object" },
         "naming": { "type": "object" }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "generation": {} },
+            "required": ["generation"]
+          },
+          "then": {
+            "properties": {
+              "optional": { "const": false },
+              "storage": { "const": "ordinary" },
+              "mutability": { "const": "immutable" }
+            },
+            "not": {
+              "properties": { "default": {} },
+              "required": ["default"]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "generation": {
+                "type": "object",
+                "required": ["strategy"],
+                "properties": { "strategy": { "const": "uuid" } }
+              }
+            },
+            "required": ["generation"]
+          },
+          "then": { "properties": { "type": { "const": "UUID" } } }
+        },
+        {
+          "if": {
+            "properties": {
+              "generation": {
+                "type": "object",
+                "required": ["strategy"],
+                "properties": { "strategy": { "const": "now" } }
+              }
+            },
+            "required": ["generation"]
+          },
+          "then": { "properties": { "type": { "const": "DateTime" } } }
+        }
+      ]
     },
     "enum": {
       "type": "object",
@@ -50,11 +95,27 @@
     },
     "field": {
       "type": "object",
-      "required": ["id", "name", "identity"],
+      "required": ["id", "name", "identity", "type", "optional", "annotations", "storage", "mutability", "span", "naming"],
       "properties": {
         "id": { "type": "string", "pattern": "^field:" },
         "name": { "type": "string" },
-        "identity": { "$ref": "#/$defs/identity" }
+        "identity": { "$ref": "#/$defs/identity" },
+        "type": { "type": "string" },
+        "optional": { "type": "boolean" },
+        "annotations": { "type": "array" },
+        "storage": { "enum": ["ordinary", "snapshot"] },
+        "generation": {
+          "type": "object",
+          "required": ["strategy", "authority"],
+          "properties": {
+            "strategy": { "enum": ["uuid", "now"] },
+            "authority": { "const": "database" }
+          },
+          "additionalProperties": false
+        },
+        "mutability": { "enum": ["mutable", "immutable"] },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
       }
     },
     "invariant": {
@@ -109,7 +170,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "queries", "enforcement"],
   "properties": {
-    "irVersion": { "const": 6 },
+    "irVersion": { "const": 7 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

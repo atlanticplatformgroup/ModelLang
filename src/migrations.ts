@@ -81,7 +81,7 @@ function requireSameIds<T extends { id: string; name: string }>(
   const removed = previous.filter((value) => !currentIds.has(value.id));
   const added = current.filter((value) => !previousIds.has(value.id));
   if (removed.length || added.length) {
-    fail(ir, "E2805", `${subject} additions/removals or changed stable IDs are unsupported in 0.6 (removed: ${removed.map((value) => value.name).join(", ") || "none"}; added: ${added.map((value) => value.name).join(", ") || "none"}).`);
+    fail(ir, "E2805", `${subject} additions/removals or changed stable IDs are unsupported in 0.7 (removed: ${removed.map((value) => value.name).join(", ") || "none"}; added: ${added.map((value) => value.name).join(", ") || "none"}).`);
   }
 }
 
@@ -208,8 +208,8 @@ function requireUniquePhysicalTargets(ir: ModelIR): void {
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (previous.irVersion !== 6 || current.irVersion !== 6) {
-    fail(current, "E2803", "Migration planning requires canonical IR version 6 inputs.");
+  if (previous.irVersion !== 7 || current.irVersion !== 7) {
+    fail(current, "E2803", "Migration planning requires canonical IR version 7 inputs.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -217,10 +217,10 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     || previous.model.name !== current.model.name
     || previous.model.naming.sqlSchema !== current.model.naming.sqlSchema
     || previous.model.naming.internalSchema !== current.model.naming.internalSchema) {
-    fail(current, "E2806", "Model identity, name, and schema must remain unchanged in a 0.6 rename migration.");
+    fail(current, "E2806", "Model identity, name, and schema must remain unchanged in a 0.7 rename migration.");
   }
   if (previous.principal.entityId !== current.principal.entityId) {
-    fail(current, "E2807", "Principal semantics changed; only stable declaration renames are supported in 0.6.");
+    fail(current, "E2807", "Principal semantics changed; only stable declaration renames are supported in 0.7.");
   }
   requireUniquePhysicalTargets(current);
 
@@ -231,14 +231,14 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   for (const currentEnum of current.enums) {
     const previousEnum = previousEnums.get(currentEnum.id)!;
     if (!same(enumStructure(previousEnum), enumStructure(currentEnum))) {
-      fail(current, "E2807", `Enum structure changed for '${currentEnum.name}'; only its declaration name may change in 0.6.`);
+      fail(current, "E2807", `Enum structure changed for '${currentEnum.name}'; only its declaration name may change in 0.7.`);
     }
     requireSameIds(previousEnum.members, currentEnum.members, `Member in enum '${currentEnum.name}'`, current);
     const previousMembers = byId(previousEnum.members);
     for (const currentMember of currentEnum.members) {
       const previousMember = previousMembers.get(currentMember.id)!;
       if (previousMember.name !== currentMember.name) {
-        fail(current, "E2807", `Enum member rename '${previousEnum.name}.${previousMember.name}' -> '${currentEnum.name}.${currentMember.name}' is identified by stable ID but stored-value migration is unsupported in 0.6.`);
+        fail(current, "E2807", `Enum member rename '${previousEnum.name}.${previousMember.name}' -> '${currentEnum.name}.${currentMember.name}' is identified by stable ID but stored-value migration is unsupported in 0.7.`);
       }
       if (!same(enumMemberStructure(previousMember), enumMemberStructure(currentMember))) {
         fail(current, "E2807", `Enum member structure changed for '${currentEnum.name}.${currentMember.name}'.`);
@@ -254,14 +254,14 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   for (const currentEntity of current.entities) {
     const previousEntity = previousEntities.get(currentEntity.id)!;
     if (!same(entityStructure(previousEntity), entityStructure(currentEntity))) {
-      fail(current, "E2807", `Entity structure changed for '${currentEntity.name}'; only declaration names may change in 0.6.`);
+      fail(current, "E2807", `Entity structure changed for '${currentEntity.name}'; only declaration names may change in 0.7.`);
     }
     requireSameIds(previousEntity.fields, currentEntity.fields, `Field in entity '${currentEntity.name}'`, current);
     const previousFields = byId(previousEntity.fields);
     for (const currentField of currentEntity.fields) {
       const previousField = previousFields.get(currentField.id)!;
       if (!same(fieldStructure(previousField), fieldStructure(currentField))) {
-        fail(current, "E2807", `Field structure changed for '${currentEntity.name}.${currentField.name}'; only its name may change in 0.6.`);
+        fail(current, "E2807", `Field structure changed for '${currentEntity.name}.${currentField.name}'; only its name may change in 0.7.`);
       }
     }
 
@@ -297,7 +297,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     for (const currentInvariant of currentEntity.invariants) {
       const previousInvariant = previousInvariants.get(currentInvariant.id)!;
       if (!same(invariantStructure(previousInvariant), invariantStructure(currentInvariant))) {
-        fail(current, "E2807", `Invariant semantics changed for '${currentEntity.name}.${currentInvariant.name}'; only its name may change in 0.6.`);
+        fail(current, "E2807", `Invariant semantics changed for '${currentEntity.name}.${currentInvariant.name}'; only its name may change in 0.7.`);
       }
       if (previousInvariant.naming.sqlConstraint !== currentInvariant.naming.sqlConstraint) {
         if (constraintTargetCollides(
@@ -323,7 +323,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     for (const currentExclusion of currentEntity.temporalExclusions) {
       const previousExclusion = previousExclusions.get(currentExclusion.id)!;
       if (!same(exclusionStructure(previousExclusion), exclusionStructure(currentExclusion))) {
-        fail(current, "E2807", `Exclusion semantics changed for '${currentEntity.name}.${currentExclusion.name}'; only its name may change in 0.6.`);
+        fail(current, "E2807", `Exclusion semantics changed for '${currentEntity.name}.${currentExclusion.name}'; only its name may change in 0.7.`);
       }
       if (previousExclusion.naming.sqlExclusionConstraint !== currentExclusion.naming.sqlExclusionConstraint) {
         const ignored = new Set([
@@ -353,7 +353,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   for (const currentAction of current.actions) {
     const previousAction = previousActions.get(currentAction.id)!;
     if (!same(actionStructure(previousAction), actionStructure(currentAction))) {
-      fail(current, "E2807", `Action semantics changed for '${currentAction.name}'; only its name may change in a 0.6 rename migration.`);
+      fail(current, "E2807", `Action semantics changed for '${currentAction.name}'; only its name may change in a 0.7 rename migration.`);
     }
     if (previousAction.naming.sqlFunction !== currentAction.naming.sqlFunction) {
       const previousOperations = [...previous.actions, ...previous.queries];
@@ -375,7 +375,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   for (const currentQuery of current.queries) {
     const previousQuery = previousQueries.get(currentQuery.id)!;
     if (!same(queryStructure(previousQuery), queryStructure(currentQuery))) {
-      fail(current, "E2807", `Query semantics changed for '${currentQuery.name}'; only its name may change in a 0.6 rename migration.`);
+      fail(current, "E2807", `Query semantics changed for '${currentQuery.name}'; only its name may change in a 0.7 rename migration.`);
     }
     if (previousQuery.naming.sqlFunction !== currentQuery.naming.sqlFunction) {
       const previousOperations = [...previous.actions, ...previous.queries];

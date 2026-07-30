@@ -49,7 +49,6 @@ async function waitUntilLockWaiting(pid: number, timeoutMs = 5_000): Promise<voi
 describe.sequential("ModelLang reservation and query boundaries", () => {
   it("allows adjacent half-open intervals and rejects overlap", async () => {
     const first = await firstClient.reserve({
-      id: randomUUID(),
       resource,
       startsAt: "2030-01-10T10:00:00.000Z",
       endsAt: "2030-01-10T11:00:00.000Z",
@@ -60,14 +59,14 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       startsAt: "2030-01-10T10:00:00+00:00",
       endsAt: "2030-01-10T11:00:00+00:00",
     });
+    expect(first.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(Number.isNaN(Date.parse(first.createdAt))).toBe(false);
     await expect(secondClient.reserve({
-      id: randomUUID(),
       resource,
       startsAt: "2030-01-10T11:00:00.000Z",
       endsAt: "2030-01-10T12:00:00.000Z",
     })).resolves.toMatchObject({ resource });
     const overlapError = await secondClient.reserve({
-      id: randomUUID(),
       resource,
       startsAt: "2030-01-10T10:30:00.000Z",
       endsAt: "2030-01-10T11:30:00.000Z",
@@ -81,7 +80,6 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
 
   it("rejects invalid intervals at the named action boundary", async () => {
     await expect(firstClient.reserve({
-      id: randomUUID(),
       resource,
       startsAt: "2030-02-01T10:00:00.000Z",
       endsAt: "2030-02-01T10:00:00.000Z",
@@ -98,20 +96,16 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
   });
 
   it("returns one resource's rows without leaking rows from another resource", async () => {
-    const firstId = randomUUID();
-    const secondId = randomUUID();
-    await firstClient.reserve({
-      id: firstId,
+    const firstId = (await firstClient.reserve({
       resource,
       startsAt: "2031-01-01T09:00:00.000Z",
       endsAt: "2031-01-01T10:00:00.000Z",
-    });
-    await secondClient.reserve({
-      id: secondId,
+    })).id;
+    const secondId = (await secondClient.reserve({
       resource: otherResource,
       startsAt: "2031-01-01T09:00:00.000Z",
       endsAt: "2031-01-01T10:00:00.000Z",
-    });
+    })).id;
 
     const firstRows = await firstClient.reservationsForResource({ resource });
     const secondRows = await firstClient.reservationsForResource({ resource: otherResource });
@@ -129,20 +123,16 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     const first = new Client({ connectionString: loginUrl("ml_reserver_one") });
     const second = new Client({ connectionString: loginUrl("ml_reserver_two") });
     await Promise.all([first.connect(), second.connect()]);
-    const firstId = randomUUID();
-    const secondId = randomUUID();
     try {
       await first.query("BEGIN");
-      await new ReservationsClient(first).reserve({
-        id: firstId,
+      const firstId = (await new ReservationsClient(first).reserve({
         resource,
         startsAt: "2030-03-01T09:00:00.000Z",
         endsAt: "2030-03-01T10:00:00.000Z",
-      });
+      })).id;
 
       const secondPid = (await second.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
       const conflicting = new ReservationsClient(second).reserve({
-        id: secondId,
         resource,
         startsAt: "2030-03-01T09:30:00.000Z",
         endsAt: "2030-03-01T10:30:00.000Z",
@@ -152,15 +142,19 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       await expect(conflicting).rejects.toBeInstanceOf(ConflictError);
 
       const rows = await admin.query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM model_reservations.reservation WHERE id = ANY($1::uuid[])",
-        [[firstId, secondId]],
+        `SELECT count(*)::text AS count
+         FROM model_reservations.reservation
+         WHERE resource_id = $1
+           AND starts_at >= '2030-03-01T09:00:00.000Z'
+           AND starts_at < '2030-03-01T11:00:00.000Z'`,
+        [resource],
       );
       expect(rows.rows[0]!.count).toBe("1");
       const audits = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count
          FROM model_reservations_internal.action_audit
-         WHERE action_id = 'action:act_508ad810a19d4b79a5009871de5cd26b' AND target_id = ANY($1::uuid[])`,
-        [[firstId, secondId]],
+         WHERE action_id = 'action:act_508ad810a19d4b79a5009871de5cd26b' AND target_id = $1`,
+        [firstId],
       );
       expect(audits.rows[0]!.count).toBe("1");
     } finally {

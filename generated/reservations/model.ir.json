@@ -1,10 +1,10 @@
 {
-  "irVersion": 6,
+  "irVersion": 7,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.6.0",
-    "sourceHash": "sha256:4bc10136557149e98256f7dfc38a4e8fbea6eeada2a22f76321b442bc75d0da7",
+    "version": "0.7.0",
+    "sourceHash": "sha256:d7fa777b326ecd4a5e83a5084a4fa86fdd25012b0754eafabaaec2b2db3284fd",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -40,6 +40,7 @@
             }
           ],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
             "line": 4,
@@ -62,6 +63,7 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
             "line": 5,
@@ -112,6 +114,7 @@
             }
           ],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
             "line": 9,
@@ -138,6 +141,7 @@
             }
           ],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
             "line": 10,
@@ -185,18 +189,65 @@
           "annotations": [
             {
               "name": "id"
+            },
+            {
+              "name": "generated",
+              "value": "uuid"
+            },
+            {
+              "name": "immutable"
             }
           ],
           "storage": "ordinary",
+          "generation": {
+            "strategy": "uuid",
+            "authority": "database"
+          },
+          "mutability": "immutable",
           "span": {
             "file": "examples/reservations.model",
             "line": 14,
             "column": 3,
             "endLine": 14,
-            "endColumn": 66
+            "endColumn": 94
           },
           "naming": {
             "sqlColumn": "id"
+          }
+        },
+        {
+          "id": "field:fld_4112857f0e4a431fb4bec42fad9884ef",
+          "name": "createdAt",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_4112857f0e4a431fb4bec42fad9884ef"
+          },
+          "type": "DateTime",
+          "optional": false,
+          "annotations": [
+            {
+              "name": "generated",
+              "value": "now"
+            },
+            {
+              "name": "immutable"
+            }
+          ],
+          "storage": "ordinary",
+          "generation": {
+            "strategy": "now",
+            "authority": "database"
+          },
+          "mutability": "immutable",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 15,
+            "column": 3,
+            "endLine": 15,
+            "endColumn": 100
+          },
+          "naming": {
+            "sqlColumn": "created_at"
           }
         },
         {
@@ -210,11 +261,12 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
-            "line": 15,
+            "line": 16,
             "column": 3,
-            "endLine": 15,
+            "endLine": 16,
             "endColumn": 72
           },
           "naming": {
@@ -232,11 +284,12 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
-            "line": 16,
+            "line": 17,
             "column": 3,
-            "endLine": 16,
+            "endLine": 17,
             "endColumn": 70
           },
           "naming": {
@@ -254,11 +307,12 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
-            "line": 17,
+            "line": 18,
             "column": 3,
-            "endLine": 17,
+            "endLine": 18,
             "endColumn": 72
           },
           "naming": {
@@ -276,11 +330,12 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/reservations.model",
-            "line": 18,
+            "line": 19,
             "column": 3,
-            "endLine": 18,
+            "endLine": 19,
             "endColumn": 70
           },
           "naming": {
@@ -304,9 +359,9 @@
           "sourceExpression": "noOverlap(resource, startsAt, endsAt)",
           "span": {
             "file": "examples/reservations.model",
-            "line": 20,
+            "line": 21,
             "column": 3,
-            "endLine": 21,
+            "endLine": 22,
             "endColumn": 43
           },
           "naming": {
@@ -320,7 +375,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 2
       },
       "naming": {
@@ -346,31 +401,14 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 25,
+            "line": 26,
             "column": 3,
-            "endLine": 25,
+            "endLine": 26,
             "endColumn": 21
           },
           "naming": {
             "sqlParameter": "p_actor",
             "typescriptProperty": "actor"
-          }
-        },
-        {
-          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
-          "name": "id",
-          "type": "UUID",
-          "caller": false,
-          "span": {
-            "file": "examples/reservations.model",
-            "line": 26,
-            "column": 3,
-            "endLine": 26,
-            "endColumn": 11
-          },
-          "naming": {
-            "sqlParameter": "p_id",
-            "typescriptProperty": "id"
           }
         },
         {
@@ -427,7 +465,6 @@
       ],
       "callerParameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
       "callableParameters": [
-        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
         "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
         "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
         "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt"
@@ -490,17 +527,6 @@
         "target": "Reservation",
         "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
         "assignments": [
-          {
-            "fieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
-            "fieldName": "id",
-            "expression": {
-              "kind": "parameter",
-              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
-              "name": "id",
-              "type": "UUID",
-              "nullable": false
-            }
-          },
           {
             "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
             "fieldName": "resource",
@@ -569,9 +595,9 @@
       ],
       "span": {
         "file": "examples/reservations.model",
-        "line": 24,
+        "line": 25,
         "column": 1,
-        "endLine": 41,
+        "endLine": 40,
         "endColumn": 2
       },
       "naming": {
@@ -597,9 +623,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 44,
+            "line": 43,
             "column": 3,
-            "endLine": 44,
+            "endLine": 43,
             "endColumn": 21
           },
           "naming": {
@@ -614,9 +640,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 45,
+            "line": 44,
             "column": 3,
-            "endLine": 45,
+            "endLine": 44,
             "endColumn": 21
           },
           "naming": {
@@ -643,9 +669,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 47,
+          "line": 46,
           "column": 13,
-          "endLine": 47,
+          "endLine": 46,
           "endColumn": 17
         }
       },
@@ -679,9 +705,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "span": {
           "file": "examples/reservations.model",
-          "line": 48,
+          "line": 47,
           "column": 9,
-          "endLine": 48,
+          "endLine": 47,
           "endColumn": 41
         }
       },
@@ -693,9 +719,9 @@
       "limit": 100,
       "span": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 42,
         "column": 1,
-        "endLine": 51,
+        "endLine": 50,
         "endColumn": 2
       },
       "naming": {
@@ -891,7 +917,35 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 66
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "generated:field:fld_066660fbd78d479084a9db613ee746ae",
+      "purpose": "Generate id with uuid under database authority.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.id",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 14,
+        "column": 3,
+        "endLine": 14,
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "immutable:field:fld_066660fbd78d479084a9db613ee746ae",
+      "purpose": "Prevent action updates to immutable field id.",
+      "layer": "ModelLang action semantics",
+      "artifact": "model.ir.json",
+      "objectName": "field:fld_066660fbd78d479084a9db613ee746ae",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 14,
+        "column": 3,
+        "endLine": 14,
+        "endColumn": 94
       }
     },
     {
@@ -905,7 +959,49 @@
         "line": 14,
         "column": 3,
         "endLine": 14,
-        "endColumn": 66
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "required:field:fld_4112857f0e4a431fb4bec42fad9884ef",
+      "purpose": "createdAt is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.created_at NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 15,
+        "column": 3,
+        "endLine": 15,
+        "endColumn": 100
+      }
+    },
+    {
+      "id": "generated:field:fld_4112857f0e4a431fb4bec42fad9884ef",
+      "purpose": "Generate createdAt with now under database authority.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.created_at",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 15,
+        "column": 3,
+        "endLine": 15,
+        "endColumn": 100
+      }
+    },
+    {
+      "id": "immutable:field:fld_4112857f0e4a431fb4bec42fad9884ef",
+      "purpose": "Prevent action updates to immutable field createdAt.",
+      "layer": "ModelLang action semantics",
+      "artifact": "model.ir.json",
+      "objectName": "field:fld_4112857f0e4a431fb4bec42fad9884ef",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 15,
+        "column": 3,
+        "endLine": 15,
+        "endColumn": 100
       }
     },
     {
@@ -916,9 +1012,9 @@
       "objectName": "model_reservations.reservation.resource_id NOT NULL",
       "source": {
         "file": "examples/reservations.model",
-        "line": 15,
+        "line": 16,
         "column": 3,
-        "endLine": 15,
+        "endLine": 16,
         "endColumn": 72
       }
     },
@@ -930,9 +1026,9 @@
       "objectName": "fk_reservation_resource_id",
       "source": {
         "file": "examples/reservations.model",
-        "line": 15,
+        "line": 16,
         "column": 3,
-        "endLine": 15,
+        "endLine": 16,
         "endColumn": 72
       }
     },
@@ -944,9 +1040,9 @@
       "objectName": "model_reservations.reservation.reserved_by_id NOT NULL",
       "source": {
         "file": "examples/reservations.model",
-        "line": 16,
+        "line": 17,
         "column": 3,
-        "endLine": 16,
+        "endLine": 17,
         "endColumn": 70
       }
     },
@@ -958,9 +1054,9 @@
       "objectName": "fk_reservation_reserved_by_id",
       "source": {
         "file": "examples/reservations.model",
-        "line": 16,
+        "line": 17,
         "column": 3,
-        "endLine": 16,
+        "endLine": 17,
         "endColumn": 70
       }
     },
@@ -972,9 +1068,9 @@
       "objectName": "model_reservations.reservation.starts_at NOT NULL",
       "source": {
         "file": "examples/reservations.model",
-        "line": 17,
+        "line": 18,
         "column": 3,
-        "endLine": 17,
+        "endLine": 18,
         "endColumn": 72
       }
     },
@@ -986,9 +1082,9 @@
       "objectName": "model_reservations.reservation.ends_at NOT NULL",
       "source": {
         "file": "examples/reservations.model",
-        "line": 18,
+        "line": 19,
         "column": 3,
-        "endLine": 18,
+        "endLine": 19,
         "endColumn": 70
       }
     },
@@ -1000,9 +1096,9 @@
       "objectName": "ex_reservation_no_overlapping_reservations",
       "source": {
         "file": "examples/reservations.model",
-        "line": 20,
+        "line": 21,
         "column": 3,
-        "endLine": 21,
+        "endLine": 22,
         "endColumn": 43
       }
     },
@@ -1014,9 +1110,9 @@
       "objectName": "ck_reservation_no_overlapping_reservations_valid_interval",
       "source": {
         "file": "examples/reservations.model",
-        "line": 20,
+        "line": 21,
         "column": 3,
-        "endLine": 21,
+        "endLine": 22,
         "endColumn": 43
       }
     },
@@ -1030,7 +1126,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 2
       }
     },
@@ -1044,7 +1140,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 2
       }
     },
@@ -1056,9 +1152,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 26,
         "column": 3,
-        "endLine": 25,
+        "endLine": 26,
         "endColumn": 21
       }
     },
@@ -1105,9 +1201,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 24,
+        "line": 25,
         "column": 1,
-        "endLine": 41,
+        "endLine": 40,
         "endColumn": 2
       }
     },
@@ -1133,9 +1229,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 44,
+        "line": 43,
         "column": 3,
-        "endLine": 44,
+        "endLine": 43,
         "endColumn": 21
       }
     },
@@ -1154,9 +1250,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 46,
         "column": 13,
-        "endLine": 47,
+        "endLine": 46,
         "endColumn": 17
       }
     },
@@ -1168,9 +1264,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 48,
+        "line": 47,
         "column": 9,
-        "endLine": 48,
+        "endLine": 47,
         "endColumn": 41
       }
     },
@@ -1182,9 +1278,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 42,
         "column": 1,
-        "endLine": 51,
+        "endLine": 50,
         "endColumn": 2
       }
     },
@@ -1196,9 +1292,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 42,
         "column": 1,
-        "endLine": 51,
+        "endLine": 50,
         "endColumn": 2
       }
     },
@@ -1210,9 +1306,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 42,
         "column": 1,
-        "endLine": 51,
+        "endLine": 50,
         "endColumn": 2
       }
     },

@@ -1,4 +1,4 @@
--- source sha256:0a86386f750a4d27a3b7b884e26add72a57f8414cbd2f7b21c6591c0da38fda0
+-- source sha256:18655980cb9f031745a4b452ac891af15856fdde7440d3df5414057674989aa9
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -13,7 +13,8 @@ CREATE TABLE "model_procurement"."user" (
 );
 
 CREATE TABLE "model_procurement"."purchase_request" (
-  "id" uuid NOT NULL PRIMARY KEY,
+  "id" uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid() PRIMARY KEY,
+  "created_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
   "requester_id" uuid NOT NULL,
   "amount" numeric NOT NULL,
   "status" text NOT NULL DEFAULT 'DRAFT',

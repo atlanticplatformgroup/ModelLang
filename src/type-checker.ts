@@ -146,7 +146,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const enforcement = buildEnforcement(enums, entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 6,
+    irVersion: 7,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -245,7 +245,7 @@ function validateEntities(symbols: Symbols, stableIds: Map<string, Span>, file: 
           validateStableId(annotation, "fld", stableIds, file);
           continue;
         }
-        if (field.type.collection === "set" && annotation.name !== "snapshot") {
+        if (field.type.collection === "set" && annotation.name !== "snapshot" && annotation.name !== "immutable") {
           throw new ModelError("E2702", `@${annotation.name} is not supported on enum-set fields in 0.4.`, annotation.span, file);
         }
         if ((annotation.name === "min" || annotation.name === "minExclusive" || annotation.name === "max") && !["Int", "Decimal"].includes(field.type.name)) {
@@ -254,6 +254,22 @@ function validateEntities(symbols: Symbols, stableIds: Map<string, Span>, file: 
         if (annotation.name === "unique" && field.optional) throw new ModelError("E2205", "@unique is not supported on optional fields.", annotation.span, file);
         if (annotation.name === "snapshot" && symbols.entities.has(field.type.name)) {
           throw new ModelError("E2207", "@snapshot is for stored scalar or enum audit values, not entity references.", annotation.span, file);
+        }
+      }
+      const generated = field.annotations.find((annotation) => annotation.name === "generated");
+      if (generated) {
+        if (field.optional) throw new ModelError("E2208", `@generated field '${entity.name}.${field.name}' must be required.`, generated.span, file);
+        if (field.default) throw new ModelError("E2209", `@generated field '${entity.name}.${field.name}' may not also declare a source default.`, field.default.span, file);
+        if (field.annotations.some((annotation) => annotation.name === "snapshot")) {
+          throw new ModelError("E2210", `@generated field '${entity.name}.${field.name}' may not be a @snapshot.`, generated.span, file);
+        }
+        const strategy = String(generated.value);
+        if (strategy !== "uuid" && strategy !== "now") {
+          throw new ModelError("E2211", `Unknown generation strategy '${strategy}'. Supported strategies are uuid and now.`, generated.span, file);
+        }
+        if ((strategy === "uuid" && (field.type.name !== "UUID" || field.type.collection))
+          || (strategy === "now" && (field.type.name !== "DateTime" || field.type.collection))) {
+          throw new ModelError("E2212", `@generated(${strategy}) is not valid on ${field.type.collection ? "Set" : field.type.name}; uuid requires UUID and now requires DateTime.`, generated.span, file);
         }
       }
       if (field.default) {
@@ -331,9 +347,20 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
     default: field.default ? typeExpression(field.default, { kind: "invariant", entity }, symbols, file) : undefined,
     annotations: field.annotations.filter((annotation) => annotation.name !== "stableId").map(({ name, value }) => ({
       name,
-      ...(typeof value === "number" ? { value } : {}),
+      ...(typeof value === "number" || typeof value === "string" ? { value } : {}),
     })),
     storage: field.annotations.some((annotation) => annotation.name === "snapshot") ? "snapshot" : "ordinary",
+    ...(field.annotations.some((annotation) => annotation.name === "generated")
+      ? {
+          generation: {
+            strategy: String(field.annotations.find((annotation) => annotation.name === "generated")!.value) as "uuid" | "now",
+            authority: "database" as const,
+          },
+        }
+      : {}),
+    mutability: field.annotations.some((annotation) => annotation.name === "immutable" || annotation.name === "generated")
+      ? "immutable"
+      : "mutable",
     span: irSpan(field.span, file),
     naming: { sqlColumn: isEntityType(fieldType(field, symbols)) ? `${snakeCase(field.name)}_id` : snakeCase(field.name) },
   }));
@@ -441,6 +468,12 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     assigned.add(assignment.field);
     const field = effectFields.get(assignment.field);
     if (!field) throw new ModelError("E2313", `Unknown field '${effectEntity.name}.${assignment.field}'.`, assignment.span, file);
+    if (field.annotations.some((annotation) => annotation.name === "generated")) {
+      throw new ModelError("E2316", `Action effects may not assign database-generated field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+    }
+    if (action.effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "immutable")) {
+      throw new ModelError("E2317", `An update may not change immutable field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+    }
     if (action.effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "id")) {
       throw new ModelError("E2314", "An update may not change an @id field.", assignment.span, file);
     }
@@ -455,7 +488,9 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   });
   if (action.effect.kind === "create") {
     for (const field of effectFields.values()) {
-      if (!field.optional && !field.default && !assigned.has(field.name)) {
+      if (!field.optional && !field.default
+        && !field.annotations.some((annotation) => annotation.name === "generated")
+        && !assigned.has(field.name)) {
         throw new ModelError("E2315", `Create effect must assign required field '${effectEntity.name}.${field.name}'.`, action.effect.span, file);
       }
     }
@@ -786,8 +821,10 @@ function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRActi
       if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${field.id}`, purpose: `${field.name} is a duplicate-free set of declared ${enums.find((candidate) => candidate.id === enumSetId(field.type))?.name ?? enumSetId(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
       if (field.default) entries.push({ id: `default:${field.id}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
       if (field.storage === "snapshot") entries.push({ id: `snapshot:${field.id}`, purpose: `${field.name} is a stored point-in-time audit snapshot, not a live relationship-derived value.`, layer: "ModelLang storage semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
+      if (field.generation) entries.push({ id: `generated:${field.id}`, purpose: `Generate ${field.name} with ${field.generation.strategy} under database authority.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
+      if (field.mutability === "immutable") entries.push({ id: `immutable:${field.id}`, purpose: `Prevent action updates to immutable field ${field.name}.`, layer: "ModelLang action semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
       for (const annotation of field.annotations) {
-        if (annotation.name === "snapshot") continue;
+        if (annotation.name === "snapshot" || annotation.name === "generated" || annotation.name === "immutable") continue;
         entries.push({
           id: `annotation:${field.id}.${annotation.name}`,
           purpose: `Enforce @${annotation.name}${annotation.value === undefined ? "" : `(${annotation.value})`}.`,

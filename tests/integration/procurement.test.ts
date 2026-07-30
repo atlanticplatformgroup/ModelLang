@@ -41,10 +41,9 @@ afterAll(async () => {
 });
 
 async function submittedRequest(amount: string): Promise<string> {
-  const id = randomUUID();
-  await clients.employeeOne.openRequest({ id, amount });
-  await clients.employeeOne.submitRequest({ request: id });
-  return id;
+  const opened = await clients.employeeOne.openRequest({ amount });
+  await clients.employeeOne.submitRequest({ request: opened.id });
+  return opened.id;
 }
 
 async function waitUntilLockWaiting(pids: number[], timeoutMs = 5_000): Promise<void> {
@@ -63,16 +62,17 @@ async function waitUntilLockWaiting(pids: number[], timeoutMs = 5_000): Promise<
 
 describe.sequential("PostgreSQL enforcement boundary", () => {
   it("allows the procurement workflow and rejects invalid actors and transitions", async () => {
-    const low = randomUUID();
-    await expect(clients.employeeOne.openRequest({ id: randomUUID(), amount: "0" })).rejects.toBeInstanceOf(PreconditionError);
-    const opened = await clients.employeeOne.openRequest({ id: low, amount: "5000" });
+    await expect(clients.employeeOne.openRequest({ amount: "0" })).rejects.toBeInstanceOf(PreconditionError);
+    const opened = await clients.employeeOne.openRequest({ amount: "5000" });
+    const low = opened.id;
     expect(opened).toMatchObject({
-      id: low,
       requester: "00000000-0000-4000-8000-000000000001",
       amount: "5000",
       status: "DRAFT",
       approvedBy: null,
     });
+    expect(opened.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(Number.isNaN(Date.parse(opened.createdAt))).toBe(false);
     await expect(clients.employeeTwo.submitRequest({ request: low })).rejects.toBeInstanceOf(AuthorizationError);
     expect((await clients.employeeOne.submitRequest({ request: low })).status).toBe("SUBMITTED");
     const approvedLow = await clients.manager.approveRequest({ request: low });
@@ -91,34 +91,31 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       approvedByRoles: ["EMPLOYEE", "FINANCE"],
     });
 
-    const managerRequest = randomUUID();
-    await expect(clients.manager.openRequest({ id: managerRequest, amount: "25" })).resolves.toMatchObject({
-      id: managerRequest,
+    const managerRequest = await clients.manager.openRequest({ amount: "25" });
+    expect(managerRequest).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000003",
     });
-    expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest)).toBe(true);
+    expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest.id)).toBe(true);
   });
 
   it("prevents self-approval for every approval tier", async () => {
-    const managerRequest = randomUUID();
-    await clients.manager.openRequest({ id: managerRequest, amount: "5000" });
-    await clients.manager.submitRequest({ request: managerRequest });
-    await expect(clients.manager.approveRequest({ request: managerRequest })).rejects.toBeInstanceOf(AuthorizationError);
+    const managerRequest = await clients.manager.openRequest({ amount: "5000" });
+    await clients.manager.submitRequest({ request: managerRequest.id });
+    await expect(clients.manager.approveRequest({ request: managerRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
 
-    const financeRequest = randomUUID();
-    await clients.finance.openRequest({ id: financeRequest, amount: "25000" });
-    await clients.finance.submitRequest({ request: financeRequest });
-    await expect(clients.finance.approveRequest({ request: financeRequest })).rejects.toBeInstanceOf(AuthorizationError);
+    const financeRequest = await clients.finance.openRequest({ amount: "25000" });
+    await clients.finance.submitRequest({ request: financeRequest.id });
+    await expect(clients.finance.approveRequest({ request: financeRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
   });
 
   it("allows each business role to open requests without seed-data role implication", async () => {
     try {
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['FINANCE']::text[] WHERE id = '00000000-0000-4000-8000-000000000004'");
-      await expect(clients.manager.openRequest({ id: randomUUID(), amount: "10" })).resolves.toMatchObject({
+      await expect(clients.manager.openRequest({ amount: "10" })).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000003",
       });
-      await expect(clients.finance.openRequest({ id: randomUUID(), amount: "10" })).resolves.toMatchObject({
+      await expect(clients.finance.openRequest({ amount: "10" })).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000004",
       });
     } finally {
@@ -128,10 +125,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("returns only the authenticated caller's requests through the generated read boundary", async () => {
-    const employeeOneId = randomUUID();
-    const employeeTwoId = randomUUID();
-    await clients.employeeOne.openRequest({ id: employeeOneId, amount: "11" });
-    await clients.employeeTwo.openRequest({ id: employeeTwoId, amount: "12" });
+    const employeeOneId = (await clients.employeeOne.openRequest({ amount: "11" })).id;
+    const employeeTwoId = (await clients.employeeTwo.openRequest({ amount: "12" })).id;
 
     const employeeOneRows = await clients.employeeOne.myRequests({});
     const employeeTwoRows = await clients.employeeTwo.myRequests({});
@@ -145,7 +140,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("binds identity before authorization and exposes no actor function argument", async () => {
-    await expect(clients.unbound.openRequest({ id: randomUUID(), amount: "10" })).rejects.toBeInstanceOf(IdentityBindingError);
+    await expect(clients.unbound.openRequest({ amount: "10" })).rejects.toBeInstanceOf(IdentityBindingError);
     const functions = await admin.query<{ proname: string; pronargs: number; args: string }>(`
       SELECT p.proname, p.pronargs, pg_catalog.pg_get_function_arguments(p.oid) AS args
       FROM pg_catalog.pg_proc p
@@ -156,7 +151,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(functions.rows).toEqual([
       expect.objectContaining({ proname: "approve_request", pronargs: 1 }),
       expect.objectContaining({ proname: "my_requests", pronargs: 0 }),
-      expect.objectContaining({ proname: "open_request", pronargs: 2 }),
+      expect.objectContaining({ proname: "open_request", pronargs: 1 }),
       expect.objectContaining({ proname: "submit_request", pronargs: 1 }),
     ]);
     expect(functions.rows.map((row) => row.args).join(" ")).not.toMatch(/actor|principal/i);
@@ -228,8 +223,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approver_differs_from_requester" });
 
-    const id = randomUUID();
-    await clients.employeeOne.openRequest({ id, amount: "3" });
+    const id = (await clients.employeeOne.openRequest({ amount: "3" })).id;
     const audit = await admin.query<{ database_principal: string; principal_id: string; count: string }>(
       `SELECT database_principal, principal_id, count(*)::text AS count
        FROM model_procurement_internal.action_audit

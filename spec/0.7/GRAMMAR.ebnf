@@ -1,0 +1,11 @@
+field_decl          = IDENT, ":", type_ref, [ "?" ],
+                      [ "=", expression ], { annotation }, ";" ;
+annotation          = inherited_annotation
+                    | generated_annotation
+                    | immutable_annotation
+                    | stable_id ;
+generated_annotation = "@generated", "(", generation_strategy, ")" ;
+generation_strategy = "uuid" | "now" ;
+immutable_annotation = "@immutable" ;
+
+All productions not replaced above are inherited from the ModelLang 0.6 grammar.

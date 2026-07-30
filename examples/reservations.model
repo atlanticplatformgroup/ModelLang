@@ -1,4 +1,4 @@
-model Reservations version "0.6.0";
+model Reservations version "0.7.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -11,7 +11,8 @@ entity Resource @stableId("ent_7cb2307972954d83a6f344764faaae39") {
 }
 
 entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
-  id: UUID @id @stableId("fld_066660fbd78d479084a9db613ee746ae");
+  id: UUID @id @generated(uuid) @immutable @stableId("fld_066660fbd78d479084a9db613ee746ae");
+  createdAt: DateTime @generated(now) @immutable @stableId("fld_4112857f0e4a431fb4bec42fad9884ef");
   resource: Resource @stableId("fld_8df4f409794e4c66acdbb162b6063d57");
   reservedBy: User @stableId("fld_8380b65e5a2a4c399a2743cee1a3a93a");
   startsAt: DateTime @stableId("fld_59e1f90fae57481f921c5a81dfd3a234");
@@ -23,7 +24,6 @@ entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
 
 action reserve @stableId("act_508ad810a19d4b79a5009871de5cd26b")(
   caller actor: User,
-  id: UUID,
   resource: Resource,
   startsAt: DateTime,
   endsAt: DateTime
@@ -32,7 +32,6 @@ action reserve @stableId("act_508ad810a19d4b79a5009871de5cd26b")(
   require valid_interval: startsAt < endsAt;
 
   create Reservation {
-    id = id;
     resource = resource;
     reservedBy = actor;
     startsAt = startsAt;

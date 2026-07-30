@@ -1,10 +1,10 @@
 {
-  "irVersion": 6,
+  "irVersion": 7,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.6.0",
-    "sourceHash": "sha256:0a86386f750a4d27a3b7b884e26add72a57f8414cbd2f7b21c6591c0da38fda0",
+    "version": "0.7.0",
+    "sourceHash": "sha256:18655980cb9f031745a4b452ac891af15856fdde7440d3df5414057674989aa9",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -197,6 +197,7 @@
             }
           ],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
             "line": 16,
@@ -219,6 +220,7 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
             "line": 17,
@@ -241,6 +243,7 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
             "line": 18,
@@ -288,18 +291,65 @@
           "annotations": [
             {
               "name": "id"
+            },
+            {
+              "name": "generated",
+              "value": "uuid"
+            },
+            {
+              "name": "immutable"
             }
           ],
           "storage": "ordinary",
+          "generation": {
+            "strategy": "uuid",
+            "authority": "database"
+          },
+          "mutability": "immutable",
           "span": {
             "file": "examples/procurement.model",
             "line": 22,
             "column": 3,
             "endLine": 22,
-            "endColumn": 66
+            "endColumn": 94
           },
           "naming": {
             "sqlColumn": "id"
+          }
+        },
+        {
+          "id": "field:fld_b425073719d6446b9859fe6ca97b0ffe",
+          "name": "createdAt",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_b425073719d6446b9859fe6ca97b0ffe"
+          },
+          "type": "DateTime",
+          "optional": false,
+          "annotations": [
+            {
+              "name": "generated",
+              "value": "now"
+            },
+            {
+              "name": "immutable"
+            }
+          ],
+          "storage": "ordinary",
+          "generation": {
+            "strategy": "now",
+            "authority": "database"
+          },
+          "mutability": "immutable",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 23,
+            "column": 3,
+            "endLine": 23,
+            "endColumn": 100
+          },
+          "naming": {
+            "sqlColumn": "created_at"
           }
         },
         {
@@ -313,11 +363,12 @@
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
-            "line": 23,
+            "line": 24,
             "column": 3,
-            "endLine": 23,
+            "endLine": 24,
             "endColumn": 69
           },
           "naming": {
@@ -340,11 +391,12 @@
             }
           ],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
-            "line": 24,
+            "line": 25,
             "column": 3,
-            "endLine": 24,
+            "endLine": 25,
             "endColumn": 86
           },
           "naming": {
@@ -370,11 +422,12 @@
           },
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
-            "line": 25,
+            "line": 26,
             "column": 3,
-            "endLine": 25,
+            "endLine": 26,
             "endColumn": 97
           },
           "naming": {
@@ -392,11 +445,12 @@
           "optional": true,
           "annotations": [],
           "storage": "ordinary",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
-            "line": 26,
+            "line": 27,
             "column": 3,
-            "endLine": 26,
+            "endLine": 27,
             "endColumn": 71
           },
           "naming": {
@@ -418,11 +472,12 @@
             }
           ],
           "storage": "snapshot",
+          "mutability": "mutable",
           "span": {
             "file": "examples/procurement.model",
-            "line": 27,
+            "line": 28,
             "column": 3,
-            "endLine": 27,
+            "endLine": 28,
             "endColumn": 91
           },
           "naming": {
@@ -571,9 +626,9 @@
           "sourceExpression": "((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRoles != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRoles == null)))",
           "span": {
             "file": "examples/procurement.model",
-            "line": 29,
+            "line": 30,
             "column": 3,
-            "endLine": 40,
+            "endLine": 41,
             "endColumn": 7
           },
           "naming": {
@@ -722,9 +777,9 @@
           "sourceExpression": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
           "span": {
             "file": "examples/procurement.model",
-            "line": 42,
+            "line": 43,
             "column": 3,
-            "endLine": 49,
+            "endLine": 50,
             "endColumn": 7
           },
           "naming": {
@@ -792,9 +847,9 @@
           "sourceExpression": "((status != RequestStatus.APPROVED) or (approvedBy != requester))",
           "span": {
             "file": "examples/procurement.model",
-            "line": 51,
+            "line": 52,
             "column": 3,
-            "endLine": 53,
+            "endLine": 54,
             "endColumn": 32
           },
           "naming": {
@@ -808,7 +863,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 54,
+        "endLine": 55,
         "endColumn": 2
       },
       "naming": {
@@ -834,31 +889,14 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 59,
+            "line": 60,
             "column": 3,
-            "endLine": 59,
+            "endLine": 60,
             "endColumn": 21
           },
           "naming": {
             "sqlParameter": "p_actor",
             "typescriptProperty": "actor"
-          }
-        },
-        {
-          "id": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
-          "name": "id",
-          "type": "UUID",
-          "caller": false,
-          "span": {
-            "file": "examples/procurement.model",
-            "line": 60,
-            "column": 3,
-            "endLine": 60,
-            "endColumn": 11
-          },
-          "naming": {
-            "sqlParameter": "p_id",
-            "typescriptProperty": "id"
           }
         },
         {
@@ -881,7 +919,6 @@
       ],
       "callerParameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
       "callableParameters": [
-        "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
         "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount"
       ],
       "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
@@ -1020,17 +1057,6 @@
         "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "assignments": [
           {
-            "fieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
-            "fieldName": "id",
-            "expression": {
-              "kind": "parameter",
-              "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
-              "name": "id",
-              "type": "UUID",
-              "nullable": false
-            }
-          },
-          {
             "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
             "fieldName": "requester",
             "expression": {
@@ -1097,9 +1123,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 58,
+        "line": 59,
         "column": 1,
-        "endLine": 77,
+        "endLine": 76,
         "endColumn": 2
       },
       "naming": {
@@ -1123,9 +1149,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 80,
+            "line": 79,
             "column": 3,
-            "endLine": 80,
+            "endLine": 79,
             "endColumn": 21
           },
           "naming": {
@@ -1140,9 +1166,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 81,
+            "line": 80,
             "column": 3,
-            "endLine": 81,
+            "endLine": 80,
             "endColumn": 27
           },
           "naming": {
@@ -1186,9 +1212,9 @@
         "sourceExpression": "(actor == request.requester)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 83,
+          "line": 82,
           "column": 13,
-          "endLine": 83,
+          "endLine": 82,
           "endColumn": 39
         }
       },
@@ -1222,9 +1248,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 84,
+            "line": 83,
             "column": 3,
-            "endLine": 84,
+            "endLine": 83,
             "endColumn": 59
           }
         }
@@ -1268,9 +1294,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 79,
+        "line": 78,
         "column": 1,
-        "endLine": 89,
+        "endLine": 88,
         "endColumn": 2
       },
       "naming": {
@@ -1294,9 +1320,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 92,
+            "line": 91,
             "column": 3,
-            "endLine": 92,
+            "endLine": 91,
             "endColumn": 21
           },
           "naming": {
@@ -1311,9 +1337,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 93,
+            "line": 92,
             "column": 3,
-            "endLine": 93,
+            "endLine": 92,
             "endColumn": 27
           },
           "naming": {
@@ -1471,9 +1497,9 @@
         "sourceExpression": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 96,
+          "line": 95,
           "column": 5,
-          "endLine": 101,
+          "endLine": 100,
           "endColumn": 62
         }
       },
@@ -1507,9 +1533,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 104,
+            "line": 103,
             "column": 3,
-            "endLine": 104,
+            "endLine": 103,
             "endColumn": 67
           }
         }
@@ -1578,9 +1604,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 91,
+        "line": 90,
         "column": 1,
-        "endLine": 111,
+        "endLine": 110,
         "endColumn": 2
       },
       "naming": {
@@ -1606,9 +1632,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 114,
+            "line": 113,
             "column": 3,
-            "endLine": 114,
+            "endLine": 113,
             "endColumn": 21
           },
           "naming": {
@@ -1633,9 +1659,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 116,
+          "line": 115,
           "column": 13,
-          "endLine": 116,
+          "endLine": 115,
           "endColumn": 17
         }
       },
@@ -1669,9 +1695,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 117,
+          "line": 116,
           "column": 9,
-          "endLine": 117,
+          "endLine": 116,
           "endColumn": 35
         }
       },
@@ -1683,9 +1709,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 113,
+        "line": 112,
         "column": 1,
-        "endLine": 120,
+        "endLine": 119,
         "endColumn": 2
       },
       "naming": {
@@ -1825,7 +1851,35 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 66
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "generated:field:fld_af918d24406040619a77b244a81ca5d3",
+      "purpose": "Generate id with uuid under database authority.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.id",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 22,
+        "column": 3,
+        "endLine": 22,
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "immutable:field:fld_af918d24406040619a77b244a81ca5d3",
+      "purpose": "Prevent action updates to immutable field id.",
+      "layer": "ModelLang action semantics",
+      "artifact": "model.ir.json",
+      "objectName": "field:fld_af918d24406040619a77b244a81ca5d3",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 22,
+        "column": 3,
+        "endLine": 22,
+        "endColumn": 94
       }
     },
     {
@@ -1839,7 +1893,49 @@
         "line": 22,
         "column": 3,
         "endLine": 22,
-        "endColumn": 66
+        "endColumn": 94
+      }
+    },
+    {
+      "id": "required:field:fld_b425073719d6446b9859fe6ca97b0ffe",
+      "purpose": "createdAt is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.created_at NOT NULL",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 23,
+        "column": 3,
+        "endLine": 23,
+        "endColumn": 100
+      }
+    },
+    {
+      "id": "generated:field:fld_b425073719d6446b9859fe6ca97b0ffe",
+      "purpose": "Generate createdAt with now under database authority.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement.purchase_request.created_at",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 23,
+        "column": 3,
+        "endLine": 23,
+        "endColumn": 100
+      }
+    },
+    {
+      "id": "immutable:field:fld_b425073719d6446b9859fe6ca97b0ffe",
+      "purpose": "Prevent action updates to immutable field createdAt.",
+      "layer": "ModelLang action semantics",
+      "artifact": "model.ir.json",
+      "objectName": "field:fld_b425073719d6446b9859fe6ca97b0ffe",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 23,
+        "column": 3,
+        "endLine": 23,
+        "endColumn": 100
       }
     },
     {
@@ -1850,9 +1946,9 @@
       "objectName": "model_procurement.purchase_request.requester_id NOT NULL",
       "source": {
         "file": "examples/procurement.model",
-        "line": 23,
+        "line": 24,
         "column": 3,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 69
       }
     },
@@ -1864,9 +1960,9 @@
       "objectName": "fk_purchase_request_requester_id",
       "source": {
         "file": "examples/procurement.model",
-        "line": 23,
+        "line": 24,
         "column": 3,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 69
       }
     },
@@ -1878,9 +1974,9 @@
       "objectName": "model_procurement.purchase_request.amount NOT NULL",
       "source": {
         "file": "examples/procurement.model",
-        "line": 24,
+        "line": 25,
         "column": 3,
-        "endLine": 24,
+        "endLine": 25,
         "endColumn": 86
       }
     },
@@ -1892,9 +1988,9 @@
       "objectName": "ck_purchase_request_amount_min_exclusive",
       "source": {
         "file": "examples/procurement.model",
-        "line": 24,
+        "line": 25,
         "column": 3,
-        "endLine": 24,
+        "endLine": 25,
         "endColumn": 86
       }
     },
@@ -1906,9 +2002,9 @@
       "objectName": "model_procurement.purchase_request.status NOT NULL",
       "source": {
         "file": "examples/procurement.model",
-        "line": 25,
+        "line": 26,
         "column": 3,
-        "endLine": 25,
+        "endLine": 26,
         "endColumn": 97
       }
     },
@@ -1920,9 +2016,9 @@
       "objectName": "ck_purchase_request_status_enum",
       "source": {
         "file": "examples/procurement.model",
-        "line": 25,
+        "line": 26,
         "column": 3,
-        "endLine": 25,
+        "endLine": 26,
         "endColumn": 97
       }
     },
@@ -1934,9 +2030,9 @@
       "objectName": "model_procurement.purchase_request.status",
       "source": {
         "file": "examples/procurement.model",
-        "line": 25,
+        "line": 26,
         "column": 3,
-        "endLine": 25,
+        "endLine": 26,
         "endColumn": 97
       }
     },
@@ -1948,9 +2044,9 @@
       "objectName": "fk_purchase_request_approved_by_id",
       "source": {
         "file": "examples/procurement.model",
-        "line": 26,
+        "line": 27,
         "column": 3,
-        "endLine": 26,
+        "endLine": 27,
         "endColumn": 71
       }
     },
@@ -1962,9 +2058,9 @@
       "objectName": "ck_purchase_request_approved_by_roles_enum_set",
       "source": {
         "file": "examples/procurement.model",
-        "line": 27,
+        "line": 28,
         "column": 3,
-        "endLine": 27,
+        "endLine": 28,
         "endColumn": 91
       }
     },
@@ -1976,9 +2072,9 @@
       "objectName": "field:fld_577b4c94c9cd4b469aded37614712fba",
       "source": {
         "file": "examples/procurement.model",
-        "line": 27,
+        "line": 28,
         "column": 3,
-        "endLine": 27,
+        "endLine": 28,
         "endColumn": 91
       }
     },
@@ -1990,9 +2086,9 @@
       "objectName": "ck_purchase_request_approval_fields_match_status",
       "source": {
         "file": "examples/procurement.model",
-        "line": 29,
+        "line": 30,
         "column": 3,
-        "endLine": 40,
+        "endLine": 41,
         "endColumn": 7
       }
     },
@@ -2004,9 +2100,9 @@
       "objectName": "ck_purchase_request_approval_authority_matches_amount",
       "source": {
         "file": "examples/procurement.model",
-        "line": 42,
+        "line": 43,
         "column": 3,
-        "endLine": 49,
+        "endLine": 50,
         "endColumn": 7
       }
     },
@@ -2018,9 +2114,9 @@
       "objectName": "ck_purchase_request_approver_differs_from_requester",
       "source": {
         "file": "examples/procurement.model",
-        "line": 51,
+        "line": 52,
         "column": 3,
-        "endLine": 53,
+        "endLine": 54,
         "endColumn": 32
       }
     },
@@ -2034,7 +2130,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 54,
+        "endLine": 55,
         "endColumn": 2
       }
     },
@@ -2048,7 +2144,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 54,
+        "endLine": 55,
         "endColumn": 2
       }
     },
@@ -2060,9 +2156,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 59,
+        "line": 60,
         "column": 3,
-        "endLine": 59,
+        "endLine": 60,
         "endColumn": 21
       }
     },
@@ -2109,9 +2205,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 58,
+        "line": 59,
         "column": 1,
-        "endLine": 77,
+        "endLine": 76,
         "endColumn": 2
       }
     },
@@ -2130,9 +2226,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 80,
+        "line": 79,
         "column": 3,
-        "endLine": 80,
+        "endLine": 79,
         "endColumn": 21
       }
     },
@@ -2151,9 +2247,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 83,
+        "line": 82,
         "column": 13,
-        "endLine": 83,
+        "endLine": 82,
         "endColumn": 39
       }
     },
@@ -2165,9 +2261,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 84,
+        "line": 83,
         "column": 3,
-        "endLine": 84,
+        "endLine": 83,
         "endColumn": 59
       }
     },
@@ -2179,9 +2275,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 79,
+        "line": 78,
         "column": 1,
-        "endLine": 89,
+        "endLine": 88,
         "endColumn": 2
       }
     },
@@ -2207,9 +2303,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 92,
+        "line": 91,
         "column": 3,
-        "endLine": 92,
+        "endLine": 91,
         "endColumn": 21
       }
     },
@@ -2228,9 +2324,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 95,
         "column": 5,
-        "endLine": 101,
+        "endLine": 100,
         "endColumn": 62
       }
     },
@@ -2242,9 +2338,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 104,
+        "line": 103,
         "column": 3,
-        "endLine": 104,
+        "endLine": 103,
         "endColumn": 67
       }
     },
@@ -2256,9 +2352,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 91,
+        "line": 90,
         "column": 1,
-        "endLine": 111,
+        "endLine": 110,
         "endColumn": 2
       }
     },
@@ -2284,9 +2380,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 114,
+        "line": 113,
         "column": 3,
-        "endLine": 114,
+        "endLine": 113,
         "endColumn": 21
       }
     },
@@ -2305,9 +2401,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 116,
+        "line": 115,
         "column": 13,
-        "endLine": 116,
+        "endLine": 115,
         "endColumn": 17
       }
     },
@@ -2319,9 +2415,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 117,
+        "line": 116,
         "column": 9,
-        "endLine": 117,
+        "endLine": 116,
         "endColumn": 35
       }
     },
@@ -2333,9 +2429,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 113,
+        "line": 112,
         "column": 1,
-        "endLine": 120,
+        "endLine": 119,
         "endColumn": 2
       }
     },
@@ -2347,9 +2443,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 113,
+        "line": 112,
         "column": 1,
-        "endLine": 120,
+        "endLine": 119,
         "endColumn": 2
       }
     },
@@ -2361,9 +2457,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 113,
+        "line": 112,
         "column": 1,
-        "endLine": 120,
+        "endLine": 119,
         "endColumn": 2
       }
     },

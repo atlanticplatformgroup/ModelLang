@@ -6,8 +6,8 @@ GRANT USAGE ON SCHEMA "model_procurement" TO modellang_app;
 REVOKE ALL ON TABLE "model_procurement"."user" FROM PUBLIC, modellang_app;
 REVOKE ALL ON TABLE "model_procurement"."purchase_request" FROM PUBLIC, modellang_app;
 
-REVOKE ALL ON FUNCTION "model_procurement"."open_request"(uuid, numeric) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "model_procurement"."open_request"(uuid, numeric) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_procurement"."open_request"(numeric) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_procurement"."open_request"(numeric) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_procurement"."submit_request"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_procurement"."submit_request"(uuid) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_procurement"."approve_request"(uuid) FROM PUBLIC;

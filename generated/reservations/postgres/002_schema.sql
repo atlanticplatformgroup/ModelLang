@@ -1,4 +1,4 @@
--- source sha256:4bc10136557149e98256f7dfc38a4e8fbea6eeada2a22f76321b442bc75d0da7
+-- source sha256:d7fa777b326ecd4a5e83a5084a4fa86fdd25012b0754eafabaaec2b2db3284fd
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;
@@ -19,7 +19,8 @@ CREATE TABLE "model_reservations"."resource" (
 );
 
 CREATE TABLE "model_reservations"."reservation" (
-  "id" uuid NOT NULL PRIMARY KEY,
+  "id" uuid NOT NULL DEFAULT pg_catalog.gen_random_uuid() PRIMARY KEY,
+  "created_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
   "resource_id" uuid NOT NULL,
   "reserved_by_id" uuid NOT NULL,
   "starts_at" timestamptz NOT NULL,

@@ -1,7 +1,7 @@
 -- Generated guarded action functions. Caller identity is always session_user.
 SET ROLE modellang_owner;
 
-CREATE OR REPLACE FUNCTION "model_reservations"."reserve"("p_id" uuid, "p_resource" uuid, "p_starts_at" timestamptz, "p_ends_at" timestamptz)
+CREATE OR REPLACE FUNCTION "model_reservations"."reserve"("p_resource" uuid, "p_starts_at" timestamptz, "p_ends_at" timestamptz)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -56,17 +56,17 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval';
   END IF;
 
-  INSERT INTO "model_reservations"."reservation" ("id", "resource_id", "reserved_by_id", "starts_at", "ends_at")
-  VALUES ("p_id", v_resource."id", v_actor."id", "p_starts_at", "p_ends_at")
+  INSERT INTO "model_reservations"."reservation" ("resource_id", "reserved_by_id", "starts_at", "ends_at")
+  VALUES (v_resource."id", v_actor."id", "p_starts_at", "p_ends_at")
   RETURNING * INTO v_result;
 
   INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at");
+  RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at");
 END
 $modellang$;
 
-REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, uuid, timestamptz, timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) FROM PUBLIC;
 
 RESET ROLE;

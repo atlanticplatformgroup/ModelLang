@@ -31,6 +31,16 @@ function checkAction(ir: ModelIR, action: IRAction): void {
   requireEntry(ir, action.authorization.id, action.authorization.span);
   for (const precondition of action.preconditions) requireEntry(ir, precondition.id, precondition.span);
   requireEntry(ir, `effect:${action.id}`, action.span);
+  const effectEntity = ir.entities.find((entity) => entity.id === action.effect.entityId);
+  if (!effectEntity) fail(ir, `Action '${action.name}' has an unknown effect entity.`, action.span);
+  for (const assignment of action.effect.assignments) {
+    const field = effectEntity.fields.find((candidate) => candidate.id === assignment.fieldId);
+    if (!field) fail(ir, `Action '${action.name}' assigns an unknown field.`, action.span);
+    if (field.generation) fail(ir, `Action '${action.name}' assigns database-generated field '${field.name}'.`, action.span);
+    if (action.effect.kind === "update" && field.mutability === "immutable") {
+      fail(ir, `Action '${action.name}' updates immutable field '${field.name}'.`, action.span);
+    }
+  }
   for (const lock of action.lockPlan) requireEntry(ir, lock.id);
   if (action.effect.kind === "update") {
     const target = action.parameters.find((parameter) => parameter.name === action.effect.target);
@@ -63,14 +73,27 @@ export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:audit");
   for (const entity of ir.entities) {
     for (const field of entity.fields) {
+      if (field.generation) {
+        if (field.optional || field.default || field.storage !== "ordinary" || field.mutability !== "immutable") {
+          fail(ir, `Generated field '${entity.name}.${field.name}' has an invalid storage contract.`, field.span);
+        }
+        if ((field.generation.strategy === "uuid" && field.type !== "UUID")
+          || (field.generation.strategy === "now" && field.type !== "DateTime")) {
+          fail(ir, `Generated field '${entity.name}.${field.name}' has an incompatible strategy and type.`, field.span);
+        }
+      }
       if (!field.optional) requireEntry(ir, `required:${field.id}`, field.span);
       if (field.type.startsWith("entity:")) requireEntry(ir, `reference:${field.id}`, field.span);
       if (field.type.startsWith("enum:")) requireEntry(ir, `enum-membership:${field.id}`, field.span);
       if (field.type.startsWith("set:enum:")) requireEntry(ir, `enum-set:${field.id}`, field.span);
       if (field.default) requireEntry(ir, `default:${field.id}`, field.span);
       if (field.storage === "snapshot") requireEntry(ir, `snapshot:${field.id}`, field.span);
+      if (field.generation) requireEntry(ir, `generated:${field.id}`, field.span);
+      if (field.mutability === "immutable") requireEntry(ir, `immutable:${field.id}`, field.span);
       for (const annotation of field.annotations) {
-        if (annotation.name !== "snapshot") requireEntry(ir, `annotation:${field.id}.${annotation.name}`, field.span);
+        if (annotation.name !== "snapshot" && annotation.name !== "generated" && annotation.name !== "immutable") {
+          requireEntry(ir, `annotation:${field.id}.${annotation.name}`, field.span);
+        }
       }
     }
     for (const invariant of entity.invariants) requireEntry(ir, invariant.id, invariant.span);

@@ -12,8 +12,8 @@ export class ReservationsClient {
   async reserve(input: ReserveInput): Promise<Reservation> {
     try {
       const result = await this.adapter.query<{ value: Reservation }>(
-        'SELECT "model_reservations"."reserve"($1, $2, $3, $4) AS value',
-        [input.id, input.resource, input.startsAt, input.endsAt],
+        'SELECT "model_reservations"."reserve"($1, $2, $3) AS value',
+        [input.resource, input.startsAt, input.endsAt],
       );
       return result.rows[0]!.value;
     } catch (error) {

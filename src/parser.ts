@@ -136,7 +136,7 @@ class Parser {
     while (this.at("@")) {
       const at = this.take();
       const name = this.identifier("Expected annotation name.");
-      if (!["id", "unique", "min", "minExclusive", "max", "snapshot", "stableId"].includes(name.text)) this.fail("E1106", `Unknown annotation @${name.text}.`);
+      if (!["id", "unique", "min", "minExclusive", "max", "snapshot", "generated", "immutable", "stableId"].includes(name.text)) this.fail("E1106", `Unknown annotation @${name.text}.`);
       let value: number | string | undefined;
       let end: Token = name;
       if (name.text === "min" || name.text === "minExclusive" || name.text === "max") {
@@ -148,6 +148,11 @@ class Parser {
         this.expect("(");
         const id = this.expect("string", "Expected a stable ID string.");
         value = String(id.value);
+        end = this.expect(")");
+      } else if (name.text === "generated") {
+        this.expect("(");
+        const strategy = this.identifier("Expected a generation strategy.");
+        value = strategy.text;
         end = this.expect(")");
       }
       annotations.push({ name: name.text as Annotation["name"], value, span: this.span(at, end) });

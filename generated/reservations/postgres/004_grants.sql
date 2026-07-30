@@ -7,8 +7,8 @@ REVOKE ALL ON TABLE "model_reservations"."user" FROM PUBLIC, modellang_app;
 REVOKE ALL ON TABLE "model_reservations"."resource" FROM PUBLIC, modellang_app;
 REVOKE ALL ON TABLE "model_reservations"."reservation" FROM PUBLIC, modellang_app;
 
-REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, uuid, timestamptz, timestamptz) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "model_reservations"."reserve"(uuid, uuid, timestamptz, timestamptz) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) TO modellang_app;
 

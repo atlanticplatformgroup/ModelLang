@@ -1,4 +1,4 @@
-model Procurement version "0.6.0";
+model Procurement version "0.7.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -19,7 +19,8 @@ entity User @stableId("ent_66c16684f17e4b4ca79eb7d916cbf725") {
 }
 
 entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
-  id: UUID @id @stableId("fld_af918d24406040619a77b244a81ca5d3");
+  id: UUID @id @generated(uuid) @immutable @stableId("fld_af918d24406040619a77b244a81ca5d3");
+  createdAt: DateTime @generated(now) @immutable @stableId("fld_b425073719d6446b9859fe6ca97b0ffe");
   requester: User @stableId("fld_04d9bc06877d4ec38a98196239c949b5");
   amount: Decimal @minExclusive(0) @stableId("fld_9810e7598584487ea4a883e3c1c3f8d1");
   status: RequestStatus = RequestStatus.DRAFT @stableId("fld_afb1dee14dfa48c98961fdb40e2b0be2");
@@ -57,7 +58,6 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
 // It does not depend on managers or finance users also carrying EMPLOYEE in seed data.
 action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
   caller actor: User,
-  id: UUID,
   amount: Decimal
 ) -> PurchaseRequest {
   authorize
@@ -67,7 +67,6 @@ action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
   require positive_amount: amount > 0;
 
   create PurchaseRequest {
-    id = id;
     requester = actor;
     amount = amount;
     status = RequestStatus.DRAFT;

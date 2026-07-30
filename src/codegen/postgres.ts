@@ -143,6 +143,8 @@ function generateSchema(ir: ModelIR): string {
       const pieces = [quoteIdent(field.naming.sqlColumn), sqlType(field.type)];
       if (!field.optional) pieces.push("NOT NULL");
       if (field.default) pieces.push(`DEFAULT ${sqlLiteral(field.default, ir)}`);
+      if (field.generation?.strategy === "uuid") pieces.push("DEFAULT pg_catalog.gen_random_uuid()");
+      if (field.generation?.strategy === "now") pieces.push("DEFAULT pg_catalog.transaction_timestamp()");
       if (field.annotations.some((annotation) => annotation.name === "id")) pieces.push("PRIMARY KEY");
       return `  ${pieces.join(" ")}`;
     });
@@ -326,12 +328,20 @@ function generateAction(ir: ModelIR, action: IRAction): string {
   const effectEntity = entityById(ir, action.effect.entityId);
   if (action.effect.kind === "create") {
     const fields = action.effect.assignments.map((assignment) => fieldById(ir, assignment.fieldId).field);
-    body.push(
-      `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} (${fields.map((field) => quoteIdent(field.naming.sqlColumn)).join(", ")})`,
-      `  VALUES (${action.effect.assignments.map((assignment) => lowerExpression(assignment.expression, context)).join(", ")})`,
-      "  RETURNING * INTO v_result;",
-      "",
-    );
+    if (fields.length === 0) {
+      body.push(
+        `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} DEFAULT VALUES`,
+        "  RETURNING * INTO v_result;",
+        "",
+      );
+    } else {
+      body.push(
+        `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} (${fields.map((field) => quoteIdent(field.naming.sqlColumn)).join(", ")})`,
+        `  VALUES (${action.effect.assignments.map((assignment) => lowerExpression(assignment.expression, context)).join(", ")})`,
+        "  RETURNING * INTO v_result;",
+        "",
+      );
+    }
   } else {
     const targetParameter = action.parameters.find((parameter) => parameter.name === action.effect.target)!;
     body.push(

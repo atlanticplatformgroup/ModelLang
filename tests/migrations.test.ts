@@ -129,7 +129,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "invariant", "exclusion", "action", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(6);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(7);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 

@@ -1,7 +1,7 @@
 -- Generated guarded action functions. Caller identity is always session_user.
 SET ROLE modellang_owner;
 
-CREATE OR REPLACE FUNCTION "model_procurement"."open_request"("p_id" uuid, "p_amount" numeric)
+CREATE OR REPLACE FUNCTION "model_procurement"."open_request"("p_amount" numeric)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -42,18 +42,18 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount';
   END IF;
 
-  INSERT INTO "model_procurement"."purchase_request" ("id", "requester_id", "amount", "status", "approved_by_id", "approved_by_roles")
-  VALUES ("p_id", v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
+  INSERT INTO "model_procurement"."purchase_request" ("requester_id", "amount", "status", "approved_by_id", "approved_by_roles")
+  VALUES (v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
   RETURNING * INTO v_result;
 
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
+  RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 
-REVOKE ALL ON FUNCTION "model_procurement"."open_request"(uuid, numeric) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "model_procurement"."open_request"(numeric) FROM PUBLIC;
 
 CREATE OR REPLACE FUNCTION "model_procurement"."submit_request"("p_request" uuid)
 RETURNS jsonb
@@ -118,7 +118,7 @@ BEGIN
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
+  RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 
@@ -189,7 +189,7 @@ BEGIN
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
   VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id");
 
-  RETURN jsonb_build_object('id', v_result."id", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
+  RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', v_result."amount"::text, 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
 $modellang$;
 

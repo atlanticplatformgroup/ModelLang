@@ -43,6 +43,38 @@ describe("lexer and parser", () => {
 });
 
 describe("semantic analysis", () => {
+  it("models database-generated values as immutable stored fields outside the callable ABI", () => {
+    const ir = compileText(`model Generated version "0.7.0";
+      entity User { id: UUID @id; }
+      entity Record {
+        id: UUID @id @generated(uuid);
+        createdAt: DateTime @generated(now) @immutable;
+        name: String;
+      }
+      action make(caller actor: User, name: String) -> Record {
+        authorize true;
+        create Record { name = name; }
+      }`);
+    const record = ir.entities.find((entity) => entity.name === "Record")!;
+    expect(ir.irVersion).toBe(7);
+    expect(record.fields.find((field) => field.name === "id")).toMatchObject({
+      generation: { strategy: "uuid", authority: "database" },
+      mutability: "immutable",
+    });
+    expect(record.fields.find((field) => field.name === "createdAt")).toMatchObject({
+      generation: { strategy: "now", authority: "database" },
+      mutability: "immutable",
+    });
+    expect(ir.actions[0]!.callableParameters).toEqual(["parameter:action:make.name"]);
+    expect(ir.actions[0]!.effect.assignments.map((assignment) => assignment.fieldName)).toEqual(["name"]);
+    expect(ir.enforcement.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "generated:field:Record.id",
+      "immutable:field:Record.id",
+      "generated:field:Record.createdAt",
+      "immutable:field:Record.createdAt",
+    ]));
+  });
+
   it("produces typed nullable expressions and explicit null comparisons", () => {
     const ir = compileText(minimal(`action act(caller actor: User, item: Item) -> Item {
       authorize item.optionalFlag == null or item.optionalFlag;
@@ -116,6 +148,13 @@ describe("semantic analysis", () => {
     ["unqualified enum", minimal(`action act(caller actor: User, item: Item) -> Item { authorize actor.role == MANAGER; update item { value = 1; } }`), "E2009"],
     ["entity snapshot", `model M version "1"; entity User { id: UUID @id; prior: User? @snapshot; } action a(caller u: User) -> User { authorize true; update u { prior = null; } }`, "E2207"],
     ["non-field snapshot assignment", `model M version "1"; enum Role { A } entity User { id: UUID @id; role: Role; } entity Record { id: UUID @id; roleCopy: Role? @snapshot; } action a(caller u: User, r: Record) -> Record { authorize true; update r { roleCopy = Role.A; } }`, "E2415"],
+    ["generated assignment", `model M version "1"; entity User { id: UUID @id; } entity Record { id: UUID @id @generated(uuid); } action a(caller u: User, id: UUID) -> Record { authorize true; create Record { id = id; } }`, "E2316"],
+    ["immutable update", `model M version "1"; entity User { id: UUID @id; } entity Record { id: UUID @id; code: String @immutable; } action a(caller u: User, r: Record) -> Record { authorize true; update r { code = "changed"; } }`, "E2317"],
+    ["optional generated field", `model M version "1"; entity User { id: UUID @id; createdAt: DateTime? @generated(now); } action a(caller u: User) -> User { authorize true; update u { id = u.id; } }`, "E2208"],
+    ["generated source default", `model M version "1"; entity User { id: UUID @id; createdAt: DateTime = "2020-01-01T00:00:00Z" @generated(now); } action a(caller u: User) -> User { authorize true; update u { id = u.id; } }`, "E2209"],
+    ["generated snapshot", `model M version "1"; entity User { id: UUID @id; createdAt: DateTime @generated(now) @snapshot; } action a(caller u: User) -> User { authorize true; update u { id = u.id; } }`, "E2210"],
+    ["unknown generation strategy", `model M version "1"; entity User { id: UUID @id @generated(sequence); } action a(caller u: User) -> User { authorize true; create User { } }`, "E2211"],
+    ["generation type mismatch", `model M version "1"; entity User { id: UUID @id; name: String @generated(uuid); } action a(caller u: User, id: UUID) -> User { authorize true; create User { id = id; } }`, "E2212"],
   ])("rejects %s", (_name, source, code) => {
     expect(failure(source).code).toBe(code);
   });
@@ -140,7 +179,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(6);
+    expect(ir.irVersion).toBe(7);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -173,7 +212,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(6);
+    expect(ir.irVersion).toBe(7);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -277,7 +316,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(6);
+    expect(ir.irVersion).toBe(7);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
