@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- Prevented managers and finance users from approving their own purchase requests through both action authorization and a durable invariant.
+- Added a durable approval-authority invariant that validates snapshotted roles against the approved amount.
+- Made request-opening authorization explicit for employee, manager, and finance roles rather than relying on seed-data role combinations.
+- Added generated-artifact, database-backstop, role-independence, and self-approval regression coverage.
+
 ## 0.5.0
 
 - Added persistent `@stableId(...)` identities for entities and stored fields.

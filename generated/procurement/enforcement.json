@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.5.0",
-    "sourceHash": "sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415",
+    "version": "0.5.1",
+    "sourceHash": "sha256:5a914b9f68c691c6c5c090460a7840f2d2833cb719408e8b2435ed1aeea2d6e2",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -313,6 +313,34 @@
       }
     },
     {
+      "id": "invariant:PurchaseRequest.approval_authority_matches_amount",
+      "purpose": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approval_authority_matches_amount",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 42,
+        "column": 3,
+        "endLine": 49,
+        "endColumn": 7
+      }
+    },
+    {
+      "id": "invariant:PurchaseRequest.approver_differs_from_requester",
+      "purpose": "((status != RequestStatus.APPROVED) or (approvedBy != requester))",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approver_differs_from_requester",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 51,
+        "column": 3,
+        "endLine": 53,
+        "endColumn": 32
+      }
+    },
+    {
       "id": "boundary:PurchaseRequest.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
@@ -322,7 +350,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 41,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -336,7 +364,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 41,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -348,9 +376,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 46,
+        "line": 59,
         "column": 3,
-        "endLine": 46,
+        "endLine": 59,
         "endColumn": 21
       }
     },
@@ -363,16 +391,16 @@
     },
     {
       "id": "authorize:openRequest",
-      "purpose": "(Role.EMPLOYEE in actor.roles)",
+      "purpose": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 50,
-        "column": 13,
-        "endLine": 50,
-        "endColumn": 41
+        "line": 64,
+        "column": 5,
+        "endLine": 66,
+        "endColumn": 35
       }
     },
     {
@@ -383,9 +411,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 51,
+        "line": 67,
         "column": 3,
-        "endLine": 51,
+        "endLine": 67,
         "endColumn": 39
       }
     },
@@ -397,9 +425,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 45,
+        "line": 58,
         "column": 1,
-        "endLine": 61,
+        "endLine": 77,
         "endColumn": 2
       }
     },
@@ -418,9 +446,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 64,
+        "line": 80,
         "column": 3,
-        "endLine": 64,
+        "endLine": 80,
         "endColumn": 21
       }
     },
@@ -439,9 +467,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 67,
+        "line": 83,
         "column": 13,
-        "endLine": 67,
+        "endLine": 83,
         "endColumn": 39
       }
     },
@@ -453,9 +481,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 68,
+        "line": 84,
         "column": 3,
-        "endLine": 68,
+        "endLine": 84,
         "endColumn": 59
       }
     },
@@ -467,9 +495,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 63,
+        "line": 79,
         "column": 1,
-        "endLine": 73,
+        "endLine": 89,
         "endColumn": 2
       }
     },
@@ -495,9 +523,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 76,
+        "line": 92,
         "column": 3,
-        "endLine": 76,
+        "endLine": 92,
         "endColumn": 21
       }
     },
@@ -510,16 +538,16 @@
     },
     {
       "id": "authorize:approveRequest",
-      "purpose": "(((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles)))",
+      "purpose": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 80,
-        "column": 6,
-        "endLine": 82,
-        "endColumn": 60
+        "line": 96,
+        "column": 5,
+        "endLine": 101,
+        "endColumn": 62
       }
     },
     {
@@ -530,9 +558,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 84,
+        "line": 104,
         "column": 3,
-        "endLine": 84,
+        "endLine": 104,
         "endColumn": 67
       }
     },
@@ -544,9 +572,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 91,
         "column": 1,
-        "endLine": 91,
+        "endLine": 111,
         "endColumn": 2
       }
     },
@@ -572,9 +600,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 94,
+        "line": 114,
         "column": 3,
-        "endLine": 94,
+        "endLine": 114,
         "endColumn": 21
       }
     },
@@ -593,9 +621,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 116,
         "column": 13,
-        "endLine": 96,
+        "endLine": 116,
         "endColumn": 17
       }
     },
@@ -607,9 +635,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 97,
+        "line": 117,
         "column": 9,
-        "endLine": 97,
+        "endLine": 117,
         "endColumn": 35
       }
     },
@@ -621,9 +649,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },
@@ -635,9 +663,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },
@@ -649,9 +677,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },

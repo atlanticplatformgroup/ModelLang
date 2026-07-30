@@ -3,8 +3,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.5.0",
-    "sourceHash": "sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415",
+    "version": "0.5.1",
+    "sourceHash": "sha256:5a914b9f68c691c6c5c090460a7840f2d2833cb719408e8b2435ed1aeea2d6e2",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -456,6 +456,215 @@
           "naming": {
             "sqlConstraint": "ck_purchase_request_approval_fields_match_status"
           }
+        },
+        {
+          "id": "invariant:PurchaseRequest.approval_authority_matches_amount",
+          "name": "approval_authority_matches_amount",
+          "expression": {
+            "kind": "binary",
+            "operator": "or",
+            "left": {
+              "kind": "binary",
+              "operator": "!=",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "self",
+                "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+                "fieldName": "status",
+                "type": "enum:RequestStatus",
+                "nullable": false
+              },
+              "right": {
+                "kind": "enumLiteral",
+                "enumId": "enum:RequestStatus",
+                "member": "APPROVED",
+                "type": "enum:RequestStatus",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false
+            },
+            "right": {
+              "kind": "binary",
+              "operator": "or",
+              "left": {
+                "kind": "binary",
+                "operator": "and",
+                "left": {
+                  "kind": "binary",
+                  "operator": "<=",
+                  "left": {
+                    "kind": "fieldAccess",
+                    "source": "self",
+                    "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                    "fieldName": "amount",
+                    "type": "Decimal",
+                    "nullable": false
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 10000,
+                    "type": "Int",
+                    "nullable": false
+                  },
+                  "type": "Boolean",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "binary",
+                  "operator": "in",
+                  "left": {
+                    "kind": "enumLiteral",
+                    "enumId": "enum:Role",
+                    "member": "MANAGER",
+                    "type": "enum:Role",
+                    "nullable": false
+                  },
+                  "right": {
+                    "kind": "fieldAccess",
+                    "source": "self",
+                    "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
+                    "fieldName": "approvedByRoles",
+                    "type": "set:enum:Role",
+                    "nullable": true
+                  },
+                  "type": "Boolean",
+                  "nullable": true,
+                  "comparisonSemantics": "setMembership"
+                },
+                "type": "Boolean",
+                "nullable": true
+              },
+              "right": {
+                "kind": "binary",
+                "operator": "and",
+                "left": {
+                  "kind": "binary",
+                  "operator": ">",
+                  "left": {
+                    "kind": "fieldAccess",
+                    "source": "self",
+                    "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                    "fieldName": "amount",
+                    "type": "Decimal",
+                    "nullable": false
+                  },
+                  "right": {
+                    "kind": "literal",
+                    "value": 10000,
+                    "type": "Int",
+                    "nullable": false
+                  },
+                  "type": "Boolean",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "binary",
+                  "operator": "in",
+                  "left": {
+                    "kind": "enumLiteral",
+                    "enumId": "enum:Role",
+                    "member": "FINANCE",
+                    "type": "enum:Role",
+                    "nullable": false
+                  },
+                  "right": {
+                    "kind": "fieldAccess",
+                    "source": "self",
+                    "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
+                    "fieldName": "approvedByRoles",
+                    "type": "set:enum:Role",
+                    "nullable": true
+                  },
+                  "type": "Boolean",
+                  "nullable": true,
+                  "comparisonSemantics": "setMembership"
+                },
+                "type": "Boolean",
+                "nullable": true
+              },
+              "type": "Boolean",
+              "nullable": true
+            },
+            "type": "Boolean",
+            "nullable": true
+          },
+          "sourceExpression": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 42,
+            "column": 3,
+            "endLine": 49,
+            "endColumn": 7
+          },
+          "naming": {
+            "sqlConstraint": "ck_purchase_request_approval_authority_matches_amount"
+          }
+        },
+        {
+          "id": "invariant:PurchaseRequest.approver_differs_from_requester",
+          "name": "approver_differs_from_requester",
+          "expression": {
+            "kind": "binary",
+            "operator": "or",
+            "left": {
+              "kind": "binary",
+              "operator": "!=",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "self",
+                "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+                "fieldName": "status",
+                "type": "enum:RequestStatus",
+                "nullable": false
+              },
+              "right": {
+                "kind": "enumLiteral",
+                "enumId": "enum:RequestStatus",
+                "member": "APPROVED",
+                "type": "enum:RequestStatus",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false
+            },
+            "right": {
+              "kind": "binary",
+              "operator": "!=",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "self",
+                "fieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
+                "fieldName": "approvedBy",
+                "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+                "nullable": true
+              },
+              "right": {
+                "kind": "fieldAccess",
+                "source": "self",
+                "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
+                "fieldName": "requester",
+                "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": true,
+              "comparisonSemantics": "entityIdentity"
+            },
+            "type": "Boolean",
+            "nullable": true
+          },
+          "sourceExpression": "((status != RequestStatus.APPROVED) or (approvedBy != requester))",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 51,
+            "column": 3,
+            "endLine": 53,
+            "endColumn": 32
+          },
+          "naming": {
+            "sqlConstraint": "ck_purchase_request_approver_differs_from_requester"
+          }
         }
       ],
       "temporalExclusions": [],
@@ -464,7 +673,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 41,
+        "endLine": 54,
         "endColumn": 2
       },
       "naming": {
@@ -486,9 +695,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 46,
+            "line": 59,
             "column": 3,
-            "endLine": 46,
+            "endLine": 59,
             "endColumn": 21
           },
           "naming": {
@@ -503,9 +712,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 47,
+            "line": 60,
             "column": 3,
-            "endLine": 47,
+            "endLine": 60,
             "endColumn": 11
           },
           "naming": {
@@ -520,9 +729,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 48,
+            "line": 61,
             "column": 3,
-            "endLine": 48,
+            "endLine": 61,
             "endColumn": 18
           },
           "naming": {
@@ -542,34 +751,92 @@
         "name": "authorize",
         "expression": {
           "kind": "binary",
-          "operator": "in",
+          "operator": "or",
           "left": {
-            "kind": "enumLiteral",
-            "enumId": "enum:Role",
-            "member": "EMPLOYEE",
-            "type": "enum:Role",
+            "kind": "binary",
+            "operator": "or",
+            "left": {
+              "kind": "binary",
+              "operator": "in",
+              "left": {
+                "kind": "enumLiteral",
+                "enumId": "enum:Role",
+                "member": "EMPLOYEE",
+                "type": "enum:Role",
+                "nullable": false
+              },
+              "right": {
+                "kind": "fieldAccess",
+                "source": "parameter:openRequest.actor",
+                "parameter": "actor",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                "fieldName": "roles",
+                "type": "set:enum:Role",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false,
+              "comparisonSemantics": "setMembership"
+            },
+            "right": {
+              "kind": "binary",
+              "operator": "in",
+              "left": {
+                "kind": "enumLiteral",
+                "enumId": "enum:Role",
+                "member": "MANAGER",
+                "type": "enum:Role",
+                "nullable": false
+              },
+              "right": {
+                "kind": "fieldAccess",
+                "source": "parameter:openRequest.actor",
+                "parameter": "actor",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                "fieldName": "roles",
+                "type": "set:enum:Role",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false,
+              "comparisonSemantics": "setMembership"
+            },
+            "type": "Boolean",
             "nullable": false
           },
           "right": {
-            "kind": "fieldAccess",
-            "source": "parameter:openRequest.actor",
-            "parameter": "actor",
-            "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
-            "fieldName": "roles",
-            "type": "set:enum:Role",
-            "nullable": false
+            "kind": "binary",
+            "operator": "in",
+            "left": {
+              "kind": "enumLiteral",
+              "enumId": "enum:Role",
+              "member": "FINANCE",
+              "type": "enum:Role",
+              "nullable": false
+            },
+            "right": {
+              "kind": "fieldAccess",
+              "source": "parameter:openRequest.actor",
+              "parameter": "actor",
+              "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+              "fieldName": "roles",
+              "type": "set:enum:Role",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false,
+            "comparisonSemantics": "setMembership"
           },
           "type": "Boolean",
-          "nullable": false,
-          "comparisonSemantics": "setMembership"
+          "nullable": false
         },
-        "sourceExpression": "(Role.EMPLOYEE in actor.roles)",
+        "sourceExpression": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 50,
-          "column": 13,
-          "endLine": 50,
-          "endColumn": 41
+          "line": 64,
+          "column": 5,
+          "endLine": 66,
+          "endColumn": 35
         }
       },
       "preconditions": [
@@ -598,9 +865,9 @@
           "sourceExpression": "(amount > 0)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 51,
+            "line": 67,
             "column": 3,
-            "endLine": 51,
+            "endLine": 67,
             "endColumn": 39
           }
         }
@@ -687,9 +954,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 45,
+        "line": 58,
         "column": 1,
-        "endLine": 61,
+        "endLine": 77,
         "endColumn": 2
       },
       "naming": {
@@ -709,9 +976,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 64,
+            "line": 80,
             "column": 3,
-            "endLine": 64,
+            "endLine": 80,
             "endColumn": 21
           },
           "naming": {
@@ -726,9 +993,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 65,
+            "line": 81,
             "column": 3,
-            "endLine": 65,
+            "endLine": 81,
             "endColumn": 27
           },
           "naming": {
@@ -772,9 +1039,9 @@
         "sourceExpression": "(actor == request.requester)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 67,
+          "line": 83,
           "column": 13,
-          "endLine": 67,
+          "endLine": 83,
           "endColumn": 39
         }
       },
@@ -807,9 +1074,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 68,
+            "line": 84,
             "column": 3,
-            "endLine": 68,
+            "endLine": 84,
             "endColumn": 59
           }
         }
@@ -852,9 +1119,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 63,
+        "line": 79,
         "column": 1,
-        "endLine": 73,
+        "endLine": 89,
         "endColumn": 2
       },
       "naming": {
@@ -874,9 +1141,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 76,
+            "line": 92,
             "column": 3,
-            "endLine": 76,
+            "endLine": 92,
             "endColumn": 21
           },
           "naming": {
@@ -891,9 +1158,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 77,
+            "line": 93,
             "column": 3,
-            "endLine": 77,
+            "endLine": 93,
             "endColumn": 27
           },
           "naming": {
@@ -912,103 +1179,133 @@
         "name": "authorize",
         "expression": {
           "kind": "binary",
-          "operator": "or",
+          "operator": "and",
           "left": {
             "kind": "binary",
-            "operator": "and",
+            "operator": "!=",
             "left": {
-              "kind": "binary",
-              "operator": "<=",
-              "left": {
-                "kind": "fieldAccess",
-                "source": "parameter:approveRequest.request",
-                "parameter": "request",
-                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
-                "fieldName": "amount",
-                "type": "Decimal",
-                "nullable": false
-              },
-              "right": {
-                "kind": "literal",
-                "value": 10000,
-                "type": "Int",
-                "nullable": false
-              },
-              "type": "Boolean",
+              "kind": "entityValue",
+              "parameterId": "parameter:approveRequest.actor",
+              "name": "actor",
+              "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+              "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "nullable": false
             },
             "right": {
-              "kind": "binary",
-              "operator": "in",
-              "left": {
-                "kind": "enumLiteral",
-                "enumId": "enum:Role",
-                "member": "MANAGER",
-                "type": "enum:Role",
-                "nullable": false
-              },
-              "right": {
-                "kind": "fieldAccess",
-                "source": "parameter:approveRequest.actor",
-                "parameter": "actor",
-                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
-                "fieldName": "roles",
-                "type": "set:enum:Role",
-                "nullable": false
-              },
-              "type": "Boolean",
-              "nullable": false,
-              "comparisonSemantics": "setMembership"
+              "kind": "fieldAccess",
+              "source": "parameter:approveRequest.request",
+              "parameter": "request",
+              "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
+              "fieldName": "requester",
+              "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+              "nullable": false
             },
             "type": "Boolean",
-            "nullable": false
+            "nullable": false,
+            "comparisonSemantics": "entityIdentity"
           },
           "right": {
             "kind": "binary",
-            "operator": "and",
+            "operator": "or",
             "left": {
               "kind": "binary",
-              "operator": ">",
+              "operator": "and",
               "left": {
-                "kind": "fieldAccess",
-                "source": "parameter:approveRequest.request",
-                "parameter": "request",
-                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
-                "fieldName": "amount",
-                "type": "Decimal",
+                "kind": "binary",
+                "operator": "<=",
+                "left": {
+                  "kind": "fieldAccess",
+                  "source": "parameter:approveRequest.request",
+                  "parameter": "request",
+                  "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                  "fieldName": "amount",
+                  "type": "Decimal",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 10000,
+                  "type": "Int",
+                  "nullable": false
+                },
+                "type": "Boolean",
                 "nullable": false
               },
               "right": {
-                "kind": "literal",
-                "value": 10000,
-                "type": "Int",
-                "nullable": false
+                "kind": "binary",
+                "operator": "in",
+                "left": {
+                  "kind": "enumLiteral",
+                  "enumId": "enum:Role",
+                  "member": "MANAGER",
+                  "type": "enum:Role",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "fieldAccess",
+                  "source": "parameter:approveRequest.actor",
+                  "parameter": "actor",
+                  "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                  "fieldName": "roles",
+                  "type": "set:enum:Role",
+                  "nullable": false
+                },
+                "type": "Boolean",
+                "nullable": false,
+                "comparisonSemantics": "setMembership"
               },
               "type": "Boolean",
               "nullable": false
             },
             "right": {
               "kind": "binary",
-              "operator": "in",
+              "operator": "and",
               "left": {
-                "kind": "enumLiteral",
-                "enumId": "enum:Role",
-                "member": "FINANCE",
-                "type": "enum:Role",
+                "kind": "binary",
+                "operator": ">",
+                "left": {
+                  "kind": "fieldAccess",
+                  "source": "parameter:approveRequest.request",
+                  "parameter": "request",
+                  "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                  "fieldName": "amount",
+                  "type": "Decimal",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "literal",
+                  "value": 10000,
+                  "type": "Int",
+                  "nullable": false
+                },
+                "type": "Boolean",
                 "nullable": false
               },
               "right": {
-                "kind": "fieldAccess",
-                "source": "parameter:approveRequest.actor",
-                "parameter": "actor",
-                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
-                "fieldName": "roles",
-                "type": "set:enum:Role",
-                "nullable": false
+                "kind": "binary",
+                "operator": "in",
+                "left": {
+                  "kind": "enumLiteral",
+                  "enumId": "enum:Role",
+                  "member": "FINANCE",
+                  "type": "enum:Role",
+                  "nullable": false
+                },
+                "right": {
+                  "kind": "fieldAccess",
+                  "source": "parameter:approveRequest.actor",
+                  "parameter": "actor",
+                  "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                  "fieldName": "roles",
+                  "type": "set:enum:Role",
+                  "nullable": false
+                },
+                "type": "Boolean",
+                "nullable": false,
+                "comparisonSemantics": "setMembership"
               },
               "type": "Boolean",
-              "nullable": false,
-              "comparisonSemantics": "setMembership"
+              "nullable": false
             },
             "type": "Boolean",
             "nullable": false
@@ -1016,13 +1313,13 @@
           "type": "Boolean",
           "nullable": false
         },
-        "sourceExpression": "(((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles)))",
+        "sourceExpression": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 80,
-          "column": 6,
-          "endLine": 82,
-          "endColumn": 60
+          "line": 96,
+          "column": 5,
+          "endLine": 101,
+          "endColumn": 62
         }
       },
       "preconditions": [
@@ -1054,9 +1351,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 84,
+            "line": 104,
             "column": 3,
-            "endLine": 84,
+            "endLine": 104,
             "endColumn": 67
           }
         }
@@ -1124,9 +1421,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 91,
         "column": 1,
-        "endLine": 91,
+        "endLine": 111,
         "endColumn": 2
       },
       "naming": {
@@ -1148,9 +1445,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 94,
+            "line": 114,
             "column": 3,
-            "endLine": 94,
+            "endLine": 114,
             "endColumn": 21
           },
           "naming": {
@@ -1175,9 +1472,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 96,
+          "line": 116,
           "column": 13,
-          "endLine": 96,
+          "endLine": 116,
           "endColumn": 17
         }
       },
@@ -1211,9 +1508,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 97,
+          "line": 117,
           "column": 9,
-          "endLine": 97,
+          "endLine": 117,
           "endColumn": 35
         }
       },
@@ -1225,9 +1522,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       },
       "naming": {
@@ -1539,6 +1836,34 @@
       }
     },
     {
+      "id": "invariant:PurchaseRequest.approval_authority_matches_amount",
+      "purpose": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approval_authority_matches_amount",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 42,
+        "column": 3,
+        "endLine": 49,
+        "endColumn": 7
+      }
+    },
+    {
+      "id": "invariant:PurchaseRequest.approver_differs_from_requester",
+      "purpose": "((status != RequestStatus.APPROVED) or (approvedBy != requester))",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "ck_purchase_request_approver_differs_from_requester",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 51,
+        "column": 3,
+        "endLine": 53,
+        "endColumn": 32
+      }
+    },
+    {
       "id": "boundary:PurchaseRequest.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
@@ -1548,7 +1873,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 41,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -1562,7 +1887,7 @@
         "file": "examples/procurement.model",
         "line": 21,
         "column": 1,
-        "endLine": 41,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -1574,9 +1899,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 46,
+        "line": 59,
         "column": 3,
-        "endLine": 46,
+        "endLine": 59,
         "endColumn": 21
       }
     },
@@ -1589,16 +1914,16 @@
     },
     {
       "id": "authorize:openRequest",
-      "purpose": "(Role.EMPLOYEE in actor.roles)",
+      "purpose": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 50,
-        "column": 13,
-        "endLine": 50,
-        "endColumn": 41
+        "line": 64,
+        "column": 5,
+        "endLine": 66,
+        "endColumn": 35
       }
     },
     {
@@ -1609,9 +1934,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 51,
+        "line": 67,
         "column": 3,
-        "endLine": 51,
+        "endLine": 67,
         "endColumn": 39
       }
     },
@@ -1623,9 +1948,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 45,
+        "line": 58,
         "column": 1,
-        "endLine": 61,
+        "endLine": 77,
         "endColumn": 2
       }
     },
@@ -1644,9 +1969,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 64,
+        "line": 80,
         "column": 3,
-        "endLine": 64,
+        "endLine": 80,
         "endColumn": 21
       }
     },
@@ -1665,9 +1990,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 67,
+        "line": 83,
         "column": 13,
-        "endLine": 67,
+        "endLine": 83,
         "endColumn": 39
       }
     },
@@ -1679,9 +2004,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 68,
+        "line": 84,
         "column": 3,
-        "endLine": 68,
+        "endLine": 84,
         "endColumn": 59
       }
     },
@@ -1693,9 +2018,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 63,
+        "line": 79,
         "column": 1,
-        "endLine": 73,
+        "endLine": 89,
         "endColumn": 2
       }
     },
@@ -1721,9 +2046,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 76,
+        "line": 92,
         "column": 3,
-        "endLine": 76,
+        "endLine": 92,
         "endColumn": 21
       }
     },
@@ -1736,16 +2061,16 @@
     },
     {
       "id": "authorize:approveRequest",
-      "purpose": "(((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles)))",
+      "purpose": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 80,
-        "column": 6,
-        "endLine": 82,
-        "endColumn": 60
+        "line": 96,
+        "column": 5,
+        "endLine": 101,
+        "endColumn": 62
       }
     },
     {
@@ -1756,9 +2081,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 84,
+        "line": 104,
         "column": 3,
-        "endLine": 84,
+        "endLine": 104,
         "endColumn": 67
       }
     },
@@ -1770,9 +2095,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 91,
         "column": 1,
-        "endLine": 91,
+        "endLine": 111,
         "endColumn": 2
       }
     },
@@ -1798,9 +2123,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 94,
+        "line": 114,
         "column": 3,
-        "endLine": 94,
+        "endLine": 114,
         "endColumn": 21
       }
     },
@@ -1819,9 +2144,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 116,
         "column": 13,
-        "endLine": 96,
+        "endLine": 116,
         "endColumn": 17
       }
     },
@@ -1833,9 +2158,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 97,
+        "line": 117,
         "column": 9,
-        "endLine": 97,
+        "endLine": 117,
         "endColumn": 35
       }
     },
@@ -1847,9 +2172,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },
@@ -1861,9 +2186,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },
@@ -1875,9 +2200,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 113,
         "column": 1,
-        "endLine": 100,
+        "endLine": 120,
         "endColumn": 2
       }
     },

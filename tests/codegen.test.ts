@@ -122,7 +122,13 @@ describe("backends", () => {
     expect(schema).toContain('"roles" <@ ARRAY[\'EMPLOYEE\', \'MANAGER\', \'FINANCE\']::text[]');
     expect(schema).toContain('array_position("roles", NULL::text) IS NULL');
     expect(schema).toContain("array_positions(\"roles\", 'MANAGER')");
+    expect(schema).toContain('CONSTRAINT "ck_purchase_request_approval_authority_matches_amount"');
+    expect(schema).toContain("'MANAGER' = ANY(\"approved_by_roles\")");
+    expect(schema).toContain('CONSTRAINT "ck_purchase_request_approver_differs_from_requester"');
     expect(actions).toContain("'EMPLOYEE' = ANY(v_actor.\"roles\")");
+    expect(actions).toContain("'MANAGER' = ANY(v_actor.\"roles\")");
+    expect(actions).toContain("'FINANCE' = ANY(v_actor.\"roles\")");
+    expect(actions).toContain('v_actor."id" <> v_request."requester_id"');
     expect(actions).toContain('"approved_by_roles" = v_actor."roles"');
     expect(output["typescript/types.ts"]).toContain("roles: Role[];");
     expect(output["typescript/types.ts"]).toContain("approvedByRoles: Role[] | null;");
@@ -134,6 +140,8 @@ describe("backends", () => {
     for (const expected of [
       "boundary:principal_binding",
       "invariant:PurchaseRequest.approval_fields_match_status",
+      "invariant:PurchaseRequest.approval_authority_matches_amount",
+      "invariant:PurchaseRequest.approver_differs_from_requester",
       "snapshot:PurchaseRequest.approvedByRoles",
       "authorize:approveRequest",
       "require:approveRequest.is_submitted",

@@ -99,6 +99,34 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest)).toBe(true);
   });
 
+  it("prevents self-approval for every approval tier", async () => {
+    const managerRequest = randomUUID();
+    await clients.manager.openRequest({ id: managerRequest, amount: "5000" });
+    await clients.manager.submitRequest({ request: managerRequest });
+    await expect(clients.manager.approveRequest({ request: managerRequest })).rejects.toBeInstanceOf(AuthorizationError);
+
+    const financeRequest = randomUUID();
+    await clients.finance.openRequest({ id: financeRequest, amount: "25000" });
+    await clients.finance.submitRequest({ request: financeRequest });
+    await expect(clients.finance.approveRequest({ request: financeRequest })).rejects.toBeInstanceOf(AuthorizationError);
+  });
+
+  it("allows each business role to open requests without seed-data role implication", async () => {
+    try {
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['FINANCE']::text[] WHERE id = '00000000-0000-4000-8000-000000000004'");
+      await expect(clients.manager.openRequest({ id: randomUUID(), amount: "10" })).resolves.toMatchObject({
+        requester: "00000000-0000-4000-8000-000000000003",
+      });
+      await expect(clients.finance.openRequest({ id: randomUUID(), amount: "10" })).resolves.toMatchObject({
+        requester: "00000000-0000-4000-8000-000000000004",
+      });
+    } finally {
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE', 'MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
+      await admin.query("UPDATE model_procurement.user SET roles = ARRAY['EMPLOYEE', 'FINANCE']::text[] WHERE id = '00000000-0000-4000-8000-000000000004'");
+    }
+  });
+
   it("returns only the authenticated caller's requests through the generated read boundary", async () => {
     const employeeOneId = randomUUID();
     const employeeTwoId = randomUUID();
@@ -160,25 +188,45 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(role.rows[0]).toEqual({ rolcanlogin: false, member: false });
   });
 
-  it("uses the bidirectional approval invariant as a final backstop and audits successes", async () => {
+  it("uses approval invariants as final backstops and audits successes", async () => {
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
        (id, requester_id, amount, status, approved_by_id, approved_by_roles)
        VALUES ($1, '00000000-0000-4000-8000-000000000001', 0, 'DRAFT', NULL, NULL)`,
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_amount_min_exclusive" });
+    // Both approval backstops reject this row; PostgreSQL does not promise
+    // which violated CHECK constraint it reports first.
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
        (id, requester_id, amount, status, approved_by_id, approved_by_roles)
        VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'APPROVED', NULL, NULL)`,
       [randomUUID()],
-    )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_fields_match_status" });
+    )).rejects.toMatchObject({ code: "23514" });
     await expect(admin.query(
       `INSERT INTO model_procurement.purchase_request
        (id, requester_id, amount, status, approved_by_id, approved_by_roles)
        VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'DRAFT', '00000000-0000-4000-8000-000000000003', ARRAY['EMPLOYEE', 'MANAGER']::text[])`,
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_fields_match_status" });
+    await expect(admin.query(
+      `INSERT INTO model_procurement.purchase_request
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
+       VALUES ($1, '00000000-0000-4000-8000-000000000001', 5, 'APPROVED', '00000000-0000-4000-8000-000000000004', ARRAY['EMPLOYEE', 'FINANCE']::text[])`,
+      [randomUUID()],
+    )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_authority_matches_amount" });
+    await expect(admin.query(
+      `INSERT INTO model_procurement.purchase_request
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
+       VALUES ($1, '00000000-0000-4000-8000-000000000001', 25000, 'APPROVED', '00000000-0000-4000-8000-000000000003', ARRAY['EMPLOYEE', 'MANAGER']::text[])`,
+      [randomUUID()],
+    )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approval_authority_matches_amount" });
+    await expect(admin.query(
+      `INSERT INTO model_procurement.purchase_request
+       (id, requester_id, amount, status, approved_by_id, approved_by_roles)
+       VALUES ($1, '00000000-0000-4000-8000-000000000003', 5, 'APPROVED', '00000000-0000-4000-8000-000000000003', ARRAY['MANAGER']::text[])`,
+      [randomUUID()],
+    )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approver_differs_from_requester" });
 
     const id = randomUUID();
     await clients.employeeOne.openRequest({ id, amount: "3" });

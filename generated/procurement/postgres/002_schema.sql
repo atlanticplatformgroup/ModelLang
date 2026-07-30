@@ -1,4 +1,4 @@
--- source sha256:ad8de99d704f929bed89e7e29107bf61412f48faf514104286b917b1e55a1415
+-- source sha256:5a914b9f68c691c6c5c090460a7840f2d2833cb719408e8b2435ed1aeea2d6e2
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -22,7 +22,9 @@ CREATE TABLE "model_procurement"."purchase_request" (
   CONSTRAINT "ck_purchase_request_amount_min_exclusive" CHECK (("amount" > 0) IS TRUE),
   CONSTRAINT "ck_purchase_request_status_enum" CHECK (("status" IN ('DRAFT', 'SUBMITTED', 'APPROVED')) IS TRUE),
   CONSTRAINT "ck_purchase_request_approved_by_roles_enum_set" CHECK (("approved_by_roles" IS NULL OR ("approved_by_roles" <@ ARRAY['EMPLOYEE', 'MANAGER', 'FINANCE']::text[] AND pg_catalog.array_position("approved_by_roles", NULL::text) IS NULL AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'EMPLOYEE')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'MANAGER')) <= 1 AND pg_catalog.cardinality(pg_catalog.array_positions("approved_by_roles", 'FINANCE')) <= 1)) IS TRUE),
-  CONSTRAINT "ck_purchase_request_approval_fields_match_status" CHECK (((((("status" = 'APPROVED') AND ("approved_by_id" IS NOT NULL)) AND ("approved_by_roles" IS NOT NULL)) OR ((("status" <> 'APPROVED') AND ("approved_by_id" IS NULL)) AND ("approved_by_roles" IS NULL)))) IS TRUE)
+  CONSTRAINT "ck_purchase_request_approval_fields_match_status" CHECK (((((("status" = 'APPROVED') AND ("approved_by_id" IS NOT NULL)) AND ("approved_by_roles" IS NOT NULL)) OR ((("status" <> 'APPROVED') AND ("approved_by_id" IS NULL)) AND ("approved_by_roles" IS NULL)))) IS TRUE),
+  CONSTRAINT "ck_purchase_request_approval_authority_matches_amount" CHECK (((("status" <> 'APPROVED') OR ((("amount" <= 10000) AND ('MANAGER' = ANY("approved_by_roles"))) OR (("amount" > 10000) AND ('FINANCE' = ANY("approved_by_roles")))))) IS TRUE),
+  CONSTRAINT "ck_purchase_request_approver_differs_from_requester" CHECK (((("status" <> 'APPROVED') OR ("approved_by_id" <> "requester_id"))) IS TRUE)
 );
 
 ALTER TABLE "model_procurement"."purchase_request"

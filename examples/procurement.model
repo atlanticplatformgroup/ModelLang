@@ -1,4 +1,4 @@
-model Procurement version "0.5.0";
+model Procurement version "0.5.1";
 
 enum Role {
   EMPLOYEE,
@@ -38,16 +38,32 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
       and approvedBy == null
       and approvedByRoles == null
     );
+
+  invariant approval_authority_matches_amount:
+    status != RequestStatus.APPROVED
+    or
+    (
+      (amount <= 10000 and Role.MANAGER in approvedByRoles)
+      or
+      (amount > 10000 and Role.FINANCE in approvedByRoles)
+    );
+
+  invariant approver_differs_from_requester:
+    status != RequestStatus.APPROVED
+    or approvedBy != requester;
 }
 
-// Roles are a set. Managers and finance users are also employees in the seed data,
-// so they may open requests and exercise their additional approval authority.
+// Opening a request is an explicit capability of every declared business role.
+// It does not depend on managers or finance users also carrying EMPLOYEE in seed data.
 action openRequest(
   caller actor: User,
   id: UUID,
   amount: Decimal
 ) -> PurchaseRequest {
-  authorize Role.EMPLOYEE in actor.roles;
+  authorize
+    Role.EMPLOYEE in actor.roles
+    or Role.MANAGER in actor.roles
+    or Role.FINANCE in actor.roles;
   require positive_amount: amount > 0;
 
   create PurchaseRequest {
@@ -77,9 +93,13 @@ action approveRequest(
   request: PurchaseRequest
 ) -> PurchaseRequest {
   authorize
-    (request.amount <= 10000 and Role.MANAGER in actor.roles)
-    or
-    (request.amount > 10000 and Role.FINANCE in actor.roles);
+    actor != request.requester
+    and
+    (
+      (request.amount <= 10000 and Role.MANAGER in actor.roles)
+      or
+      (request.amount > 10000 and Role.FINANCE in actor.roles)
+    );
 
   require is_submitted: request.status == RequestStatus.SUBMITTED;
 

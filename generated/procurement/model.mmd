@@ -7,6 +7,8 @@ flowchart LR
   entity_ent_9bc680209327484c8e98f5f740bcc702 -->|requester| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   entity_ent_9bc680209327484c8e98f5f740bcc702 -->|approvedBy| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   invariant_PurchaseRequest_approval_fields_match_status["Invariant: approval_fields_match_status"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
+  invariant_PurchaseRequest_approval_authority_matches_amount["Invariant: approval_authority_matches_amount"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
+  invariant_PurchaseRequest_approver_differs_from_requester["Invariant: approver_differs_from_requester"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_openRequest["Action: openRequest"]
   principal -->|authenticated caller| action_openRequest
   action_openRequest -->|creates| entity_ent_9bc680209327484c8e98f5f740bcc702
