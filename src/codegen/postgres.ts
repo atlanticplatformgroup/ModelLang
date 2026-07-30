@@ -1,4 +1,4 @@
-import type { IRAction, IREntity, IRExpression, IRField, IRParameter, IRQuery, ModelIR } from "../ir.js";
+import type { IRAction, IREntity, IREnumMember, IRExpression, IRField, IRParameter, IRQuery, ModelIR } from "../ir.js";
 import { quoteIdent, snakeCase } from "../naming.js";
 
 export interface PostgresOutput {
@@ -28,6 +28,12 @@ function fieldById(ir: ModelIR, id: string): { entity: IREntity; field: IRField 
   throw new Error(`E4002 Unknown field ${id}`);
 }
 
+function enumMemberById(ir: ModelIR, enumId: string, memberId: string): IREnumMember {
+  const member = ir.enums.find((enumeration) => enumeration.id === enumId)?.members.find((candidate) => candidate.id === memberId);
+  if (!member) throw new Error(`E4009 Unknown enum member ${memberId}`);
+  return member;
+}
+
 function sqlType(type: string): string {
   if (type.startsWith("entity:")) return "uuid";
   if (type.startsWith("set:enum:")) return "text[]";
@@ -40,9 +46,12 @@ function sqlType(type: string): string {
   return result;
 }
 
-function sqlLiteral(expression: IRExpression): string {
+function sqlLiteral(expression: IRExpression, ir: ModelIR): string {
   if (expression.kind === "nullLiteral") return "NULL";
-  if (expression.kind === "enumLiteral") return `'${expression.member.replaceAll("'", "''")}'`;
+  if (expression.kind === "enumLiteral") {
+    const value = enumMemberById(ir, expression.enumId, expression.memberId).naming.sqlValue;
+    return `'${value.replaceAll("'", "''")}'`;
+  }
   if (expression.kind !== "literal") throw new Error("E4004 Default is not a literal.");
   if (typeof expression.value === "string") return `'${expression.value.replaceAll("'", "''")}'`;
   if (typeof expression.value === "boolean") return expression.value ? "TRUE" : "FALSE";
@@ -59,9 +68,9 @@ interface ExpressionContext {
 
 function lowerExpression(expression: IRExpression, context: ExpressionContext): string {
   switch (expression.kind) {
-    case "literal": return sqlLiteral(expression);
+    case "literal": return sqlLiteral(expression, context.ir);
     case "nullLiteral": return "NULL";
-    case "enumLiteral": return `'${expression.member.replaceAll("'", "''")}'`;
+    case "enumLiteral": return sqlLiteral(expression, context.ir);
     case "parameter": {
       const parameter = context.action?.parameters.find((candidate) => candidate.id === expression.parameterId)
         ?? context.query?.parameters.find((candidate) => candidate.id === expression.parameterId);
@@ -133,17 +142,17 @@ function generateSchema(ir: ModelIR): string {
     const columns = entity.fields.map((field) => {
       const pieces = [quoteIdent(field.naming.sqlColumn), sqlType(field.type)];
       if (!field.optional) pieces.push("NOT NULL");
-      if (field.default) pieces.push(`DEFAULT ${sqlLiteral(field.default)}`);
+      if (field.default) pieces.push(`DEFAULT ${sqlLiteral(field.default, ir)}`);
       if (field.annotations.some((annotation) => annotation.name === "id")) pieces.push("PRIMARY KEY");
       return `  ${pieces.join(" ")}`;
     });
     const constraints: string[] = [];
     for (const field of entity.fields) {
       if (field.type.startsWith("set:enum:")) {
-        const enumId = `enum:${field.type.slice("set:enum:".length)}`;
+        const enumId = field.type.slice("set:".length);
         const enumeration = ir.enums.find((candidate) => candidate.id === enumId)!;
         const column = quoteIdent(field.naming.sqlColumn);
-        const members = enumeration.members.map((member) => `'${member.replaceAll("'", "''")}'`);
+        const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`);
         const tests = [
           `${column} <@ ARRAY[${members.join(", ")}]::text[]`,
           `pg_catalog.array_position(${column}, NULL::text) IS NULL`,
@@ -154,7 +163,7 @@ function generateSchema(ir: ModelIR): string {
       }
       if (field.type.startsWith("enum:")) {
         const enumeration = ir.enums.find((candidate) => candidate.id === field.type)!;
-        const members = enumeration.members.map((member) => `'${member.replaceAll("'", "''")}'`).join(", ");
+        const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`).join(", ");
         const test = `${quoteIdent(field.naming.sqlColumn)} IN (${members})`;
         const optionalTest = field.optional ? `(${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test})` : test;
         constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`)} CHECK ((${optionalTest}) IS TRUE)`);

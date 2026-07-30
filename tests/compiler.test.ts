@@ -60,7 +60,7 @@ describe("semantic analysis", () => {
       update item { owner = actor; }
     }`));
     const action = ir.actions[0]!;
-    expect(action.callableParameters).toEqual(["parameter:act.item"]);
+    expect(action.callableParameters).toEqual(["parameter:action:act.item"]);
     expect(action.lockPlan).toEqual([
       expect.objectContaining({ entityId: "entity:Item", mode: "update", order: 0 }),
       expect.objectContaining({ entityId: "entity:User", mode: "share", order: 1 }),
@@ -94,7 +94,7 @@ describe("semantic analysis", () => {
       }`);
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "roleAtApproval"))
       .toMatchObject({ storage: "snapshot" });
-    expect(ir.enforcement.some((entry) => entry.id === "snapshot:Record.roleAtApproval")).toBe(true);
+    expect(ir.enforcement.some((entry) => entry.id === "snapshot:field:Record.roleAtApproval")).toBe(true);
   });
 
   it("is deterministic", () => {
@@ -140,7 +140,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(5);
+    expect(ir.irVersion).toBe(6);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -173,10 +173,10 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(5);
+    expect(ir.irVersion).toBe(6);
     expect(resolved).toMatchObject({
       id: "query:owned",
-      callerParameterId: "parameter:owned.actor",
+      callerParameterId: "parameter:query:owned.actor",
       callableParameters: [],
       sourceEntityId: "entity:Item",
       rowAlias: "item",
@@ -197,13 +197,13 @@ describe("ModelLang authenticated queries", () => {
     });
     expect(resolved.parameters[0]).toMatchObject({ caller: true, binding: "session_user" });
     for (const id of [
-      "caller:owned.actor",
-      "authorize:owned",
-      "where:owned",
-      "order:owned",
-      "limit:owned",
-      "read:owned",
-      "boundary:Item.direct_read",
+      "caller:query:owned.actor",
+      "authorize:query:owned",
+      "where:query:owned",
+      "order:query:owned",
+      "limit:query:owned",
+      "read:query:owned",
+      "boundary:entity:Item.direct_read",
     ]) expect(ir.enforcement.some((entry) => entry.id === id), id).toBe(true);
   });
 
@@ -277,7 +277,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(5);
+    expect(ir.irVersion).toBe(6);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -287,11 +287,11 @@ describe("ModelLang 0.4 enum sets", () => {
       operator: "in",
       comparisonSemantics: "setMembership",
       nullable: false,
-      left: { kind: "enumLiteral", enumId: "enum:Role", member: "MANAGER" },
+      left: { kind: "enumLiteral", enumId: "enum:Role", memberId: "enumMember:Role.MANAGER", memberName: "MANAGER" },
       right: { kind: "fieldAccess", fieldId: "field:User.roles", type: "set:enum:Role" },
     });
-    expect(ir.enforcement.some((entry) => entry.id === "enum-set:User.roles")).toBe(true);
-    expect(ir.enforcement.some((entry) => entry.id === "snapshot:Record.rolesAtWrite")).toBe(true);
+    expect(ir.enforcement.some((entry) => entry.id === "enum-set:field:User.roles")).toBe(true);
+    expect(ir.enforcement.some((entry) => entry.id === "snapshot:field:Record.rolesAtWrite")).toBe(true);
   });
 
   it("preserves nullable membership for fail-closed Boolean boundaries", () => {

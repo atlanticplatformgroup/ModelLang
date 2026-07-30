@@ -1,0 +1,15 @@
+enum_decl        = "enum", IDENT, [ stable_id ], "{",
+                   enum_member, { ",", enum_member }, [ "," ], "}" ;
+enum_member      = IDENT, [ stable_id ] ;
+entity_decl      = "entity", IDENT, [ stable_id ], "{",
+                   { field_decl | invariant_decl | exclusion_decl }, "}" ;
+invariant_decl   = "invariant", IDENT, [ stable_id ], ":", expression, ";" ;
+exclusion_decl   = "exclusion", IDENT, [ stable_id ], ":",
+                   "noOverlap", "(", IDENT, ",", IDENT, ",", IDENT, ")", ";" ;
+action_decl      = "action", IDENT, [ stable_id ], "(", parameter_list, ")",
+                   "->", type_ref, action_body ;
+query_decl       = "query", IDENT, [ stable_id ], "(", parameter_list, ")",
+                   "from", type_ref, "as", IDENT, query_body ;
+stable_id        = "@stableId", "(", STRING, ")" ;
+
+All productions not replaced above are inherited from the ModelLang 0.5 grammar.

@@ -39,7 +39,7 @@ describe("backends", () => {
     expect(schema).toContain("tstzrange(\"starts_at\", \"ends_at\", '[)')");
     expect(output["typescript/errors.ts"]).toContain('value?.code === "23P01"');
     expect(output["typescript/errors.ts"]).toContain("class ConflictError");
-    expect(output["enforcement.md"]).toContain("exclusion:Reservation.no_overlapping_reservations");
+    expect(output["enforcement.md"]).toContain("exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba");
     expect(output["model.mmd"]).toContain("Temporal exclusion: no_overlapping_reservations");
   });
 
@@ -130,28 +130,29 @@ describe("backends", () => {
     expect(actions).toContain("'FINANCE' = ANY(v_actor.\"roles\")");
     expect(actions).toContain('v_actor."id" <> v_request."requester_id"');
     expect(actions).toContain('"approved_by_roles" = v_actor."roles"');
+    expect(actions).toContain("'action:act_1e35db0451b1461e941af6283d86dca2'");
     expect(output["typescript/types.ts"]).toContain("roles: Role[];");
     expect(output["typescript/types.ts"]).toContain("approvedByRoles: Role[] | null;");
-    expect(output["enforcement.md"]).toContain("enum-set:User.roles");
+    expect(output["enforcement.md"]).toContain("enum-set:field:fld_b4b29a4d0d914ec0913e578da89e5dcb");
   });
 
   it("explains identity, locks, invariants, guards, effects, and privilege boundaries", async () => {
     const markdown = generateAll(await procurement())["enforcement.md"];
     for (const expected of [
       "boundary:principal_binding",
-      "invariant:PurchaseRequest.approval_fields_match_status",
-      "invariant:PurchaseRequest.approval_authority_matches_amount",
-      "invariant:PurchaseRequest.approver_differs_from_requester",
-      "snapshot:PurchaseRequest.approvedByRoles",
-      "authorize:approveRequest",
-      "require:approveRequest.is_submitted",
-      "lock:approveRequest.request",
-      "boundary:PurchaseRequest.direct_write",
-      "boundary:PurchaseRequest.direct_read",
-      "where:myRequests",
-      "order:myRequests",
-      "limit:myRequests",
-      "read:myRequests",
+      "invariant:inv_b70e8aa03e6d498f8b0bccf413636b19",
+      "invariant:inv_91184dc547c24978a48362a679eeb836",
+      "invariant:inv_f8c6cf86f9d64874ac4159766e522cb8",
+      "snapshot:field:fld_577b4c94c9cd4b469aded37614712fba",
+      "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+      "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted",
+      "lock:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+      "boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_write",
+      "boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_read",
+      "where:query:qry_4406b045404a48449282db804f6167a8",
+      "order:query:qry_4406b045404a48449282db804f6167a8",
+      "limit:query:qry_4406b045404a48449282db804f6167a8",
+      "read:query:qry_4406b045404a48449282db804f6167a8",
       "boundary:audit",
     ]) expect(markdown).toContain(expected);
   });

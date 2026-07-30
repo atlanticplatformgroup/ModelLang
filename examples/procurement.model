@@ -1,15 +1,15 @@
-model Procurement version "0.5.1";
+model Procurement version "0.6.0";
 
-enum Role {
-  EMPLOYEE,
-  MANAGER,
-  FINANCE
+enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
+  EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
+  MANAGER @stableId("emv_dd1ac9d5f2134b998a9d4fec76df5e3e"),
+  FINANCE @stableId("emv_be7e2d336369444cb7bd75c42668afa6")
 }
 
-enum RequestStatus {
-  DRAFT,
-  SUBMITTED,
-  APPROVED
+enum RequestStatus @stableId("enm_3e6bbbdf302d482080890af3aab0b40f") {
+  DRAFT @stableId("emv_5528c88aa0fb42c79a9a773de2d7d675"),
+  SUBMITTED @stableId("emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1"),
+  APPROVED @stableId("emv_8ad72d5d6c314e12864c247677e51b8d")
 }
 
 entity User @stableId("ent_66c16684f17e4b4ca79eb7d916cbf725") {
@@ -26,7 +26,7 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
   approvedBy: User? @stableId("fld_5da56f04460f4deba9ccda4f552c2b97");
   approvedByRoles: Set<Role>? @snapshot @stableId("fld_577b4c94c9cd4b469aded37614712fba");
 
-  invariant approval_fields_match_status:
+  invariant approval_fields_match_status @stableId("inv_b70e8aa03e6d498f8b0bccf413636b19"):
     (
       status == RequestStatus.APPROVED
       and approvedBy != null
@@ -39,7 +39,7 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
       and approvedByRoles == null
     );
 
-  invariant approval_authority_matches_amount:
+  invariant approval_authority_matches_amount @stableId("inv_91184dc547c24978a48362a679eeb836"):
     status != RequestStatus.APPROVED
     or
     (
@@ -48,14 +48,14 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
       (amount > 10000 and Role.FINANCE in approvedByRoles)
     );
 
-  invariant approver_differs_from_requester:
+  invariant approver_differs_from_requester @stableId("inv_f8c6cf86f9d64874ac4159766e522cb8"):
     status != RequestStatus.APPROVED
     or approvedBy != requester;
 }
 
 // Opening a request is an explicit capability of every declared business role.
 // It does not depend on managers or finance users also carrying EMPLOYEE in seed data.
-action openRequest(
+action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
   caller actor: User,
   id: UUID,
   amount: Decimal
@@ -76,7 +76,7 @@ action openRequest(
   }
 }
 
-action submitRequest(
+action submitRequest @stableId("act_ed2374e822704c51a2925338253d05d2")(
   caller actor: User,
   request: PurchaseRequest
 ) -> PurchaseRequest {
@@ -88,7 +88,7 @@ action submitRequest(
   }
 }
 
-action approveRequest(
+action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
   caller actor: User,
   request: PurchaseRequest
 ) -> PurchaseRequest {
@@ -110,7 +110,7 @@ action approveRequest(
   }
 }
 
-query myRequests(
+query myRequests @stableId("qry_4406b045404a48449282db804f6167a8")(
   caller actor: User
 ) from PurchaseRequest as request {
   authorize true;

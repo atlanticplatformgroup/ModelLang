@@ -49,11 +49,11 @@ BEGIN
   END IF;
 
   IF NOT ((TRUE) IS TRUE) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:reserve';
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_508ad810a19d4b79a5009871de5cd26b';
   END IF;
 
   IF NOT ((("p_starts_at" < "p_ends_at")) IS TRUE) THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:reserve.valid_interval';
+    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval';
   END IF;
 
   INSERT INTO "model_reservations"."reservation" ("id", "resource_id", "reserved_by_id", "starts_at", "ends_at")
@@ -61,7 +61,7 @@ BEGIN
   RETURNING * INTO v_result;
 
   INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
-  VALUES ('action:reserve', session_user, v_principal_id, v_result."id");
+  VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id");
 
   RETURN jsonb_build_object('id', v_result."id", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at");
 END

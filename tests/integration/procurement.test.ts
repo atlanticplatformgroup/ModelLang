@@ -233,7 +233,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const audit = await admin.query<{ database_principal: string; principal_id: string; count: string }>(
       `SELECT database_principal, principal_id, count(*)::text AS count
        FROM model_procurement_internal.action_audit
-       WHERE action_id = 'action:openRequest' AND target_id = $1
+       WHERE action_id = 'action:act_1e35db0451b1461e941af6283d86dca2' AND target_id = $1
        GROUP BY database_principal, principal_id`,
       [id],
     );
@@ -343,7 +343,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       expect(rejection.reason).toBeInstanceOf(PreconditionError);
       const audit = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
-         WHERE action_id = 'action:approveRequest' AND target_id = $1`,
+         WHERE action_id = 'action:act_d39dbb883b5f4019b9027b85add3de47' AND target_id = $1`,
         [request],
       );
       expect(audit.rows[0]!.count).toBe("1");

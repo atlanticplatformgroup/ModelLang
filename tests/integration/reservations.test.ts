@@ -159,7 +159,7 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       const audits = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count
          FROM model_reservations_internal.action_audit
-         WHERE action_id = 'action:reserve' AND target_id = ANY($1::uuid[])`,
+         WHERE action_id = 'action:act_508ad810a19d4b79a5009871de5cd26b' AND target_id = ANY($1::uuid[])`,
         [[firstId, secondId]],
       );
       expect(audits.rows[0]!.count).toBe("1");

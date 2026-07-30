@@ -1,10 +1,10 @@
 {
-  "irVersion": 5,
+  "irVersion": 6,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.5.1",
-    "sourceHash": "sha256:5a914b9f68c691c6c5c090460a7840f2d2833cb719408e8b2435ed1aeea2d6e2",
+    "version": "0.6.0",
+    "sourceHash": "sha256:0a86386f750a4d27a3b7b884e26add72a57f8414cbd2f7b21c6591c0da38fda0",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -17,12 +17,70 @@
   },
   "enums": [
     {
-      "id": "enum:Role",
+      "id": "enum:enm_025acdd67483499fbd780d0e19867e9b",
       "name": "Role",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "enm_025acdd67483499fbd780d0e19867e9b"
+      },
       "members": [
-        "EMPLOYEE",
-        "MANAGER",
-        "FINANCE"
+        {
+          "id": "enumMember:emv_409f87bd5a4340d79e21d4d982175494",
+          "name": "EMPLOYEE",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_409f87bd5a4340d79e21d4d982175494"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 4,
+            "column": 3,
+            "endLine": 4,
+            "endColumn": 61
+          },
+          "naming": {
+            "sqlValue": "EMPLOYEE",
+            "typescriptValue": "EMPLOYEE"
+          }
+        },
+        {
+          "id": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+          "name": "MANAGER",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_dd1ac9d5f2134b998a9d4fec76df5e3e"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 5,
+            "column": 3,
+            "endLine": 5,
+            "endColumn": 60
+          },
+          "naming": {
+            "sqlValue": "MANAGER",
+            "typescriptValue": "MANAGER"
+          }
+        },
+        {
+          "id": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+          "name": "FINANCE",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_be7e2d336369444cb7bd75c42668afa6"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 6,
+            "column": 3,
+            "endLine": 6,
+            "endColumn": 60
+          },
+          "naming": {
+            "sqlValue": "FINANCE",
+            "typescriptValue": "FINANCE"
+          }
+        }
       ],
       "span": {
         "file": "examples/procurement.model",
@@ -37,12 +95,70 @@
       }
     },
     {
-      "id": "enum:RequestStatus",
+      "id": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
       "name": "RequestStatus",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "enm_3e6bbbdf302d482080890af3aab0b40f"
+      },
       "members": [
-        "DRAFT",
-        "SUBMITTED",
-        "APPROVED"
+        {
+          "id": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+          "name": "DRAFT",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_5528c88aa0fb42c79a9a773de2d7d675"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 10,
+            "column": 3,
+            "endLine": 10,
+            "endColumn": 58
+          },
+          "naming": {
+            "sqlValue": "DRAFT",
+            "typescriptValue": "DRAFT"
+          }
+        },
+        {
+          "id": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+          "name": "SUBMITTED",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 11,
+            "column": 3,
+            "endLine": 11,
+            "endColumn": 62
+          },
+          "naming": {
+            "sqlValue": "SUBMITTED",
+            "typescriptValue": "SUBMITTED"
+          }
+        },
+        {
+          "id": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+          "name": "APPROVED",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "emv_8ad72d5d6c314e12864c247677e51b8d"
+          },
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 12,
+            "column": 3,
+            "endLine": 12,
+            "endColumn": 61
+          },
+          "naming": {
+            "sqlValue": "APPROVED",
+            "typescriptValue": "APPROVED"
+          }
+        }
       ],
       "span": {
         "file": "examples/procurement.model",
@@ -121,7 +237,7 @@
             "strategy": "explicitStableId",
             "stableId": "fld_b4b29a4d0d914ec0913e578da89e5dcb"
           },
-          "type": "set:enum:Role",
+          "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
           "optional": false,
           "annotations": [],
           "storage": "ordinary",
@@ -242,13 +358,14 @@
             "strategy": "explicitStableId",
             "stableId": "fld_afb1dee14dfa48c98961fdb40e2b0be2"
           },
-          "type": "enum:RequestStatus",
+          "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
           "optional": false,
           "default": {
             "kind": "enumLiteral",
-            "enumId": "enum:RequestStatus",
-            "member": "DRAFT",
-            "type": "enum:RequestStatus",
+            "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+            "memberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+            "memberName": "DRAFT",
+            "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
             "nullable": false
           },
           "annotations": [],
@@ -293,7 +410,7 @@
             "strategy": "explicitStableId",
             "stableId": "fld_577b4c94c9cd4b469aded37614712fba"
           },
-          "type": "set:enum:Role",
+          "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
           "optional": true,
           "annotations": [
             {
@@ -315,8 +432,12 @@
       ],
       "invariants": [
         {
-          "id": "invariant:PurchaseRequest.approval_fields_match_status",
+          "id": "invariant:inv_b70e8aa03e6d498f8b0bccf413636b19",
           "name": "approval_fields_match_status",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "inv_b70e8aa03e6d498f8b0bccf413636b19"
+          },
           "expression": {
             "kind": "binary",
             "operator": "or",
@@ -334,14 +455,15 @@
                     "source": "self",
                     "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                     "fieldName": "status",
-                    "type": "enum:RequestStatus",
+                    "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                     "nullable": false
                   },
                   "right": {
                     "kind": "enumLiteral",
-                    "enumId": "enum:RequestStatus",
-                    "member": "APPROVED",
-                    "type": "enum:RequestStatus",
+                    "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+                    "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+                    "memberName": "APPROVED",
+                    "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                     "nullable": false
                   },
                   "type": "Boolean",
@@ -372,7 +494,7 @@
                   "source": "self",
                   "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                   "fieldName": "approvedByRoles",
-                  "type": "set:enum:Role",
+                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": true
                 },
                 "type": "Boolean",
@@ -395,14 +517,15 @@
                     "source": "self",
                     "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                     "fieldName": "status",
-                    "type": "enum:RequestStatus",
+                    "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                     "nullable": false
                   },
                   "right": {
                     "kind": "enumLiteral",
-                    "enumId": "enum:RequestStatus",
-                    "member": "APPROVED",
-                    "type": "enum:RequestStatus",
+                    "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+                    "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+                    "memberName": "APPROVED",
+                    "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                     "nullable": false
                   },
                   "type": "Boolean",
@@ -433,7 +556,7 @@
                   "source": "self",
                   "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                   "fieldName": "approvedByRoles",
-                  "type": "set:enum:Role",
+                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": true
                 },
                 "type": "Boolean",
@@ -458,8 +581,12 @@
           }
         },
         {
-          "id": "invariant:PurchaseRequest.approval_authority_matches_amount",
+          "id": "invariant:inv_91184dc547c24978a48362a679eeb836",
           "name": "approval_authority_matches_amount",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "inv_91184dc547c24978a48362a679eeb836"
+          },
           "expression": {
             "kind": "binary",
             "operator": "or",
@@ -471,14 +598,15 @@
                 "source": "self",
                 "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                 "fieldName": "status",
-                "type": "enum:RequestStatus",
+                "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                 "nullable": false
               },
               "right": {
                 "kind": "enumLiteral",
-                "enumId": "enum:RequestStatus",
-                "member": "APPROVED",
-                "type": "enum:RequestStatus",
+                "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+                "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+                "memberName": "APPROVED",
+                "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                 "nullable": false
               },
               "type": "Boolean",
@@ -515,9 +643,10 @@
                   "operator": "in",
                   "left": {
                     "kind": "enumLiteral",
-                    "enumId": "enum:Role",
-                    "member": "MANAGER",
-                    "type": "enum:Role",
+                    "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                    "memberId": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+                    "memberName": "MANAGER",
+                    "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                     "nullable": false
                   },
                   "right": {
@@ -525,7 +654,7 @@
                     "source": "self",
                     "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                     "fieldName": "approvedByRoles",
-                    "type": "set:enum:Role",
+                    "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                     "nullable": true
                   },
                   "type": "Boolean",
@@ -563,9 +692,10 @@
                   "operator": "in",
                   "left": {
                     "kind": "enumLiteral",
-                    "enumId": "enum:Role",
-                    "member": "FINANCE",
-                    "type": "enum:Role",
+                    "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                    "memberId": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+                    "memberName": "FINANCE",
+                    "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                     "nullable": false
                   },
                   "right": {
@@ -573,7 +703,7 @@
                     "source": "self",
                     "fieldId": "field:fld_577b4c94c9cd4b469aded37614712fba",
                     "fieldName": "approvedByRoles",
-                    "type": "set:enum:Role",
+                    "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                     "nullable": true
                   },
                   "type": "Boolean",
@@ -602,8 +732,12 @@
           }
         },
         {
-          "id": "invariant:PurchaseRequest.approver_differs_from_requester",
+          "id": "invariant:inv_f8c6cf86f9d64874ac4159766e522cb8",
           "name": "approver_differs_from_requester",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "inv_f8c6cf86f9d64874ac4159766e522cb8"
+          },
           "expression": {
             "kind": "binary",
             "operator": "or",
@@ -615,14 +749,15 @@
                 "source": "self",
                 "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
                 "fieldName": "status",
-                "type": "enum:RequestStatus",
+                "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                 "nullable": false
               },
               "right": {
                 "kind": "enumLiteral",
-                "enumId": "enum:RequestStatus",
-                "member": "APPROVED",
-                "type": "enum:RequestStatus",
+                "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+                "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+                "memberName": "APPROVED",
+                "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
                 "nullable": false
               },
               "type": "Boolean",
@@ -684,11 +819,15 @@
   ],
   "actions": [
     {
-      "id": "action:openRequest",
+      "id": "action:act_1e35db0451b1461e941af6283d86dca2",
       "name": "openRequest",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "act_1e35db0451b1461e941af6283d86dca2"
+      },
       "parameters": [
         {
-          "id": "parameter:openRequest.actor",
+          "id": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
           "name": "actor",
           "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
@@ -706,7 +845,7 @@
           }
         },
         {
-          "id": "parameter:openRequest.id",
+          "id": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
           "name": "id",
           "type": "UUID",
           "caller": false,
@@ -723,7 +862,7 @@
           }
         },
         {
-          "id": "parameter:openRequest.amount",
+          "id": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
           "name": "amount",
           "type": "Decimal",
           "caller": false,
@@ -740,14 +879,14 @@
           }
         }
       ],
-      "callerParameterId": "parameter:openRequest.actor",
+      "callerParameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
       "callableParameters": [
-        "parameter:openRequest.id",
-        "parameter:openRequest.amount"
+        "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
+        "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount"
       ],
       "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
-        "id": "authorize:openRequest",
+        "id": "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
         "name": "authorize",
         "expression": {
           "kind": "binary",
@@ -760,18 +899,19 @@
               "operator": "in",
               "left": {
                 "kind": "enumLiteral",
-                "enumId": "enum:Role",
-                "member": "EMPLOYEE",
-                "type": "enum:Role",
+                "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "memberId": "enumMember:emv_409f87bd5a4340d79e21d4d982175494",
+                "memberName": "EMPLOYEE",
+                "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                 "nullable": false
               },
               "right": {
                 "kind": "fieldAccess",
-                "source": "parameter:openRequest.actor",
+                "source": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
                 "parameter": "actor",
                 "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                 "fieldName": "roles",
-                "type": "set:enum:Role",
+                "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                 "nullable": false
               },
               "type": "Boolean",
@@ -783,18 +923,19 @@
               "operator": "in",
               "left": {
                 "kind": "enumLiteral",
-                "enumId": "enum:Role",
-                "member": "MANAGER",
-                "type": "enum:Role",
+                "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "memberId": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+                "memberName": "MANAGER",
+                "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                 "nullable": false
               },
               "right": {
                 "kind": "fieldAccess",
-                "source": "parameter:openRequest.actor",
+                "source": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
                 "parameter": "actor",
                 "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                 "fieldName": "roles",
-                "type": "set:enum:Role",
+                "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                 "nullable": false
               },
               "type": "Boolean",
@@ -809,18 +950,19 @@
             "operator": "in",
             "left": {
               "kind": "enumLiteral",
-              "enumId": "enum:Role",
-              "member": "FINANCE",
-              "type": "enum:Role",
+              "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+              "memberId": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+              "memberName": "FINANCE",
+              "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
               "nullable": false
             },
             "right": {
               "kind": "fieldAccess",
-              "source": "parameter:openRequest.actor",
+              "source": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
               "parameter": "actor",
               "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
               "fieldName": "roles",
-              "type": "set:enum:Role",
+              "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
               "nullable": false
             },
             "type": "Boolean",
@@ -841,14 +983,14 @@
       },
       "preconditions": [
         {
-          "id": "require:openRequest.positive_amount",
+          "id": "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount",
           "name": "positive_amount",
           "expression": {
             "kind": "binary",
             "operator": ">",
             "left": {
               "kind": "parameter",
-              "parameterId": "parameter:openRequest.amount",
+              "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
               "name": "amount",
               "type": "Decimal",
               "nullable": false
@@ -882,7 +1024,7 @@
             "fieldName": "id",
             "expression": {
               "kind": "parameter",
-              "parameterId": "parameter:openRequest.id",
+              "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.id",
               "name": "id",
               "type": "UUID",
               "nullable": false
@@ -893,7 +1035,7 @@
             "fieldName": "requester",
             "expression": {
               "kind": "entityValue",
-              "parameterId": "parameter:openRequest.actor",
+              "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
               "name": "actor",
               "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
@@ -905,7 +1047,7 @@
             "fieldName": "amount",
             "expression": {
               "kind": "parameter",
-              "parameterId": "parameter:openRequest.amount",
+              "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
               "name": "amount",
               "type": "Decimal",
               "nullable": false
@@ -916,9 +1058,10 @@
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
-              "enumId": "enum:RequestStatus",
-              "member": "DRAFT",
-              "type": "enum:RequestStatus",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+              "memberName": "DRAFT",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             }
           },
@@ -944,9 +1087,9 @@
       },
       "lockPlan": [
         {
-          "id": "lock:openRequest.actor",
+          "id": "lock:action:act_1e35db0451b1461e941af6283d86dca2.actor",
           "source": "caller",
-          "parameterId": "parameter:openRequest.actor",
+          "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
           "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
           "order": 0
@@ -965,11 +1108,15 @@
       }
     },
     {
-      "id": "action:submitRequest",
+      "id": "action:act_ed2374e822704c51a2925338253d05d2",
       "name": "submitRequest",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "act_ed2374e822704c51a2925338253d05d2"
+      },
       "parameters": [
         {
-          "id": "parameter:submitRequest.actor",
+          "id": "parameter:action:act_ed2374e822704c51a2925338253d05d2.actor",
           "name": "actor",
           "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
@@ -987,7 +1134,7 @@
           }
         },
         {
-          "id": "parameter:submitRequest.request",
+          "id": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
           "name": "request",
           "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "caller": false,
@@ -1004,20 +1151,20 @@
           }
         }
       ],
-      "callerParameterId": "parameter:submitRequest.actor",
+      "callerParameterId": "parameter:action:act_ed2374e822704c51a2925338253d05d2.actor",
       "callableParameters": [
-        "parameter:submitRequest.request"
+        "parameter:action:act_ed2374e822704c51a2925338253d05d2.request"
       ],
       "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
-        "id": "authorize:submitRequest",
+        "id": "authorize:action:act_ed2374e822704c51a2925338253d05d2",
         "name": "authorize",
         "expression": {
           "kind": "binary",
           "operator": "==",
           "left": {
             "kind": "entityValue",
-            "parameterId": "parameter:submitRequest.actor",
+            "parameterId": "parameter:action:act_ed2374e822704c51a2925338253d05d2.actor",
             "name": "actor",
             "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
@@ -1025,7 +1172,7 @@
           },
           "right": {
             "kind": "fieldAccess",
-            "source": "parameter:submitRequest.request",
+            "source": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
             "parameter": "request",
             "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
             "fieldName": "requester",
@@ -1047,25 +1194,26 @@
       },
       "preconditions": [
         {
-          "id": "require:submitRequest.is_draft",
+          "id": "require:action:act_ed2374e822704c51a2925338253d05d2.is_draft",
           "name": "is_draft",
           "expression": {
             "kind": "binary",
             "operator": "==",
             "left": {
               "kind": "fieldAccess",
-              "source": "parameter:submitRequest.request",
+              "source": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
               "parameter": "request",
               "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
               "fieldName": "status",
-              "type": "enum:RequestStatus",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             },
             "right": {
               "kind": "enumLiteral",
-              "enumId": "enum:RequestStatus",
-              "member": "DRAFT",
-              "type": "enum:RequestStatus",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+              "memberName": "DRAFT",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             },
             "type": "Boolean",
@@ -1091,9 +1239,10 @@
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
-              "enumId": "enum:RequestStatus",
-              "member": "SUBMITTED",
-              "type": "enum:RequestStatus",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+              "memberName": "SUBMITTED",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             }
           }
@@ -1101,17 +1250,17 @@
       },
       "lockPlan": [
         {
-          "id": "lock:submitRequest.actor",
+          "id": "lock:action:act_ed2374e822704c51a2925338253d05d2.actor",
           "source": "caller",
-          "parameterId": "parameter:submitRequest.actor",
+          "parameterId": "parameter:action:act_ed2374e822704c51a2925338253d05d2.actor",
           "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
           "order": 0
         },
         {
-          "id": "lock:submitRequest.request",
-          "source": "parameter:submitRequest.request",
-          "parameterId": "parameter:submitRequest.request",
+          "id": "lock:action:act_ed2374e822704c51a2925338253d05d2.request",
+          "source": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
+          "parameterId": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
           "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "mode": "update",
           "order": 1
@@ -1130,11 +1279,15 @@
       }
     },
     {
-      "id": "action:approveRequest",
+      "id": "action:act_d39dbb883b5f4019b9027b85add3de47",
       "name": "approveRequest",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "act_d39dbb883b5f4019b9027b85add3de47"
+      },
       "parameters": [
         {
-          "id": "parameter:approveRequest.actor",
+          "id": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
           "name": "actor",
           "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
@@ -1152,7 +1305,7 @@
           }
         },
         {
-          "id": "parameter:approveRequest.request",
+          "id": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
           "name": "request",
           "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "caller": false,
@@ -1169,13 +1322,13 @@
           }
         }
       ],
-      "callerParameterId": "parameter:approveRequest.actor",
+      "callerParameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
       "callableParameters": [
-        "parameter:approveRequest.request"
+        "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request"
       ],
       "returnEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "authorization": {
-        "id": "authorize:approveRequest",
+        "id": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
         "name": "authorize",
         "expression": {
           "kind": "binary",
@@ -1185,7 +1338,7 @@
             "operator": "!=",
             "left": {
               "kind": "entityValue",
-              "parameterId": "parameter:approveRequest.actor",
+              "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
               "name": "actor",
               "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
@@ -1193,7 +1346,7 @@
             },
             "right": {
               "kind": "fieldAccess",
-              "source": "parameter:approveRequest.request",
+              "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
               "parameter": "request",
               "fieldId": "field:fld_04d9bc06877d4ec38a98196239c949b5",
               "fieldName": "requester",
@@ -1215,7 +1368,7 @@
                 "operator": "<=",
                 "left": {
                   "kind": "fieldAccess",
-                  "source": "parameter:approveRequest.request",
+                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
                   "parameter": "request",
                   "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
                   "fieldName": "amount",
@@ -1236,18 +1389,19 @@
                 "operator": "in",
                 "left": {
                   "kind": "enumLiteral",
-                  "enumId": "enum:Role",
-                  "member": "MANAGER",
-                  "type": "enum:Role",
+                  "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                  "memberId": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+                  "memberName": "MANAGER",
+                  "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": false
                 },
                 "right": {
                   "kind": "fieldAccess",
-                  "source": "parameter:approveRequest.actor",
+                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
                   "parameter": "actor",
                   "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                   "fieldName": "roles",
-                  "type": "set:enum:Role",
+                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": false
                 },
                 "type": "Boolean",
@@ -1265,7 +1419,7 @@
                 "operator": ">",
                 "left": {
                   "kind": "fieldAccess",
-                  "source": "parameter:approveRequest.request",
+                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
                   "parameter": "request",
                   "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
                   "fieldName": "amount",
@@ -1286,18 +1440,19 @@
                 "operator": "in",
                 "left": {
                   "kind": "enumLiteral",
-                  "enumId": "enum:Role",
-                  "member": "FINANCE",
-                  "type": "enum:Role",
+                  "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                  "memberId": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+                  "memberName": "FINANCE",
+                  "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": false
                 },
                 "right": {
                   "kind": "fieldAccess",
-                  "source": "parameter:approveRequest.actor",
+                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
                   "parameter": "actor",
                   "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
                   "fieldName": "roles",
-                  "type": "set:enum:Role",
+                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
                   "nullable": false
                 },
                 "type": "Boolean",
@@ -1324,25 +1479,26 @@
       },
       "preconditions": [
         {
-          "id": "require:approveRequest.is_submitted",
+          "id": "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted",
           "name": "is_submitted",
           "expression": {
             "kind": "binary",
             "operator": "==",
             "left": {
               "kind": "fieldAccess",
-              "source": "parameter:approveRequest.request",
+              "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
               "parameter": "request",
               "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
               "fieldName": "status",
-              "type": "enum:RequestStatus",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             },
             "right": {
               "kind": "enumLiteral",
-              "enumId": "enum:RequestStatus",
-              "member": "SUBMITTED",
-              "type": "enum:RequestStatus",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+              "memberName": "SUBMITTED",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             },
             "type": "Boolean",
@@ -1368,9 +1524,10 @@
             "fieldName": "status",
             "expression": {
               "kind": "enumLiteral",
-              "enumId": "enum:RequestStatus",
-              "member": "APPROVED",
-              "type": "enum:RequestStatus",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+              "memberName": "APPROVED",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
               "nullable": false
             }
           },
@@ -1379,7 +1536,7 @@
             "fieldName": "approvedBy",
             "expression": {
               "kind": "entityValue",
-              "parameterId": "parameter:approveRequest.actor",
+              "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
               "name": "actor",
               "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
               "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
@@ -1391,11 +1548,11 @@
             "fieldName": "approvedByRoles",
             "expression": {
               "kind": "fieldAccess",
-              "source": "parameter:approveRequest.actor",
+              "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
               "parameter": "actor",
               "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
               "fieldName": "roles",
-              "type": "set:enum:Role",
+              "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
               "nullable": false
             }
           }
@@ -1403,17 +1560,17 @@
       },
       "lockPlan": [
         {
-          "id": "lock:approveRequest.actor",
+          "id": "lock:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
           "source": "caller",
-          "parameterId": "parameter:approveRequest.actor",
+          "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
           "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "mode": "share",
           "order": 0
         },
         {
-          "id": "lock:approveRequest.request",
-          "source": "parameter:approveRequest.request",
-          "parameterId": "parameter:approveRequest.request",
+          "id": "lock:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+          "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+          "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
           "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
           "mode": "update",
           "order": 1
@@ -1434,11 +1591,15 @@
   ],
   "queries": [
     {
-      "id": "query:myRequests",
+      "id": "query:qry_4406b045404a48449282db804f6167a8",
       "name": "myRequests",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "qry_4406b045404a48449282db804f6167a8"
+      },
       "parameters": [
         {
-          "id": "parameter:myRequests.actor",
+          "id": "parameter:query:qry_4406b045404a48449282db804f6167a8.actor",
           "name": "actor",
           "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
           "caller": true,
@@ -1456,12 +1617,12 @@
           }
         }
       ],
-      "callerParameterId": "parameter:myRequests.actor",
+      "callerParameterId": "parameter:query:qry_4406b045404a48449282db804f6167a8.actor",
       "callableParameters": [],
       "sourceEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "rowAlias": "request",
       "authorization": {
-        "id": "authorize:myRequests",
+        "id": "authorize:query:qry_4406b045404a48449282db804f6167a8",
         "name": "authorize",
         "expression": {
           "kind": "literal",
@@ -1479,7 +1640,7 @@
         }
       },
       "rowPolicy": {
-        "id": "where:myRequests",
+        "id": "where:query:qry_4406b045404a48449282db804f6167a8",
         "name": "where",
         "expression": {
           "kind": "binary",
@@ -1495,7 +1656,7 @@
           },
           "right": {
             "kind": "entityValue",
-            "parameterId": "parameter:myRequests.actor",
+            "parameterId": "parameter:query:qry_4406b045404a48449282db804f6167a8.actor",
             "name": "actor",
             "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
             "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
@@ -1556,7 +1717,7 @@
       "objectName": "model_procurement_internal"
     },
     {
-      "id": "required:User.id",
+      "id": "required:field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1570,7 +1731,7 @@
       }
     },
     {
-      "id": "annotation:User.id.id",
+      "id": "annotation:field:fld_fe4c8fe8243b456eadeefb42b0bd7097.id",
       "purpose": "Enforce @id.",
       "layer": "PostgreSQL primary key",
       "artifact": "postgres/002_schema.sql",
@@ -1584,7 +1745,7 @@
       }
     },
     {
-      "id": "required:User.name",
+      "id": "required:field:fld_a261560f630d4e818f8f099868078535",
       "purpose": "name is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1598,7 +1759,7 @@
       }
     },
     {
-      "id": "required:User.roles",
+      "id": "required:field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
       "purpose": "roles is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1612,7 +1773,7 @@
       }
     },
     {
-      "id": "enum-set:User.roles",
+      "id": "enum-set:field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
       "purpose": "roles is a duplicate-free set of declared Role members.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1626,7 +1787,7 @@
       }
     },
     {
-      "id": "boundary:User.direct_write",
+      "id": "boundary:entity:ent_66c16684f17e4b4ca79eb7d916cbf725.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1640,7 +1801,7 @@
       }
     },
     {
-      "id": "boundary:User.direct_read",
+      "id": "boundary:entity:ent_66c16684f17e4b4ca79eb7d916cbf725.direct_read",
       "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1654,7 +1815,7 @@
       }
     },
     {
-      "id": "required:PurchaseRequest.id",
+      "id": "required:field:fld_af918d24406040619a77b244a81ca5d3",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1668,7 +1829,7 @@
       }
     },
     {
-      "id": "annotation:PurchaseRequest.id.id",
+      "id": "annotation:field:fld_af918d24406040619a77b244a81ca5d3.id",
       "purpose": "Enforce @id.",
       "layer": "PostgreSQL primary key",
       "artifact": "postgres/002_schema.sql",
@@ -1682,7 +1843,7 @@
       }
     },
     {
-      "id": "required:PurchaseRequest.requester",
+      "id": "required:field:fld_04d9bc06877d4ec38a98196239c949b5",
       "purpose": "requester is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1696,7 +1857,7 @@
       }
     },
     {
-      "id": "reference:PurchaseRequest.requester",
+      "id": "reference:field:fld_04d9bc06877d4ec38a98196239c949b5",
       "purpose": "requester references User.",
       "layer": "PostgreSQL foreign key",
       "artifact": "postgres/002_schema.sql",
@@ -1710,7 +1871,7 @@
       }
     },
     {
-      "id": "required:PurchaseRequest.amount",
+      "id": "required:field:fld_9810e7598584487ea4a883e3c1c3f8d1",
       "purpose": "amount is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1724,7 +1885,7 @@
       }
     },
     {
-      "id": "annotation:PurchaseRequest.amount.minExclusive",
+      "id": "annotation:field:fld_9810e7598584487ea4a883e3c1c3f8d1.minExclusive",
       "purpose": "Enforce @minExclusive(0).",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1738,7 +1899,7 @@
       }
     },
     {
-      "id": "required:PurchaseRequest.status",
+      "id": "required:field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
       "purpose": "status is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1752,7 +1913,7 @@
       }
     },
     {
-      "id": "enum-membership:PurchaseRequest.status",
+      "id": "enum-membership:field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
       "purpose": "status must be a declared RequestStatus member.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1766,7 +1927,7 @@
       }
     },
     {
-      "id": "default:PurchaseRequest.status",
+      "id": "default:field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
       "purpose": "Apply the declared constant default for status.",
       "layer": "PostgreSQL column default",
       "artifact": "postgres/002_schema.sql",
@@ -1780,7 +1941,7 @@
       }
     },
     {
-      "id": "reference:PurchaseRequest.approvedBy",
+      "id": "reference:field:fld_5da56f04460f4deba9ccda4f552c2b97",
       "purpose": "approvedBy references User.",
       "layer": "PostgreSQL foreign key",
       "artifact": "postgres/002_schema.sql",
@@ -1794,7 +1955,7 @@
       }
     },
     {
-      "id": "enum-set:PurchaseRequest.approvedByRoles",
+      "id": "enum-set:field:fld_577b4c94c9cd4b469aded37614712fba",
       "purpose": "approvedByRoles is a duplicate-free set of declared Role members.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1808,7 +1969,7 @@
       }
     },
     {
-      "id": "snapshot:PurchaseRequest.approvedByRoles",
+      "id": "snapshot:field:fld_577b4c94c9cd4b469aded37614712fba",
       "purpose": "approvedByRoles is a stored point-in-time audit snapshot, not a live relationship-derived value.",
       "layer": "ModelLang storage semantics",
       "artifact": "model.ir.json",
@@ -1822,7 +1983,7 @@
       }
     },
     {
-      "id": "invariant:PurchaseRequest.approval_fields_match_status",
+      "id": "invariant:inv_b70e8aa03e6d498f8b0bccf413636b19",
       "purpose": "((((status == RequestStatus.APPROVED) and (approvedBy != null)) and (approvedByRoles != null)) or (((status != RequestStatus.APPROVED) and (approvedBy == null)) and (approvedByRoles == null)))",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1836,7 +1997,7 @@
       }
     },
     {
-      "id": "invariant:PurchaseRequest.approval_authority_matches_amount",
+      "id": "invariant:inv_91184dc547c24978a48362a679eeb836",
       "purpose": "((status != RequestStatus.APPROVED) or (((amount <= 10000) and (Role.MANAGER in approvedByRoles)) or ((amount > 10000) and (Role.FINANCE in approvedByRoles))))",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1850,7 +2011,7 @@
       }
     },
     {
-      "id": "invariant:PurchaseRequest.approver_differs_from_requester",
+      "id": "invariant:inv_f8c6cf86f9d64874ac4159766e522cb8",
       "purpose": "((status != RequestStatus.APPROVED) or (approvedBy != requester))",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1864,7 +2025,7 @@
       }
     },
     {
-      "id": "boundary:PurchaseRequest.direct_write",
+      "id": "boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1878,7 +2039,7 @@
       }
     },
     {
-      "id": "boundary:PurchaseRequest.direct_read",
+      "id": "boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_read",
       "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1892,7 +2053,7 @@
       }
     },
     {
-      "id": "caller:openRequest.actor",
+      "id": "caller:action:act_1e35db0451b1461e941af6283d86dca2.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_actions.sql",
@@ -1906,14 +2067,14 @@
       }
     },
     {
-      "id": "boundary:openRequest.safe_search_path",
+      "id": "boundary:action:act_1e35db0451b1461e941af6283d86dca2.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:openRequest",
+      "id": "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
       "purpose": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -1927,7 +2088,7 @@
       }
     },
     {
-      "id": "require:openRequest.positive_amount",
+      "id": "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount",
       "purpose": "(amount > 0)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -1941,7 +2102,7 @@
       }
     },
     {
-      "id": "effect:openRequest",
+      "id": "effect:action:act_1e35db0451b1461e941af6283d86dca2",
       "purpose": "create entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
@@ -1955,14 +2116,14 @@
       }
     },
     {
-      "id": "lock:openRequest.actor",
+      "id": "lock:action:act_1e35db0451b1461e941af6283d86dca2.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.open_request"
     },
     {
-      "id": "caller:submitRequest.actor",
+      "id": "caller:action:act_ed2374e822704c51a2925338253d05d2.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_actions.sql",
@@ -1976,14 +2137,14 @@
       }
     },
     {
-      "id": "boundary:submitRequest.safe_search_path",
+      "id": "boundary:action:act_ed2374e822704c51a2925338253d05d2.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.submit_request search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:submitRequest",
+      "id": "authorize:action:act_ed2374e822704c51a2925338253d05d2",
       "purpose": "(actor == request.requester)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -1997,7 +2158,7 @@
       }
     },
     {
-      "id": "require:submitRequest.is_draft",
+      "id": "require:action:act_ed2374e822704c51a2925338253d05d2.is_draft",
       "purpose": "(request.status == RequestStatus.DRAFT)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -2011,7 +2172,7 @@
       }
     },
     {
-      "id": "effect:submitRequest",
+      "id": "effect:action:act_ed2374e822704c51a2925338253d05d2",
       "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
@@ -2025,21 +2186,21 @@
       }
     },
     {
-      "id": "lock:submitRequest.actor",
+      "id": "lock:action:act_ed2374e822704c51a2925338253d05d2.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.submit_request"
     },
     {
-      "id": "lock:submitRequest.request",
-      "purpose": "Stabilize parameter:submitRequest.request before evaluating guards and effects.",
+      "id": "lock:action:act_ed2374e822704c51a2925338253d05d2.request",
+      "purpose": "Stabilize parameter:action:act_ed2374e822704c51a2925338253d05d2.request before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR UPDATE in model_procurement.submit_request"
     },
     {
-      "id": "caller:approveRequest.actor",
+      "id": "caller:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_actions.sql",
@@ -2053,14 +2214,14 @@
       }
     },
     {
-      "id": "boundary:approveRequest.safe_search_path",
+      "id": "boundary:action:act_d39dbb883b5f4019b9027b85add3de47.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:approveRequest",
+      "id": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       "purpose": "((actor != request.requester) and (((request.amount <= 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > 10000) and (Role.FINANCE in actor.roles))))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -2074,7 +2235,7 @@
       }
     },
     {
-      "id": "require:approveRequest.is_submitted",
+      "id": "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted",
       "purpose": "(request.status == RequestStatus.SUBMITTED)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -2088,7 +2249,7 @@
       }
     },
     {
-      "id": "effect:approveRequest",
+      "id": "effect:action:act_d39dbb883b5f4019b9027b85add3de47",
       "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
@@ -2102,21 +2263,21 @@
       }
     },
     {
-      "id": "lock:approveRequest.actor",
+      "id": "lock:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_procurement.approve_request"
     },
     {
-      "id": "lock:approveRequest.request",
-      "purpose": "Stabilize parameter:approveRequest.request before evaluating guards and effects.",
+      "id": "lock:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+      "purpose": "Stabilize parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR UPDATE in model_procurement.approve_request"
     },
     {
-      "id": "caller:myRequests.actor",
+      "id": "caller:query:qry_4406b045404a48449282db804f6167a8.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_queries.sql",
@@ -2130,14 +2291,14 @@
       }
     },
     {
-      "id": "boundary:myRequests.safe_search_path",
+      "id": "boundary:query:qry_4406b045404a48449282db804f6167a8.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:myRequests",
+      "id": "authorize:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "true",
       "layer": "PostgreSQL query guard",
       "artifact": "postgres/003_queries.sql",
@@ -2151,7 +2312,7 @@
       }
     },
     {
-      "id": "where:myRequests",
+      "id": "where:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "(request.requester == actor)",
       "layer": "PostgreSQL row policy",
       "artifact": "postgres/003_queries.sql",
@@ -2165,7 +2326,7 @@
       }
     },
     {
-      "id": "order:myRequests",
+      "id": "order:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
@@ -2179,7 +2340,7 @@
       }
     },
     {
-      "id": "limit:myRequests",
+      "id": "limit:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "Return at most 100 rows.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
@@ -2193,7 +2354,7 @@
       }
     },
     {
-      "id": "read:myRequests",
+      "id": "read:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",

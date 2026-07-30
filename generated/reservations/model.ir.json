@@ -1,10 +1,10 @@
 {
-  "irVersion": 5,
+  "irVersion": 6,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.5.1",
-    "sourceHash": "sha256:4943a8e76be8729736d7d146f6034c91f3bfad55d913c8f4a489fecf34e6cdac",
+    "version": "0.6.0",
+    "sourceHash": "sha256:4bc10136557149e98256f7dfc38a4e8fbea6eeada2a22f76321b442bc75d0da7",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -291,8 +291,12 @@
       "invariants": [],
       "temporalExclusions": [
         {
-          "id": "exclusion:Reservation.no_overlapping_reservations",
+          "id": "exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba",
           "name": "no_overlapping_reservations",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "exc_d55bab6e14884cd5a7d2bacfc30458ba"
+          },
           "keyFieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
           "startFieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
           "endFieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
@@ -327,11 +331,15 @@
   ],
   "actions": [
     {
-      "id": "action:reserve",
+      "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
       "name": "reserve",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "act_508ad810a19d4b79a5009871de5cd26b"
+      },
       "parameters": [
         {
-          "id": "parameter:reserve.actor",
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
           "name": "actor",
           "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "caller": true,
@@ -349,7 +357,7 @@
           }
         },
         {
-          "id": "parameter:reserve.id",
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
           "name": "id",
           "type": "UUID",
           "caller": false,
@@ -366,7 +374,7 @@
           }
         },
         {
-          "id": "parameter:reserve.resource",
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
           "name": "resource",
           "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "caller": false,
@@ -383,7 +391,7 @@
           }
         },
         {
-          "id": "parameter:reserve.startsAt",
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
           "name": "startsAt",
           "type": "DateTime",
           "caller": false,
@@ -400,7 +408,7 @@
           }
         },
         {
-          "id": "parameter:reserve.endsAt",
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
           "name": "endsAt",
           "type": "DateTime",
           "caller": false,
@@ -417,16 +425,16 @@
           }
         }
       ],
-      "callerParameterId": "parameter:reserve.actor",
+      "callerParameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
       "callableParameters": [
-        "parameter:reserve.id",
-        "parameter:reserve.resource",
-        "parameter:reserve.startsAt",
-        "parameter:reserve.endsAt"
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt"
       ],
       "returnEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "authorization": {
-        "id": "authorize:reserve",
+        "id": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
         "name": "authorize",
         "expression": {
           "kind": "literal",
@@ -445,21 +453,21 @@
       },
       "preconditions": [
         {
-          "id": "require:reserve.valid_interval",
+          "id": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
           "name": "valid_interval",
           "expression": {
             "kind": "binary",
             "operator": "<",
             "left": {
               "kind": "parameter",
-              "parameterId": "parameter:reserve.startsAt",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
               "name": "startsAt",
               "type": "DateTime",
               "nullable": false
             },
             "right": {
               "kind": "parameter",
-              "parameterId": "parameter:reserve.endsAt",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
               "name": "endsAt",
               "type": "DateTime",
               "nullable": false
@@ -487,7 +495,7 @@
             "fieldName": "id",
             "expression": {
               "kind": "parameter",
-              "parameterId": "parameter:reserve.id",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.id",
               "name": "id",
               "type": "UUID",
               "nullable": false
@@ -498,7 +506,7 @@
             "fieldName": "resource",
             "expression": {
               "kind": "entityValue",
-              "parameterId": "parameter:reserve.resource",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
               "name": "resource",
               "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
               "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
@@ -510,7 +518,7 @@
             "fieldName": "reservedBy",
             "expression": {
               "kind": "entityValue",
-              "parameterId": "parameter:reserve.actor",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
               "name": "actor",
               "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
               "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
@@ -522,7 +530,7 @@
             "fieldName": "startsAt",
             "expression": {
               "kind": "parameter",
-              "parameterId": "parameter:reserve.startsAt",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
               "name": "startsAt",
               "type": "DateTime",
               "nullable": false
@@ -533,7 +541,7 @@
             "fieldName": "endsAt",
             "expression": {
               "kind": "parameter",
-              "parameterId": "parameter:reserve.endsAt",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
               "name": "endsAt",
               "type": "DateTime",
               "nullable": false
@@ -543,17 +551,17 @@
       },
       "lockPlan": [
         {
-          "id": "lock:reserve.resource",
-          "source": "parameter:reserve.resource",
-          "parameterId": "parameter:reserve.resource",
+          "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "source": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
           "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "mode": "share",
           "order": 0
         },
         {
-          "id": "lock:reserve.actor",
+          "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
           "source": "caller",
-          "parameterId": "parameter:reserve.actor",
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
           "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "mode": "share",
           "order": 1
@@ -574,11 +582,15 @@
   ],
   "queries": [
     {
-      "id": "query:reservationsForResource",
+      "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "name": "reservationsForResource",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "qry_94d8a56f4c2640fab58a4c2190c35c69"
+      },
       "parameters": [
         {
-          "id": "parameter:reservationsForResource.actor",
+          "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
           "name": "actor",
           "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
           "caller": true,
@@ -596,7 +608,7 @@
           }
         },
         {
-          "id": "parameter:reservationsForResource.resource",
+          "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
           "name": "resource",
           "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
           "caller": false,
@@ -613,14 +625,14 @@
           }
         }
       ],
-      "callerParameterId": "parameter:reservationsForResource.actor",
+      "callerParameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
       "callableParameters": [
-        "parameter:reservationsForResource.resource"
+        "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource"
       ],
       "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "rowAlias": "reservation",
       "authorization": {
-        "id": "authorize:reservationsForResource",
+        "id": "authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
         "name": "authorize",
         "expression": {
           "kind": "literal",
@@ -638,7 +650,7 @@
         }
       },
       "rowPolicy": {
-        "id": "where:reservationsForResource",
+        "id": "where:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
         "name": "where",
         "expression": {
           "kind": "binary",
@@ -654,7 +666,7 @@
           },
           "right": {
             "kind": "entityValue",
-            "parameterId": "parameter:reservationsForResource.resource",
+            "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
             "name": "resource",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
             "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
@@ -715,7 +727,7 @@
       "objectName": "model_reservations_internal"
     },
     {
-      "id": "required:User.id",
+      "id": "required:field:fld_968ff16b1c28419d9f2f7833635e5653",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -729,7 +741,7 @@
       }
     },
     {
-      "id": "annotation:User.id.id",
+      "id": "annotation:field:fld_968ff16b1c28419d9f2f7833635e5653.id",
       "purpose": "Enforce @id.",
       "layer": "PostgreSQL primary key",
       "artifact": "postgres/002_schema.sql",
@@ -743,7 +755,7 @@
       }
     },
     {
-      "id": "required:User.name",
+      "id": "required:field:fld_c5d58534769747848252b806b96ade1d",
       "purpose": "name is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -757,7 +769,7 @@
       }
     },
     {
-      "id": "boundary:User.direct_write",
+      "id": "boundary:entity:ent_82878bde58d948d4a84d85d01279e01d.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -771,7 +783,7 @@
       }
     },
     {
-      "id": "boundary:User.direct_read",
+      "id": "boundary:entity:ent_82878bde58d948d4a84d85d01279e01d.direct_read",
       "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -785,7 +797,7 @@
       }
     },
     {
-      "id": "required:Resource.id",
+      "id": "required:field:fld_8a690418c88c4400b88b6efca8eaa752",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -799,7 +811,7 @@
       }
     },
     {
-      "id": "annotation:Resource.id.id",
+      "id": "annotation:field:fld_8a690418c88c4400b88b6efca8eaa752.id",
       "purpose": "Enforce @id.",
       "layer": "PostgreSQL primary key",
       "artifact": "postgres/002_schema.sql",
@@ -813,7 +825,7 @@
       }
     },
     {
-      "id": "required:Resource.name",
+      "id": "required:field:fld_41fd1b66c84441519c8ff1e4db72d145",
       "purpose": "name is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -827,7 +839,7 @@
       }
     },
     {
-      "id": "annotation:Resource.name.unique",
+      "id": "annotation:field:fld_41fd1b66c84441519c8ff1e4db72d145.unique",
       "purpose": "Enforce @unique.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -841,7 +853,7 @@
       }
     },
     {
-      "id": "boundary:Resource.direct_write",
+      "id": "boundary:entity:ent_7cb2307972954d83a6f344764faaae39.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -855,7 +867,7 @@
       }
     },
     {
-      "id": "boundary:Resource.direct_read",
+      "id": "boundary:entity:ent_7cb2307972954d83a6f344764faaae39.direct_read",
       "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -869,7 +881,7 @@
       }
     },
     {
-      "id": "required:Reservation.id",
+      "id": "required:field:fld_066660fbd78d479084a9db613ee746ae",
       "purpose": "id is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -883,7 +895,7 @@
       }
     },
     {
-      "id": "annotation:Reservation.id.id",
+      "id": "annotation:field:fld_066660fbd78d479084a9db613ee746ae.id",
       "purpose": "Enforce @id.",
       "layer": "PostgreSQL primary key",
       "artifact": "postgres/002_schema.sql",
@@ -897,7 +909,7 @@
       }
     },
     {
-      "id": "required:Reservation.resource",
+      "id": "required:field:fld_8df4f409794e4c66acdbb162b6063d57",
       "purpose": "resource is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -911,7 +923,7 @@
       }
     },
     {
-      "id": "reference:Reservation.resource",
+      "id": "reference:field:fld_8df4f409794e4c66acdbb162b6063d57",
       "purpose": "resource references Resource.",
       "layer": "PostgreSQL foreign key",
       "artifact": "postgres/002_schema.sql",
@@ -925,7 +937,7 @@
       }
     },
     {
-      "id": "required:Reservation.reservedBy",
+      "id": "required:field:fld_8380b65e5a2a4c399a2743cee1a3a93a",
       "purpose": "reservedBy is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -939,7 +951,7 @@
       }
     },
     {
-      "id": "reference:Reservation.reservedBy",
+      "id": "reference:field:fld_8380b65e5a2a4c399a2743cee1a3a93a",
       "purpose": "reservedBy references User.",
       "layer": "PostgreSQL foreign key",
       "artifact": "postgres/002_schema.sql",
@@ -953,7 +965,7 @@
       }
     },
     {
-      "id": "required:Reservation.startsAt",
+      "id": "required:field:fld_59e1f90fae57481f921c5a81dfd3a234",
       "purpose": "startsAt is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -967,7 +979,7 @@
       }
     },
     {
-      "id": "required:Reservation.endsAt",
+      "id": "required:field:fld_fd818707952f4b388baea4c3132bce63",
       "purpose": "endsAt is required.",
       "layer": "PostgreSQL constraint",
       "artifact": "postgres/002_schema.sql",
@@ -981,7 +993,7 @@
       }
     },
     {
-      "id": "exclusion:Reservation.no_overlapping_reservations",
+      "id": "exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba",
       "purpose": "noOverlap(resource, startsAt, endsAt) rejects overlapping half-open intervals for the same key.",
       "layer": "PostgreSQL exclusion constraint",
       "artifact": "postgres/002_schema.sql",
@@ -995,7 +1007,7 @@
       }
     },
     {
-      "id": "derived:exclusion:Reservation.no_overlapping_reservations.valid_interval",
+      "id": "derived:exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba.valid_interval",
       "purpose": "Require interval start to be strictly before interval end.",
       "layer": "PostgreSQL check constraint",
       "artifact": "postgres/002_schema.sql",
@@ -1009,7 +1021,7 @@
       }
     },
     {
-      "id": "boundary:Reservation.direct_write",
+      "id": "boundary:entity:ent_ba2d028e915841d1ab90adfa40d38404.direct_write",
       "purpose": "Application principals cannot directly mutate entity rows.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1023,7 +1035,7 @@
       }
     },
     {
-      "id": "boundary:Reservation.direct_read",
+      "id": "boundary:entity:ent_ba2d028e915841d1ab90adfa40d38404.direct_read",
       "purpose": "Application principals cannot directly read entity rows outside generated queries.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
@@ -1037,7 +1049,7 @@
       }
     },
     {
-      "id": "caller:reserve.actor",
+      "id": "caller:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_actions.sql",
@@ -1051,14 +1063,14 @@
       }
     },
     {
-      "id": "boundary:reserve.safe_search_path",
+      "id": "boundary:action:act_508ad810a19d4b79a5009871de5cd26b.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations.reserve search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:reserve",
+      "id": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
       "purpose": "true",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -1072,7 +1084,7 @@
       }
     },
     {
-      "id": "require:reserve.valid_interval",
+      "id": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
       "purpose": "(startsAt < endsAt)",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
@@ -1086,7 +1098,7 @@
       }
     },
     {
-      "id": "effect:reserve",
+      "id": "effect:action:act_508ad810a19d4b79a5009871de5cd26b",
       "purpose": "create entity:ent_ba2d028e915841d1ab90adfa40d38404.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
@@ -1100,21 +1112,21 @@
       }
     },
     {
-      "id": "lock:reserve.resource",
-      "purpose": "Stabilize parameter:reserve.resource before evaluating guards and effects.",
+      "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+      "purpose": "Stabilize parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_reservations.reserve"
     },
     {
-      "id": "lock:reserve.actor",
+      "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
       "purpose": "Stabilize caller before evaluating guards and effects.",
       "layer": "PostgreSQL row lock",
       "artifact": "postgres/003_actions.sql",
       "objectName": "FOR SHARE in model_reservations.reserve"
     },
     {
-      "id": "caller:reservationsForResource.actor",
+      "id": "caller:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
       "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/003_queries.sql",
@@ -1128,14 +1140,14 @@
       }
     },
     {
-      "id": "boundary:reservationsForResource.safe_search_path",
+      "id": "boundary:query:qry_94d8a56f4c2640fab58a4c2190c35c69.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource search_path=pg_catalog,pg_temp"
     },
     {
-      "id": "authorize:reservationsForResource",
+      "id": "authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "purpose": "true",
       "layer": "PostgreSQL query guard",
       "artifact": "postgres/003_queries.sql",
@@ -1149,7 +1161,7 @@
       }
     },
     {
-      "id": "where:reservationsForResource",
+      "id": "where:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "purpose": "(reservation.resource == resource)",
       "layer": "PostgreSQL row policy",
       "artifact": "postgres/003_queries.sql",
@@ -1163,7 +1175,7 @@
       }
     },
     {
-      "id": "order:reservationsForResource",
+      "id": "order:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
@@ -1177,7 +1189,7 @@
       }
     },
     {
-      "id": "limit:reservationsForResource",
+      "id": "limit:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "purpose": "Return at most 100 rows.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
@@ -1191,7 +1203,7 @@
       }
     },
     {
-      "id": "read:reservationsForResource",
+      "id": "read:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
       "purpose": "Read entity:ent_ba2d028e915841d1ab90adfa40d38404 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",

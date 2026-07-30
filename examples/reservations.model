@@ -1,4 +1,4 @@
-model Reservations version "0.5.1";
+model Reservations version "0.6.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -17,11 +17,11 @@ entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
   startsAt: DateTime @stableId("fld_59e1f90fae57481f921c5a81dfd3a234");
   endsAt: DateTime @stableId("fld_fd818707952f4b388baea4c3132bce63");
 
-  exclusion no_overlapping_reservations:
+  exclusion no_overlapping_reservations @stableId("exc_d55bab6e14884cd5a7d2bacfc30458ba"):
     noOverlap(resource, startsAt, endsAt);
 }
 
-action reserve(
+action reserve @stableId("act_508ad810a19d4b79a5009871de5cd26b")(
   caller actor: User,
   id: UUID,
   resource: Resource,
@@ -40,7 +40,7 @@ action reserve(
   }
 }
 
-query reservationsForResource(
+query reservationsForResource @stableId("qry_94d8a56f4c2640fab58a4c2190c35c69")(
   caller actor: User,
   resource: Resource
 ) from Reservation as reservation {

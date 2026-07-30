@@ -27,10 +27,10 @@ function checkAction(ir: ModelIR, action: IRAction): void {
   if (JSON.stringify(action.callableParameters) !== JSON.stringify(expectedCallable)) {
     fail(ir, `Action '${action.name}' callable parameters are not an exact caller-free signature.`, action.span);
   }
-  requireEntry(ir, `caller:${action.name}.${caller.name}`, caller.span);
+  requireEntry(ir, `caller:${action.id}.${caller.name}`, caller.span);
   requireEntry(ir, action.authorization.id, action.authorization.span);
   for (const precondition of action.preconditions) requireEntry(ir, precondition.id, precondition.span);
-  requireEntry(ir, `effect:${action.name}`, action.span);
+  requireEntry(ir, `effect:${action.id}`, action.span);
   for (const lock of action.lockPlan) requireEntry(ir, lock.id);
   if (action.effect.kind === "update") {
     const target = action.parameters.find((parameter) => parameter.name === action.effect.target);
@@ -47,13 +47,13 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   if (JSON.stringify(query.callableParameters) !== JSON.stringify(expectedCallable)) {
     fail(ir, `Query '${query.name}' callable parameters are not an exact caller-free signature.`, query.span);
   }
-  requireEntry(ir, `caller:${query.name}.${caller.name}`, caller.span);
-  requireEntry(ir, `boundary:${query.name}.safe_search_path`, query.span);
+  requireEntry(ir, `caller:${query.id}.${caller.name}`, caller.span);
+  requireEntry(ir, `boundary:${query.id}.safe_search_path`, query.span);
   requireEntry(ir, query.authorization.id, query.authorization.span);
   requireEntry(ir, query.rowPolicy.id, query.rowPolicy.span);
-  requireEntry(ir, `order:${query.name}`, query.span);
-  requireEntry(ir, `limit:${query.name}`, query.span);
-  requireEntry(ir, `read:${query.name}`, query.span);
+  requireEntry(ir, `order:${query.id}`, query.span);
+  requireEntry(ir, `limit:${query.id}`, query.span);
+  requireEntry(ir, `read:${query.id}`, query.span);
 }
 
 export function assertEnforceable(ir: ModelIR): void {
@@ -63,14 +63,14 @@ export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:audit");
   for (const entity of ir.entities) {
     for (const field of entity.fields) {
-      if (!field.optional) requireEntry(ir, `required:${entity.name}.${field.name}`, field.span);
-      if (field.type.startsWith("entity:")) requireEntry(ir, `reference:${entity.name}.${field.name}`, field.span);
-      if (field.type.startsWith("enum:")) requireEntry(ir, `enum-membership:${entity.name}.${field.name}`, field.span);
-      if (field.type.startsWith("set:enum:")) requireEntry(ir, `enum-set:${entity.name}.${field.name}`, field.span);
-      if (field.default) requireEntry(ir, `default:${entity.name}.${field.name}`, field.span);
-      if (field.storage === "snapshot") requireEntry(ir, `snapshot:${entity.name}.${field.name}`, field.span);
+      if (!field.optional) requireEntry(ir, `required:${field.id}`, field.span);
+      if (field.type.startsWith("entity:")) requireEntry(ir, `reference:${field.id}`, field.span);
+      if (field.type.startsWith("enum:")) requireEntry(ir, `enum-membership:${field.id}`, field.span);
+      if (field.type.startsWith("set:enum:")) requireEntry(ir, `enum-set:${field.id}`, field.span);
+      if (field.default) requireEntry(ir, `default:${field.id}`, field.span);
+      if (field.storage === "snapshot") requireEntry(ir, `snapshot:${field.id}`, field.span);
       for (const annotation of field.annotations) {
-        if (annotation.name !== "snapshot") requireEntry(ir, `annotation:${entity.name}.${field.name}.${annotation.name}`, field.span);
+        if (annotation.name !== "snapshot") requireEntry(ir, `annotation:${field.id}.${annotation.name}`, field.span);
       }
     }
     for (const invariant of entity.invariants) requireEntry(ir, invariant.id, invariant.span);
@@ -78,8 +78,8 @@ export function assertEnforceable(ir: ModelIR): void {
       requireEntry(ir, exclusion.id, exclusion.span);
       requireEntry(ir, `derived:${exclusion.id}.valid_interval`, exclusion.span);
     }
-    requireEntry(ir, `boundary:${entity.name}.direct_write`, entity.span);
-    requireEntry(ir, `boundary:${entity.name}.direct_read`, entity.span);
+    requireEntry(ir, `boundary:${entity.id}.direct_write`, entity.span);
+    requireEntry(ir, `boundary:${entity.id}.direct_read`, entity.span);
   }
   for (const action of ir.actions) checkAction(ir, action);
   for (const query of ir.queries) checkQuery(ir, query);

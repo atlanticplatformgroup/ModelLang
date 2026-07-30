@@ -7,16 +7,16 @@ flowchart LR
   entity_ent_ba2d028e915841d1ab90adfa40d38404["Entity: Reservation"]
   entity_ent_ba2d028e915841d1ab90adfa40d38404 -->|resource| entity_ent_7cb2307972954d83a6f344764faaae39
   entity_ent_ba2d028e915841d1ab90adfa40d38404 -->|reservedBy| entity_ent_82878bde58d948d4a84d85d01279e01d
-  exclusion_Reservation_no_overlapping_reservations["Temporal exclusion: no_overlapping_reservations"] -->|prevents overlap| entity_ent_ba2d028e915841d1ab90adfa40d38404
-  action_reserve["Action: reserve"]
-  principal -->|authenticated caller| action_reserve
-  action_reserve -->|creates| entity_ent_ba2d028e915841d1ab90adfa40d38404
-  authorize_reserve["Authorize"] -->|guards| action_reserve
-  require_reserve_valid_interval["Require: valid_interval"] -->|guards| action_reserve
-  action_reserve -->|locks share| entity_ent_7cb2307972954d83a6f344764faaae39
-  action_reserve -->|locks share| entity_ent_82878bde58d948d4a84d85d01279e01d
-  query_reservationsForResource["Query: reservationsForResource"]
-  principal -->|authenticated caller| query_reservationsForResource
-  query_reservationsForResource -->|reads| entity_ent_ba2d028e915841d1ab90adfa40d38404
-  authorize_reservationsForResource["Authorize"] -->|guards| query_reservationsForResource
-  where_reservationsForResource["Where"] -->|filters rows| query_reservationsForResource
+  exclusion_exc_d55bab6e14884cd5a7d2bacfc30458ba["Temporal exclusion: no_overlapping_reservations"] -->|prevents overlap| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  action_act_508ad810a19d4b79a5009871de5cd26b["Action: reserve"]
+  principal -->|authenticated caller| action_act_508ad810a19d4b79a5009871de5cd26b
+  action_act_508ad810a19d4b79a5009871de5cd26b -->|creates| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  authorize_action_act_508ad810a19d4b79a5009871de5cd26b["Authorize"] -->|guards| action_act_508ad810a19d4b79a5009871de5cd26b
+  require_action_act_508ad810a19d4b79a5009871de5cd26b_valid_interval["Require: valid_interval"] -->|guards| action_act_508ad810a19d4b79a5009871de5cd26b
+  action_act_508ad810a19d4b79a5009871de5cd26b -->|locks share| entity_ent_7cb2307972954d83a6f344764faaae39
+  action_act_508ad810a19d4b79a5009871de5cd26b -->|locks share| entity_ent_82878bde58d948d4a84d85d01279e01d
+  query_qry_94d8a56f4c2640fab58a4c2190c35c69["Query: reservationsForResource"]
+  principal -->|authenticated caller| query_qry_94d8a56f4c2640fab58a4c2190c35c69
+  query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|reads| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  authorize_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Authorize"] -->|guards| query_qry_94d8a56f4c2640fab58a4c2190c35c69
+  where_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Where"] -->|filters rows| query_qry_94d8a56f4c2640fab58a4c2190c35c69

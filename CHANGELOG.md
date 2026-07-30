@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0
+
+- Extended `@stableId(...)` to enums, enum members, invariants, temporal exclusions, actions, and queries.
+- Added canonical IR version 6 with ID-based enum types, enum literals, operation ownership, rule IDs, enforcement entries, and action audit identities.
+- Extended `modelc assign-ids` to every durable declaration supported by 0.6.
+- Added identity-based rename planning for invariant and exclusion constraints and action/query PostgreSQL functions.
+- Recognized enum declaration renames as semantic-only and made enum-member renames fail closed until stored-value migrations are supported.
+- Migrated both canonical models to complete explicit declaration identity.
+- Added unit and live PostgreSQL tests for stable reference lowering, complete ID assignment, broad rename planning, data preservation, constraint renames, and callable function renames.
+
 ## 0.5.1
 
 - Prevented managers and finance users from approving their own purchase requests through both action authorization and a durable invariant.

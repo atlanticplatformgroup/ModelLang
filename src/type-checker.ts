@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IRExpression, IRField, IRLock, IRParameter, IRQuery, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
 import { snakeCase } from "./naming.js";
 import type {
-  ActionDecl, Declaration, EntityDecl, Expression, FieldDecl, Program, QueryDecl,
+  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
@@ -50,8 +50,14 @@ function expressionText(expression: Expression): string {
 function isEntityType(type: string): boolean { return type.startsWith("entity:"); }
 function isEnumType(type: string): boolean { return type.startsWith("enum:"); }
 function isEnumSetType(type: string): boolean { return type.startsWith("set:enum:"); }
-function enumSetName(type: string): string { return type.slice("set:enum:".length); }
+function enumSetId(type: string): string { return type.slice("set:".length); }
 function isNumeric(type: string): boolean { return type === "Int" || type === "Decimal"; }
+
+function identity(annotation: Annotation | undefined): IRIdentity {
+  return annotation
+    ? { strategy: "explicitStableId", stableId: String(annotation.value) }
+    : { strategy: "nameDerived" };
+}
 
 function entityId(entity: EntityDecl): string {
   return `entity:${String(entity.stableId?.value ?? entity.name)}`;
@@ -62,6 +68,33 @@ function fieldId(entity: EntityDecl, field: FieldDecl): string {
   return `field:${String(stableId ?? `${entity.name}.${field.name}`)}`;
 }
 
+function enumId(enumeration: Extract<Declaration, { kind: "enum" }>): string {
+  return `enum:${String(enumeration.stableId?.value ?? enumeration.name)}`;
+}
+
+function enumMemberId(
+  enumeration: Extract<Declaration, { kind: "enum" }>,
+  member: Extract<Declaration, { kind: "enum" }>["members"][number],
+): string {
+  return `enumMember:${String(member.stableId?.value ?? `${enumeration.name}.${member.name}`)}`;
+}
+
+function actionId(action: ActionDecl): string {
+  return `action:${String(action.stableId?.value ?? action.name)}`;
+}
+
+function queryId(query: QueryDecl): string {
+  return `query:${String(query.stableId?.value ?? query.name)}`;
+}
+
+function invariantId(entity: EntityDecl, invariant: InvariantDecl): string {
+  return `invariant:${String(invariant.stableId?.value ?? `${entity.name}.${invariant.name}`)}`;
+}
+
+function exclusionId(entity: EntityDecl, exclusion: ExclusionDecl): string {
+  return `exclusion:${String(exclusion.stableId?.value ?? `${entity.name}.${exclusion.name}`)}`;
+}
+
 function entityForType(symbols: Symbols, type: string): EntityDecl {
   const entity = [...symbols.entities.values()].find((candidate) => entityId(candidate) === type);
   if (!entity) throw new Error(`E2900 Unknown resolved entity type '${type}'.`);
@@ -70,7 +103,9 @@ function entityForType(symbols: Symbols, type: string): EntityDecl {
 
 export function analyze(program: Program, source: string, file: string): ModelIR {
   const symbols = collectSymbols(program, file);
-  validateEntities(symbols, file);
+  const stableIds = new Map<string, Span>();
+  validateDeclarationIdentities(symbols, stableIds, file);
+  validateEntities(symbols, stableIds, file);
   const principalNames = new Set<string>();
   for (const action of symbols.actions.values()) {
     const callers = action.parameters.filter((parameter) => parameter.caller);
@@ -93,18 +128,25 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const internalSchema = `${schema}_internal`;
 
   const enums = [...symbols.enums.values()].map((declaration) => ({
-    id: `enum:${declaration.name}`,
+    id: enumId(declaration),
     name: declaration.name,
-    members: declaration.members.map((member) => member.name),
+    identity: identity(declaration.stableId),
+    members: declaration.members.map((member) => ({
+      id: enumMemberId(declaration, member),
+      name: member.name,
+      identity: identity(member.stableId),
+      span: irSpan(member.span, file),
+      naming: { sqlValue: member.name, typescriptValue: member.name },
+    })),
     span: irSpan(declaration.span, file),
     naming: { sqlCheckPrefix: `ck_enum_${snakeCase(declaration.name)}`, typescriptName: declaration.name },
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
-  const enforcement = buildEnforcement(entities, actions, queries, schema, internalSchema);
+  const enforcement = buildEnforcement(enums, entities, actions, queries, schema, internalSchema);
   return {
-    irVersion: 5,
+    irVersion: 6,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -163,8 +205,24 @@ function collectSymbols(program: Program, file: string): Symbols {
   return { enums, entities, actions, queries, fields };
 }
 
-function validateEntities(symbols: Symbols, file: string): void {
-  const stableIds = new Map<string, Span>();
+type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "act" | "qry" | "inv" | "exc";
+
+function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
+  for (const enumeration of symbols.enums.values()) {
+    if (enumeration.stableId) validateStableId(enumeration.stableId, "enm", stableIds, file);
+    for (const member of enumeration.members) {
+      if (member.stableId) validateStableId(member.stableId, "emv", stableIds, file);
+    }
+  }
+  for (const action of symbols.actions.values()) {
+    if (action.stableId) validateStableId(action.stableId, "act", stableIds, file);
+  }
+  for (const query of symbols.queries.values()) {
+    if (query.stableId) validateStableId(query.stableId, "qry", stableIds, file);
+  }
+}
+
+function validateEntities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const entity of symbols.entities.values()) {
     if (entity.stableId) validateStableId(entity.stableId, "ent", stableIds, file);
     const fields = [...symbols.fields.get(entity.name)!.values()];
@@ -206,6 +264,7 @@ function validateEntities(symbols: Symbols, file: string): void {
       }
     }
     for (const exclusion of entity.members.filter((member) => member.kind === "exclusion")) {
+      if (exclusion.stableId) validateStableId(exclusion.stableId, "exc", stableIds, file);
       const key = symbols.fields.get(entity.name)!.get(exclusion.keyField);
       const start = symbols.fields.get(entity.name)!.get(exclusion.startField);
       const end = symbols.fields.get(entity.name)!.get(exclusion.endField);
@@ -223,14 +282,27 @@ function validateEntities(symbols: Symbols, file: string): void {
         throw new ModelError("E2504", "Temporal exclusion key, start, and end fields must be distinct.", exclusion.span, file);
       }
     }
+    for (const invariant of entity.members.filter((member) => member.kind === "invariant")) {
+      if (invariant.stableId) validateStableId(invariant.stableId, "inv", stableIds, file);
+    }
   }
 }
 
-function validateStableId(annotation: { value?: number | string; span: Span }, kind: "ent" | "fld", seen: Map<string, Span>, file: string): void {
+function validateStableId(annotation: { value?: number | string; span: Span }, kind: StableDeclarationKind, seen: Map<string, Span>, file: string): void {
   const value = typeof annotation.value === "string" ? annotation.value : "";
-  const pattern = kind === "ent" ? /^ent_[0-9a-f]{32}$/ : /^fld_[0-9a-f]{32}$/;
+  const pattern = new RegExp(`^${kind}_[0-9a-f]{32}$`);
   if (!pattern.test(value)) {
-    throw new ModelError("E2801", `Stable ${kind === "ent" ? "entity" : "field"} ID must match ${kind}_[0-9a-f]{32}.`, annotation.span, file);
+    const subject: Record<StableDeclarationKind, string> = {
+      ent: "entity",
+      fld: "field",
+      enm: "enum",
+      emv: "enum member",
+      act: "action",
+      qry: "query",
+      inv: "invariant",
+      exc: "exclusion",
+    };
+    throw new ModelError("E2801", `Stable ${subject[kind]} ID must match ${kind}_[0-9a-f]{32}.`, annotation.span, file);
   }
   const previous = seen.get(value);
   if (previous) throw new ModelError("E2802", `Duplicate stable ID '${value}'.`, annotation.span, file, { message: "First declared here.", span: previous });
@@ -243,9 +315,9 @@ function isCompileTimeConstant(expression: Expression, symbols: Symbols): boolea
 }
 
 function fieldType(field: FieldDecl, symbols: Symbols): string {
-  if (field.type.collection === "set") return `set:enum:${field.type.name}`;
+  if (field.type.collection === "set") return `set:${enumId(symbols.enums.get(field.type.name)!)}`;
   if (symbols.entities.has(field.type.name)) return entityId(symbols.entities.get(field.type.name)!);
-  if (symbols.enums.has(field.type.name)) return `enum:${field.type.name}`;
+  if (symbols.enums.has(field.type.name)) return enumId(symbols.enums.get(field.type.name)!);
   return field.type.name;
 }
 
@@ -253,9 +325,7 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
   const fields: IRField[] = entity.members.filter((member): member is FieldDecl => member.kind === "field").map((field) => ({
     id: fieldId(entity, field),
     name: field.name,
-    identity: field.annotations.some((annotation) => annotation.name === "stableId")
-      ? { strategy: "explicitStableId", stableId: String(field.annotations.find((annotation) => annotation.name === "stableId")!.value) }
-      : { strategy: "nameDerived" },
+    identity: identity(field.annotations.find((annotation) => annotation.name === "stableId")),
     type: fieldType(field, symbols),
     optional: field.optional,
     default: field.default ? typeExpression(field.default, { kind: "invariant", entity }, symbols, file) : undefined,
@@ -272,8 +342,9 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
     const expression = typeExpression(invariant.expression, { kind: "invariant", entity }, symbols, file);
     requireBoolean(expression, invariant.expression.span, file, "Invariant");
     return {
-      id: `invariant:${entity.name}.${invariant.name}`,
+      id: invariantId(entity, invariant),
       name: invariant.name,
+      identity: identity(invariant.stableId),
       expression,
       sourceExpression: expressionText(invariant.expression),
       span: irSpan(invariant.span, file),
@@ -281,8 +352,9 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
     };
   });
   const temporalExclusions = entity.members.filter((member) => member.kind === "exclusion").map((exclusion) => ({
-    id: `exclusion:${entity.name}.${exclusion.name}`,
+    id: exclusionId(entity, exclusion),
     name: exclusion.name,
+    identity: identity(exclusion.stableId),
     keyFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.keyField)!),
     startFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.startField)!),
     endFieldId: fieldId(entity, symbols.fields.get(entity.name)!.get(exclusion.endField)!),
@@ -297,9 +369,7 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
   return {
     id: entityId(entity),
     name: entity.name,
-    identity: entity.stableId
-      ? { strategy: "explicitStableId", stableId: String(entity.stableId.value) }
-      : { strategy: "nameDerived" },
+    identity: identity(entity.stableId),
     fields,
     invariants,
     temporalExclusions,
@@ -310,6 +380,7 @@ function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREnti
 }
 
 function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string, file: string): IRAction {
+  const semanticId = actionId(action);
   const seen = new Map<string, Span>();
   const parameters: IRParameter[] = action.parameters.map((parameter) => {
     const previous = seen.get(parameter.name);
@@ -319,9 +390,13 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     if (!scalars.has(parameter.type.name) && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
-    const type = symbols.entities.has(parameter.type.name) ? entityId(symbols.entities.get(parameter.type.name)!) : symbols.enums.has(parameter.type.name) ? `enum:${parameter.type.name}` : parameter.type.name;
+    const type = symbols.entities.has(parameter.type.name)
+      ? entityId(symbols.entities.get(parameter.type.name)!)
+      : symbols.enums.has(parameter.type.name)
+        ? enumId(symbols.enums.get(parameter.type.name)!)
+        : parameter.type.name;
     return {
-      id: `parameter:${action.name}.${parameter.name}`,
+      id: `parameter:${semanticId}.${parameter.name}`,
       name: parameter.name,
       type,
       caller: parameter.caller,
@@ -342,7 +417,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     preconditionNames.add(requirement.name);
     const expression = typeExpression(requirement.expression, scope, symbols, file);
     requireBoolean(expression, requirement.expression.span, file, "Precondition");
-    return { id: `require:${action.name}.${requirement.name}`, name: requirement.name, expression, sourceExpression: expressionText(requirement.expression), span: irSpan(requirement.span, file) };
+    return { id: `require:${semanticId}.${requirement.name}`, name: requirement.name, expression, sourceExpression: expressionText(requirement.expression), span: irSpan(requirement.span, file) };
   });
   const returnEntity = symbols.entities.get(action.returnType.name);
   if (!returnEntity) throw new ModelError("E2307", `Action return type '${action.returnType.name}' must be an entity.`, action.returnType.span, file);
@@ -392,13 +467,13 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   for (const assignment of assignments) collectEntityParameters(assignment.expression, usedParameters);
   const locks: Omit<IRLock, "order">[] = [];
   if (targetParameter) {
-    locks.push({ id: `lock:${action.name}.${targetParameter.name}`, source: targetParameter.id, parameterId: targetParameter.id, entityId: targetParameter.type, mode: "update" });
+    locks.push({ id: `lock:${semanticId}.${targetParameter.name}`, source: targetParameter.id, parameterId: targetParameter.id, entityId: targetParameter.type, mode: "update" });
     usedParameters.delete(targetParameter.id);
   }
   for (const parameterId of usedParameters) {
     const parameter = parameters.find((candidate) => candidate.id === parameterId)!;
     locks.push({
-      id: `lock:${action.name}.${parameter.name}`,
+      id: `lock:${semanticId}.${parameter.name}`,
       source: parameter.caller ? "caller" : parameter.id,
       parameterId: parameter.id,
       entityId: parameter.type,
@@ -408,13 +483,14 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   locks.sort((left, right) => left.entityId.localeCompare(right.entityId) || left.source.localeCompare(right.source));
   const lockPlan = locks.map((lock, order) => ({ ...lock, order }));
   return {
-    id: `action:${action.name}`,
+    id: semanticId,
     name: action.name,
+    identity: identity(action.stableId),
     parameters,
     callerParameterId: caller.id,
     callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
     returnEntityId: entityId(returnEntity),
-    authorization: { id: `authorize:${action.name}`, name: "authorize", expression: authorization, sourceExpression: expressionText(action.authorize), span: irSpan(action.authorize.span, file) },
+    authorization: { id: `authorize:${semanticId}`, name: "authorize", expression: authorization, sourceExpression: expressionText(action.authorize), span: irSpan(action.authorize.span, file) },
     preconditions,
     effect: { kind: action.effect.kind, target: action.effect.target, entityId: entityId(effectEntity), assignments },
     lockPlan,
@@ -424,6 +500,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
 }
 
 function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, file: string): IRQuery {
+  const semanticId = queryId(query);
   const seen = new Map<string, Span>();
   const parameters: IRParameter[] = query.parameters.map((parameter) => {
     const previous = seen.get(parameter.name);
@@ -436,10 +513,10 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     const type = symbols.entities.has(parameter.type.name)
       ? entityId(symbols.entities.get(parameter.type.name)!)
       : symbols.enums.has(parameter.type.name)
-        ? `enum:${parameter.type.name}`
+        ? enumId(symbols.enums.get(parameter.type.name)!)
         : parameter.type.name;
     return {
-      id: `parameter:${query.name}.${parameter.name}`,
+      id: `parameter:${semanticId}.${parameter.name}`,
       name: parameter.name,
       type,
       caller: parameter.caller,
@@ -495,22 +572,23 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   }
 
   return {
-    id: `query:${query.name}`,
+    id: semanticId,
     name: query.name,
+    identity: identity(query.stableId),
     parameters,
     callerParameterId: caller.id,
     callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
     sourceEntityId: entityId(sourceEntity),
     rowAlias: query.rowAlias.name,
     authorization: {
-      id: `authorize:${query.name}`,
+      id: `authorize:${semanticId}`,
       name: "authorize",
       expression: authorization,
       sourceExpression: expressionText(query.authorize),
       span: irSpan(query.authorize.span, file),
     },
     rowPolicy: {
-      id: `where:${query.name}`,
+      id: `where:${semanticId}`,
       name: "where",
       expression: rowPolicy,
       sourceExpression: expressionText(query.where),
@@ -548,7 +626,7 @@ function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, 
     return { kind: "binary", operator: expression.operator, left, right, type: "Boolean", nullable: left.nullable || right.nullable };
   }
   if (expression.operator === "in") {
-    if (!isEnumSetType(right.type) || left.type !== `enum:${enumSetName(right.type)}`) {
+    if (!isEnumSetType(right.type) || left.type !== enumSetId(right.type)) {
       throw new ModelError("E2705", `Set membership requires a matching enum member and enum set, not ${left.type} in ${right.type}.`, expression.span, file);
     }
     return {
@@ -595,10 +673,18 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
   if (third) throw new ModelError("E2405", "Transitive relationship traversal is not supported.", expression.span, file);
   const enumeration = first ? symbols.enums.get(first) : undefined;
   if (enumeration && second) {
-    if (expression.parts.length !== 2 || !enumeration.members.some((member) => member.name === second)) {
+    const member = enumeration.members.find((candidate) => candidate.name === second);
+    if (expression.parts.length !== 2 || !member) {
       throw new ModelError("E2006", `Unknown enum member '${expression.parts.join(".")}'.`, expression.span, file);
     }
-    return { kind: "enumLiteral", enumId: `enum:${first}`, member: second, type: `enum:${first}`, nullable: false };
+    return {
+      kind: "enumLiteral",
+      enumId: enumId(enumeration),
+      memberId: enumMemberId(enumeration, member),
+      memberName: member.name,
+      type: enumId(enumeration),
+      nullable: false,
+    };
   }
   if (scope.kind === "invariant") {
     if (expression.parts.length !== 1) throw new ModelError("E2406", "Entity invariants may not dereference related entities.", expression.span, file);
@@ -672,7 +758,7 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
   if (expression.kind === "nullComparison") collectEntityParameters(expression.operand, found);
 }
 
-function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IRQuery[], schema: string, internalSchema: string): EnforcementEntry[] {
+function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRAction[], queries: IRQuery[], schema: string, internalSchema: string): EnforcementEntry[] {
   const entries: EnforcementEntry[] = [{
     id: "boundary:principal_binding",
     purpose: "Bind session_user to the model principal through an owner-controlled table.",
@@ -694,16 +780,16 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IR
   }];
   for (const entity of entities) {
     for (const field of entity.fields) {
-      if (!field.optional) entries.push({ id: `required:${entity.name}.${field.name}`, purpose: `${field.name} is required.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn} NOT NULL`, source: field.span });
-      if (isEntityType(field.type)) entries.push({ id: `reference:${entity.name}.${field.name}`, purpose: `${field.name} references ${entities.find((candidate) => candidate.id === field.type)?.name ?? field.type}.`, layer: "PostgreSQL foreign key", artifact: "postgres/002_schema.sql", objectName: `fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`, source: field.span });
-      if (isEnumType(field.type)) entries.push({ id: `enum-membership:${entity.name}.${field.name}`, purpose: `${field.name} must be a declared ${field.type.slice(5)} member.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`, source: field.span });
-      if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${entity.name}.${field.name}`, purpose: `${field.name} is a duplicate-free set of declared ${enumSetName(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
-      if (field.default) entries.push({ id: `default:${entity.name}.${field.name}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
-      if (field.storage === "snapshot") entries.push({ id: `snapshot:${entity.name}.${field.name}`, purpose: `${field.name} is a stored point-in-time audit snapshot, not a live relationship-derived value.`, layer: "ModelLang storage semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
+      if (!field.optional) entries.push({ id: `required:${field.id}`, purpose: `${field.name} is required.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn} NOT NULL`, source: field.span });
+      if (isEntityType(field.type)) entries.push({ id: `reference:${field.id}`, purpose: `${field.name} references ${entities.find((candidate) => candidate.id === field.type)?.name ?? field.type}.`, layer: "PostgreSQL foreign key", artifact: "postgres/002_schema.sql", objectName: `fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`, source: field.span });
+      if (isEnumType(field.type)) entries.push({ id: `enum-membership:${field.id}`, purpose: `${field.name} must be a declared ${enums.find((candidate) => candidate.id === field.type)?.name ?? field.type} member.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`, source: field.span });
+      if (isEnumSetType(field.type)) entries.push({ id: `enum-set:${field.id}`, purpose: `${field.name} is a duplicate-free set of declared ${enums.find((candidate) => candidate.id === enumSetId(field.type))?.name ?? enumSetId(field.type)} members.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`, source: field.span });
+      if (field.default) entries.push({ id: `default:${field.id}`, purpose: `Apply the declared constant default for ${field.name}.`, layer: "PostgreSQL column default", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn}`, source: field.span });
+      if (field.storage === "snapshot") entries.push({ id: `snapshot:${field.id}`, purpose: `${field.name} is a stored point-in-time audit snapshot, not a live relationship-derived value.`, layer: "ModelLang storage semantics", artifact: "model.ir.json", objectName: field.id, source: field.span });
       for (const annotation of field.annotations) {
         if (annotation.name === "snapshot") continue;
         entries.push({
-          id: `annotation:${entity.name}.${field.name}.${annotation.name}`,
+          id: `annotation:${field.id}.${annotation.name}`,
           purpose: `Enforce @${annotation.name}${annotation.value === undefined ? "" : `(${annotation.value})`}.`,
           layer: annotation.name === "id" ? "PostgreSQL primary key" : "PostgreSQL constraint",
           artifact: "postgres/002_schema.sql",
@@ -731,29 +817,29 @@ function buildEnforcement(entities: IREntity[], actions: IRAction[], queries: IR
         source: exclusion.span,
       });
     }
-    entries.push({ id: `boundary:${entity.name}.direct_write`, purpose: "Application principals cannot directly mutate entity rows.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
-    entries.push({ id: `boundary:${entity.name}.direct_read`, purpose: "Application principals cannot directly read entity rows outside generated queries.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
+    entries.push({ id: `boundary:${entity.id}.direct_write`, purpose: "Application principals cannot directly mutate entity rows.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
+    entries.push({ id: `boundary:${entity.id}.direct_read`, purpose: "Application principals cannot directly read entity rows outside generated queries.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
   }
   for (const action of actions) {
     const fn = `${schema}.${action.naming.sqlFunction}`;
     const caller = action.parameters.find((parameter) => parameter.id === action.callerParameterId)!;
-    entries.push({ id: `caller:${action.name}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_actions.sql", objectName: fn, source: caller.span });
-    entries.push({ id: `boundary:${action.name}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_actions.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
+    entries.push({ id: `caller:${action.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_actions.sql", objectName: fn, source: caller.span });
+    entries.push({ id: `boundary:${action.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_actions.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
-    entries.push({ id: `effect:${action.name}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
+    entries.push({ id: `effect:${action.id}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     for (const lock of action.lockPlan) entries.push({ id: lock.id, purpose: `Stabilize ${lock.source} before evaluating guards and effects.`, layer: "PostgreSQL row lock", artifact: "postgres/003_actions.sql", objectName: `${lock.mode === "update" ? "FOR UPDATE" : "FOR SHARE"} in ${fn}` });
   }
   for (const query of queries) {
     const fn = `${schema}.${query.naming.sqlFunction}`;
     const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId)!;
-    entries.push({ id: `caller:${query.name}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
-    entries.push({ id: `boundary:${query.name}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
+    entries.push({ id: `caller:${query.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
+    entries.push({ id: `boundary:${query.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
-    entries.push({ id: `order:${query.name}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
-    entries.push({ id: `limit:${query.name}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
-    entries.push({ id: `read:${query.name}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `read:${query.id}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
   }
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   return entries;

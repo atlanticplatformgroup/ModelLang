@@ -20,7 +20,9 @@ export type Declaration = EnumDecl | EntityDecl | ActionDecl | QueryDecl;
 export interface EnumDecl {
   kind: "enum";
   name: string;
-  members: { name: string; span: Span }[];
+  nameSpan: Span;
+  stableId?: Annotation;
+  members: { name: string; nameSpan: Span; stableId?: Annotation; span: Span }[];
   span: Span;
 }
 
@@ -49,6 +51,8 @@ export interface FieldDecl {
 export interface InvariantDecl {
   kind: "invariant";
   name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
   expression: Expression;
   span: Span;
 }
@@ -56,6 +60,8 @@ export interface InvariantDecl {
 export interface ExclusionDecl {
   kind: "exclusion";
   name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
   keyField: string;
   startField: string;
   endField: string;
@@ -100,6 +106,8 @@ export interface Effect {
 export interface ActionDecl {
   kind: "action";
   name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
   parameters: ParameterDecl[];
   returnType: TypeRef;
   authorize: Expression;
@@ -111,6 +119,8 @@ export interface ActionDecl {
 export interface QueryDecl {
   kind: "query";
   name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
   parameters: ParameterDecl[];
   sourceType: TypeRef;
   rowAlias: { name: string; span: Span };

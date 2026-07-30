@@ -11,21 +11,35 @@ export interface IRType {
   nullable: boolean;
 }
 
+export interface IRIdentity {
+  strategy: "explicitStableId" | "nameDerived";
+  stableId?: string;
+}
+
 export type IRExpression =
   | { kind: "literal"; value: string | number | boolean; type: string; nullable: false }
   | { kind: "nullLiteral"; type: "null"; nullable: true }
   | { kind: "parameter"; parameterId: string; name: string; type: string; nullable: false }
   | { kind: "entityValue"; parameterId: string; name: string; entityId: string; type: string; nullable: false }
   | { kind: "fieldAccess"; source: string; parameter?: string; fieldId: string; fieldName: string; type: string; nullable: boolean }
-  | { kind: "enumLiteral"; enumId: string; member: string; type: string; nullable: false }
+  | { kind: "enumLiteral"; enumId: string; memberId: string; memberName: string; type: string; nullable: false }
   | { kind: "unary"; operator: "not"; operand: IRExpression; type: "Boolean"; nullable: boolean }
   | { kind: "binary"; operator: "and" | "or" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: IRExpression; right: IRExpression; type: "Boolean"; nullable: boolean; comparisonSemantics?: "entityIdentity" | "setMembership" }
   | { kind: "nullComparison"; operator: "isNull" | "isNotNull"; operand: IRExpression; type: "Boolean"; nullable: false };
 
+export interface IREnumMember {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  span: IRSpan;
+  naming: { sqlValue: string; typescriptValue: string };
+}
+
 export interface IREnum {
   id: string;
   name: string;
-  members: string[];
+  identity: IRIdentity;
+  members: IREnumMember[];
   span: IRSpan;
   naming: { sqlCheckPrefix: string; typescriptName: string };
 }
@@ -33,7 +47,7 @@ export interface IREnum {
 export interface IRField {
   id: string;
   name: string;
-  identity: { strategy: "explicitStableId" | "nameDerived"; stableId?: string };
+  identity: IRIdentity;
   type: string;
   optional: boolean;
   default?: IRExpression;
@@ -46,6 +60,7 @@ export interface IRField {
 export interface IRInvariant {
   id: string;
   name: string;
+  identity: IRIdentity;
   expression: IRExpression;
   sourceExpression: string;
   span: IRSpan;
@@ -55,6 +70,7 @@ export interface IRInvariant {
 export interface IRTemporalExclusion {
   id: string;
   name: string;
+  identity: IRIdentity;
   keyFieldId: string;
   startFieldId: string;
   endFieldId: string;
@@ -70,7 +86,7 @@ export interface IRTemporalExclusion {
 export interface IREntity {
   id: string;
   name: string;
-  identity: { strategy: "explicitStableId" | "nameDerived"; stableId?: string };
+  identity: IRIdentity;
   fields: IRField[];
   invariants: IRInvariant[];
   temporalExclusions: IRTemporalExclusion[];
@@ -116,6 +132,7 @@ export interface IREffect {
 export interface IRAction {
   id: string;
   name: string;
+  identity: IRIdentity;
   parameters: IRParameter[];
   callerParameterId: string;
   callableParameters: string[];
@@ -131,6 +148,7 @@ export interface IRAction {
 export interface IRQuery {
   id: string;
   name: string;
+  identity: IRIdentity;
   parameters: IRParameter[];
   callerParameterId: string;
   callableParameters: string[];
@@ -158,7 +176,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 5;
+  irVersion: 6;
   model: {
     id: string;
     name: string;

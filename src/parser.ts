@@ -64,11 +64,18 @@ class Parser {
   private parseEnum(): Declaration {
     const start = this.expectWord("enum");
     const name = this.identifier();
+    const stableId = this.at("@") ? this.parseStableId("enum declaration") : undefined;
     this.expect("{");
-    const members: { name: string; span: Span }[] = [];
+    const members: { name: string; nameSpan: Span; stableId?: Annotation; span: Span }[] = [];
     while (!this.at("}")) {
       const member = this.identifier("Expected enum member.");
-      members.push({ name: member.text, span: member.span });
+      const memberStableId = this.at("@") ? this.parseStableId("enum member") : undefined;
+      members.push({
+        name: member.text,
+        nameSpan: member.span,
+        stableId: memberStableId,
+        span: memberStableId ? this.span(member, memberStableId.span) : member.span,
+      });
       if (this.at(",")) {
         this.take();
         if (this.at("}")) break;
@@ -78,14 +85,14 @@ class Parser {
     }
     if (members.length === 0) this.fail("E1105", "An enum must have at least one member.");
     const end = this.expect("}");
-    return { kind: "enum", name: name.text, members, span: this.span(start, end) };
+    return { kind: "enum", name: name.text, nameSpan: name.span, stableId, members, span: this.span(start, end) };
   }
 
   private parseEntity(): EntityDecl {
     const start = this.expectWord("entity");
     const name = this.identifier();
     let stableId: Annotation | undefined;
-    if (this.at("@")) stableId = this.parseStableId();
+    if (this.at("@")) stableId = this.parseStableId("entity declaration");
     this.expect("{");
     const members: EntityDecl["members"] = [];
     while (!this.at("}")) {
@@ -97,10 +104,10 @@ class Parser {
     return { kind: "entity", name: name.text, nameSpan: name.span, stableId, members, span: this.span(start, end) };
   }
 
-  private parseStableId(): Annotation {
+  private parseStableId(subject: string): Annotation {
     const start = this.expect("@");
     const name = this.identifier("Expected stableId annotation.");
-    if (name.text !== "stableId") this.fail("E1111", "Only @stableId is valid on an entity declaration.");
+    if (name.text !== "stableId") this.fail("E1111", `Only @stableId is valid on a ${subject}.`);
     this.expect("(");
     const value = this.expect("string", "Expected a stable ID string.");
     const end = this.expect(")");
@@ -152,15 +159,17 @@ class Parser {
   private parseInvariant(): InvariantDecl {
     const start = this.expectWord("invariant");
     const name = this.identifier();
+    const stableId = this.at("@") ? this.parseStableId("invariant declaration") : undefined;
     this.expect(":");
     const expression = this.parseExpression();
     const end = this.expect(";");
-    return { kind: "invariant", name: name.text, expression, span: this.span(start, end) };
+    return { kind: "invariant", name: name.text, nameSpan: name.span, stableId, expression, span: this.span(start, end) };
   }
 
   private parseExclusion(): ExclusionDecl {
     const start = this.expectWord("exclusion");
     const name = this.identifier();
+    const stableId = this.at("@") ? this.parseStableId("exclusion declaration") : undefined;
     this.expect(":");
     this.expectWord("noOverlap");
     this.expect("(");
@@ -174,6 +183,8 @@ class Parser {
     return {
       kind: "exclusion",
       name: name.text,
+      nameSpan: name.span,
+      stableId,
       keyField: keyField.text,
       startField: startField.text,
       endField: endField.text,
@@ -184,6 +195,7 @@ class Parser {
   private parseAction(): ActionDecl {
     const start = this.expectWord("action");
     const name = this.identifier();
+    const stableId = this.at("@") ? this.parseStableId("action declaration") : undefined;
     this.expect("(");
     const parameters: ParameterDecl[] = [];
     if (!this.at(")")) {
@@ -216,12 +228,13 @@ class Parser {
     }
     const effect = this.parseEffect();
     const end = this.expect("}");
-    return { kind: "action", name: name.text, parameters, returnType, authorize, requires, effect, span: this.span(start, end) };
+    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, effect, span: this.span(start, end) };
   }
 
   private parseQuery(): QueryDecl {
     const start = this.expectWord("query");
     const name = this.identifier();
+    const stableId = this.at("@") ? this.parseStableId("query declaration") : undefined;
     this.expect("(");
     const parameters: ParameterDecl[] = [];
     if (!this.at(")")) {
@@ -260,6 +273,8 @@ class Parser {
     return {
       kind: "query",
       name: name.text,
+      nameSpan: name.span,
+      stableId,
       parameters,
       sourceType,
       rowAlias: { name: alias.text, span: alias.span },
