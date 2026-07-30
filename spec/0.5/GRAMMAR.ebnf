@@ -1,0 +1,8 @@
+entity_decl      = "entity", IDENT, [ stable_id ], "{",
+                   { field_decl | invariant_decl | exclusion_decl }, "}" ;
+field_decl       = IDENT, ":", type_ref, [ "?" ],
+                   [ "=", expression ], { annotation }, ";" ;
+annotation       = inherited_annotation | stable_id ;
+stable_id        = "@stableId", "(", STRING, ")" ;
+
+All productions not replaced above are inherited from the ModelLang 0.4 grammar.
