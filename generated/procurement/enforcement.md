@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3febe7`
+Source hash: `sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -58,11 +58,14 @@ Source hash: `sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3
 | `effect:action:act_d39dbb883b5f4019b9027b85add3de47` | update entity:ent_9bc680209327484c8e98f5f740bcc702. | PostgreSQL action function | `postgres/003_actions.sql`: `model_procurement.approve_request` | examples/procurement.model:90:1 |
 | `lock:action:act_d39dbb883b5f4019b9027b85add3de47.actor` | Stabilize caller before evaluating guards and effects. | PostgreSQL row lock | `postgres/003_actions.sql`: `FOR SHARE in model_procurement.approve_request` | compiler-derived |
 | `lock:action:act_d39dbb883b5f4019b9027b85add3de47.request` | Stabilize parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request before evaluating guards and effects. | PostgreSQL row lock | `postgres/003_actions.sql`: `FOR UPDATE in model_procurement.approve_request` | compiler-derived |
-| `caller:query:qry_4406b045404a48449282db804f6167a8.actor` | Derive the semantic caller from session_user; no caller UUID is accepted. | PostgreSQL session identity | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:113:3 |
+| `caller:query:qry_4406b045404a48449282db804f6167a8.actor` | Derive the semantic caller from session_user; no caller UUID is accepted. | PostgreSQL session identity | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:121:3 |
 | `boundary:query:qry_4406b045404a48449282db804f6167a8.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_procurement.my_requests search_path=pg_catalog,pg_temp` | compiler-derived |
-| `authorize:query:qry_4406b045404a48449282db804f6167a8` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:115:13 |
-| `where:query:qry_4406b045404a48449282db804f6167a8` | (request.requester == actor) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:116:9 |
-| `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:112:1 |
-| `limit:query:qry_4406b045404a48449282db804f6167a8` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:112:1 |
-| `read:query:qry_4406b045404a48449282db804f6167a8` | Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:112:1 |
+| `authorize:query:qry_4406b045404a48449282db804f6167a8` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:123:13 |
+| `where:query:qry_4406b045404a48449282db804f6167a8` | (request.requester == actor) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:124:9 |
+| `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:120:1 |
+| `limit:query:qry_4406b045404a48449282db804f6167a8` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:120:1 |
+| `read:query:qry_4406b045404a48449282db804f6167a8` | Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:120:1 |
+| `workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87` | Require new entity:ent_9bc680209327484c8e98f5f740bcc702 rows to begin in the declared initial state. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_insert` | examples/procurement.model:112:1 |
+| `transition:trn_7787ccd311944f109b69e35967bcbe2c` | Permit only the declared workflow edge implemented by action:act_ed2374e822704c51a2925338253d05d2. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_update` | examples/procurement.model:114:3 |
+| `transition:trn_efd18c8576154ba8b138c97b551afae3` | Permit only the declared workflow edge implemented by action:act_d39dbb883b5f4019b9027b85add3de47. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_update` | examples/procurement.model:116:3 |
 | `boundary:audit` | Record each successful action with database and model principal identities. | PostgreSQL audit | `postgres/003_actions.sql`: `model_procurement_internal.action_audit` | compiler-derived |

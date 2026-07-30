@@ -56,7 +56,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(8);
+    expect(ir.irVersion).toBe(9);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -176,7 +176,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(8);
+    expect(ir.irVersion).toBe(9);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -246,7 +246,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(8);
+    expect(ir.irVersion).toBe(9);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -279,7 +279,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(8);
+    expect(ir.irVersion).toBe(9);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -383,7 +383,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(8);
+    expect(ir.irVersion).toBe(9);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -428,6 +428,121 @@ describe("ModelLang 0.4 enum sets", () => {
       ${authorization}
       update record { rolesAtWrite = actor.roles; }
     }`);
+    expect(failure(source).code).toBe(code);
+  });
+});
+
+const workflowModel = `model WorkflowProof version "0.9.0";
+enum State { DRAFT, SUBMITTED, DONE }
+entity User { id: UUID @id; }
+entity Task {
+  id: UUID @id;
+  state: State = State.DRAFT;
+}
+action open(caller actor: User, id: UUID) -> Task {
+  authorize true;
+  create Task { id = id; state = State.DRAFT; }
+}
+action submit(caller actor: User, task: Task) -> Task {
+  authorize true;
+  require is_draft: task.state == State.DRAFT;
+  update task { state = State.SUBMITTED; }
+}
+action finish(caller actor: User, task: Task) -> Task {
+  authorize true;
+  require is_submitted: task.state == State.SUBMITTED;
+  update task { state = State.DONE; }
+}
+workflow TaskLifecycle for Task.state {
+  initial State.DRAFT;
+  transition submit: State.DRAFT -> State.SUBMITTED by submit;
+  transition finish: State.SUBMITTED -> State.DONE by finish;
+}`;
+
+describe("ModelLang 0.9 workflows", () => {
+  it("lowers initial state, action-backed transitions, and enforcement targets into IR9", () => {
+    const ir = compileText(workflowModel, "workflow.model");
+    expect(ir.irVersion).toBe(9);
+    expect(ir.workflows).toEqual([
+      expect.objectContaining({
+        id: "workflow:TaskLifecycle",
+        entityId: "entity:Task",
+        fieldId: "field:Task.state",
+        enumId: "enum:State",
+        initialMemberId: "enumMember:State.DRAFT",
+        transitions: [
+          expect.objectContaining({
+            id: "transition:TaskLifecycle.submit",
+            fromMemberId: "enumMember:State.DRAFT",
+            toMemberId: "enumMember:State.SUBMITTED",
+            actionId: "action:submit",
+          }),
+          expect.objectContaining({
+            id: "transition:TaskLifecycle.finish",
+            fromMemberId: "enumMember:State.SUBMITTED",
+            toMemberId: "enumMember:State.DONE",
+            actionId: "action:finish",
+          }),
+        ],
+      }),
+    ]);
+    expect(ir.enforcement.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "workflow-initial:workflow:TaskLifecycle",
+      "transition:TaskLifecycle.submit",
+      "transition:TaskLifecycle.finish",
+    ]));
+  });
+
+  it.each([
+    [
+      "a state-field default that differs from initial",
+      workflowModel.replace("state: State = State.DRAFT", "state: State = State.SUBMITTED"),
+      "E3007",
+    ],
+    [
+      "an action that writes a different destination",
+      workflowModel.replace("update task { state = State.SUBMITTED; }", "update task { state = State.DONE; }"),
+      "E3014",
+    ],
+    [
+      "a transition action without a source-state require",
+      workflowModel.replace("  require is_draft: task.state == State.DRAFT;\n", ""),
+      "E3015",
+    ],
+    [
+      "a create action that skips the initial state",
+      workflowModel.replace(
+        "create Task { id = id; state = State.DRAFT; }",
+        "create Task { id = id; state = State.SUBMITTED; }",
+      ),
+      "E3016",
+    ],
+    [
+      "an action that mutates the state outside the workflow",
+      workflowModel.replace(
+        "workflow TaskLifecycle",
+        `action reset(caller actor: User, task: Task) -> Task {
+  authorize true;
+  update task { state = State.DRAFT; }
+}
+workflow TaskLifecycle`,
+      ),
+      "E3017",
+    ],
+    [
+      "a self-transition",
+      workflowModel.replace(
+        "transition submit: State.DRAFT -> State.SUBMITTED by submit;",
+        "transition submit: State.SUBMITTED -> State.SUBMITTED by submit;",
+      ),
+      "E3009",
+    ],
+    [
+      "an unreachable enum state",
+      workflowModel.replace("enum State { DRAFT, SUBMITTED, DONE }", "enum State { DRAFT, SUBMITTED, DONE, ARCHIVED }"),
+      "E3018",
+    ],
+  ])("rejects %s", (_name, source, code) => {
     expect(failure(source).code).toBe(code);
   });
 });

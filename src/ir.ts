@@ -169,6 +169,34 @@ export interface IRQuery {
   naming: { sqlFunction: string; typescriptMethod: string };
 }
 
+export interface IRWorkflowTransition {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  fromMemberId: string;
+  toMemberId: string;
+  actionId: string;
+  span: IRSpan;
+}
+
+export interface IRWorkflow {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  entityId: string;
+  fieldId: string;
+  enumId: string;
+  initialMemberId: string;
+  transitions: IRWorkflowTransition[];
+  span: IRSpan;
+  naming: {
+    sqlTriggerFunction: string;
+    sqlInsertTrigger: string;
+    sqlUpdateTrigger: string;
+    typescriptName: string;
+  };
+}
+
 export interface EnforcementEntry {
   id: string;
   purpose: string;
@@ -179,7 +207,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 8;
+  irVersion: 9;
   model: {
     id: string;
     name: string;
@@ -193,6 +221,7 @@ export interface ModelIR {
   entities: IREntity[];
   actions: IRAction[];
   queries: IRQuery[];
+  workflows: IRWorkflow[];
   enforcement: EnforcementEntry[];
 }
 

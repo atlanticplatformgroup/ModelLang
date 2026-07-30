@@ -1,4 +1,4 @@
--- source sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3febe7
+-- source sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -36,6 +36,39 @@ ALTER TABLE "model_procurement"."purchase_request"
 ALTER TABLE "model_procurement"."purchase_request"
   ADD CONSTRAINT "fk_purchase_request_approved_by_id"
   FOREIGN KEY ("approved_by_id") REFERENCES "model_procurement"."user" ("id");
+
+CREATE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW."status" IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87', CONSTRAINT = 'trg_purchase_request_status_workflow_insert';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW."status" IS NOT DISTINCT FROM OLD."status" THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT ((OLD."status" = 'DRAFT' AND NEW."status" = 'SUBMITTED')
+    OR (OLD."status" = 'SUBMITTED' AND NEW."status" = 'APPROVED')) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87', CONSTRAINT = 'trg_purchase_request_status_workflow_update';
+  END IF;
+  RETURN NEW;
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"() FROM PUBLIC;
+CREATE TRIGGER "trg_purchase_request_status_workflow_insert"
+AFTER INSERT ON "model_procurement"."purchase_request"
+FOR EACH ROW EXECUTE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"();
+CREATE TRIGGER "trg_purchase_request_status_workflow_update"
+BEFORE UPDATE OF "status" ON "model_procurement"."purchase_request"
+FOR EACH ROW EXECUTE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"();
 
 CREATE TABLE "model_procurement_internal"."principal_binding" (
   "database_principal" name PRIMARY KEY,

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileText } from "../src/compiler.js";
 import { ModelError } from "../src/diagnostics.js";
@@ -90,6 +91,40 @@ action make(caller actor: User, id: UUID) -> User {
     });
   });
 
+  it("assigns stable IDs to workflows and their transitions", () => {
+    const source = `model WorkflowIds version "0.9.0";
+enum State { DRAFT, SUBMITTED }
+entity User { id: UUID @id; }
+entity Task { id: UUID @id; state: State = State.DRAFT; }
+action open(caller actor: User, id: UUID) -> Task {
+  authorize true;
+  create Task { id = id; state = State.DRAFT; }
+}
+action submit(caller actor: User, task: Task) -> Task {
+  authorize true;
+  require is_draft: task.state == State.DRAFT;
+  update task { state = State.SUBMITTED; }
+}
+workflow TaskLifecycle for Task.state {
+  initial State.DRAFT;
+  transition submit: State.DRAFT -> State.SUBMITTED by submit;
+}`;
+    const prefix: Record<StableIdKind, string> = {
+      entity: "ent", field: "fld", enum: "enm", enumMember: "emv",
+      action: "act", query: "qry", invariant: "inv", exclusion: "exc",
+      workflow: "wfl", transition: "trn",
+    };
+    let sequence = 0;
+    const assigned = assignStableIds(source, "workflow-ids.model", (kind) =>
+      `${prefix[kind]}_${(++sequence).toString(16).padStart(32, "0")}`);
+    expect(assigned.source).toMatch(/workflow TaskLifecycle @stableId\("wfl_[0-9a-f]{32}"\)/);
+    expect(assigned.source).toMatch(/transition submit @stableId\("trn_[0-9a-f]{32}"\):/);
+    const ir = compileText(assigned.source, "workflow-ids.model");
+    expect(ir.workflows[0]!.identity).toMatchObject({ strategy: "explicitStableId" });
+    expect(ir.workflows[0]!.transitions[0]!.identity).toMatchObject({ strategy: "explicitStableId" });
+    expect(assignStableIds(assigned.source, "workflow-ids.model").assigned).toBe(0);
+  });
+
   it("assigns IDs to enums, enum members, invariants, exclusions, actions, and queries", () => {
     const source = `model CompleteIds version "1";
 enum State { OPEN, CLOSED }
@@ -119,6 +154,7 @@ query bookings(caller actor: User) from Booking as booking {
     const prefixes: Record<StableIdKind, string> = {
       entity: "ent", field: "fld", enum: "enm", enumMember: "emv",
       action: "act", query: "qry", invariant: "inv", exclusion: "exc",
+      workflow: "wfl", transition: "trn",
     };
     const assigned = assignStableIds(source, "complete.model", (kind) => {
       seen.push(kind);
@@ -129,7 +165,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "invariant", "exclusion", "action", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(8);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(9);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -150,6 +186,8 @@ query bookings(caller actor: User) from Booking as booking {
     ["exclusion", `entity User { id: UUID @id; } entity Resource { id: UUID @id; } entity Slot { id: UUID @id; resource: Resource; starts: DateTime; ends: DateTime; exclusion no_overlap @stableId("bad"): noOverlap(resource, starts, ends); }`],
     ["action", `entity User { id: UUID @id; } action make @stableId("bad")(caller actor: User, id: UUID) -> User { authorize true; create User { id = id; } }`],
     ["query", `entity User { id: UUID @id; } query users @stableId("bad")(caller actor: User) from User as user { authorize true; where true; orderBy user.id asc; limit 10; }`],
+    ["workflow", `enum State { DRAFT } entity User { id: UUID @id; state: State = State.DRAFT; } workflow Lifecycle @stableId("bad") for User.state { initial State.DRAFT; }`],
+    ["transition", `enum State { DRAFT, DONE } entity User { id: UUID @id; state: State = State.DRAFT; } workflow Lifecycle for User.state { initial State.DRAFT; transition finish @stableId("bad"): State.DRAFT -> State.DONE by establish; }`],
   ])("rejects an invalid %s stable ID", (_name, declaration) => {
     const source = `model InvalidStableId version "1"; ${declaration}
       action establish(caller actor: User, id: UUID) -> User { authorize true; create User { id = id; } }`;
@@ -217,6 +255,26 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.6 rename migration planning", () => {
+  it("fails closed when a stable workflow changes", () => {
+    const source = readFileSync("examples/procurement.model", "utf8");
+    const previous = compileText(source, "examples/procurement.model");
+    const renamed = compileText(
+      source.replace("PurchaseRequestLifecycle", "RequestLifecycle"),
+      "examples/procurement.model",
+    );
+    const workflowError = error(() => planMigration(previous, renamed));
+    expect(workflowError.code).toBe("E2807");
+    expect(workflowError.message).toContain("workflow migrations are intentionally unsupported in 0.9");
+
+    const renamedTarget = compileText(
+      source.replaceAll("status", "lifecycleStatus"),
+      "examples/procurement.model",
+    );
+    const targetError = error(() => planMigration(previous, renamedTarget));
+    expect(targetError.code).toBe("E2807");
+    expect(targetError.message).toContain("workflow migrations are intentionally unsupported in 0.9");
+  });
+
   it("matches by ID and emits deterministic entity and field renames", () => {
     const previous = compileText(renameModel({ version: "1.0.0" }), "previous.model");
     const current = compileText(renameModel({

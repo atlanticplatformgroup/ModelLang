@@ -9,7 +9,9 @@ export type StableIdKind =
   | "action"
   | "query"
   | "invariant"
-  | "exclusion";
+  | "exclusion"
+  | "workflow"
+  | "transition";
 
 export interface AssignedStableIds {
   source: string;
@@ -26,6 +28,8 @@ function generatedId(kind: StableIdKind): string {
     query: "qry",
     invariant: "inv",
     exclusion: "exc",
+    workflow: "wfl",
+    transition: "trn",
   };
   return `${prefix[kind]}_${randomUUID().replaceAll("-", "")}`;
 }
@@ -67,6 +71,15 @@ export function assignStableIds(
             text: ` @stableId("${createId(member.kind)}")`,
           });
         }
+      }
+    }
+    if (declaration.kind === "workflow") {
+      for (const transition of declaration.transitions) {
+        if (transition.stableId) continue;
+        edits.push({
+          offset: transition.nameSpan.end.offset,
+          text: ` @stableId("${createId("transition")}")`,
+        });
       }
     }
   }

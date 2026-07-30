@@ -218,6 +218,51 @@ function generateSchema(ir: ModelIR): string {
       );
     }
   }
+  for (const workflow of ir.workflows) {
+    const entity = entityById(ir, workflow.entityId);
+    const field = fieldById(ir, workflow.fieldId).field;
+    const initial = enumMemberById(ir, workflow.enumId, workflow.initialMemberId);
+    const allowed = workflow.transitions.map((transition) => {
+      const from = enumMemberById(ir, workflow.enumId, transition.fromMemberId).naming.sqlValue.replaceAll("'", "''");
+      const to = enumMemberById(ir, workflow.enumId, transition.toMemberId).naming.sqlValue.replaceAll("'", "''");
+      return `(OLD.${quoteIdent(field.naming.sqlColumn)} = '${from}' AND NEW.${quoteIdent(field.naming.sqlColumn)} = '${to}')`;
+    });
+    const workflowRule = workflow.id.replaceAll("'", "''");
+    lines.push(
+      `CREATE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}()`,
+      "RETURNS trigger",
+      "LANGUAGE plpgsql",
+      "SET search_path = pg_catalog, pg_temp",
+      "AS $modellang$",
+      "BEGIN",
+      "  IF TG_OP = 'INSERT' THEN",
+      `    IF NEW.${quoteIdent(field.naming.sqlColumn)} IS DISTINCT FROM '${initial.naming.sqlValue.replaceAll("'", "''")}' THEN`,
+      `      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlInsertTrigger.replaceAll("'", "''")}';`,
+      "    END IF;",
+      "    RETURN NEW;",
+      "  END IF;",
+      "",
+      `  IF NEW.${quoteIdent(field.naming.sqlColumn)} IS NOT DISTINCT FROM OLD.${quoteIdent(field.naming.sqlColumn)} THEN`,
+      "    RETURN NEW;",
+      "  END IF;",
+      "",
+      `  IF NOT (${allowed.length ? allowed.join("\n    OR ") : "FALSE"}) THEN`,
+      `    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlUpdateTrigger.replaceAll("'", "''")}';`,
+      "  END IF;",
+      "  RETURN NEW;",
+      "END",
+      "$modellang$;",
+      "",
+      `REVOKE ALL ON FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}() FROM PUBLIC;`,
+      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlInsertTrigger)}`,
+      `AFTER INSERT ON ${qname(schema, entity.naming.sqlTable)}`,
+      `FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
+      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlUpdateTrigger)}`,
+      `BEFORE UPDATE OF ${quoteIdent(field.naming.sqlColumn)} ON ${qname(schema, entity.naming.sqlTable)}`,
+      `FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
+      "",
+    );
+  }
   const principal = entityById(ir, ir.principal.entityId);
   lines.push(
     `CREATE TABLE ${qname(internal, "principal_binding")} (`,

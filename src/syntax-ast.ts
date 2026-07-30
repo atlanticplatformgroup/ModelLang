@@ -15,7 +15,7 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | ActionDecl | QueryDecl;
+export type Declaration = EnumDecl | EntityDecl | ActionDecl | QueryDecl | WorkflowDecl;
 
 export interface EnumDecl {
   kind: "enum";
@@ -134,6 +134,32 @@ export interface QueryDecl {
   };
   limit: number;
   limitSpan: Span;
+  span: Span;
+}
+
+export interface WorkflowTransitionDecl {
+  kind: "transition";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  from: { enumName: string; memberName: string; span: Span };
+  to: { enumName: string; memberName: string; span: Span };
+  actionName: string;
+  actionSpan: Span;
+  span: Span;
+}
+
+export interface WorkflowDecl {
+  kind: "workflow";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  entityName: string;
+  entitySpan: Span;
+  fieldName: string;
+  fieldSpan: Span;
+  initial: { enumName: string; memberName: string; span: Span };
+  transitions: WorkflowTransitionDecl[];
   span: Span;
 }
 

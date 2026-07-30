@@ -1,6 +1,6 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { moneyProfile } from "./money.js";
-import type { ActionDecl, Declaration, EntityDecl, Program, QueryDecl } from "./syntax-ast.js";
+import type { ActionDecl, Declaration, EntityDecl, Program, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
   program: Program;
@@ -8,6 +8,7 @@ export interface ResolvedProgram {
   entities: ReadonlyMap<string, EntityDecl>;
   actions: ReadonlyMap<string, ActionDecl>;
   queries: ReadonlyMap<string, QueryDecl>;
+  workflows: ReadonlyMap<string, WorkflowDecl>;
   typeNames: ReadonlySet<string>;
 }
 
@@ -28,6 +29,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
   const entities = new Map<string, EntityDecl>();
   const actions = new Map<string, ActionDecl>();
   const queries = new Map<string, QueryDecl>();
+  const workflows = new Map<string, WorkflowDecl>();
   for (const declaration of program.declarations) {
     const previous = declarations.get(declaration.name);
     if (previous) {
@@ -40,6 +42,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
+    if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
   }
   const typeNames = new Set([
     ...scalarNames,
@@ -75,5 +78,5 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
       }
     }
   }
-  return { program, declarations, entities, actions, queries, typeNames };
+  return { program, declarations, entities, actions, queries, workflows, typeNames };
 }

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.0
+
+- Added first-class `workflow ... for Entity.field` declarations with explicit initial states and action-backed transitions.
+- Added compile-time validation for required enum targets, initial defaults, source-state requirements, destination assignments, declared state writes, unique edges, and reachability.
+- Extended stable semantic identity with `wfl_...` workflow and `trn_...` transition IDs and idempotent `assign-ids` support.
+- Added canonical IR version 9 with ID-resolved workflow targets, states, transitions, and action bindings.
+- Added PostgreSQL initial-state and legal-edge triggers with named `ML_WORKFLOW` failures.
+- Added generated TypeScript workflow metadata and typed `TransitionError` mapping.
+- Added workflow lifecycle edges to Mermaid and workflow contracts to enforcement artifacts.
+- Made rename migration planning require workflow IDs and fail closed on workflow changes.
+- Added compiler, code-generation, stable-ID, schema, and live PostgreSQL workflow conformance tests.
+
 ## 0.8.0
 
 - Added exact nominal `Money<C>` types and explicit currency literals such as `USD 10000`.

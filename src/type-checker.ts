@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import type {
   ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl, TypeRef,
+  WorkflowDecl,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
@@ -25,6 +26,7 @@ interface Symbols {
   entities: Map<string, EntityDecl>;
   actions: Map<string, ActionDecl>;
   queries: Map<string, QueryDecl>;
+  workflows: Map<string, WorkflowDecl>;
   fields: Map<string, Map<string, FieldDecl>>;
 }
 
@@ -89,6 +91,14 @@ function queryId(query: QueryDecl): string {
   return `query:${String(query.stableId?.value ?? query.name)}`;
 }
 
+function workflowId(workflow: WorkflowDecl): string {
+  return `workflow:${String(workflow.stableId?.value ?? workflow.name)}`;
+}
+
+function transitionId(workflow: WorkflowDecl, transition: WorkflowDecl["transitions"][number]): string {
+  return `transition:${String(transition.stableId?.value ?? `${workflow.name}.${transition.name}`)}`;
+}
+
 function invariantId(entity: EntityDecl, invariant: InvariantDecl): string {
   return `invariant:${String(invariant.stableId?.value ?? `${entity.name}.${invariant.name}`)}`;
 }
@@ -146,9 +156,10 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
-  const enforcement = buildEnforcement(enums, entities, actions, queries, schema, internalSchema);
+  const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
+  const enforcement = buildEnforcement(enums, entities, actions, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 8,
+    irVersion: 9,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -162,6 +173,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     entities,
     actions,
     queries,
+    workflows,
     enforcement,
   };
 }
@@ -171,6 +183,7 @@ function collectSymbols(program: Program, file: string): Symbols {
   const entities = new Map<string, EntityDecl>();
   const actions = new Map<string, ActionDecl>();
   const queries = new Map<string, QueryDecl>();
+  const workflows = new Map<string, WorkflowDecl>();
   const top = new Map<string, Declaration>();
   for (const declaration of program.declarations) {
     const previous = top.get(declaration.name);
@@ -180,6 +193,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
+    if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
   }
   for (const enumeration of enums.values()) {
     const seen = new Set<string>();
@@ -204,10 +218,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, actions, queries, fields };
+  return { enums, entities, actions, queries, workflows, fields };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "act" | "qry" | "inv" | "exc";
+type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -221,6 +235,12 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
   }
   for (const query of symbols.queries.values()) {
     if (query.stableId) validateStableId(query.stableId, "qry", stableIds, file);
+  }
+  for (const workflow of symbols.workflows.values()) {
+    if (workflow.stableId) validateStableId(workflow.stableId, "wfl", stableIds, file);
+    for (const transition of workflow.transitions) {
+      if (transition.stableId) validateStableId(transition.stableId, "trn", stableIds, file);
+    }
   }
 }
 
@@ -327,6 +347,8 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
       qry: "query",
       inv: "invariant",
       exc: "exclusion",
+      wfl: "workflow",
+      trn: "workflow transition",
     };
     throw new ModelError("E2801", `Stable ${subject[kind]} ID must match ${kind}_[0-9a-f]{32}.`, annotation.span, file);
   }
@@ -647,6 +669,172 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   };
 }
 
+function lowerWorkflows(
+  symbols: Symbols,
+  entities: IREntity[],
+  enums: IREnum[],
+  actions: IRAction[],
+  file: string,
+): IRWorkflow[] {
+  const occupiedTargets = new Map<string, WorkflowDecl>();
+  const result: IRWorkflow[] = [];
+  for (const workflow of symbols.workflows.values()) {
+    const entityDecl = symbols.entities.get(workflow.entityName);
+    if (!entityDecl) {
+      throw new ModelError("E3001", `Workflow '${workflow.name}' references unknown entity '${workflow.entityName}'.`, workflow.entitySpan, file);
+    }
+    const fieldDecl = symbols.fields.get(entityDecl.name)!.get(workflow.fieldName);
+    if (!fieldDecl) {
+      throw new ModelError("E3002", `Workflow '${workflow.name}' references unknown field '${entityDecl.name}.${workflow.fieldName}'.`, workflow.fieldSpan, file);
+    }
+    const enumerationDecl = symbols.enums.get(fieldDecl.type.name);
+    if (!enumerationDecl || fieldDecl.type.collection || fieldDecl.optional) {
+      throw new ModelError("E3003", `Workflow field '${entityDecl.name}.${fieldDecl.name}' must be a required enum field.`, fieldDecl.span, file);
+    }
+    const targetId = fieldId(entityDecl, fieldDecl);
+    const previousWorkflow = occupiedTargets.get(targetId);
+    if (previousWorkflow) {
+      throw new ModelError("E3004", `Field '${entityDecl.name}.${fieldDecl.name}' already has workflow '${previousWorkflow.name}'.`, workflow.span, file);
+    }
+    occupiedTargets.set(targetId, workflow);
+
+    const enumeration = enums.find((candidate) => candidate.id === enumId(enumerationDecl))!;
+    const entity = entities.find((candidate) => candidate.id === entityId(entityDecl))!;
+    const resolveMember = (
+      reference: { enumName: string; memberName: string; span: Span },
+      subject: string,
+    ) => {
+      if (reference.enumName !== enumerationDecl.name) {
+        throw new ModelError("E3005", `${subject} must use enum '${enumerationDecl.name}', not '${reference.enumName}'.`, reference.span, file);
+      }
+      const declaration = enumerationDecl.members.find((candidate) => candidate.name === reference.memberName);
+      if (!declaration) {
+        throw new ModelError("E3006", `Unknown workflow state '${reference.enumName}.${reference.memberName}'.`, reference.span, file);
+      }
+      return enumeration.members.find((candidate) => candidate.id === enumMemberId(enumerationDecl, declaration))!;
+    };
+    const initial = resolveMember(workflow.initial, "Workflow initial state");
+    const defaultValue = entity.fields.find((candidate) => candidate.id === targetId)!.default;
+    if (defaultValue?.kind !== "enumLiteral" || defaultValue.memberId !== initial.id) {
+      throw new ModelError("E3007", `Workflow field '${entityDecl.name}.${fieldDecl.name}' must default to its initial state '${workflow.initial.enumName}.${workflow.initial.memberName}'.`, fieldDecl.span, file);
+    }
+
+    const transitionNames = new Set<string>();
+    const transitionEdges = new Set<string>();
+    const transitionActions = new Set<string>();
+    const transitions = workflow.transitions.map((transition) => {
+      if (transitionNames.has(transition.name)) {
+        throw new ModelError("E3008", `Duplicate transition name '${workflow.name}.${transition.name}'.`, transition.span, file);
+      }
+      transitionNames.add(transition.name);
+      const from = resolveMember(transition.from, `Transition '${transition.name}' source`);
+      const to = resolveMember(transition.to, `Transition '${transition.name}' destination`);
+      if (from.id === to.id) {
+        throw new ModelError("E3009", `Transition '${workflow.name}.${transition.name}' may not be a self-transition.`, transition.span, file);
+      }
+      const edge = `${from.id}->${to.id}`;
+      if (transitionEdges.has(edge)) {
+        throw new ModelError("E3010", `Workflow '${workflow.name}' declares the '${from.name}' to '${to.name}' edge more than once.`, transition.span, file);
+      }
+      transitionEdges.add(edge);
+      const action = actions.find((candidate) => candidate.name === transition.actionName);
+      if (!action) {
+        throw new ModelError("E3011", `Transition '${workflow.name}.${transition.name}' references unknown action '${transition.actionName}'.`, transition.actionSpan, file);
+      }
+      if (transitionActions.has(action.id)) {
+        throw new ModelError("E3012", `Action '${action.name}' may implement only one transition in workflow '${workflow.name}'.`, transition.actionSpan, file);
+      }
+      transitionActions.add(action.id);
+      const assignment = action.effect.assignments.find((candidate) => candidate.fieldId === targetId);
+      if (action.effect.kind !== "update" || action.effect.entityId !== entity.id || !assignment) {
+        throw new ModelError("E3013", `Transition action '${action.name}' must update '${entity.name}.${fieldDecl.name}'.`, transition.actionSpan, file);
+      }
+      if (assignment.expression.kind !== "enumLiteral" || assignment.expression.memberId !== to.id) {
+        throw new ModelError("E3014", `Transition action '${action.name}' must assign destination state '${to.name}'.`, transition.actionSpan, file);
+      }
+      const targetParameter = action.parameters.find((candidate) => candidate.name === action.effect.target);
+      const guarded = Boolean(targetParameter && action.preconditions.some((precondition) =>
+        isWorkflowSourceGuard(precondition.expression, targetParameter.id, targetId, from.id)));
+      if (!guarded) {
+        throw new ModelError("E3015", `Transition action '${action.name}' must have a named require asserting '${action.effect.target}.${fieldDecl.name} == ${enumerationDecl.name}.${from.name}'.`, transition.actionSpan, file);
+      }
+      return {
+        id: transitionId(workflow, transition),
+        name: transition.name,
+        identity: identity(transition.stableId),
+        fromMemberId: from.id,
+        toMemberId: to.id,
+        actionId: action.id,
+        span: irSpan(transition.span, file),
+      };
+    });
+
+    for (const action of actions) {
+      if (action.effect.entityId !== entity.id) continue;
+      const assignment = action.effect.assignments.find((candidate) => candidate.fieldId === targetId);
+      if (action.effect.kind === "create") {
+        if (assignment && (assignment.expression.kind !== "enumLiteral" || assignment.expression.memberId !== initial.id)) {
+          throw new ModelError("E3016", `Create action '${action.name}' must initialize '${entity.name}.${fieldDecl.name}' to '${initial.name}'.`, symbols.actions.get(action.name)!.span, file);
+        }
+      } else if (assignment && !transitionActions.has(action.id)) {
+        throw new ModelError("E3017", `Action '${action.name}' changes workflow field '${entity.name}.${fieldDecl.name}' but is not declared as a transition.`, symbols.actions.get(action.name)!.span, file);
+      }
+    }
+
+    const reachable = new Set([initial.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const transition of transitions) {
+        if (reachable.has(transition.fromMemberId) && !reachable.has(transition.toMemberId)) {
+          reachable.add(transition.toMemberId);
+          changed = true;
+        }
+      }
+    }
+    const unreachable = enumeration.members.filter((member) => !reachable.has(member.id));
+    if (unreachable.length) {
+      throw new ModelError("E3018", `Workflow '${workflow.name}' has unreachable state(s): ${unreachable.map((member) => member.name).join(", ")}.`, workflow.span, file);
+    }
+
+    const baseName = snakeCase(workflow.name);
+    result.push({
+      id: workflowId(workflow),
+      name: workflow.name,
+      identity: identity(workflow.stableId),
+      entityId: entity.id,
+      fieldId: targetId,
+      enumId: enumeration.id,
+      initialMemberId: initial.id,
+      transitions,
+      span: irSpan(workflow.span, file),
+      naming: {
+        sqlTriggerFunction: `enforce_${baseName}`,
+        sqlInsertTrigger: `trg_${entity.naming.sqlTable}_${snakeCase(fieldDecl.name)}_workflow_insert`,
+        sqlUpdateTrigger: `trg_${entity.naming.sqlTable}_${snakeCase(fieldDecl.name)}_workflow_update`,
+        typescriptName: workflow.name,
+      },
+    });
+  }
+  return result;
+}
+
+function isWorkflowSourceGuard(
+  expression: IRExpression,
+  targetParameterId: string,
+  fieldIdValue: string,
+  sourceMemberId: string,
+): boolean {
+  if (expression.kind !== "binary" || expression.operator !== "==") return false;
+  const matches = (field: IRExpression, member: IRExpression): boolean =>
+    field.kind === "fieldAccess"
+    && field.source === targetParameterId
+    && field.fieldId === fieldIdValue
+    && member.kind === "enumLiteral"
+    && member.memberId === sourceMemberId;
+  return matches(expression.left, expression.right) || matches(expression.right, expression.left);
+}
+
 function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, file: string): IRExpression {
   if (expression.kind === "moneyLiteral") {
     const profile = moneyProfile(expression.currency);
@@ -816,7 +1004,15 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
   if (expression.kind === "nullComparison") collectEntityParameters(expression.operand, found);
 }
 
-function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRAction[], queries: IRQuery[], schema: string, internalSchema: string): EnforcementEntry[] {
+function buildEnforcement(
+  enums: IREnum[],
+  entities: IREntity[],
+  actions: IRAction[],
+  queries: IRQuery[],
+  workflows: IRWorkflow[],
+  schema: string,
+  internalSchema: string,
+): EnforcementEntry[] {
   const entries: EnforcementEntry[] = [{
     id: "boundary:principal_binding",
     purpose: "Bind session_user to the model principal through an owner-controlled table.",
@@ -907,6 +1103,26 @@ function buildEnforcement(enums: IREnum[], entities: IREntity[], actions: IRActi
     entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `read:${query.id}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+  }
+  for (const workflow of workflows) {
+    entries.push({
+      id: `workflow-initial:${workflow.id}`,
+      purpose: `Require new ${workflow.entityId} rows to begin in the declared initial state.`,
+      layer: "PostgreSQL workflow trigger",
+      artifact: "postgres/002_schema.sql",
+      objectName: workflow.naming.sqlInsertTrigger,
+      source: workflow.span,
+    });
+    for (const transition of workflow.transitions) {
+      entries.push({
+        id: transition.id,
+        purpose: `Permit only the declared workflow edge implemented by ${transition.actionId}.`,
+        layer: "PostgreSQL workflow trigger",
+        artifact: "postgres/002_schema.sql",
+        objectName: workflow.naming.sqlUpdateTrigger,
+        source: transition.span,
+      });
+    }
   }
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   return entries;

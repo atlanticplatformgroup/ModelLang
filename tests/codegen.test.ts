@@ -227,4 +227,24 @@ describe("backends", () => {
       "boundary:audit",
     ]) expect(markdown).toContain(expected);
   });
+
+  it("generates database workflow backstops, typed metadata, and lifecycle diagrams", async () => {
+    const output = generateAll(await procurement());
+    const schema = output["postgres/002_schema.sql"];
+    expect(schema).toContain('CREATE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()');
+    expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
+    expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
+    expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
+    expect(schema).toContain('BEFORE UPDATE OF "status" ON "model_procurement"."purchase_request"');
+    expect(schema).toContain('(OLD."status" = \'DRAFT\' AND NEW."status" = \'SUBMITTED\')');
+    expect(schema).toContain('(OLD."status" = \'SUBMITTED\' AND NEW."status" = \'APPROVED\')');
+    expect(output["typescript/errors.ts"]).toContain("class TransitionError");
+    expect(output["typescript/workflows.ts"]).toContain("export const PurchaseRequestLifecycle");
+    expect(output["typescript/workflows.ts"]).toContain('{ name: "approve", from: "SUBMITTED", to: "APPROVED", action: "approveRequest" }');
+    expect(output["typescript/index.ts"]).toContain('export * from "./workflows.js"');
+    expect(output["model.mmd"]).toContain("submit via submitRequest");
+    expect(output["model.mmd"]).toContain("approve via approveRequest");
+    expect(output["enforcement.md"]).toContain("workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
+    expect(output["enforcement.md"]).toContain("transition:trn_efd18c8576154ba8b138c97b551afae3");
+  });
 });

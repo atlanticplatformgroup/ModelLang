@@ -1,0 +1,12 @@
+declaration          = inherited_declaration | workflow_decl ;
+workflow_decl        = "workflow", IDENTIFIER, [ stable_id ], "for",
+                       IDENTIFIER, ".", IDENTIFIER, "{",
+                       "initial", enum_value, ";",
+                       { transition_decl },
+                       "}" ;
+transition_decl      = "transition", IDENTIFIER, [ stable_id ], ":",
+                       enum_value, "->", enum_value, "by", IDENTIFIER, ";" ;
+enum_value           = IDENTIFIER, ".", IDENTIFIER ;
+stable_id            = "@", "stableId", "(", STRING, ")" ;
+
+All productions not replaced above are inherited from the ModelLang 0.8 grammar.

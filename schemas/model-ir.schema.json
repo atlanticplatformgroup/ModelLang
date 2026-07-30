@@ -18,7 +18,7 @@
             "strategy": { "const": "explicitStableId" },
             "stableId": {
               "type": "string",
-              "pattern": "^(ent|fld|enm|emv|act|qry|inv|exc)_[0-9a-f]{32}$"
+              "pattern": "^(ent|fld|enm|emv|act|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
             }
           },
           "additionalProperties": false
@@ -165,12 +165,41 @@
         "name": { "type": "string" },
         "identity": { "$ref": "#/$defs/identity" }
       }
+    },
+    "workflowTransition": {
+      "type": "object",
+      "required": ["id", "name", "identity", "fromMemberId", "toMemberId", "actionId", "span"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^transition:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "fromMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "toMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "actionId": { "type": "string", "pattern": "^action:" },
+        "span": { "type": "object" }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["id", "name", "identity", "entityId", "fieldId", "enumId", "initialMemberId", "transitions", "span", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^workflow:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "fieldId": { "type": "string", "pattern": "^field:" },
+        "enumId": { "type": "string", "pattern": "^enum:" },
+        "initialMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/workflowTransition" } },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
+      }
     }
   },
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "queries", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "actions", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 8 },
+    "irVersion": { "const": 9 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -205,6 +234,7 @@
     "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" } },
     "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
     "queries": { "type": "array", "items": { "$ref": "#/$defs/query" } },
+    "workflows": { "type": "array", "items": { "$ref": "#/$defs/workflow" } },
     "enforcement": { "type": "array" }
   },
   "additionalProperties": false

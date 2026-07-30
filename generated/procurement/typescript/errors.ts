@@ -8,6 +8,7 @@ export class ModelDatabaseError extends Error {
 export class IdentityBindingError extends ModelDatabaseError {}
 export class AuthorizationError extends ModelDatabaseError {}
 export class PreconditionError extends ModelDatabaseError {}
+export class TransitionError extends ModelDatabaseError {}
 export class InvariantError extends ModelDatabaseError {}
 export class ConflictError extends ModelDatabaseError {}
 export class NotFoundError extends ModelDatabaseError {}
@@ -22,6 +23,7 @@ export function mapDatabaseError(error: unknown): ModelDatabaseError {
   if (message.startsWith("ML_IDENTITY_UNBOUND")) return new IdentityBindingError(message, value.code, "boundary:principal_binding", error);
   if (message.startsWith("ML_AUTHORIZATION:")) return new AuthorizationError(message, value.code, suffix, error);
   if (message.startsWith("ML_PRECONDITION:")) return new PreconditionError(message, value.code, suffix, error);
+  if (message.startsWith("ML_WORKFLOW:")) return new TransitionError(message, value.code, suffix, error);
   if (message.startsWith("ML_NOT_FOUND:")) return new NotFoundError(message, value.code, suffix, error);
   if (message.startsWith("ML_VALIDATION:")) return new ValidationError(message, value.code, suffix, error);
   if (value?.code === "23P01") return new ConflictError(message, value.code, value.constraint, error);

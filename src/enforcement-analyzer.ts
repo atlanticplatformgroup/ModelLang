@@ -1,5 +1,5 @@
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IRQuery, IRSpan, ModelIR } from "./ir.js";
+import type { IRAction, IRQuery, IRSpan, IRWorkflow, ModelIR } from "./ir.js";
 import { isMoneyType, moneyProfileFromType } from "./money.js";
 
 function sourceSpan(span: IRSpan): Span {
@@ -75,6 +75,27 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   requireEntry(ir, `read:${query.id}`, query.span);
 }
 
+function checkWorkflow(ir: ModelIR, workflow: IRWorkflow): void {
+  const entity = ir.entities.find((candidate) => candidate.id === workflow.entityId);
+  const field = entity?.fields.find((candidate) => candidate.id === workflow.fieldId);
+  const enumeration = ir.enums.find((candidate) => candidate.id === workflow.enumId);
+  if (!entity || !field || !enumeration || field.type !== enumeration.id || field.optional) {
+    fail(ir, `Workflow '${workflow.name}' has an invalid entity, field, or enum target.`, workflow.span);
+  }
+  if (!enumeration.members.some((member) => member.id === workflow.initialMemberId)) {
+    fail(ir, `Workflow '${workflow.name}' has an invalid initial state.`, workflow.span);
+  }
+  requireEntry(ir, `workflow-initial:${workflow.id}`, workflow.span);
+  for (const transition of workflow.transitions) {
+    if (!enumeration.members.some((member) => member.id === transition.fromMemberId)
+      || !enumeration.members.some((member) => member.id === transition.toMemberId)
+      || !ir.actions.some((action) => action.id === transition.actionId)) {
+      fail(ir, `Workflow '${workflow.name}' has an unresolved transition '${transition.name}'.`, transition.span);
+    }
+    requireEntry(ir, transition.id, transition.span);
+  }
+}
+
 export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:principal_binding");
   requireEntry(ir, "boundary:owner_role");
@@ -119,4 +140,5 @@ export function assertEnforceable(ir: ModelIR): void {
   }
   for (const action of ir.actions) checkAction(ir, action);
   for (const query of ir.queries) checkQuery(ir, query);
+  for (const workflow of ir.workflows) checkWorkflow(ir, workflow);
 }

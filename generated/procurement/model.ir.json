@@ -1,10 +1,10 @@
 {
-  "irVersion": 8,
+  "irVersion": 9,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.8.0",
-    "sourceHash": "sha256:441fba0752ec8cda5c0a336d949be0be77f989c9c7525d8af2820a16ef3febe7",
+    "version": "0.9.0",
+    "sourceHash": "sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1647,9 +1647,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 113,
+            "line": 121,
             "column": 3,
-            "endLine": 113,
+            "endLine": 121,
             "endColumn": 21
           },
           "naming": {
@@ -1674,9 +1674,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 115,
+          "line": 123,
           "column": 13,
-          "endLine": 115,
+          "endLine": 123,
           "endColumn": 17
         }
       },
@@ -1710,9 +1710,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 116,
+          "line": 124,
           "column": 9,
-          "endLine": 116,
+          "endLine": 124,
           "endColumn": 35
         }
       },
@@ -1724,14 +1724,79 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 112,
+        "line": 120,
         "column": 1,
-        "endLine": 119,
+        "endLine": 127,
         "endColumn": 2
       },
       "naming": {
         "sqlFunction": "my_requests",
         "typescriptMethod": "myRequests"
+      }
+    }
+  ],
+  "workflows": [
+    {
+      "id": "workflow:wfl_96a1115ba9bf42f2a206374822eeaa87",
+      "name": "PurchaseRequestLifecycle",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "wfl_96a1115ba9bf42f2a206374822eeaa87"
+      },
+      "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+      "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+      "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+      "initialMemberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+      "transitions": [
+        {
+          "id": "transition:trn_7787ccd311944f109b69e35967bcbe2c",
+          "name": "submit",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "trn_7787ccd311944f109b69e35967bcbe2c"
+          },
+          "fromMemberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+          "toMemberId": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+          "actionId": "action:act_ed2374e822704c51a2925338253d05d2",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 114,
+            "column": 3,
+            "endLine": 115,
+            "endColumn": 69
+          }
+        },
+        {
+          "id": "transition:trn_efd18c8576154ba8b138c97b551afae3",
+          "name": "approve",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "trn_efd18c8576154ba8b138c97b551afae3"
+          },
+          "fromMemberId": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+          "toMemberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+          "actionId": "action:act_d39dbb883b5f4019b9027b85add3de47",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 116,
+            "column": 3,
+            "endLine": 117,
+            "endColumn": 73
+          }
+        }
+      ],
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 112,
+        "column": 1,
+        "endLine": 118,
+        "endColumn": 2
+      },
+      "naming": {
+        "sqlTriggerFunction": "enforce_purchase_request_lifecycle",
+        "sqlInsertTrigger": "trg_purchase_request_status_workflow_insert",
+        "sqlUpdateTrigger": "trg_purchase_request_status_workflow_update",
+        "typescriptName": "PurchaseRequestLifecycle"
       }
     }
   ],
@@ -2423,9 +2488,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 113,
+        "line": 121,
         "column": 3,
-        "endLine": 113,
+        "endLine": 121,
         "endColumn": 21
       }
     },
@@ -2444,9 +2509,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 115,
+        "line": 123,
         "column": 13,
-        "endLine": 115,
+        "endLine": 123,
         "endColumn": 17
       }
     },
@@ -2458,9 +2523,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 116,
+        "line": 124,
         "column": 9,
-        "endLine": 116,
+        "endLine": 124,
         "endColumn": 35
       }
     },
@@ -2472,9 +2537,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 112,
+        "line": 120,
         "column": 1,
-        "endLine": 119,
+        "endLine": 127,
         "endColumn": 2
       }
     },
@@ -2486,9 +2551,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 112,
+        "line": 120,
         "column": 1,
-        "endLine": 119,
+        "endLine": 127,
         "endColumn": 2
       }
     },
@@ -2500,10 +2565,52 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
+        "line": 120,
+        "column": 1,
+        "endLine": 127,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87",
+      "purpose": "Require new entity:ent_9bc680209327484c8e98f5f740bcc702 rows to begin in the declared initial state.",
+      "layer": "PostgreSQL workflow trigger",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "trg_purchase_request_status_workflow_insert",
+      "source": {
+        "file": "examples/procurement.model",
         "line": 112,
         "column": 1,
-        "endLine": 119,
+        "endLine": 118,
         "endColumn": 2
+      }
+    },
+    {
+      "id": "transition:trn_7787ccd311944f109b69e35967bcbe2c",
+      "purpose": "Permit only the declared workflow edge implemented by action:act_ed2374e822704c51a2925338253d05d2.",
+      "layer": "PostgreSQL workflow trigger",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "trg_purchase_request_status_workflow_update",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 114,
+        "column": 3,
+        "endLine": 115,
+        "endColumn": 69
+      }
+    },
+    {
+      "id": "transition:trn_efd18c8576154ba8b138c97b551afae3",
+      "purpose": "Permit only the declared workflow edge implemented by action:act_d39dbb883b5f4019b9027b85add3de47.",
+      "layer": "PostgreSQL workflow trigger",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "trg_purchase_request_status_workflow_update",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 116,
+        "column": 3,
+        "endLine": 117,
+        "endColumn": 73
       }
     },
     {

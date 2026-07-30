@@ -3,6 +3,7 @@ import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
   ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, ExclusionDecl,
   Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
+  WorkflowDecl,
 } from "./syntax-ast.js";
 
 const binaryPrecedence: Partial<Record<string, number>> = {
@@ -57,7 +58,8 @@ class Parser {
       else if (this.atWord("entity")) declarations.push(this.parseEntity());
       else if (this.atWord("action")) declarations.push(this.parseAction());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
-      else this.fail("E1103", "Expected enum, entity, action, or query declaration.");
+      else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
+      else this.fail("E1103", "Expected enum, entity, action, query, or workflow declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -302,6 +304,65 @@ class Parser {
       limitSpan: this.span(limit, limitEnd),
       span: this.span(start, end),
     };
+  }
+
+  private parseWorkflow(): WorkflowDecl {
+    const start = this.expectWord("workflow");
+    const name = this.identifier("Expected workflow name.");
+    const stableId = this.at("@") ? this.parseStableId("workflow declaration") : undefined;
+    this.expectWord("for");
+    const entity = this.identifier("Expected workflow entity.");
+    this.expect(".");
+    const field = this.identifier("Expected workflow state field.");
+    this.expect("{");
+    this.expectWord("initial");
+    const initial = this.parseEnumValue("Expected qualified initial enum value.");
+    this.expect(";");
+    const transitions: WorkflowDecl["transitions"] = [];
+    while (!this.at("}")) {
+      const transitionStart = this.expectWord("transition");
+      const transitionName = this.identifier("Expected transition name.");
+      const transitionStableId = this.at("@") ? this.parseStableId("workflow transition") : undefined;
+      this.expect(":");
+      const from = this.parseEnumValue("Expected qualified source enum value.");
+      this.expect("->");
+      const to = this.parseEnumValue("Expected qualified destination enum value.");
+      this.expectWord("by");
+      const action = this.identifier("Expected transition action name.");
+      const transitionEnd = this.expect(";");
+      transitions.push({
+        kind: "transition",
+        name: transitionName.text,
+        nameSpan: transitionName.span,
+        stableId: transitionStableId,
+        from,
+        to,
+        actionName: action.text,
+        actionSpan: action.span,
+        span: this.span(transitionStart, transitionEnd),
+      });
+    }
+    const end = this.expect("}");
+    return {
+      kind: "workflow",
+      name: name.text,
+      nameSpan: name.span,
+      stableId,
+      entityName: entity.text,
+      entitySpan: entity.span,
+      fieldName: field.text,
+      fieldSpan: field.span,
+      initial,
+      transitions,
+      span: this.span(start, end),
+    };
+  }
+
+  private parseEnumValue(message: string): { enumName: string; memberName: string; span: Span } {
+    const enumeration = this.identifier(message);
+    this.expect(".");
+    const member = this.identifier(message);
+    return { enumName: enumeration.text, memberName: member.text, span: this.span(enumeration, member) };
   }
 
   private parsePath(): Extract<Expression, { kind: "path" }> {

@@ -102,6 +102,43 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest.id)).toBe(true);
   });
 
+  it("enforces workflow initial state and declared edges against direct SQL", async () => {
+    await expect(admin.query(
+      `INSERT INTO model_procurement.purchase_request
+         (requester_id, amount, status, approved_by_id, approved_by_roles)
+       VALUES
+         ('00000000-0000-4000-8000-000000000001', 5000, 'APPROVED',
+          '00000000-0000-4000-8000-000000000003', ARRAY['MANAGER']::text[])`,
+    )).rejects.toMatchObject({
+      code: "23514",
+      constraint: "trg_purchase_request_status_workflow_insert",
+      message: expect.stringContaining("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87"),
+    });
+
+    const inserted = await admin.query<{ id: string }>(
+      `INSERT INTO model_procurement.purchase_request (requester_id, amount, status)
+       VALUES ('00000000-0000-4000-8000-000000000001', 5000, 'DRAFT')
+       RETURNING id`,
+    );
+    const id = inserted.rows[0]!.id;
+    try {
+      await expect(admin.query(
+        `UPDATE model_procurement.purchase_request
+         SET status = 'APPROVED',
+             approved_by_id = '00000000-0000-4000-8000-000000000003',
+             approved_by_roles = ARRAY['MANAGER']::text[]
+         WHERE id = $1`,
+        [id],
+      )).rejects.toMatchObject({
+        code: "23514",
+        constraint: "trg_purchase_request_status_workflow_update",
+        message: expect.stringContaining("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87"),
+      });
+    } finally {
+      await admin.query("DELETE FROM model_procurement.purchase_request WHERE id = $1", [id]);
+    }
+  });
+
   it("rejects malformed, wrong-currency, and out-of-profile money at every public boundary", async () => {
     await expect(clients.employeeOne.openRequest({
       amount: { currency: "EUR", amount: "1.00" } as unknown as ReturnType<typeof usd>,

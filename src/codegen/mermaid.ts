@@ -31,5 +31,18 @@ export function generateMermaid(ir: ModelIR): string {
     lines.push(`  ${safe(query.authorization.id)}["Authorize"] -->|guards| ${safe(query.id)}`);
     lines.push(`  ${safe(query.rowPolicy.id)}["Where"] -->|filters rows| ${safe(query.id)}`);
   }
+  for (const workflow of ir.workflows) {
+    const enumeration = ir.enums.find((candidate) => candidate.id === workflow.enumId)!;
+    const stateNode = (memberId: string) => `state_${safe(memberId)}`;
+    for (const member of enumeration.members) {
+      const initial = member.id === workflow.initialMemberId ? " (initial)" : "";
+      lines.push(`  ${stateNode(member.id)}["State: ${member.name}${initial}"]`);
+    }
+    lines.push(`  ${safe(workflow.entityId)} -->|workflow ${workflow.name}| ${stateNode(workflow.initialMemberId)}`);
+    for (const transition of workflow.transitions) {
+      const action = ir.actions.find((candidate) => candidate.id === transition.actionId)!;
+      lines.push(`  ${stateNode(transition.fromMemberId)} -->|${transition.name} via ${action.name}| ${stateNode(transition.toMemberId)}`);
+    }
+  }
   return `${lines.join("\n")}\n`;
 }

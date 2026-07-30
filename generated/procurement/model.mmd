@@ -34,3 +34,9 @@ flowchart LR
   query_qry_4406b045404a48449282db804f6167a8 -->|reads| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_query_qry_4406b045404a48449282db804f6167a8["Authorize"] -->|guards| query_qry_4406b045404a48449282db804f6167a8
   where_query_qry_4406b045404a48449282db804f6167a8["Where"] -->|filters rows| query_qry_4406b045404a48449282db804f6167a8
+  state_enumMember_emv_5528c88aa0fb42c79a9a773de2d7d675["State: DRAFT (initial)"]
+  state_enumMember_emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1["State: SUBMITTED"]
+  state_enumMember_emv_8ad72d5d6c314e12864c247677e51b8d["State: APPROVED"]
+  entity_ent_9bc680209327484c8e98f5f740bcc702 -->|workflow PurchaseRequestLifecycle| state_enumMember_emv_5528c88aa0fb42c79a9a773de2d7d675
+  state_enumMember_emv_5528c88aa0fb42c79a9a773de2d7d675 -->|submit via submitRequest| state_enumMember_emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1
+  state_enumMember_emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1 -->|approve via approveRequest| state_enumMember_emv_8ad72d5d6c314e12864c247677e51b8d
