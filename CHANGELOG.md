@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.0
+
+- Added transactional safe schema evolution while retaining canonical IR version 9 for 0.9 baseline compatibility.
+- Added automatic planning for enums/members, entities, nullable/default-backed fields, actions, queries, workflows, and workflow transitions.
+- Added dependency-ordered table, field, constraint, foreign-key, enum-refresh, and workflow-refresh SQL generation.
+- Added owner-controlled migration history containing model identity, version, source hash, and application time.
+- Added fail-closed baseline verification with `ML_MIGRATION_BASELINE` and SQLSTATE `55000`.
+- Added automatic transactional redeployment of generated actions, queries, and least-privilege grants.
+- Rejected required additions without backfills, data-dependent unique additions, removals, and existing semantic changes.
+- Preserved rename migrations under the guarded 0.10 transaction.
+- Added unit and live PostgreSQL tests proving row preservation, defaults, new foreign keys, enum expansion, new callables, workflow expansion, history recording, and out-of-order rejection.
+
 ## 0.9.0
 
 - Added first-class `workflow ... for Entity.field` declarations with explicit initial states and action-backed transitions.

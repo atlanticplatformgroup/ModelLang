@@ -1,4 +1,4 @@
--- source sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68
+-- source sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -37,7 +37,7 @@ ALTER TABLE "model_procurement"."purchase_request"
   ADD CONSTRAINT "fk_purchase_request_approved_by_id"
   FOREIGN KEY ("approved_by_id") REFERENCES "model_procurement"."user" ("id");
 
-CREATE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = pg_catalog, pg_temp
@@ -63,9 +63,11 @@ END
 $modellang$;
 
 REVOKE ALL ON FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"() FROM PUBLIC;
+
 CREATE TRIGGER "trg_purchase_request_status_workflow_insert"
 AFTER INSERT ON "model_procurement"."purchase_request"
 FOR EACH ROW EXECUTE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"();
+
 CREATE TRIGGER "trg_purchase_request_status_workflow_update"
 BEFORE UPDATE OF "status" ON "model_procurement"."purchase_request"
 FOR EACH ROW EXECUTE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"();
@@ -83,5 +85,15 @@ CREATE TABLE "model_procurement_internal"."action_audit" (
   "target_id" uuid,
   "occurred_at" timestamptz NOT NULL DEFAULT transaction_timestamp()
 );
+
+CREATE TABLE "model_procurement_internal"."schema_migrations" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "model_id" text NOT NULL,
+  "version" text NOT NULL UNIQUE,
+  "source_hash" text NOT NULL UNIQUE,
+  "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
+);
+INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash")
+VALUES ('model:Procurement', '0.10.0', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62');
 RESET ROLE;
 

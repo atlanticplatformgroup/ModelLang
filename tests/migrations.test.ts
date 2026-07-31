@@ -51,6 +51,61 @@ function error(operation: () => unknown): ModelError {
   throw new Error("Expected ModelError");
 }
 
+function evolutionSource(version: string, expanded: boolean): string {
+  return `model SafeEvolution version "${version}";
+enum Status @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  DRAFT @stableId("emv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")${expanded ? `,
+  SUBMITTED @stableId("emv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")` : ""}
+}
+${expanded ? `enum Severity @stableId("enm_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  LOW @stableId("emv_cccccccccccccccccccccccccccccccc")
+}
+` : ""}
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Ticket @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");
+  ${expanded ? `note: String? @stableId("fld_dddddddddddddddddddddddddddddddd");
+  priority: Int = 0 @min(0) @stableId("fld_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+  severity: Severity? @stableId("fld_ffffffffffffffffffffffffffffffff");` : ""}
+}
+${expanded ? `entity Comment @stableId("ent_cccccccccccccccccccccccccccccccc") {
+  id: UUID @id @stableId("fld_11111111111111111111111111111111");
+  ticket: Ticket @stableId("fld_22222222222222222222222222222222");
+  body: String @stableId("fld_33333333333333333333333333333333");
+}
+` : ""}
+action open @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Ticket {
+  authorize true;
+  create Ticket { id = id; status = Status.DRAFT; }
+}
+${expanded ? `action submit @stableId("act_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")(caller actor: User, ticket: Ticket) -> Ticket {
+  authorize true;
+  require is_draft: ticket.status == Status.DRAFT;
+  update ticket { status = Status.SUBMITTED; }
+}
+action comment @stableId("act_cccccccccccccccccccccccccccccccc")(
+  caller actor: User, id: UUID, ticket: Ticket, body: String
+) -> Comment {
+  authorize true;
+  create Comment { id = id; ticket = ticket; body = body; }
+}
+query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) from Ticket as ticket {
+  authorize true;
+  where ticket.status == Status.SUBMITTED;
+  orderBy ticket.id asc;
+  limit 100;
+}
+` : ""}
+workflow TicketLifecycle @stableId("wfl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") for Ticket.status {
+  initial Status.DRAFT;
+  ${expanded ? `transition submit @stableId("trn_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"):
+    Status.DRAFT -> Status.SUBMITTED by submit;` : ""}
+}`;
+}
+
 describe("ModelLang 0.6 stable IDs", () => {
   it("assigns every missing durable declaration ID and is idempotent", () => {
     const source = `model IDs version "1";
@@ -237,7 +292,10 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
         memberId: "enumMember:emv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       },
     });
-    const renamed = compileText(source.replaceAll("State", "Lifecycle"), "identity-renamed.model");
+    const renamed = compileText(
+      source.replaceAll("State", "Lifecycle").replace('version "1"', 'version "2"'),
+      "identity-renamed.model",
+    );
     expect(renamed.entities[0]!.fields[1]!.type).toBe(ir.entities[0]!.fields[1]!.type);
     expect(planMigration(ir, renamed).operations).toEqual([{
       kind: "renameEnum",
@@ -254,6 +312,73 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
   });
 });
 
+describe("ModelLang 0.10 safe schema evolution", () => {
+  it("plans enum, entity, field, callable, and workflow additions as one guarded transaction", () => {
+    const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
+    const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
+    const plan = planMigration(previous, current);
+    expect(plan.operations.map((operation) => operation.kind)).toEqual([
+      "addEnum",
+      "addEnumMember",
+      "addEntity",
+      "addField",
+      "addField",
+      "addField",
+      "addAction",
+      "addAction",
+      "addQuery",
+      "addTransition",
+    ]);
+    expect(plan.sql).toContain('CREATE TABLE "model_safe_evolution"."comment"');
+    expect(plan.sql).toContain('ALTER TABLE "model_safe_evolution"."ticket" ADD COLUMN "note" text;');
+    expect(plan.sql).toContain('ALTER TABLE "model_safe_evolution"."ticket" ADD COLUMN "priority" bigint NOT NULL DEFAULT 0;');
+    expect(plan.sql).toContain('ALTER TABLE "model_safe_evolution"."ticket" ADD COLUMN "severity" text;');
+    expect(plan.sql).toContain('DROP CONSTRAINT "ck_ticket_status_enum"');
+    expect(plan.sql).toContain("CHECK ((\"status\" IN ('DRAFT', 'SUBMITTED')) IS TRUE)");
+    expect(plan.sql).toContain('(OLD."status" = \'DRAFT\' AND NEW."status" = \'SUBMITTED\')');
+    expect(plan.sql).toContain('CREATE OR REPLACE FUNCTION "model_safe_evolution"."submit"');
+    expect(plan.sql).toContain('CREATE OR REPLACE FUNCTION "model_safe_evolution"."submitted"');
+    expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
+    expect(plan.sql).toContain("VALUES ('model:SafeEvolution', '2.0.0'");
+  });
+
+  it("rejects additions that need a backfill or data-dependent uniqueness proof", () => {
+    const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
+    const required = compileText(
+      evolutionSource("2.0.0", false).replace(
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");`,
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");
+  ownerNote: String @stableId("fld_dddddddddddddddddddddddddddddddd");`,
+      ).replace(
+        "create Ticket { id = id; status = Status.DRAFT; }",
+        `create Ticket { id = id; status = Status.DRAFT; ownerNote = "created"; }`,
+      ),
+      "required.model",
+    );
+    expect(error(() => planMigration(previous, required)).code).toBe("E2811");
+
+    const unique = compileText(
+      evolutionSource("2.0.0", false).replace(
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");`,
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");
+  code: String = "same" @unique @stableId("fld_dddddddddddddddddddddddddddddddd");`,
+      ),
+      "unique.model",
+    );
+    expect(error(() => planMigration(previous, unique)).code).toBe("E2812");
+
+    const invalidDefault = compileText(
+      evolutionSource("2.0.0", false).replace(
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");`,
+        `  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");
+  priority: Int = 0 @minExclusive(0) @stableId("fld_dddddddddddddddddddddddddddddddd");`,
+      ),
+      "invalid-default.model",
+    );
+    expect(error(() => planMigration(previous, invalidDefault)).code).toBe("E2813");
+  });
+});
+
 describe("ModelLang 0.6 rename migration planning", () => {
   it("fails closed when a stable workflow changes", () => {
     const source = readFileSync("examples/procurement.model", "utf8");
@@ -264,7 +389,7 @@ describe("ModelLang 0.6 rename migration planning", () => {
     );
     const workflowError = error(() => planMigration(previous, renamed));
     expect(workflowError.code).toBe("E2807");
-    expect(workflowError.message).toContain("workflow migrations are intentionally unsupported in 0.9");
+    expect(workflowError.message).toContain("only transition additions are safe in 0.10");
 
     const renamedTarget = compileText(
       source.replaceAll("status", "lifecycleStatus"),
@@ -272,7 +397,7 @@ describe("ModelLang 0.6 rename migration planning", () => {
     );
     const targetError = error(() => planMigration(previous, renamedTarget));
     expect(targetError.code).toBe("E2807");
-    expect(targetError.message).toContain("workflow migrations are intentionally unsupported in 0.9");
+    expect(targetError.message).toContain("only transition additions are safe in 0.10");
   });
 
   it("matches by ID and emits deterministic entity and field renames", () => {
@@ -299,13 +424,13 @@ describe("ModelLang 0.6 rename migration planning", () => {
         to: "requestor_id",
       },
     ]);
-    expect(plan.sql).toBe(`-- ModelLang rename migration 1.0.0 -> 2.0.0
-BEGIN;
-ALTER TABLE "model_rename_proof"."purchase" RENAME TO "purchase_order";
-ALTER TABLE "model_rename_proof"."purchase_order" RENAME COLUMN "requested_by_id" TO "requestor_id";
-COMMIT;
--- Next apply the current generated 003_actions.sql, 003_queries.sql, and 004_grants.sql.
-`);
+    expect(plan.sql).toContain("-- ModelLang safe schema migration 1.0.0 -> 2.0.0");
+    expect(plan.sql).toContain('ALTER TABLE "model_rename_proof"."purchase" RENAME TO "purchase_order";');
+    expect(plan.sql).toContain('ALTER TABLE "model_rename_proof"."purchase_order" RENAME COLUMN "requested_by_id" TO "requestor_id";');
+    expect(plan.sql).toContain('CREATE TABLE IF NOT EXISTS "model_rename_proof_internal"."schema_migrations"');
+    expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
+    expect(plan.sql).toContain('CREATE OR REPLACE FUNCTION "model_rename_proof"."make"');
+    expect(plan.sql).toContain('INSERT INTO "model_rename_proof_internal"."schema_migrations"');
     expect(planMigration(previous, current)).toEqual(plan);
   });
 
@@ -400,10 +525,10 @@ query ${names.queryName} @stableId("qry_11111111111111111111111111111111")(
     }).replace("ACTIVE @stableId", "ENABLED @stableId"));
     const memberError = error(() => planMigration(previous, renamedMember));
     expect(memberError.code).toBe("E2807");
-    expect(memberError.message).toContain("stored-value migration is unsupported");
+    expect(memberError.message).toContain("requires stored-value migration");
   });
 
-  it("refuses name-derived, additive, and structural changes", () => {
+  it("refuses name-derived, destructive, and structural changes", () => {
     const previous = compileText(renameModel({ version: "1" }));
     const derived = compileText(`model Derived version "2";
       entity User { id: UUID @id; name: String; }
@@ -414,9 +539,27 @@ query ${names.queryName} @stableId("qry_11111111111111111111111111111111")(
       version: "2",
       extraField: `note: String? @stableId("fld_44444444444444444444444444444444");`,
     }));
-    expect(error(() => planMigration(previous, added)).code).toBe("E2805");
+    expect(planMigration(previous, added).operations).toContainEqual(expect.objectContaining({
+      kind: "addField",
+      fieldId: "field:fld_44444444444444444444444444444444",
+    }));
+
+    const required = compileText(renameModel({
+      version: "2",
+      extraField: `note: String @stableId("fld_44444444444444444444444444444444");`,
+    }).replace(
+      "requestedBy = actor;",
+      `requestedBy = actor; note = "created";`,
+    ));
+    expect(error(() => planMigration(previous, required)).code).toBe("E2811");
 
     const changed = compileText(renameModel({ version: "2", fieldOptional: true }));
     expect(error(() => planMigration(previous, changed)).code).toBe("E2807");
+
+    const removed = compileText(renameModel({ version: "3" }).replace(
+      `  requestedBy: User @stableId("${fieldRequester}");\n`,
+      "",
+    ).replace("    requestedBy = actor;\n", ""));
+    expect(error(() => planMigration(previous, removed)).code).toBe("E2805");
   });
 });

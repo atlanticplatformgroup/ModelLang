@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.9.0",
-    "sourceHash": "sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68",
+    "version": "0.10.0",
+    "sourceHash": "sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -27,10 +27,17 @@
     },
     {
       "id": "boundary:internal_schema",
-      "purpose": "Application principals cannot access principal bindings or audit storage.",
+      "purpose": "Application principals cannot access principal bindings, audit storage, or migration history.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_procurement_internal"
+    },
+    {
+      "id": "boundary:migration_history",
+      "purpose": "Record the installed model version and source hash for fail-closed migration baseline checks.",
+      "layer": "PostgreSQL migration history",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.schema_migrations"
     },
     {
       "id": "required:field:fld_fe4c8fe8243b456eadeefb42b0bd7097",

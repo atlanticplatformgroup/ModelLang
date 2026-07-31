@@ -1,6 +1,6 @@
-# ModelLang 0.9 reference compiler
+# ModelLang 0.10 reference compiler
 
-ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, authenticated actions, bounded queries, enum-set permissions, safe rename migrations, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, authenticated actions, bounded queries, enum-set permissions, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -59,13 +59,14 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. IR version 9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. ModelLang 0.10 deliberately retains IR version 9 so released 0.9 IR remains a valid migration baseline. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 The PostgreSQL backend emits:
 
 - roles and ownership;
 - entity tables, foreign keys, enum checks, annotations, invariants, and temporal exclusion constraints;
 - initial-state and legal-edge workflow triggers;
+- internal model-version and source-hash migration history;
 - `SECURITY DEFINER` action functions;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
@@ -84,7 +85,7 @@ PostgreSQL creates both values inside the action transaction, and the returned t
 
 Each generated subtree contains `model.mmd`, `enforcement.json`, and `enforcement.md`, making the relationship between declarations and executable enforcement visible.
 
-## Stable declaration identity and rename migrations
+## Stable identity and safe schema evolution
 
 Durable declarations carry kind-specific opaque IDs:
 
@@ -108,9 +109,11 @@ action submit @stableId("act_11111111111111111111111111111111")(
 
 The ID is semantic identity; the name is an editable source, API, and physical label. `assign-ids` adds missing IDs to enums, members, entities, fields, invariants, exclusions, actions, queries, workflows, and transitions without changing existing IDs. Audit rows store stable action IDs, so an action rename does not split its audit history.
 
-The migration command compares a released IR with current source exclusively by ID. The rename planner introduced in 0.6 emits transactional renames for tables, columns, invariant constraints, temporal-exclusion constraints, and action/query functions. Enum declaration renames are semantic-only because the PostgreSQL backend stores constrained text values. Enum-member renames are recognized by ID and refused until the compiler can migrate every stored scalar, array, default, and dependent expression safely.
+The migration command compares a released IR with current source exclusively by ID. ModelLang 0.10 plans new enums and members, new entities, nullable or default-backed fields, actions, queries, workflows, and workflow transitions. It also retains transactional renames for tables, columns, invariant constraints, temporal-exclusion constraints, and action/query functions.
 
-Version 0.9 still refuses additions, removals, semantic changes, collisions, rename cycles, or models without complete explicit IDs. Workflow changes additionally fail closed for manual review. After the structural migration, the current generated `003_actions.sql`, `003_queries.sql`, and `004_grants.sql` redeploy replaceable routines and grants.
+Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
+
+Version 0.10 refuses removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. These cases need explicit backfill or transformation semantics rather than compiler guesses.
 
 ## Explicit language semantics
 
@@ -118,6 +121,8 @@ Version 0.9 still refuses additions, removals, semantic changes, collisions, ren
 - `caller actor: User` is semantic context, not a user-supplied action or query argument. It is omitted from both the generated SQL and TypeScript callable signatures, then resolved from `session_user` through the owner-controlled principal-binding table.
 - A `workflow` targets one required stored enum field, declares its initial state, and binds each legal edge to one update action. The compiler verifies that the action has a named source-state requirement and writes the declared destination, rejects undeclared state writes, and requires every enum state to be reachable.
 - PostgreSQL workflow triggers require initial-state inserts and reject skipped or otherwise undeclared update edges. They are durable state-shape backstops; transition authorization, locking, assignments, and auditing remain explicit in the bound generated action.
+- Added fields on existing entities must be nullable or have a constant/database-generated default. Added enum members refresh existing constraints, and added workflow edges replace the trigger function without weakening its initial-state or edge checks.
+- Migration history is an internal enforcement boundary. Application roles cannot read or edit it, and the target version is recorded only if the full migration commits.
 - `Money<USD>` is an exact nominal type, distinct from `Money<EUR>`, `Decimal`, and JavaScript numbers. Currency literals are explicit (`USD 10000`), PostgreSQL stores exact `numeric` values behind profile constraints, and TypeScript uses `{ currency: "USD", amount: "10000.00" }`.
 - `@generated(uuid)` and `@generated(now)` are valid only on required `UUID` and `DateTime` stored fields respectively. Actions cannot assign them. PostgreSQL supplies qualified column defaults and returns the values from the same create statement.
 - Generated fields are implicitly immutable. `@immutable` also prevents update effects from assigning ordinary stored fields while still allowing their explicit initial assignment during creation.
@@ -178,7 +183,7 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, PostgreSQL data preservation across renames, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
+The full suite validates parsing and spans, additive migration planning and live row preservation, baseline-history rejection, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
@@ -188,8 +193,8 @@ The full suite validates parsing and spans, workflow/action contracts and direct
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
-- Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and automatic UI generation in 0.9.
-- Rename migration planning intentionally omits additions, removals, type changes including `Decimal` to `Money<C>`, generation or mutability changes, enum-member value migration, workflow changes, backfills, rename cycles, and deployment orchestration in 0.9.
+- Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and automatic UI generation.
+- Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.9 language is in [spec/0.9/LANGUAGE.md](./spec/0.9/LANGUAGE.md), with its [workflow semantics](./spec/0.9/WORKFLOWS.md), [grammar](./spec/0.9/GRAMMAR.ebnf), [conformance requirements](./spec/0.9/CONFORMANCE.md), and [unstable boundaries](./spec/0.9/UNSTABLE.md). The [0.8 language](./spec/0.8/LANGUAGE.md) remains normative where 0.9 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.10 language is in [spec/0.10/LANGUAGE.md](./spec/0.10/LANGUAGE.md), with its [safe-evolution semantics](./spec/0.10/SAFE_EVOLUTION.md), [conformance requirements](./spec/0.10/CONFORMANCE.md), and [unstable boundaries](./spec/0.10/UNSTABLE.md). The [0.9 language](./spec/0.9/LANGUAGE.md) remains normative where 0.10 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

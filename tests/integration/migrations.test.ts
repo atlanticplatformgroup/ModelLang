@@ -43,6 +43,56 @@ query ${queryName} @stableId("${ordersQuery}")(caller actor: User) from ${entity
 }`;
 }
 
+function evolutionSource(version: string, expanded: boolean): string {
+  return `model EvolutionIntegration version "${version}";
+enum Status @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  DRAFT @stableId("emv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")${expanded ? `,
+  SUBMITTED @stableId("emv_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")` : ""}
+}
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Ticket @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  status: Status = Status.DRAFT @stableId("fld_cccccccccccccccccccccccccccccccc");
+  ${expanded ? `note: String? @stableId("fld_dddddddddddddddddddddddddddddddd");
+  priority: Int = 0 @min(0) @stableId("fld_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");` : ""}
+}
+${expanded ? `entity Comment @stableId("ent_cccccccccccccccccccccccccccccccc") {
+  id: UUID @id @stableId("fld_11111111111111111111111111111111");
+  ticket: Ticket @stableId("fld_22222222222222222222222222222222");
+  body: String @stableId("fld_33333333333333333333333333333333");
+}
+` : ""}
+action open @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Ticket {
+  authorize true;
+  create Ticket { id = id; status = Status.DRAFT; }
+}
+${expanded ? `action submit @stableId("act_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")(caller actor: User, ticket: Ticket) -> Ticket {
+  authorize true;
+  require is_draft: ticket.status == Status.DRAFT;
+  update ticket { status = Status.SUBMITTED; }
+}
+action comment @stableId("act_cccccccccccccccccccccccccccccccc")(
+  caller actor: User, id: UUID, ticket: Ticket, body: String
+) -> Comment {
+  authorize true;
+  create Comment { id = id; ticket = ticket; body = body; }
+}
+query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) from Ticket as ticket {
+  authorize true;
+  where ticket.status == Status.SUBMITTED;
+  orderBy ticket.id asc;
+  limit 100;
+}
+` : ""}
+workflow TicketLifecycle @stableId("wfl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") for Ticket.status {
+  initial Status.DRAFT;
+  ${expanded ? `transition submit @stableId("trn_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"):
+    Status.DRAFT -> Status.SUBMITTED by submit;` : ""}
+}`;
+}
+
 let admin: Pool;
 
 beforeAll(() => {
@@ -53,6 +103,8 @@ afterAll(async () => {
   if (admin) {
     await admin.query("DROP SCHEMA IF EXISTS model_rename_integration_internal CASCADE");
     await admin.query("DROP SCHEMA IF EXISTS model_rename_integration CASCADE");
+    await admin.query("DROP SCHEMA IF EXISTS model_evolution_integration_internal CASCADE");
+    await admin.query("DROP SCHEMA IF EXISTS model_evolution_integration CASCADE");
     await admin.end();
   }
 });
@@ -122,5 +174,67 @@ describe("ModelLang 0.6 PostgreSQL rename migration", () => {
       "INSERT INTO model_rename_integration.purchase_order (id, requestor_id) VALUES ($1, $2)",
       ["90000000-0000-4000-8000-000000000003", "90000000-0000-4000-8000-000000000099"],
     )).rejects.toMatchObject({ code: "23503" });
+  });
+});
+
+describe("ModelLang 0.10 PostgreSQL safe evolution", () => {
+  it("preserves rows while adding fields, entities, callables, enum values, workflow edges, and history", async () => {
+    const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
+    const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
+    const generated = generateAll(previous);
+    await admin.query("DROP SCHEMA IF EXISTS model_evolution_integration_internal CASCADE");
+    await admin.query("DROP SCHEMA IF EXISTS model_evolution_integration CASCADE");
+    await admin.query(generated["postgres/001_roles.sql"]!);
+    await admin.query(generated["postgres/002_schema.sql"]!);
+    await admin.query(generated["postgres/003_actions.sql"]!);
+    await admin.query(generated["postgres/003_queries.sql"]!);
+
+    const userId = "91000000-0000-4000-8000-000000000001";
+    const ticketId = "91000000-0000-4000-8000-000000000002";
+    const commentId = "91000000-0000-4000-8000-000000000003";
+    await admin.query(`INSERT INTO model_evolution_integration."user" (id) VALUES ($1)`, [userId]);
+    await admin.query(
+      "INSERT INTO model_evolution_integration_internal.principal_binding (database_principal, principal_id) VALUES ('postgres', $1)",
+      [userId],
+    );
+    await admin.query("SELECT model_evolution_integration.open($1)", [ticketId]);
+
+    const plan = planMigration(previous, current);
+    await admin.query(plan.sql);
+
+    const preserved = await admin.query<{ id: string; status: string; note: string | null; priority: string }>(
+      "SELECT id, status, note, priority::text FROM model_evolution_integration.ticket WHERE id = $1",
+      [ticketId],
+    );
+    expect(preserved.rows).toEqual([{ id: ticketId, status: "DRAFT", note: null, priority: "0" }]);
+
+    const submitted = await admin.query<{ value: { id: string; status: string; priority: number } }>(
+      "SELECT model_evolution_integration.submit($1) AS value",
+      [ticketId],
+    );
+    expect(submitted.rows[0]!.value).toMatchObject({ id: ticketId, status: "SUBMITTED", priority: 0 });
+    const comment = await admin.query<{ value: { id: string; ticket: string; body: string } }>(
+      "SELECT model_evolution_integration.comment($1, $2, $3) AS value",
+      [commentId, ticketId, "preserved"],
+    );
+    expect(comment.rows[0]!.value).toEqual({ id: commentId, ticket: ticketId, body: "preserved" });
+    const listed = await admin.query<{ value: { id: string; status: string }[] }>(
+      "SELECT model_evolution_integration.submitted() AS value",
+    );
+    expect(listed.rows[0]!.value).toEqual([expect.objectContaining({ id: ticketId, status: "SUBMITTED" })]);
+
+    const history = await admin.query<{ version: string; source_hash: string }>(
+      `SELECT version, source_hash
+       FROM model_evolution_integration_internal.schema_migrations
+       ORDER BY id`,
+    );
+    expect(history.rows).toEqual([
+      { version: "1.0.0", source_hash: previous.model.sourceHash },
+      { version: "2.0.0", source_hash: current.model.sourceHash },
+    ]);
+    await expect(admin.query(plan.sql)).rejects.toMatchObject({
+      code: "55000",
+      message: expect.stringContaining("ML_MIGRATION_BASELINE:"),
+    });
   });
 });

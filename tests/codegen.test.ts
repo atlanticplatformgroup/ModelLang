@@ -211,6 +211,7 @@ describe("backends", () => {
     const markdown = generateAll(await procurement())["enforcement.md"];
     for (const expected of [
       "boundary:principal_binding",
+      "boundary:migration_history",
       "invariant:inv_b70e8aa03e6d498f8b0bccf413636b19",
       "invariant:inv_91184dc547c24978a48362a679eeb836",
       "invariant:inv_f8c6cf86f9d64874ac4159766e522cb8",
@@ -231,7 +232,9 @@ describe("backends", () => {
   it("generates database workflow backstops, typed metadata, and lifecycle diagrams", async () => {
     const output = generateAll(await procurement());
     const schema = output["postgres/002_schema.sql"];
-    expect(schema).toContain('CREATE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()');
+    expect(schema).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()');
+    expect(schema).toContain('CREATE TABLE "model_procurement_internal"."schema_migrations"');
+    expect(schema).toContain("VALUES ('model:Procurement', '0.10.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

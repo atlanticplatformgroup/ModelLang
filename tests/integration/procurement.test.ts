@@ -236,6 +236,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         `DELETE FROM model_procurement.purchase_request WHERE false`,
         `TRUNCATE model_procurement.purchase_request`,
         `SELECT * FROM model_procurement_internal.principal_binding`,
+        `SELECT * FROM model_procurement_internal.schema_migrations`,
         `SET ROLE modellang_owner`,
       ]) {
         await expect(application.query(sql)).rejects.toMatchObject({ code: "42501" });

@@ -1,8 +1,16 @@
 import { ModelError, internalSpan } from "./diagnostics.js";
 import type {
   IRAction, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRQuery,
-  IRTemporalExclusion, IRWorkflow, ModelIR,
+  IRTemporalExclusion, IRWorkflow, IRWorkflowTransition, ModelIR,
 } from "./ir.js";
+import {
+  generateAddFieldStatements,
+  generateEntityForeignKeyStatements,
+  generateEntityTableStatement,
+  generatePostgres,
+  generateRefreshEnumConstraintStatements,
+  generateWorkflowStatements,
+} from "./codegen/postgres.js";
 import { isMoneyType } from "./money.js";
 import { quoteIdent, snakeCase } from "./naming.js";
 
@@ -15,10 +23,22 @@ export type RenameOperation =
   | { kind: "renameAction"; actionId: string; from: string; to: string; parameterTypes: string[] }
   | { kind: "renameQuery"; queryId: string; from: string; to: string; parameterTypes: string[] };
 
+export type AdditiveOperation =
+  | { kind: "addEnum"; enumId: string; name: string }
+  | { kind: "addEnumMember"; enumId: string; memberId: string; name: string }
+  | { kind: "addEntity"; entityId: string; name: string; table: string }
+  | { kind: "addField"; entityId: string; fieldId: string; name: string; table: string; column: string }
+  | { kind: "addAction"; actionId: string; name: string }
+  | { kind: "addQuery"; queryId: string; name: string }
+  | { kind: "addWorkflow"; workflowId: string; name: string }
+  | { kind: "addTransition"; workflowId: string; transitionId: string; name: string };
+
+export type MigrationOperation = RenameOperation | AdditiveOperation;
+
 export interface MigrationPlan {
   previousVersion: string;
   currentVersion: string;
-  operations: RenameOperation[];
+  operations: MigrationOperation[];
   sql: string;
 }
 
@@ -77,19 +97,22 @@ function requireExplicitIds(ir: ModelIR): void {
   }
 }
 
-function requireSameIds<T extends { id: string; name: string }>(
+function additiveDiff<T extends { id: string; name: string }>(
   previous: T[],
   current: T[],
   subject: string,
   ir: ModelIR,
-): void {
+): { added: T[]; existing: T[] } {
   const previousIds = new Set(previous.map((value) => value.id));
   const currentIds = new Set(current.map((value) => value.id));
   const removed = previous.filter((value) => !currentIds.has(value.id));
-  const added = current.filter((value) => !previousIds.has(value.id));
-  if (removed.length || added.length) {
-    fail(ir, "E2805", `${subject} additions/removals or changed stable IDs are unsupported in 0.9 (removed: ${removed.map((value) => value.name).join(", ") || "none"}; added: ${added.map((value) => value.name).join(", ") || "none"}).`);
+  if (removed.length) {
+    fail(ir, "E2805", `${subject} removal or changed stable ID is unsafe in 0.10 (removed: ${removed.map((value) => value.name).join(", ")}).`);
   }
+  return {
+    added: current.filter((value) => !previousIds.has(value.id)),
+    existing: current.filter((value) => previousIds.has(value.id)),
+  };
 }
 
 function fieldStructure(field: IRField): unknown {
@@ -136,7 +159,12 @@ function queryStructure(query: IRQuery): unknown {
 }
 
 function workflowStructure(workflow: IRWorkflow): unknown {
-  const { identity: _identity, ...structure } = workflow;
+  const { identity: _identity, transitions: _transitions, ...structure } = workflow;
+  return structure;
+}
+
+function transitionStructure(transition: IRWorkflowTransition): unknown {
+  const { name: _name, identity: _identity, ...structure } = transition;
   return structure;
 }
 
@@ -221,6 +249,70 @@ function requireUniquePhysicalTargets(ir: ModelIR): void {
   if (fn) fail(ir, "E2808", `Generated function rename target '${fn}' is not unique.`);
 }
 
+function requireSafeAddedField(ir: ModelIR, entity: IREntity, field: IRField): void {
+  if (!field.optional && !field.default && !field.generation) {
+    fail(ir, "E2811", `Required added field '${entity.name}.${field.name}' needs a constant default or database generation strategy.`);
+  }
+  if (field.annotations.some((annotation) => annotation.name === "unique")) {
+    fail(ir, "E2812", `Adding @unique field '${entity.name}.${field.name}' to an existing entity requires a reviewed data migration.`);
+  }
+  if (field.default?.kind === "literal" || field.default?.kind === "moneyLiteral") {
+    const value = field.default.kind === "moneyLiteral"
+      ? Number(field.default.amount)
+      : typeof field.default.value === "number" ? field.default.value : undefined;
+    if (value !== undefined) {
+      for (const annotation of field.annotations) {
+        const boundary = typeof annotation.value === "number" || typeof annotation.value === "string"
+          ? Number(annotation.value)
+          : undefined;
+        if (boundary === undefined || !Number.isFinite(boundary)) continue;
+        if ((annotation.name === "min" && value < boundary)
+          || (annotation.name === "minExclusive" && value <= boundary)
+          || (annotation.name === "max" && value > boundary)) {
+          fail(ir, "E2813", `Default for added field '${entity.name}.${field.name}' violates @${annotation.name}(${annotation.value}).`);
+        }
+      }
+    }
+  }
+}
+
+function sqlText(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function historyBootstrapStatements(previous: ModelIR, current: ModelIR): string[] {
+  const internal = quoteIdent(current.model.naming.internalSchema);
+  return [
+    `CREATE TABLE IF NOT EXISTS ${internal}.${quoteIdent("schema_migrations")} (`,
+    `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
+    `  ${quoteIdent("model_id")} text NOT NULL,`,
+    `  ${quoteIdent("version")} text NOT NULL UNIQUE,`,
+    `  ${quoteIdent("source_hash")} text NOT NULL UNIQUE,`,
+    `  ${quoteIdent("applied_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()`,
+    ");",
+    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")})`,
+    `SELECT ${sqlText(previous.model.id)}, ${sqlText(previous.model.version)}, ${sqlText(previous.model.sourceHash)}`,
+    `WHERE NOT EXISTS (SELECT 1 FROM ${internal}.${quoteIdent("schema_migrations")});`,
+    `DO $modellang_migration$`,
+    "DECLARE",
+    "  v_model_id text;",
+    "  v_version text;",
+    "  v_source_hash text;",
+    "BEGIN",
+    `  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}`,
+    "  INTO v_model_id, v_version, v_source_hash",
+    `  FROM ${internal}.${quoteIdent("schema_migrations")}`,
+    `  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;`,
+    `  IF v_model_id IS DISTINCT FROM ${sqlText(previous.model.id)}`,
+    `     OR v_version IS DISTINCT FROM ${sqlText(previous.model.version)}`,
+    `     OR v_source_hash IS DISTINCT FROM ${sqlText(previous.model.sourceHash)} THEN`,
+    `    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${previous.model.sourceHash.replaceAll("'", "''")}';`,
+    "  END IF;",
+    "END",
+    "$modellang_migration$;",
+  ];
+}
+
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
   if (previous.irVersion !== 9 || current.irVersion !== 9) {
     fail(current, "E2803", "Migration planning requires canonical IR version 9 inputs.");
@@ -231,39 +323,35 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     || previous.model.name !== current.model.name
     || previous.model.naming.sqlSchema !== current.model.naming.sqlSchema
     || previous.model.naming.internalSchema !== current.model.naming.internalSchema) {
-    fail(current, "E2806", "Model identity, name, and schema must remain unchanged in a 0.9 rename migration.");
+    fail(current, "E2806", "Model identity, name, and schema must remain unchanged in a 0.10 safe migration.");
   }
   if (previous.principal.entityId !== current.principal.entityId) {
-    fail(current, "E2807", "Principal semantics changed; only stable declaration renames are supported in 0.9.");
+    fail(current, "E2807", "Principal semantics changed; principal replacement is unsafe in 0.10.");
   }
   requireUniquePhysicalTargets(current);
 
-  const operations: RenameOperation[] = [];
-
-  requireSameIds(previous.workflows, current.workflows, "Workflow", current);
-  const previousWorkflows = byId(previous.workflows);
-  for (const currentWorkflow of current.workflows) {
-    const previousWorkflow = previousWorkflows.get(currentWorkflow.id)!;
-    requireSameIds(previousWorkflow.transitions, currentWorkflow.transitions, `Transition in workflow '${currentWorkflow.name}'`, current);
-    if (JSON.stringify(previousWorkflow.naming) !== JSON.stringify(currentWorkflow.naming)
-      || !same(workflowStructure(previousWorkflow), workflowStructure(currentWorkflow))) {
-      fail(current, "E2807", `Workflow '${currentWorkflow.name}' changed; workflow migrations are intentionally unsupported in 0.9 and must be reviewed manually.`);
-    }
+  const operations: MigrationOperation[] = [];
+  const enumDiff = additiveDiff(previous.enums, current.enums, "Enum", current);
+  for (const enumeration of enumDiff.added) {
+    operations.push({ kind: "addEnum", enumId: enumeration.id, name: enumeration.name });
   }
-
-  requireSameIds(previous.enums, current.enums, "Enum", current);
   const previousEnums = byId(previous.enums);
-  for (const currentEnum of current.enums) {
+  const expandedEnumIds = new Set<string>();
+  for (const currentEnum of enumDiff.existing) {
     const previousEnum = previousEnums.get(currentEnum.id)!;
     if (!same(enumStructure(previousEnum), enumStructure(currentEnum))) {
-      fail(current, "E2807", `Enum structure changed for '${currentEnum.name}'; only its declaration name may change in 0.9.`);
+      fail(current, "E2807", `Enum structure changed for '${currentEnum.name}'; only renames and member additions are safe in 0.10.`);
     }
-    requireSameIds(previousEnum.members, currentEnum.members, `Member in enum '${currentEnum.name}'`, current);
+    const memberDiff = additiveDiff(previousEnum.members, currentEnum.members, `Member in enum '${currentEnum.name}'`, current);
+    if (memberDiff.added.length) expandedEnumIds.add(currentEnum.id);
+    for (const member of memberDiff.added) {
+      operations.push({ kind: "addEnumMember", enumId: currentEnum.id, memberId: member.id, name: member.name });
+    }
     const previousMembers = byId(previousEnum.members);
-    for (const currentMember of currentEnum.members) {
+    for (const currentMember of memberDiff.existing) {
       const previousMember = previousMembers.get(currentMember.id)!;
       if (previousMember.name !== currentMember.name) {
-        fail(current, "E2807", `Enum member rename '${previousEnum.name}.${previousMember.name}' -> '${currentEnum.name}.${currentMember.name}' is identified by stable ID but stored-value migration is unsupported in 0.9.`);
+        fail(current, "E2807", `Enum member rename '${previousEnum.name}.${previousMember.name}' -> '${currentEnum.name}.${currentMember.name}' requires stored-value migration and is unsafe in 0.10.`);
       }
       if (!same(enumMemberStructure(previousMember), enumMemberStructure(currentMember))) {
         fail(current, "E2807", `Enum member structure changed for '${currentEnum.name}.${currentMember.name}'.`);
@@ -274,19 +362,33 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  requireSameIds(previous.entities, current.entities, "Entity", current);
+  const entityDiff = additiveDiff(previous.entities, current.entities, "Entity", current);
+  for (const entity of entityDiff.added) {
+    operations.push({ kind: "addEntity", entityId: entity.id, name: entity.name, table: entity.naming.sqlTable });
+  }
   const previousEntities = byId(previous.entities);
-  for (const currentEntity of current.entities) {
+  for (const currentEntity of entityDiff.existing) {
     const previousEntity = previousEntities.get(currentEntity.id)!;
     if (!same(entityStructure(previousEntity), entityStructure(currentEntity))) {
-      fail(current, "E2807", `Entity structure changed for '${currentEntity.name}'; only declaration names may change in 0.9.`);
+      fail(current, "E2807", `Entity structure changed for '${currentEntity.name}'; only renames and safe field additions are supported in 0.10.`);
     }
-    requireSameIds(previousEntity.fields, currentEntity.fields, `Field in entity '${currentEntity.name}'`, current);
+    const fields = additiveDiff(previousEntity.fields, currentEntity.fields, `Field in entity '${currentEntity.name}'`, current);
+    for (const field of fields.added) {
+      requireSafeAddedField(current, currentEntity, field);
+      operations.push({
+        kind: "addField",
+        entityId: currentEntity.id,
+        fieldId: field.id,
+        name: field.name,
+        table: currentEntity.naming.sqlTable,
+        column: field.naming.sqlColumn,
+      });
+    }
     const previousFields = byId(previousEntity.fields);
-    for (const currentField of currentEntity.fields) {
+    for (const currentField of fields.existing) {
       const previousField = previousFields.get(currentField.id)!;
       if (!same(fieldStructure(previousField), fieldStructure(currentField))) {
-        fail(current, "E2807", `Field structure changed for '${currentEntity.name}.${currentField.name}'; only its name may change in 0.9.`);
+        fail(current, "E2807", `Field structure changed for '${currentEntity.name}.${currentField.name}'; only its name may change in 0.10.`);
       }
     }
 
@@ -301,7 +403,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
         to: currentEntity.naming.sqlTable,
       });
     }
-    for (const currentField of currentEntity.fields) {
+    for (const currentField of fields.existing) {
       const previousField = previousFields.get(currentField.id)!;
       if (previousField.naming.sqlColumn === currentField.naming.sqlColumn) continue;
       if (collides(previousEntity.fields, currentField.id, (candidate) => candidate.naming.sqlColumn, currentField.naming.sqlColumn)) {
@@ -317,12 +419,15 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
       });
     }
 
-    requireSameIds(previousEntity.invariants, currentEntity.invariants, `Invariant in entity '${currentEntity.name}'`, current);
+    const invariants = additiveDiff(previousEntity.invariants, currentEntity.invariants, `Invariant in entity '${currentEntity.name}'`, current);
+    if (invariants.added.length) {
+      fail(current, "E2814", `Adding invariants to existing entity '${currentEntity.name}' requires explicit validation of stored rows.`);
+    }
     const previousInvariants = byId(previousEntity.invariants);
-    for (const currentInvariant of currentEntity.invariants) {
+    for (const currentInvariant of invariants.existing) {
       const previousInvariant = previousInvariants.get(currentInvariant.id)!;
       if (!same(invariantStructure(previousInvariant), invariantStructure(currentInvariant))) {
-        fail(current, "E2807", `Invariant semantics changed for '${currentEntity.name}.${currentInvariant.name}'; only its name may change in 0.9.`);
+        fail(current, "E2807", `Invariant semantics changed for '${currentEntity.name}.${currentInvariant.name}'; only its name may change in 0.10.`);
       }
       if (previousInvariant.naming.sqlConstraint !== currentInvariant.naming.sqlConstraint) {
         if (constraintTargetCollides(
@@ -343,12 +448,15 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
       }
     }
 
-    requireSameIds(previousEntity.temporalExclusions, currentEntity.temporalExclusions, `Exclusion in entity '${currentEntity.name}'`, current);
+    const exclusions = additiveDiff(previousEntity.temporalExclusions, currentEntity.temporalExclusions, `Exclusion in entity '${currentEntity.name}'`, current);
+    if (exclusions.added.length) {
+      fail(current, "E2815", `Adding temporal exclusions to existing entity '${currentEntity.name}' requires explicit validation of stored rows.`);
+    }
     const previousExclusions = byId(previousEntity.temporalExclusions);
-    for (const currentExclusion of currentEntity.temporalExclusions) {
+    for (const currentExclusion of exclusions.existing) {
       const previousExclusion = previousExclusions.get(currentExclusion.id)!;
       if (!same(exclusionStructure(previousExclusion), exclusionStructure(currentExclusion))) {
-        fail(current, "E2807", `Exclusion semantics changed for '${currentEntity.name}.${currentExclusion.name}'; only its name may change in 0.9.`);
+        fail(current, "E2807", `Exclusion semantics changed for '${currentEntity.name}.${currentExclusion.name}'; only its name may change in 0.10.`);
       }
       if (previousExclusion.naming.sqlExclusionConstraint !== currentExclusion.naming.sqlExclusionConstraint) {
         const ignored = new Set([
@@ -373,12 +481,15 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  requireSameIds(previous.actions, current.actions, "Action", current);
+  const actionDiff = additiveDiff(previous.actions, current.actions, "Action", current);
+  for (const action of actionDiff.added) {
+    operations.push({ kind: "addAction", actionId: action.id, name: action.name });
+  }
   const previousActions = byId(previous.actions);
-  for (const currentAction of current.actions) {
+  for (const currentAction of actionDiff.existing) {
     const previousAction = previousActions.get(currentAction.id)!;
     if (!same(actionStructure(previousAction), actionStructure(currentAction))) {
-      fail(current, "E2807", `Action semantics changed for '${currentAction.name}'; only its name may change in a 0.9 rename migration.`);
+      fail(current, "E2807", `Action semantics changed for '${currentAction.name}'; only its name may change in a 0.10 safe migration.`);
     }
     if (previousAction.naming.sqlFunction !== currentAction.naming.sqlFunction) {
       const previousOperations = [...previous.actions, ...previous.queries];
@@ -395,12 +506,15 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  requireSameIds(previous.queries, current.queries, "Query", current);
+  const queryDiff = additiveDiff(previous.queries, current.queries, "Query", current);
+  for (const query of queryDiff.added) {
+    operations.push({ kind: "addQuery", queryId: query.id, name: query.name });
+  }
   const previousQueries = byId(previous.queries);
-  for (const currentQuery of current.queries) {
+  for (const currentQuery of queryDiff.existing) {
     const previousQuery = previousQueries.get(currentQuery.id)!;
     if (!same(queryStructure(previousQuery), queryStructure(currentQuery))) {
-      fail(current, "E2807", `Query semantics changed for '${currentQuery.name}'; only its name may change in a 0.9 rename migration.`);
+      fail(current, "E2807", `Query semantics changed for '${currentQuery.name}'; only its name may change in a 0.10 safe migration.`);
     }
     if (previousQuery.naming.sqlFunction !== currentQuery.naming.sqlFunction) {
       const previousOperations = [...previous.actions, ...previous.queries];
@@ -417,8 +531,48 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
+  const workflowDiff = additiveDiff(previous.workflows, current.workflows, "Workflow", current);
+  const addedWorkflowIds = new Set(workflowDiff.added.map((workflow) => workflow.id));
+  for (const workflow of workflowDiff.added) {
+    operations.push({ kind: "addWorkflow", workflowId: workflow.id, name: workflow.name });
+  }
+  const previousWorkflows = byId(previous.workflows);
+  const expandedWorkflowIds = new Set<string>();
+  for (const currentWorkflow of workflowDiff.existing) {
+    const previousWorkflow = previousWorkflows.get(currentWorkflow.id)!;
+    if (JSON.stringify(previousWorkflow.naming) !== JSON.stringify(currentWorkflow.naming)
+      || !same(workflowStructure(previousWorkflow), workflowStructure(currentWorkflow))) {
+      fail(current, "E2807", `Workflow '${currentWorkflow.name}' changed; only transition additions are safe in 0.10.`);
+    }
+    const transitions = additiveDiff(
+      previousWorkflow.transitions,
+      currentWorkflow.transitions,
+      `Transition in workflow '${currentWorkflow.name}'`,
+      current,
+    );
+    if (transitions.added.length) expandedWorkflowIds.add(currentWorkflow.id);
+    for (const transition of transitions.added) {
+      operations.push({
+        kind: "addTransition",
+        workflowId: currentWorkflow.id,
+        transitionId: transition.id,
+        name: transition.name,
+      });
+    }
+    const previousTransitions = byId(previousWorkflow.transitions);
+    for (const transition of transitions.existing) {
+      if (!same(transitionStructure(previousTransitions.get(transition.id)!), transitionStructure(transition))) {
+        fail(current, "E2807", `Transition '${currentWorkflow.name}.${transition.name}' changed; existing workflow edges are immutable in 0.10.`);
+      }
+    }
+  }
+
+  if (previous.model.version === current.model.version) {
+    fail(current, "E2810", `Safe migration requires a new model version; both inputs declare '${current.model.version}'.`);
+  }
+
   const schema = quoteIdent(current.model.naming.sqlSchema);
-  const statements = operations.flatMap((operation): string[] => {
+  const renameStatements = operations.flatMap((operation): string[] => {
     switch (operation.kind) {
       case "renameEntity":
         return [`ALTER TABLE ${schema}.${quoteIdent(operation.from)} RENAME TO ${quoteIdent(operation.to)};`];
@@ -436,14 +590,67 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
       case "renameAction":
       case "renameQuery":
         return [`ALTER FUNCTION ${schema}.${quoteIdent(operation.from)}(${operation.parameterTypes.join(", ")}) RENAME TO ${quoteIdent(operation.to)};`];
+      default:
+        return [];
     }
   });
+
+  const structuralStatements: string[] = [...renameStatements];
+  for (const enumeration of enumDiff.added) {
+    structuralStatements.push(`-- Added semantic enum ${enumeration.name}; PostgreSQL stores enum values as constrained text.`);
+  }
+  for (const memberOperation of operations.filter((operation): operation is Extract<AdditiveOperation, { kind: "addEnumMember" }> =>
+    operation.kind === "addEnumMember")) {
+    structuralStatements.push(`-- Added enum member ${memberOperation.name} (${memberOperation.memberId}).`);
+  }
+  for (const entity of entityDiff.added) structuralStatements.push(generateEntityTableStatement(current, entity));
+  for (const currentEntity of entityDiff.existing) {
+    const previousEntity = previousEntities.get(currentEntity.id)!;
+    const previousFieldIds = new Set(previousEntity.fields.map((field) => field.id));
+    for (const field of currentEntity.fields.filter((candidate) => !previousFieldIds.has(candidate.id))) {
+      structuralStatements.push(...generateAddFieldStatements(current, currentEntity, field));
+    }
+  }
+  for (const entity of entityDiff.added) {
+    structuralStatements.push(...generateEntityForeignKeyStatements(current, entity));
+  }
+  for (const enumId of expandedEnumIds) {
+    for (const previousEntity of previous.entities) {
+      const currentEntity = current.entities.find((candidate) => candidate.id === previousEntity.id)!;
+      for (const previousField of previousEntity.fields.filter((field) =>
+        field.type === enumId || field.type === `set:${enumId}`)) {
+        const currentField = currentEntity.fields.find((candidate) => candidate.id === previousField.id)!;
+        structuralStatements.push(...generateRefreshEnumConstraintStatements(current, currentEntity, currentField));
+      }
+    }
+  }
+  for (const workflow of current.workflows) {
+    if (addedWorkflowIds.has(workflow.id)) {
+      structuralStatements.push(...generateWorkflowStatements(current, workflow, true));
+    } else if (expandedWorkflowIds.has(workflow.id)) {
+      structuralStatements.push(...generateWorkflowStatements(current, workflow, false));
+    }
+  }
+
+  const generated = generatePostgres(current);
+  const internal = quoteIdent(current.model.naming.internalSchema);
   const sql = [
-    `-- ModelLang rename migration ${previous.model.version} -> ${current.model.version}`,
+    `-- ModelLang safe schema migration ${previous.model.version} -> ${current.model.version}`,
     "BEGIN;",
-    ...(statements.length ? statements : ["-- No semantic renames detected."]),
+    ...(entityDiff.added.some((entity) => entity.temporalExclusions.length > 0)
+      ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;"]
+      : []),
+    "SET LOCAL ROLE modellang_owner;",
+    ...historyBootstrapStatements(previous, current),
+    ...(structuralStatements.length ? structuralStatements : ["-- No structural schema changes detected."]),
+    "-- Redeploy the complete generated callable boundary and grants.",
+    generated["003_actions.sql"]!.trim(),
+    generated["003_queries.sql"]!.trim(),
+    generated["004_grants.sql"]!.trim(),
+    "SET LOCAL ROLE modellang_owner;",
+    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")})`,
+    `VALUES (${sqlText(current.model.id)}, ${sqlText(current.model.version)}, ${sqlText(current.model.sourceHash)});`,
     "COMMIT;",
-    "-- Next apply the current generated 003_actions.sql, 003_queries.sql, and 004_grants.sql.",
     "",
   ].join("\n");
   return {

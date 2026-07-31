@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.9.0",
-    "sourceHash": "sha256:c7f24cfbd1df74354ef0d2a38ac568d8a1a935f4061ed0c73004aaeb638f3790",
+    "version": "0.10.0",
+    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -27,10 +27,17 @@
     },
     {
       "id": "boundary:internal_schema",
-      "purpose": "Application principals cannot access principal bindings or audit storage.",
+      "purpose": "Application principals cannot access principal bindings, audit storage, or migration history.",
       "layer": "PostgreSQL privilege",
       "artifact": "postgres/004_grants.sql",
       "objectName": "model_reservations_internal"
+    },
+    {
+      "id": "boundary:migration_history",
+      "purpose": "Record the installed model version and source hash for fail-closed migration baseline checks.",
+      "layer": "PostgreSQL migration history",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.schema_migrations"
     },
     {
       "id": "required:field:fld_968ff16b1c28419d9f2f7833635e5653",

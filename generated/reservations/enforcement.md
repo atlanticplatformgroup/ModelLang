@@ -1,12 +1,13 @@
 # Reservations enforcement map
 
-Source hash: `sha256:c7f24cfbd1df74354ef0d2a38ac568d8a1a935f4061ed0c73004aaeb638f3790`
+Source hash: `sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
 | `boundary:principal_binding` | Bind session_user to the model principal through an owner-controlled table. | PostgreSQL session identity | `postgres/002_schema.sql`: `model_reservations_internal.principal_binding` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
-| `boundary:internal_schema` | Application principals cannot access principal bindings or audit storage. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_reservations_internal` | compiler-derived |
+| `boundary:internal_schema` | Application principals cannot access principal bindings, audit storage, or migration history. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_reservations_internal` | compiler-derived |
+| `boundary:migration_history` | Record the installed model version and source hash for fail-closed migration baseline checks. | PostgreSQL migration history | `postgres/002_schema.sql`: `model_reservations_internal.schema_migrations` | compiler-derived |
 | `required:field:fld_968ff16b1c28419d9f2f7833635e5653` | id is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_reservations.user.id NOT NULL` | examples/reservations.model:4:3 |
 | `annotation:field:fld_968ff16b1c28419d9f2f7833635e5653.id` | Enforce @id. | PostgreSQL primary key | `postgres/002_schema.sql`: `user_pkey` | examples/reservations.model:4:3 |
 | `required:field:fld_c5d58534769747848252b806b96ade1d` | name is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_reservations.user.name NOT NULL` | examples/reservations.model:5:3 |

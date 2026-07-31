@@ -100,6 +100,7 @@ export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:principal_binding");
   requireEntry(ir, "boundary:owner_role");
   requireEntry(ir, "boundary:internal_schema");
+  requireEntry(ir, "boundary:migration_history");
   requireEntry(ir, "boundary:audit");
   for (const entity of ir.entities) {
     for (const field of entity.fields) {

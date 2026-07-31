@@ -1027,10 +1027,16 @@ function buildEnforcement(
     objectName: "modellang_owner NOLOGIN",
   }, {
     id: "boundary:internal_schema",
-    purpose: "Application principals cannot access principal bindings or audit storage.",
+    purpose: "Application principals cannot access principal bindings, audit storage, or migration history.",
     layer: "PostgreSQL privilege",
     artifact: "postgres/004_grants.sql",
     objectName: internalSchema,
+  }, {
+    id: "boundary:migration_history",
+    purpose: "Record the installed model version and source hash for fail-closed migration baseline checks.",
+    layer: "PostgreSQL migration history",
+    artifact: "postgres/002_schema.sql",
+    objectName: `${internalSchema}.schema_migrations`,
   }];
   for (const entity of entities) {
     for (const field of entity.fields) {

@@ -1,4 +1,4 @@
-import type { IRAction, IREntity, IREnumMember, IRExpression, IRField, IRParameter, IRQuery, ModelIR } from "../ir.js";
+import type { IRAction, IREntity, IREnumMember, IRExpression, IRField, IRParameter, IRQuery, IRWorkflow, ModelIR } from "../ir.js";
 import { isMoneyType, moneyMagnitudeLimit, moneyProfileFromType } from "../money.js";
 import { quoteIdent, snakeCase } from "../naming.js";
 
@@ -61,6 +61,61 @@ function sqlLiteral(expression: IRExpression, ir: ModelIR): string {
   return String(expression.value);
 }
 
+function columnDefinition(ir: ModelIR, field: IRField): string {
+  const pieces = [quoteIdent(field.naming.sqlColumn), sqlType(field.type)];
+  if (!field.optional) pieces.push("NOT NULL");
+  if (field.default) pieces.push(`DEFAULT ${sqlLiteral(field.default, ir)}`);
+  if (field.generation?.strategy === "uuid") pieces.push("DEFAULT pg_catalog.gen_random_uuid()");
+  if (field.generation?.strategy === "now") pieces.push("DEFAULT pg_catalog.transaction_timestamp()");
+  if (field.annotations.some((annotation) => annotation.name === "id")) pieces.push("PRIMARY KEY");
+  return pieces.join(" ");
+}
+
+function fieldConstraintBodies(ir: ModelIR, entity: IREntity, field: IRField): string[] {
+  const constraints: string[] = [];
+  if (field.type.startsWith("set:enum:")) {
+    const enumId = field.type.slice("set:".length);
+    const enumeration = ir.enums.find((candidate) => candidate.id === enumId)!;
+    const column = quoteIdent(field.naming.sqlColumn);
+    const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`);
+    const tests = [
+      `${column} <@ ARRAY[${members.join(", ")}]::text[]`,
+      `pg_catalog.array_position(${column}, NULL::text) IS NULL`,
+      ...members.map((member) => `pg_catalog.cardinality(pg_catalog.array_positions(${column}, ${member})) <= 1`),
+    ];
+    const test = tests.join(" AND ");
+    constraints.push(`CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
+  }
+  if (field.type.startsWith("enum:")) {
+    const enumeration = ir.enums.find((candidate) => candidate.id === field.type)!;
+    const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`).join(", ");
+    const test = `${quoteIdent(field.naming.sqlColumn)} IN (${members})`;
+    const optionalTest = field.optional ? `(${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test})` : test;
+    constraints.push(`CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`)} CHECK ((${optionalTest}) IS TRUE)`);
+  }
+  if (isMoneyType(field.type)) {
+    const profile = moneyProfileFromType(field.type)!;
+    const column = quoteIdent(field.naming.sqlColumn);
+    const test = `${column} <> 'NaN'::numeric AND pg_catalog.scale(${column}) <= ${profile.scale} AND pg_catalog.abs(${column}) < ${moneyMagnitudeLimit(profile)}`;
+    constraints.push(`CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_money`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
+  }
+  for (const annotation of field.annotations) {
+    if (annotation.name === "unique") {
+      constraints.push(`CONSTRAINT ${quoteIdent(`uq_${entity.naming.sqlTable}_${field.naming.sqlColumn}_unique`)} UNIQUE (${quoteIdent(field.naming.sqlColumn)})`);
+    }
+    if (annotation.name === "min" || annotation.name === "minExclusive") {
+      const operator = annotation.name === "minExclusive" ? ">" : ">=";
+      const test = `${quoteIdent(field.naming.sqlColumn)} ${operator} ${annotation.value}`;
+      constraints.push(`CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_${snakeCase(annotation.name)}`)} CHECK ((${field.optional ? `${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test}` : test}) IS TRUE)`);
+    }
+    if (annotation.name === "max") {
+      const test = `${quoteIdent(field.naming.sqlColumn)} <= ${annotation.value}`;
+      constraints.push(`CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_max`)} CHECK ((${field.optional ? `${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test}` : test}) IS TRUE)`);
+    }
+  }
+  return constraints;
+}
+
 interface ExpressionContext {
   ir: ModelIR;
   action?: IRAction;
@@ -108,6 +163,116 @@ function sqlOperator(operator: Exclude<Extract<IRExpression, { kind: "binary" }>
   return ({ and: "AND", or: "OR", "==": "=", "!=": "<>", "<": "<", "<=": "<=", ">": ">", ">=": ">=" } as const)[operator];
 }
 
+export function generateEntityTableStatement(ir: ModelIR, entity: IREntity): string {
+  const columns = entity.fields.map((field) => `  ${columnDefinition(ir, field)}`);
+  const constraints = entity.fields.flatMap((field) => fieldConstraintBodies(ir, entity, field).map((constraint) => `  ${constraint}`));
+  for (const invariant of entity.invariants) {
+    constraints.push(`  CONSTRAINT ${quoteIdent(invariant.naming.sqlConstraint)} CHECK ((${lowerExpression(invariant.expression, { ir, selfEntity: entity })}) IS TRUE)`);
+  }
+  for (const exclusion of entity.temporalExclusions) {
+    const key = fieldById(ir, exclusion.keyFieldId).field;
+    const start = fieldById(ir, exclusion.startFieldId).field;
+    const end = fieldById(ir, exclusion.endFieldId).field;
+    constraints.push(
+      `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlValidIntervalConstraint)} CHECK ((${quoteIdent(start.naming.sqlColumn)} < ${quoteIdent(end.naming.sqlColumn)}) IS TRUE)`,
+      `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlExclusionConstraint)} EXCLUDE USING gist (${quoteIdent(key.naming.sqlColumn)} WITH =, pg_catalog.tstzrange(${quoteIdent(start.naming.sqlColumn)}, ${quoteIdent(end.naming.sqlColumn)}, '${exclusion.intervalBounds}') WITH &&)`,
+    );
+  }
+  return `CREATE TABLE ${qname(ir.model.naming.sqlSchema, entity.naming.sqlTable)} (\n${[...columns, ...constraints].join(",\n")}\n);`;
+}
+
+export function generateEntityForeignKeyStatements(ir: ModelIR, entity: IREntity): string[] {
+  return entity.fields.filter((field) => field.type.startsWith("entity:")).map((field) => {
+    const target = entityById(ir, field.type);
+    return `ALTER TABLE ${qname(ir.model.naming.sqlSchema, entity.naming.sqlTable)}
+  ADD CONSTRAINT ${quoteIdent(`fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`)}
+  FOREIGN KEY (${quoteIdent(field.naming.sqlColumn)}) REFERENCES ${qname(ir.model.naming.sqlSchema, target.naming.sqlTable)} (${quoteIdent("id")});`;
+  });
+}
+
+export function generateAddFieldStatements(ir: ModelIR, entity: IREntity, field: IRField): string[] {
+  const table = qname(ir.model.naming.sqlSchema, entity.naming.sqlTable);
+  const statements = [`ALTER TABLE ${table} ADD COLUMN ${columnDefinition(ir, field)};`];
+  statements.push(...fieldConstraintBodies(ir, entity, field).map((constraint) =>
+    `ALTER TABLE ${table} ADD ${constraint};`));
+  if (field.type.startsWith("entity:")) {
+    const target = entityById(ir, field.type);
+    statements.push(`ALTER TABLE ${table}
+  ADD CONSTRAINT ${quoteIdent(`fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`)}
+  FOREIGN KEY (${quoteIdent(field.naming.sqlColumn)}) REFERENCES ${qname(ir.model.naming.sqlSchema, target.naming.sqlTable)} (${quoteIdent("id")});`);
+  }
+  return statements;
+}
+
+export function generateRefreshEnumConstraintStatements(ir: ModelIR, entity: IREntity, field: IRField): string[] {
+  const constraint = fieldConstraintBodies(ir, entity, field).find((candidate) =>
+    field.type.startsWith("set:enum:") ? candidate.includes("_enum_set") : candidate.includes("_enum"));
+  if (!constraint) throw new Error(`E4010 Missing enum constraint for ${entity.name}.${field.name}`);
+  const name = field.type.startsWith("set:enum:")
+    ? `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`
+    : `ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`;
+  const table = qname(ir.model.naming.sqlSchema, entity.naming.sqlTable);
+  return [
+    `ALTER TABLE ${table} DROP CONSTRAINT ${quoteIdent(name)};`,
+    `ALTER TABLE ${table} ADD ${constraint};`,
+  ];
+}
+
+export function generateWorkflowStatements(
+  ir: ModelIR,
+  workflow: IRWorkflow,
+  createTriggers: boolean,
+): string[] {
+  const schema = ir.model.naming.sqlSchema;
+  const internal = ir.model.naming.internalSchema;
+  const entity = entityById(ir, workflow.entityId);
+  const field = fieldById(ir, workflow.fieldId).field;
+  const initial = enumMemberById(ir, workflow.enumId, workflow.initialMemberId);
+  const allowed = workflow.transitions.map((transition) => {
+    const from = enumMemberById(ir, workflow.enumId, transition.fromMemberId).naming.sqlValue.replaceAll("'", "''");
+    const to = enumMemberById(ir, workflow.enumId, transition.toMemberId).naming.sqlValue.replaceAll("'", "''");
+    return `(OLD.${quoteIdent(field.naming.sqlColumn)} = '${from}' AND NEW.${quoteIdent(field.naming.sqlColumn)} = '${to}')`;
+  });
+  const workflowRule = workflow.id.replaceAll("'", "''");
+  const statements = [
+    `CREATE OR REPLACE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.${quoteIdent(field.naming.sqlColumn)} IS DISTINCT FROM '${initial.naming.sqlValue.replaceAll("'", "''")}' THEN
+      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlInsertTrigger.replaceAll("'", "''")}';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW.${quoteIdent(field.naming.sqlColumn)} IS NOT DISTINCT FROM OLD.${quoteIdent(field.naming.sqlColumn)} THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT (${allowed.length ? allowed.join("\n    OR ") : "FALSE"}) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlUpdateTrigger.replaceAll("'", "''")}';
+  END IF;
+  RETURN NEW;
+END
+$modellang$;`,
+    `REVOKE ALL ON FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}() FROM PUBLIC;`,
+  ];
+  if (createTriggers) {
+    statements.push(
+      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlInsertTrigger)}
+AFTER INSERT ON ${qname(schema, entity.naming.sqlTable)}
+FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
+      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlUpdateTrigger)}
+BEFORE UPDATE OF ${quoteIdent(field.naming.sqlColumn)} ON ${qname(schema, entity.naming.sqlTable)}
+FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
+    );
+  }
+  return statements;
+}
+
 function generateRoles(): string {
   return `-- Generated by ModelLang. Administrative bootstrap; run as a role with CREATEROLE.
 DO $modellang$
@@ -143,125 +308,13 @@ function generateSchema(ir: ModelIR): string {
     "",
   ];
   for (const entity of ir.entities) {
-    const columns = entity.fields.map((field) => {
-      const pieces = [quoteIdent(field.naming.sqlColumn), sqlType(field.type)];
-      if (!field.optional) pieces.push("NOT NULL");
-      if (field.default) pieces.push(`DEFAULT ${sqlLiteral(field.default, ir)}`);
-      if (field.generation?.strategy === "uuid") pieces.push("DEFAULT pg_catalog.gen_random_uuid()");
-      if (field.generation?.strategy === "now") pieces.push("DEFAULT pg_catalog.transaction_timestamp()");
-      if (field.annotations.some((annotation) => annotation.name === "id")) pieces.push("PRIMARY KEY");
-      return `  ${pieces.join(" ")}`;
-    });
-    const constraints: string[] = [];
-    for (const field of entity.fields) {
-      if (field.type.startsWith("set:enum:")) {
-        const enumId = field.type.slice("set:".length);
-        const enumeration = ir.enums.find((candidate) => candidate.id === enumId)!;
-        const column = quoteIdent(field.naming.sqlColumn);
-        const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`);
-        const tests = [
-          `${column} <@ ARRAY[${members.join(", ")}]::text[]`,
-          `pg_catalog.array_position(${column}, NULL::text) IS NULL`,
-          ...members.map((member) => `pg_catalog.cardinality(pg_catalog.array_positions(${column}, ${member})) <= 1`),
-        ];
-        const test = tests.join(" AND ");
-        constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum_set`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
-      }
-      if (field.type.startsWith("enum:")) {
-        const enumeration = ir.enums.find((candidate) => candidate.id === field.type)!;
-        const members = enumeration.members.map((member) => `'${member.naming.sqlValue.replaceAll("'", "''")}'`).join(", ");
-        const test = `${quoteIdent(field.naming.sqlColumn)} IN (${members})`;
-        const optionalTest = field.optional ? `(${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test})` : test;
-        constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_enum`)} CHECK ((${optionalTest}) IS TRUE)`);
-      }
-      if (isMoneyType(field.type)) {
-        const profile = moneyProfileFromType(field.type)!;
-        const column = quoteIdent(field.naming.sqlColumn);
-        const test = `${column} <> 'NaN'::numeric AND pg_catalog.scale(${column}) <= ${profile.scale} AND pg_catalog.abs(${column}) < ${moneyMagnitudeLimit(profile)}`;
-        constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_money`)} CHECK ((${field.optional ? `${column} IS NULL OR (${test})` : test}) IS TRUE)`);
-      }
-      for (const annotation of field.annotations) {
-        if (annotation.name === "unique") constraints.push(`  CONSTRAINT ${quoteIdent(`uq_${entity.naming.sqlTable}_${field.naming.sqlColumn}_unique`)} UNIQUE (${quoteIdent(field.naming.sqlColumn)})`);
-        if (annotation.name === "min" || annotation.name === "minExclusive") {
-          const operator = annotation.name === "minExclusive" ? ">" : ">=";
-          const test = `${quoteIdent(field.naming.sqlColumn)} ${operator} ${annotation.value}`;
-          constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_${snakeCase(annotation.name)}`)} CHECK ((${field.optional ? `${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test}` : test}) IS TRUE)`);
-        }
-        if (annotation.name === "max") {
-          const test = `${quoteIdent(field.naming.sqlColumn)} <= ${annotation.value}`;
-          constraints.push(`  CONSTRAINT ${quoteIdent(`ck_${entity.naming.sqlTable}_${field.naming.sqlColumn}_max`)} CHECK ((${field.optional ? `${quoteIdent(field.naming.sqlColumn)} IS NULL OR ${test}` : test}) IS TRUE)`);
-        }
-      }
-    }
-    for (const invariant of entity.invariants) {
-      constraints.push(`  CONSTRAINT ${quoteIdent(invariant.naming.sqlConstraint)} CHECK ((${lowerExpression(invariant.expression, { ir, selfEntity: entity })}) IS TRUE)`);
-    }
-    for (const exclusion of entity.temporalExclusions) {
-      const key = fieldById(ir, exclusion.keyFieldId).field;
-      const start = fieldById(ir, exclusion.startFieldId).field;
-      const end = fieldById(ir, exclusion.endFieldId).field;
-      constraints.push(
-        `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlValidIntervalConstraint)} CHECK ((${quoteIdent(start.naming.sqlColumn)} < ${quoteIdent(end.naming.sqlColumn)}) IS TRUE)`,
-        `  CONSTRAINT ${quoteIdent(exclusion.naming.sqlExclusionConstraint)} EXCLUDE USING gist (${quoteIdent(key.naming.sqlColumn)} WITH =, pg_catalog.tstzrange(${quoteIdent(start.naming.sqlColumn)}, ${quoteIdent(end.naming.sqlColumn)}, '${exclusion.intervalBounds}') WITH &&)`,
-      );
-    }
-    lines.push(`CREATE TABLE ${qname(schema, entity.naming.sqlTable)} (\n${[...columns, ...constraints].join(",\n")}\n);`, "");
+    lines.push(generateEntityTableStatement(ir, entity), "");
   }
   for (const entity of ir.entities) {
-    for (const field of entity.fields.filter((candidate) => candidate.type.startsWith("entity:"))) {
-      const target = entityById(ir, field.type);
-      lines.push(
-        `ALTER TABLE ${qname(schema, entity.naming.sqlTable)}`,
-        `  ADD CONSTRAINT ${quoteIdent(`fk_${entity.naming.sqlTable}_${field.naming.sqlColumn}`)}`,
-        `  FOREIGN KEY (${quoteIdent(field.naming.sqlColumn)}) REFERENCES ${qname(schema, target.naming.sqlTable)} (${quoteIdent("id")});`,
-        "",
-      );
-    }
+    for (const statement of generateEntityForeignKeyStatements(ir, entity)) lines.push(statement, "");
   }
   for (const workflow of ir.workflows) {
-    const entity = entityById(ir, workflow.entityId);
-    const field = fieldById(ir, workflow.fieldId).field;
-    const initial = enumMemberById(ir, workflow.enumId, workflow.initialMemberId);
-    const allowed = workflow.transitions.map((transition) => {
-      const from = enumMemberById(ir, workflow.enumId, transition.fromMemberId).naming.sqlValue.replaceAll("'", "''");
-      const to = enumMemberById(ir, workflow.enumId, transition.toMemberId).naming.sqlValue.replaceAll("'", "''");
-      return `(OLD.${quoteIdent(field.naming.sqlColumn)} = '${from}' AND NEW.${quoteIdent(field.naming.sqlColumn)} = '${to}')`;
-    });
-    const workflowRule = workflow.id.replaceAll("'", "''");
-    lines.push(
-      `CREATE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}()`,
-      "RETURNS trigger",
-      "LANGUAGE plpgsql",
-      "SET search_path = pg_catalog, pg_temp",
-      "AS $modellang$",
-      "BEGIN",
-      "  IF TG_OP = 'INSERT' THEN",
-      `    IF NEW.${quoteIdent(field.naming.sqlColumn)} IS DISTINCT FROM '${initial.naming.sqlValue.replaceAll("'", "''")}' THEN`,
-      `      RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlInsertTrigger.replaceAll("'", "''")}';`,
-      "    END IF;",
-      "    RETURN NEW;",
-      "  END IF;",
-      "",
-      `  IF NEW.${quoteIdent(field.naming.sqlColumn)} IS NOT DISTINCT FROM OLD.${quoteIdent(field.naming.sqlColumn)} THEN`,
-      "    RETURN NEW;",
-      "  END IF;",
-      "",
-      `  IF NOT (${allowed.length ? allowed.join("\n    OR ") : "FALSE"}) THEN`,
-      `    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'ML_WORKFLOW:${workflowRule}', CONSTRAINT = '${workflow.naming.sqlUpdateTrigger.replaceAll("'", "''")}';`,
-      "  END IF;",
-      "  RETURN NEW;",
-      "END",
-      "$modellang$;",
-      "",
-      `REVOKE ALL ON FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}() FROM PUBLIC;`,
-      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlInsertTrigger)}`,
-      `AFTER INSERT ON ${qname(schema, entity.naming.sqlTable)}`,
-      `FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
-      `CREATE TRIGGER ${quoteIdent(workflow.naming.sqlUpdateTrigger)}`,
-      `BEFORE UPDATE OF ${quoteIdent(field.naming.sqlColumn)} ON ${qname(schema, entity.naming.sqlTable)}`,
-      `FOR EACH ROW EXECUTE FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`,
-      "",
-    );
+    for (const statement of generateWorkflowStatements(ir, workflow, true)) lines.push(statement, "");
   }
   const principal = entityById(ir, ir.principal.entityId);
   lines.push(
@@ -278,6 +331,16 @@ function generateSchema(ir: ModelIR): string {
     `  ${quoteIdent("target_id")} uuid,`,
     `  ${quoteIdent("occurred_at")} timestamptz NOT NULL DEFAULT transaction_timestamp()`,
     ");",
+    "",
+    `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
+    `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
+    `  ${quoteIdent("model_id")} text NOT NULL,`,
+    `  ${quoteIdent("version")} text NOT NULL UNIQUE,`,
+    `  ${quoteIdent("source_hash")} text NOT NULL UNIQUE,`,
+    `  ${quoteIdent("applied_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()`,
+    ");",
+    `INSERT INTO ${qname(internal, "schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")})`,
+    `VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}');`,
     "RESET ROLE;",
     "",
   );

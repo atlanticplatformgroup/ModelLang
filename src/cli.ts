@@ -42,14 +42,14 @@ async function main(): Promise<void> {
     const plan = planMigration(previous, current);
     const out = resolve(rest[outIndex + 1]!);
     await writeFile(out, plan.sql, "utf8");
-    process.stdout.write(`Generated ${plan.operations.length} rename operation${plan.operations.length === 1 ? "" : "s"} into ${out}\n`);
+    process.stdout.write(`Generated ${plan.operations.length} migration operation${plan.operations.length === 1 ? "" : "s"} into ${out}\n`);
     return;
   }
   if (!["check", "build", "print-ir", "explain"].includes(command)) usage();
   const file = resolve(fileArg);
   const ir = await compileFile(file);
   if (command === "check") {
-    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions, ${ir.queries.length} queries)\n`);
+    process.stdout.write(`OK ${ir.model.name} ${ir.model.version} (${ir.entities.length} entities, ${ir.actions.length} actions, ${ir.queries.length} queries, ${ir.workflows.length} workflows)\n`);
     return;
   }
   if (command === "print-ir") {

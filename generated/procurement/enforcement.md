@@ -1,12 +1,13 @@
 # Procurement enforcement map
 
-Source hash: `sha256:da275901eb5fd98551ce71b83a0bc11e4e02e97e0381348defe5d3a231571b68`
+Source hash: `sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
 | `boundary:principal_binding` | Bind session_user to the model principal through an owner-controlled table. | PostgreSQL session identity | `postgres/002_schema.sql`: `model_procurement_internal.principal_binding` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
-| `boundary:internal_schema` | Application principals cannot access principal bindings or audit storage. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement_internal` | compiler-derived |
+| `boundary:internal_schema` | Application principals cannot access principal bindings, audit storage, or migration history. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement_internal` | compiler-derived |
+| `boundary:migration_history` | Record the installed model version and source hash for fail-closed migration baseline checks. | PostgreSQL migration history | `postgres/002_schema.sql`: `model_procurement_internal.schema_migrations` | compiler-derived |
 | `required:field:fld_fe4c8fe8243b456eadeefb42b0bd7097` | id is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_procurement.user.id NOT NULL` | examples/procurement.model:16:3 |
 | `annotation:field:fld_fe4c8fe8243b456eadeefb42b0bd7097.id` | Enforce @id. | PostgreSQL primary key | `postgres/002_schema.sql`: `user_pkey` | examples/procurement.model:16:3 |
 | `required:field:fld_a261560f630d4e818f8f099868078535` | name is required. | PostgreSQL constraint | `postgres/002_schema.sql`: `model_procurement.user.name NOT NULL` | examples/procurement.model:17:3 |
