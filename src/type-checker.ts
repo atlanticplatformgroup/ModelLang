@@ -1051,7 +1051,7 @@ function buildEnforcement(
     objectName: internalSchema,
   }, {
     id: "boundary:migration_history",
-    purpose: "Record the installed model version and source hash for fail-closed migration baseline checks.",
+    purpose: "Record installed model/source identity, migration kind, and reviewed plan provenance for fail-closed evolution checks.",
     layer: "PostgreSQL migration history",
     artifact: "postgres/002_schema.sql",
     objectName: `${internalSchema}.schema_migrations`,

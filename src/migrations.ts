@@ -78,7 +78,7 @@ function requireExplicit(
   }
 }
 
-function requireExplicitIds(ir: ModelIR): void {
+export function requireExplicitIds(ir: ModelIR): void {
   for (const enumeration of ir.enums) {
     requireExplicit(ir, enumeration, "enum", "enum");
     for (const member of enumeration.members) requireExplicit(ir, member, `enum member in '${enumeration.name}'`, "enumMember");
@@ -238,7 +238,7 @@ function duplicate(values: string[]): string | undefined {
   return undefined;
 }
 
-function requireUniquePhysicalTargets(ir: ModelIR): void {
+export function requireUniquePhysicalTargets(ir: ModelIR): void {
   const table = duplicate(ir.entities.map((entity) => entity.naming.sqlTable));
   if (table) fail(ir, "E2808", `Table rename target '${table}' is not unique.`);
   for (const entity of ir.entities) {
@@ -278,11 +278,11 @@ function requireSafeAddedField(ir: ModelIR, entity: IREntity, field: IRField): v
   }
 }
 
-function sqlText(value: string): string {
+export function sqlText(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function historyBootstrapStatements(previous: ModelIR, current: ModelIR): string[] {
+export function historyBootstrapStatements(previous: ModelIR, current: ModelIR): string[] {
   const internal = quoteIdent(current.model.naming.internalSchema);
   return [
     `CREATE TABLE IF NOT EXISTS ${internal}.${quoteIdent("schema_migrations")} (`,
@@ -290,10 +290,31 @@ function historyBootstrapStatements(previous: ModelIR, current: ModelIR): string
     `  ${quoteIdent("model_id")} text NOT NULL,`,
     `  ${quoteIdent("version")} text NOT NULL UNIQUE,`,
     `  ${quoteIdent("source_hash")} text NOT NULL UNIQUE,`,
+    `  ${quoteIdent("migration_kind")} text NOT NULL,`,
+    `  ${quoteIdent("plan_hash")} text,`,
+    `  CONSTRAINT ${quoteIdent("ck_schema_migrations_kind")} CHECK (${quoteIdent("migration_kind")} IN ('installation', 'safe', 'reviewed')),`,
+    `  CONSTRAINT ${quoteIdent("ck_schema_migrations_reviewed_plan")} CHECK (((${quoteIdent("migration_kind")} = 'reviewed') = (${quoteIdent("plan_hash")} IS NOT NULL)) AND (${quoteIdent("plan_hash")} IS NULL OR ${quoteIdent("plan_hash")} ~ '^sha256:[0-9a-f]{64}$')),`,
     `  ${quoteIdent("applied_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()`,
     ");",
-    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")})`,
-    `SELECT ${sqlText(previous.model.id)}, ${sqlText(previous.model.version)}, ${sqlText(previous.model.sourceHash)}`,
+    `ALTER TABLE ${internal}.${quoteIdent("schema_migrations")} ADD COLUMN IF NOT EXISTS ${quoteIdent("migration_kind")} text;`,
+    `ALTER TABLE ${internal}.${quoteIdent("schema_migrations")} ADD COLUMN IF NOT EXISTS ${quoteIdent("plan_hash")} text;`,
+    `UPDATE ${internal}.${quoteIdent("schema_migrations")} SET ${quoteIdent("migration_kind")} = CASE`,
+    `  WHEN ${quoteIdent("id")} = (SELECT pg_catalog.min(${quoteIdent("id")}) FROM ${internal}.${quoteIdent("schema_migrations")}) THEN 'installation'`,
+    "  ELSE 'safe'",
+    `END WHERE ${quoteIdent("migration_kind")} IS NULL;`,
+    `ALTER TABLE ${internal}.${quoteIdent("schema_migrations")} ALTER COLUMN ${quoteIdent("migration_kind")} SET NOT NULL;`,
+    "DO $modellang_history$",
+    "BEGIN",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${internal}.${quoteIdent("schema_migrations")}'::regclass AND conname = 'ck_schema_migrations_kind') THEN`,
+    `    ALTER TABLE ${internal}.${quoteIdent("schema_migrations")} ADD CONSTRAINT ${quoteIdent("ck_schema_migrations_kind")} CHECK (${quoteIdent("migration_kind")} IN ('installation', 'safe', 'reviewed'));`,
+    "  END IF;",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${internal}.${quoteIdent("schema_migrations")}'::regclass AND conname = 'ck_schema_migrations_reviewed_plan') THEN`,
+    `    ALTER TABLE ${internal}.${quoteIdent("schema_migrations")} ADD CONSTRAINT ${quoteIdent("ck_schema_migrations_reviewed_plan")} CHECK (((${quoteIdent("migration_kind")} = 'reviewed') = (${quoteIdent("plan_hash")} IS NOT NULL)) AND (${quoteIdent("plan_hash")} IS NULL OR ${quoteIdent("plan_hash")} ~ '^sha256:[0-9a-f]{64}$'));`,
+    "  END IF;",
+    "END",
+    "$modellang_history$;",
+    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}, ${quoteIdent("migration_kind")})`,
+    `SELECT ${sqlText(previous.model.id)}, ${sqlText(previous.model.version)}, ${sqlText(previous.model.sourceHash)}, 'installation'`,
     `WHERE NOT EXISTS (SELECT 1 FROM ${internal}.${quoteIdent("schema_migrations")});`,
     `DO $modellang_migration$`,
     "DECLARE",
@@ -654,8 +675,8 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     generated["003_queries.sql"]!.trim(),
     generated["004_grants.sql"]!.trim(),
     "SET LOCAL ROLE modellang_owner;",
-    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")})`,
-    `VALUES (${sqlText(current.model.id)}, ${sqlText(current.model.version)}, ${sqlText(current.model.sourceHash)});`,
+    `INSERT INTO ${internal}.${quoteIdent("schema_migrations")} (${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}, ${quoteIdent("migration_kind")})`,
+    `VALUES (${sqlText(current.model.id)}, ${sqlText(current.model.version)}, ${sqlText(current.model.sourceHash)}, 'safe');`,
     "COMMIT;",
     "",
   ].join("\n");

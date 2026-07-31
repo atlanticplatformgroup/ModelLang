@@ -536,6 +536,9 @@ describe("backends", () => {
     const schema = output["postgres/002_schema.sql"];
     expect(schema).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."enforce_purchase_request_lifecycle"()');
     expect(schema).toContain('CREATE TABLE "model_procurement_internal"."schema_migrations"');
+    expect(schema).toContain('"migration_kind" text NOT NULL');
+    expect(schema).toContain('"plan_hash" text');
+    expect(schema).toContain("'installation'");
     expect(schema).toContain("VALUES ('model:Procurement', '0.10.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");

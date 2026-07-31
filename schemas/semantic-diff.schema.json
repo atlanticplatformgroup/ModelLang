@@ -24,7 +24,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-diff.schema.json" },
-    "diffVersion": { "const": 1 },
+    "diffVersion": { "const": 2 },
     "compilerVersion": { "type": "string" },
     "irVersion": { "const": 9 },
     "previous": { "$ref": "#/$defs/model" },
@@ -75,7 +75,7 @@
       },
       "additionalProperties": false
     },
-    "migrationAuthority": { "const": "separateSafeMigrationPlanner" }
+    "migrationAuthority": { "const": "separateGuardedMigrationPlanners" }
   },
   "additionalProperties": false
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.0
+
+- Added a versioned reviewed-migration plan with exact released/current source hashes, stable-ID semantic acknowledgements, typed field values, and scalar enum mappings.
+- Added canonical object-order-independent plan hashing and recorded reviewed plan hashes alongside model/source provenance in migration history.
+- Added `modelc reviewed-migration` as a separate guarded authority while preserving the narrower automatic safe planner unchanged.
+- Added PostgreSQL-first offline transactional rebuilds that lock previous tables, validate retained rows in a constrained staging schema, verify row counts and references, and replace the model schema only after validation succeeds.
+- Added explicit support for acknowledged entity/field removal, required-field backfill, scalar enum replacement, and changed current constraints/callables without adding raw SQL or callback escape hatches.
+- Kept field-type conversions, enum-set transformations, principal/schema replacement, inferred rollback, and unmatched plan intent fail-closed.
+- Advanced semantic diff to v2 to identify both separate guarded migration planners without making diff analysis executable authority.
+- Added normative contracts, JSON Schema, unit coverage, and a live Procurement migration proof including failed-backfill rollback, history provenance, callable redeployment, and stale-baseline rejection.
+
 ## 0.15.0
 
 - Added engineering semantic manifest v1 with typed rules, stable dependencies, read sets, lock plans, explicit assignments, linked postconditions, workflow bindings, failure classes, and source spans.

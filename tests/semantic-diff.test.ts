@@ -62,10 +62,10 @@ describe("semantic change analysis", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 1,
-      compilerVersion: "0.15.0",
+      diffVersion: 2,
+      compilerVersion: "0.16.0",
       irVersion: 9,
-      migrationAuthority: "separateSafeMigrationPlanner",
+      migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: "declarationAdded", area: "structure", classification: "additive" }),

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/reviewed-migration-plan.schema.json",
+  "title": "ModelLang reviewed migration plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema", "planVersion", "strategy", "description", "from", "to",
+    "acknowledgements", "fieldValues", "enumMappings"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/reviewed-migration-plan.schema.json" },
+    "planVersion": { "const": 1 },
+    "strategy": { "const": "transactionalRebuild" },
+    "description": { "type": "string", "minLength": 1 },
+    "from": { "$ref": "#/$defs/modelReference" },
+    "to": { "$ref": "#/$defs/modelReference" },
+    "acknowledgements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["changeKind", "subjectId", "disposition", "reason"],
+        "properties": {
+          "changeKind": { "type": "string", "minLength": 1 },
+          "subjectId": { "type": "string", "minLength": 1 },
+          "disposition": { "enum": ["accepted", "dataLossAccepted", "transformed"] },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "fieldValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["targetFieldId", "source"],
+        "properties": {
+          "targetFieldId": { "type": "string", "minLength": 1 },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "value"],
+                "properties": {
+                  "kind": { "const": "literal" },
+                  "value": {
+                    "oneOf": [
+                      { "type": "string" },
+                      { "type": "number" },
+                      { "type": "boolean" },
+                      { "type": "null" }
+                    ]
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "memberId"],
+                "properties": {
+                  "kind": { "const": "enumMember" },
+                  "memberId": { "type": "string", "minLength": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind", "sourceFieldId"],
+                "properties": {
+                  "kind": { "const": "copyField" },
+                  "sourceFieldId": { "type": "string", "minLength": 1 }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "enumMappings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["enumId", "members"],
+        "properties": {
+          "enumId": { "type": "string", "minLength": 1 },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["fromMemberId", "toMemberId"],
+              "properties": {
+                "fromMemberId": { "type": "string", "minLength": 1 },
+                "toMemberId": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "modelReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modelId", "version", "sourceHash"],
+      "properties": {
+        "modelId": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

@@ -3,19 +3,19 @@
 ## Making application meaning a first-class, executable artifact
 
 **Author:** Nick Scipione<br>
-**Status:** Repository working draft 0.3<br>
+**Status:** Repository working draft 0.4<br>
 **Date:** 31 July 2026
 
 > ModelLang is presented as a reference implementation. The architectural proposal is intended to stand independently of any one language, compiler, or runtime.
 
 ## Implementation Status
 
-This repository edition distinguishes the architectural target from the released reference implementation. ModelLang 0.15 is a working implementation of a bounded transactional subset of the proposal. It is not yet a conforming implementation of the complete SML-Core profile in Appendix B and does not claim the SML-Agent or SML-Federation profiles.
+This repository edition distinguishes the architectural target from the released reference implementation. ModelLang 0.16 is a working implementation of a bounded transactional subset of the proposal. It is not yet a conforming implementation of the complete SML-Core profile in Appendix B and does not claim the SML-Agent or SML-Federation profiles.
 
-| Capability | ModelLang 0.15 status |
+| Capability | ModelLang 0.16 status |
 |---|---|
 | Textual domain source, typed IR, stable declaration identity, invariants, actions, authorization, preconditions, queries, and workflows | Implemented |
-| PostgreSQL enforcement, guarded additive migrations, authenticated HTTP, typed clients and errors, framework-neutral UI metadata | Implemented |
+| PostgreSQL enforcement, guarded automatic-safe and explicitly reviewed migrations, authenticated HTTP, typed clients and errors, framework-neutral UI metadata | Implemented for a bounded PostgreSQL-first profile |
 | Engineering semantic manifest with rules, dependencies, read sets, locks, effects, postconditions, workflows, failures, and source spans | Implemented |
 | Deterministic artifact-provenance catalog and stable-ID-aware semantic change report | Implemented |
 | First-class reusable policy declarations, decision evidence, authored semantic presentation hints, events, and typed external operations | Partial or proposed |
@@ -27,13 +27,14 @@ The implementation has several independent version axes:
 
 | Axis | Current value | Meaning |
 |---|---|---|
-| Compiler release | 0.15.0 | Toolchain and generated-artifact release |
+| Compiler release | 0.16.0 | Toolchain and generated-artifact release |
 | Canonical IR | IR9 | Typed backend boundary; retained for migration-baseline compatibility |
 | Example source models | 0.10.0 | Domain-model evolution version, independent of compiler release |
 | Operation manifest | v2 | Static transport-neutral public operation contract |
 | UI manifest | v2 | Static framework-neutral presentation contract |
 | Engineering semantic manifest | v1 | Full static semantic closure for trusted engineering consumers |
-| Semantic diff and provenance | v1 | Independently versioned analysis and build-assurance contracts |
+| Semantic diff | v2 | Stable-ID change analysis that names separate guarded migration authorities |
+| Reviewed migration plan and provenance | v1 | Independently versioned evolution-intent and build-assurance contracts |
 
 These distinctions are intentional. A compiler upgrade need not change a domain model, IR schema, HTTP contract, or UI schema.
 
@@ -41,7 +42,7 @@ These distinctions are intentional. A compiler upgrade need not change a domain 
 
 Software architecture commonly treats the database, service layer, API, user interface, policy engine, tests, documentation, and agent tools as separate concerns. Each artifact contains a partial restatement of the same domain. A purchase-approval threshold, for example, may appear in backend conditionals, user-interface visibility rules, policy middleware, test fixtures, workflow diagrams, and prose. Because none of these representations is necessarily authoritative, application meaning becomes fragmented and must be reconstructed from implementation details.
 
-This paper proposes the **semantic model layer**: a versioned, typed, executable representation of a bounded application domain that defines concepts, stable identity, relationships, valid states, permitted transitions, policies, queries, events, effects, and presentation intent. The layer is architectural rather than necessarily a runtime service. A complete implementation could translate it into database schemas and migrations, backend handlers, API contracts, frontend metadata, policy checks, agent tools, tests, and documentation. The status table above identifies the smaller subset implemented by ModelLang 0.15.
+This paper proposes the **semantic model layer**: a versioned, typed, executable representation of a bounded application domain that defines concepts, stable identity, relationships, valid states, permitted transitions, policies, queries, events, effects, and presentation intent. The layer is architectural rather than necessarily a runtime service. A complete implementation could translate it into database schemas and migrations, backend handlers, API contracts, frontend metadata, policy checks, agent tools, tests, and documentation. The status table above identifies the smaller subset implemented by ModelLang 0.16.
 
 The proposal belongs to the lineage of Domain-Driven Design, model-driven engineering, ontology engineering, schema-first interfaces, policy as code, and semantic layers. It does not claim that a new syntax is intrinsically better for AI agents than every possible combination of OpenAPI, policy definitions, and state-machine specifications. A sufficiently integrated bundle of those artifacts could provide equivalent semantics. The architectural claim is that applications benefit from a **referentially closed, identity-preserving semantic representation** from which those partial contracts are generated or into which they are compiled.
 
@@ -934,7 +935,7 @@ These outcomes should be measured rather than argued away.
 
 # 9. Evidence Status and Evaluation Program
 
-This document is a research proposal and architecture design. It does not present pilot results, production telemetry, controlled experiments, or longitudinal adoption data. ModelLang 0.15 provides two executable reference applications, deterministic generated golden artifacts, live PostgreSQL integration coverage, and 152 passing automated conformance tests. This establishes engineering feasibility for the implemented subset; it does not establish that the architecture improves software delivery.
+This document is a research proposal and architecture design. It does not present pilot results, production telemetry, controlled experiments, or longitudinal adoption data. ModelLang 0.16 provides two executable reference applications, deterministic generated golden artifacts, live PostgreSQL integration coverage, and 156 passing automated conformance tests. This establishes engineering feasibility for the implemented subset; it does not establish that the architecture improves software delivery.
 
 ## 9.1 Evidence classes
 
@@ -942,7 +943,7 @@ This document is a research proposal and architecture design. It does not presen
 |---|---|---|
 | Application meaning is repeated across technical artifacts | Observable in conventional architectures; supported indirectly by the existence of separate schema, policy, workflow, and interface standards | A motivating observation, not a quantified universal law |
 | Narrow, domain-specific, incremental MDE can succeed while whole-system and top-down efforts often struggle | Supported by prior empirical MDE research [13][14][15] | A historical constraint on the proposal |
-| Stable IDs, typed IR, source-linked enforcement, semantic manifests, semantic diffs, provenance, and one-way generation are technically implementable | Implemented in the ModelLang 0.15 reference compiler and exercised by its conformance suite | An engineering feasibility claim, not a productivity claim |
+| Stable IDs, typed IR, source-linked enforcement, semantic manifests, semantic diffs, reviewed evolution plans, provenance, and one-way generation are technically implementable | Implemented in the ModelLang 0.16 reference compiler and exercised by its conformance suite | An engineering feasibility claim, not a productivity claim |
 | A semantic model reduces drift, change amplification, or policy defects | Not yet measured for ModelLang | A testable hypothesis |
 | A semantic manifest improves agent planning beyond integrated existing specifications | Not yet measured | A comparative research question |
 | The declarative core remains adequate under production pressure | Unknown | The central long-term risk |
@@ -1612,6 +1613,8 @@ Stable identity enables more precise compatibility analysis than name-based sche
 
 Not every classification can be determined mechanically. The compiler can identify structural consequences, while the model author supplies migration and compatibility intent for ambiguous changes.
 
+The reference implementation now separates three concerns that are often conflated: semantic diff reports what changed, the automatic-safe planner authorizes only changes whose data effect is known without review, and a versioned reviewed plan supplies explicit intent for a bounded set of backfills, enum mappings, and removals. The reviewed artifact is keyed by stable IDs and exact source hashes, contains no arbitrary SQL, and receives a deterministic hash in migration history. PostgreSQL execution validates copied rows against the current constrained schema before replacing the old one. This is evidence for reviewable semantic evolution, but the current full-schema staging strategy is offline, backend-specific, and intentionally narrower than a general migration language.
+
 ## 13.6 Generated artifacts need semantic provenance
 
 Every generated operation, field, policy check, migration, event, UI action, and agent tool should carry provenance where the target permits it. Provenance may include:
@@ -1881,7 +1884,7 @@ The case suggests diagnostics that could be useful without pretending to prove p
 
 These should generally be warnings with suppression mechanisms, not universal errors. A compiler can identify suspicious structural patterns; domain experts must decide whether the pattern is intentional.
 
-## A.5 Status in the 0.15 reference implementation
+## A.5 Status in the 0.16 reference implementation
 
 Appendix A intentionally preserves the 0.5.0 source reviewed in Section 7. It is a historical fixture, not the current Procurement model.
 
@@ -1897,7 +1900,7 @@ Appendix A intentionally preserves the 0.5.0 source reviewed in Section 7. It is
 | Correction could not propagate to an application boundary | HTTP, browser client, UI metadata, workflow helpers, and typed transport errors are generated across 0.11–0.14 |
 | Audit captured every approver role instead of the authority used | Still open; current invariants prove sufficient snapshotted authority, but decision evidence remains broader than the exact decision basis |
 
-ModelLang 0.15 additionally emits an engineering semantic manifest containing the normalized authorization and precondition expressions, fact dependencies, read and lock sets, effects, linked postconditions, lifecycle bindings, failures, and source spans. It is explicitly not an authorization-filtered agent view or runtime applicability decision.
+ModelLang 0.16 emits the engineering semantic manifest introduced in 0.15 and adds a reviewed evolution artifact that covers every non-additive semantic-diff entry, binds exact before/after source hashes, and records its canonical hash with the applied model version. The artifact is migration intent rather than authorization-filtered agent context or runtime applicability evidence.
 
 # Appendix B. Minimal Conformance Profile
 
@@ -1997,9 +2000,9 @@ The following practices would violate the intent of the profile:
 - Claiming cross-context consistency through direct writes into another context's storage.
 - Requiring a proprietary visual editor to inspect or version the authoritative semantics.
 
-## B.5 ModelLang 0.15 conformance declaration
+## B.5 ModelLang 0.16 conformance declaration
 
-ModelLang 0.15 does not claim complete conformance with SML-Core. It substantially implements model and declaration identity for its current language, typed references and values, valid-state semantics, action semantics, explicit workflows, operation-level and row-level query visibility, typed IR, deterministic diagnostics, PostgreSQL-oriented traceability, semantic change analysis, and conformance tests.
+ModelLang 0.16 does not claim complete conformance with SML-Core. It substantially implements model and declaration identity for its current language, typed references and values, valid-state semantics, action semantics, explicit workflows, operation-level and row-level query visibility, typed IR, deterministic diagnostics, PostgreSQL-oriented traceability, semantic change analysis, reviewed evolution intent, and conformance tests.
 
 The following SML-Core requirements remain partial or absent:
 

@@ -1,6 +1,6 @@
-# ModelLang 0.15 reference compiler
+# ModelLang 0.16 reference compiler
 
-ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, a trusted engineering semantic manifest, a framework-neutral UI manifest, deterministic artifact provenance, OpenAPI, a browser-safe HTTP client and typed UI/workflow executors, an authenticated server handler, guarded additive schema evolution, stable-ID-aware semantic change reports, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, a trusted engineering semantic manifest, a framework-neutral UI manifest, deterministic artifact provenance, OpenAPI, a browser-safe HTTP client and typed UI/workflow executors, an authenticated server handler, guarded safe and explicitly reviewed schema evolution, stable-ID-aware semantic change reports, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -47,6 +47,7 @@ npx tsx src/cli.ts print-ir examples/procurement.model
 npx tsx src/cli.ts explain examples/procurement.model
 npx tsx src/cli.ts assign-ids examples/procurement.model
 npx tsx src/cli.ts migration previous-model.ir.json examples/procurement.model --out migration.sql
+npx tsx src/cli.ts reviewed-migration previous-model.ir.json examples/procurement.model --plan reviewed-plan.json --out migration.sql
 npx tsx src/cli.ts semantic-diff previous-model.ir.json examples/procurement.model --out semantic-diff.json
 ```
 
@@ -60,7 +61,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.15 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.16 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v2 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, and stable workflow/transition/action/target bindings. It contains no HTTP paths, SQL names, database roles, connection details, PostgreSQL types, or UI concepts. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
@@ -76,7 +77,7 @@ The PostgreSQL backend emits:
 - direct-login and shared-gateway identity bindings;
 - entity tables, foreign keys, enum checks, annotations, invariants, and temporal exclusion constraints;
 - initial-state and legal-edge workflow triggers;
-- internal model-version and source-hash migration history;
+- internal model-version, source-hash, migration-kind, and reviewed-plan-hash history;
 - `SECURITY DEFINER` action functions;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
@@ -219,9 +220,11 @@ The ID is semantic identity; the name is an editable source, API, and physical l
 
 The migration command compares a released IR with current source exclusively by ID. ModelLang 0.10 plans new enums and members, new entities, nullable or default-backed fields, actions, queries, workflows, and workflow transitions. It also retains transactional renames for tables, columns, invariant constraints, temporal-exclusion constraints, and action/query functions.
 
-The separate `semantic-diff` command is non-mutating and broader than migration planning. It reports all detected identity, structure, validation, authorization, query-visibility, lifecycle, effect, and persistence changes as additive, restrictive, expansive, breaking, or requiring review. It deliberately leaves migration authority with the guarded safe-migration planner and marks predicate changes as review when logical implication cannot be proven.
+The separate `semantic-diff` command is non-mutating and broader than migration planning. It reports all detected identity, structure, validation, authorization, query-visibility, lifecycle, effect, and persistence changes as additive, restrictive, expansive, breaking, or requiring review. Semantic diff v2 deliberately leaves authority with the separate guarded migration planners and marks predicate changes as review when logical implication cannot be proven.
 
 Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
+
+Changes outside the automatic safe subset use a versioned JSON plan conforming to `schemas/reviewed-migration-plan.schema.json`. `reviewed-migration` requires exact source hashes, acknowledges every non-additive semantic change by stable ID, and supports typed literal/enum/copy-field backfills, scalar enum mappings, and explicitly accepted removals. The plan contains no raw SQL or callback surface. PostgreSQL execution takes offline locks, copies retained data into a deterministic staging schema with all current constraints, validates row counts and references, then replaces the old model schema and records the canonical plan hash in the same transaction. An invalid backfill rolls back before replacement. Version 1 rejects field-type and enum-set transformations, principal/schema replacement, and inferred rollback.
 
 For an existing 0.11 database that is not otherwise receiving a model migration, apply the generated 0.12 backend upgrade with the same administrative credential used for installation:
 
@@ -232,7 +235,7 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The artifact is transactional and idempotent. It first verifies the installed model ID, version, and source hash, then changes only the internal identity/audit boundary, generated callables, roles, and grants; it does not alter model entity data or migration history. A mismatched artifact fails with `ML_MIGRATION_BASELINE`. A normal generated safe migration includes the same upgrade automatically. The credential applying either path must be able to create/alter roles and assume `modellang_owner`. Production issuer/subject bindings are then provisioned through a trusted administrative path; the example seed values are demo-only.
 
-Version 0.10 refuses removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. These cases need explicit backfill or transformation semantics rather than compiler guesses.
+The 0.10 safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. In 0.16, the supported subset of those changes can proceed only through a reviewed plan; unsupported transformations still fail closed rather than becoming compiler guesses.
 
 ## Explicit language semantics
 

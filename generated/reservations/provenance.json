@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/artifact-provenance.schema.json",
   "provenanceVersion": 1,
-  "compilerVersion": "0.15.0",
+  "compilerVersion": "0.16.0",
   "generatorProfile": "postgresql-http-ui/1",
   "model": {
     "id": "model:Reservations",
@@ -14,17 +14,17 @@
     {
       "path": "enforcement.json",
       "role": "assurance",
-      "sha256": "sha256:de55d48608b0e846205edb42047161416f61ea65cd8aad27bd76720c9f559fb9"
+      "sha256": "sha256:689595e5de3aad457b3d637695674c0000e2a0d48af32d29ae147213895a7ed7"
     },
     {
       "path": "enforcement.md",
       "role": "assurance",
-      "sha256": "sha256:8d243416b76e2b858cc65fc6c79c1a1b56fa797be639381155704a8db80cfc46"
+      "sha256": "sha256:94cf78520d24911ae295fee08486a6d8f5984d49f9e8c22402b6e664bf5d5ef8"
     },
     {
       "path": "model.ir.json",
       "role": "canonical",
-      "sha256": "sha256:5c1fc03b36ec541e29de50d6742445e7fb01fe7df81824f6d36f9be0b0e80802"
+      "sha256": "sha256:85941b4f6eb09fb420dc64598cd9479bd3e3870b6e1cb4b249cf1a4dff8b391c"
     },
     {
       "path": "model.mmd",
@@ -49,7 +49,7 @@
     {
       "path": "postgres/002_schema.sql",
       "role": "projection",
-      "sha256": "sha256:1a439ff1a9b2a769d8efb8e6a01cc9277283deba2864dd385aacb013a356ba27"
+      "sha256": "sha256:c84a758e1fde7a8667f0612c7355873e7a5666f053abaae00cfffba0779476b7"
     },
     {
       "path": "postgres/003_actions.sql",
@@ -79,7 +79,7 @@
     {
       "path": "semantic.json",
       "role": "contract",
-      "sha256": "sha256:71ad1db7c534bd9e2f306d9804a60b84e06ed45e2261953c6ddd1a94fd422c82"
+      "sha256": "sha256:f0cc79fa6c9fbf3327ff16d40be5ac1d2fd9b739d82bb67df6ddba56944cc8f5"
     },
     {
       "path": "typescript/browser.ts",

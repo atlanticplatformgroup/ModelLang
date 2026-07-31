@@ -11,12 +11,14 @@ import { validateIR } from "./validate-ir.js";
 import { assignStableIds } from "./stable-ids.js";
 import { planMigration } from "./migrations.js";
 import { semanticDiff } from "./semantic-diff.js";
+import { parseReviewedMigrationPlan, planReviewedMigration } from "./reviewed-migrations.js";
 
 function usage(): never {
   process.stderr.write(`Usage:
   modelc <check|build|print-ir|explain> <file> [--out <directory>] [--debug]
   modelc assign-ids <file>
   modelc migration <previous-ir.json> <current.model> --out <migration.sql>
+  modelc reviewed-migration <previous-ir.json> <current.model> --plan <reviewed-plan.json> --out <migration.sql>
   modelc semantic-diff <previous-ir.json> <current.model> --out <semantic-diff.json>
 `);
   process.exit(2);
@@ -33,7 +35,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${assigned.assigned > 0 ? `Assigned ${assigned.assigned} stable IDs` : "All stable IDs already assigned"} in ${file}\n`);
     return;
   }
-  if (command === "migration" || command === "semantic-diff") {
+  if (command === "migration" || command === "reviewed-migration" || command === "semantic-diff") {
     const currentArg = rest[0];
     const outIndex = rest.indexOf("--out");
     if (!currentArg || outIndex < 0 || !rest[outIndex + 1]) usage();
@@ -46,6 +48,13 @@ async function main(): Promise<void> {
       const report = semanticDiff(previous, current);
       await writeFile(out, stableJson(report), "utf8");
       process.stdout.write(`Generated ${report.changes.length} semantic change${report.changes.length === 1 ? "" : "s"} into ${out}\n`);
+    } else if (command === "reviewed-migration") {
+      const planIndex = rest.indexOf("--plan");
+      if (planIndex < 0 || !rest[planIndex + 1]) usage();
+      const document = parseReviewedMigrationPlan(JSON.parse(await readFile(resolve(rest[planIndex + 1]!), "utf8")));
+      const reviewed = planReviewedMigration(previous, current, document);
+      await writeFile(out, reviewed.sql, "utf8");
+      process.stdout.write(`Generated reviewed migration ${reviewed.planHash} into ${out}\n`);
     } else {
       const plan = planMigration(previous, current);
       await writeFile(out, plan.sql, "utf8");

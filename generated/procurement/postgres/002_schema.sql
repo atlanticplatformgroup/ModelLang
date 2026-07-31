@@ -187,9 +187,16 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "model_id" text NOT NULL,
   "version" text NOT NULL UNIQUE,
   "source_hash" text NOT NULL UNIQUE,
+  "migration_kind" text NOT NULL,
+  "plan_hash" text,
+  CONSTRAINT "ck_schema_migrations_kind" CHECK ("migration_kind" IN ('installation', 'safe', 'reviewed')),
+  CONSTRAINT "ck_schema_migrations_reviewed_plan" CHECK (
+    (("migration_kind" = 'reviewed') = ("plan_hash" IS NOT NULL))
+    AND ("plan_hash" IS NULL OR "plan_hash" ~ '^sha256:[0-9a-f]{64}$')
+  ),
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
-INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash")
-VALUES ('model:Procurement', '0.10.0', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62');
+INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
+VALUES ('model:Procurement', '0.10.0', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62', 'installation');
 RESET ROLE;
 

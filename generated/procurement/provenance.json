@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/artifact-provenance.schema.json",
   "provenanceVersion": 1,
-  "compilerVersion": "0.15.0",
+  "compilerVersion": "0.16.0",
   "generatorProfile": "postgresql-http-ui/1",
   "model": {
     "id": "model:Procurement",
@@ -14,17 +14,17 @@
     {
       "path": "enforcement.json",
       "role": "assurance",
-      "sha256": "sha256:60364b2c81d1eda31aa41237a03c20589978c2cb85af2a505e39bc73251b25b4"
+      "sha256": "sha256:e490d0514c1540a96962b9ca02745e41411bdef85bffc3206786e98759f17e0d"
     },
     {
       "path": "enforcement.md",
       "role": "assurance",
-      "sha256": "sha256:4dc20ce4f9c1fa3e57919d53bd6c8b6e136aeb22be77a95df47afaac1729b55a"
+      "sha256": "sha256:e77dec291f267af6ceb82c22a055952570ce27329f7ba2794774c90b8366b311"
     },
     {
       "path": "model.ir.json",
       "role": "canonical",
-      "sha256": "sha256:dfb3bc3e5335a3bef8477488670bd89ea505c2af4e51e55bec5d2b697a4d1deb"
+      "sha256": "sha256:2158866705f196c8701017244b3ebd37def24090ca021e4ec2842e4940ecd3a6"
     },
     {
       "path": "model.mmd",
@@ -49,7 +49,7 @@
     {
       "path": "postgres/002_schema.sql",
       "role": "projection",
-      "sha256": "sha256:8d8472498ceab98f55ce5a96f95068c1b8ce93031b19a2cd1d2e6a97d2c185f4"
+      "sha256": "sha256:86f577a80206f8a44aa89278070acca66097d6058817abfcc028ddf823b3e0ca"
     },
     {
       "path": "postgres/003_actions.sql",
@@ -79,7 +79,7 @@
     {
       "path": "semantic.json",
       "role": "contract",
-      "sha256": "sha256:f3520ec8e49f984b0438f8a0a8be424a3c874817657b7268f63775ea99febf57"
+      "sha256": "sha256:c07f996760f89981b9d41f2a8669159dcd3fe00a023a6a70ac9c22f68a718293"
     },
     {
       "path": "typescript/browser.ts",

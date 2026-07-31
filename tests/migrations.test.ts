@@ -431,6 +431,7 @@ describe("ModelLang 0.6 rename migration planning", () => {
     expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
     expect(plan.sql).toContain('CREATE OR REPLACE FUNCTION "model_rename_proof"."make"');
     expect(plan.sql).toContain('INSERT INTO "model_rename_proof_internal"."schema_migrations"');
+    expect(plan.sql).toContain("'safe'");
     expect(planMigration(previous, current)).toEqual(plan);
   });
 

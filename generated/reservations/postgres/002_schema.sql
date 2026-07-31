@@ -152,9 +152,16 @@ CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "model_id" text NOT NULL,
   "version" text NOT NULL UNIQUE,
   "source_hash" text NOT NULL UNIQUE,
+  "migration_kind" text NOT NULL,
+  "plan_hash" text,
+  CONSTRAINT "ck_schema_migrations_kind" CHECK ("migration_kind" IN ('installation', 'safe', 'reviewed')),
+  CONSTRAINT "ck_schema_migrations_reviewed_plan" CHECK (
+    (("migration_kind" = 'reviewed') = ("plan_hash" IS NOT NULL))
+    AND ("plan_hash" IS NULL OR "plan_hash" ~ '^sha256:[0-9a-f]{64}$')
+  ),
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
-INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash")
-VALUES ('model:Reservations', '0.10.0', 'sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215');
+INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
+VALUES ('model:Reservations', '0.10.0', 'sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215', 'installation');
 RESET ROLE;
 

@@ -1,7 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.15](./spec/0.15/LANGUAGE.md). It retains the complete 0.14 application boundary and adds trusted engineering semantic closure, deterministic artifact provenance, and stable-ID-aware semantic change reports without changing public operation/UI contracts or enforcement.
+The current normative specification is [ModelLang 0.16](./spec/0.16/LANGUAGE.md). It retains the complete 0.15 language and application boundary and adds stable-ID-complete reviewed semantic evolution without changing `.model` grammar, canonical IR9, public operation/UI contracts, caller identity, or enforcement semantics.
 
+- [Reviewed semantic-evolution semantics](./spec/0.16/REVIEWED_EVOLUTION.md)
+- [0.16 unchanged grammar statement](./spec/0.16/GRAMMAR.ebnf)
+- [0.16 conformance requirements](./spec/0.16/CONFORMANCE.md)
+- [0.16 unstable evolution boundaries](./spec/0.16/UNSTABLE.md)
 - [Semantic closure, provenance, and change-analysis semantics](./spec/0.15/SEMANTIC_CLOSURE.md)
 - [0.15 unchanged grammar statement](./spec/0.15/GRAMMAR.ebnf)
 - [0.15 conformance requirements](./spec/0.15/CONFORMANCE.md)

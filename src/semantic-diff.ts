@@ -38,14 +38,14 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 1;
+  diffVersion: 2;
   compilerVersion: string;
   irVersion: 9;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
   summary: Record<SemanticChangeClassification, number>;
-  migrationAuthority: "separateSafeMigrationPlanner";
+  migrationAuthority: "separateGuardedMigrationPlanners";
 }
 
 function normalized(value: unknown): unknown {
@@ -453,7 +453,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 1,
+    diffVersion: 2,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {
@@ -468,6 +468,6 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
     },
     changes,
     summary,
-    migrationAuthority: "separateSafeMigrationPlanner",
+    migrationAuthority: "separateGuardedMigrationPlanners",
   };
 }
