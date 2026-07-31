@@ -11,9 +11,13 @@ DECLARE
   v_principal_id uuid;
   v_identity_issuer text;
   v_identity_subject text;
+  v_revision text;
+  v_expected_revision text;
   v_result "model_reservations"."reservation"%ROWTYPE;
   v_actor "model_reservations"."user"%ROWTYPE;
+  v_actor_xmin text;
   v_resource "model_reservations"."resource"%ROWTYPE;
+  v_resource_xmin text;
 BEGIN
   SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
   INTO v_principal_id, v_identity_issuer, v_identity_subject
@@ -28,25 +32,41 @@ BEGIN
   ORDER BY "id" FOR SHARE;
 
   SELECT * INTO v_resource
-  FROM "model_reservations"."resource"
-  WHERE "id" = "p_resource"
+  FROM "model_reservations"."resource" AS row_value
+  WHERE row_value."id" = "p_resource"
 ;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:resource';
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_508ad810a19d4b79a5009871de5cd26b';
   END IF;
+
+  SELECT row_value.xmin::text INTO v_resource_xmin
+  FROM "model_reservations"."resource" AS row_value
+  WHERE row_value."id" = "p_resource";
 
   SELECT * INTO v_actor
-  FROM "model_reservations"."user"
-  WHERE "id" = v_principal_id
+  FROM "model_reservations"."user" AS row_value
+  WHERE row_value."id" = v_principal_id
 ;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:actor';
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_508ad810a19d4b79a5009871de5cd26b';
   END IF;
+
+  SELECT row_value.xmin::text INTO v_actor_xmin
+  FROM "model_reservations"."user" AS row_value
+  WHERE row_value."id" = v_principal_id;
+
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215', 'operationId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource', 'value', pg_catalog.to_jsonb("p_resource"), 'rowVersion', pg_catalog.to_jsonb(v_resource_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt', 'value', pg_catalog.to_jsonb("p_starts_at")), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt', 'value', pg_catalog.to_jsonb("p_ends_at"))))::text);
+  v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');
+  PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);
 
   IF NOT ((TRUE) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_508ad810a19d4b79a5009871de5cd26b';
+  END IF;
+
+  IF v_expected_revision IS NOT NULL AND v_expected_revision IS DISTINCT FROM v_revision THEN
+    RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:revision:action:act_508ad810a19d4b79a5009871de5cd26b';
   END IF;
 
   IF NOT ((("p_starts_at" < "p_ends_at")) IS TRUE) THEN

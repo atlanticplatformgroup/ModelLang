@@ -1,0 +1,89 @@
+{
+  "$schema": "https://modellang.dev/schemas/decision-plan.schema.json",
+  "planVersion": 1,
+  "audience": "enforcement",
+  "public": false,
+  "compilerVersion": "0.17.0",
+  "irVersion": 9,
+  "model": {
+    "id": "model:Reservations",
+    "version": "0.10.0",
+    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215"
+  },
+  "actions": [
+    {
+      "operationId": "action:act_508ad810a19d4b79a5009871de5cd26b",
+      "callableParameterIds": [
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+        "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt"
+      ],
+      "callerParameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+      "entityLoads": [
+        {
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+          "source": "operationInput",
+          "executionLock": "share",
+          "order": 0
+        },
+        {
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+          "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+          "source": "authenticatedContext",
+          "executionLock": "share",
+          "order": 1
+        }
+      ],
+      "authorization": {
+        "id": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        }
+      },
+      "preconditions": [
+        {
+          "id": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+          "expression": {
+            "kind": "binary",
+            "operator": "<",
+            "left": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+              "name": "startsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "right": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
+              "name": "endsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          }
+        }
+      ],
+      "revision": {
+        "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+        "algorithm": "authoritativeRowVersion/1",
+        "componentParameterIds": [
+          "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+          "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+          "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt"
+        ],
+        "grantsAuthority": false
+      },
+      "absenceProjection": {
+        "outcome": "denied",
+        "explanationRuleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b"
+      }
+    }
+  ]
+}

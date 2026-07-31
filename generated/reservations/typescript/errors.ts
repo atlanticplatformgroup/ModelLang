@@ -14,6 +14,7 @@ export class PreconditionError extends ModelDatabaseError {}
 export class TransitionError extends ModelDatabaseError {}
 export class InvariantError extends ModelDatabaseError {}
 export class ConflictError extends ModelDatabaseError {}
+export class StaleError extends ConflictError {}
 export class NotFoundError extends ModelDatabaseError {}
 export class ValidationError extends ModelDatabaseError {}
 
@@ -29,6 +30,7 @@ export function mapDatabaseError(error: unknown): ModelOperationError {
   if (message.startsWith("ML_WORKFLOW:")) return new TransitionError(message, value.code, suffix, error);
   if (message.startsWith("ML_NOT_FOUND:")) return new NotFoundError(message, value.code, suffix, error);
   if (message.startsWith("ML_VALIDATION:")) return new ValidationError(message, value.code, suffix, error);
+  if (message.startsWith("ML_STALE:")) return new StaleError(message, value.code, suffix, error);
   if (value?.code === "23P01") return new ConflictError(message, value.code, value.constraint, error);
   if (value?.code === "23514" || value?.code === "23502" || value?.code === "23503" || value?.code === "23505") {
     return new InvariantError(message, value.code, value.constraint, error);
@@ -58,6 +60,7 @@ export function mapHttpProblem(problem: unknown, httpStatus: number): ModelOpera
   if (type.endsWith("/transition")) return new TransitionError(message, code, ruleId, problem);
   if (type.endsWith("/invariant")) return new InvariantError(message, code, ruleId, problem);
   if (type.endsWith("/conflict")) return new ConflictError(message, code, ruleId, problem);
+  if (type.endsWith("/stale")) return new StaleError(message, code, ruleId, problem);
   if (type.endsWith("/not-found")) return new NotFoundError(message, code, ruleId, problem);
   if (type.endsWith("/validation")) return new ValidationError(message, code, ruleId, problem);
   if (type.endsWith("/method-not-allowed") || type.endsWith("/request-too-large") || type.endsWith("/unsupported-media-type")) {

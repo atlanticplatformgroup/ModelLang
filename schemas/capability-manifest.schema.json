@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/capability-manifest.schema.json",
+  "title": "ModelLang public capability contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "capabilityManifestVersion", "operationManifestVersion", "model", "view", "authentication", "actions"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/capability-manifest.schema.json" },
+    "capabilityManifestVersion": { "const": 1 },
+    "operationManifestVersion": { "const": 2 },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["audience", "safeProjection", "containsExpressions", "containsCurrentState", "grantsAuthority"],
+      "properties": {
+        "audience": { "const": "application" },
+        "safeProjection": { "const": true },
+        "containsExpressions": { "const": false },
+        "containsCurrentState": { "const": false },
+        "grantsAuthority": { "const": false }
+      }
+    },
+    "authentication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "callerInput"],
+      "properties": { "required": { "const": true }, "callerInput": { "const": false } }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["operationId", "inputParameterIds", "outcomes", "explanation", "revision"],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^action:" },
+          "inputParameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:" } },
+          "outcomes": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "prefixItems": [
+              { "const": "applicable" }, { "const": "denied" }, { "const": "notApplicable" }, { "const": "stale" }
+            ],
+            "items": false
+          },
+          "explanation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["safe", "authorizationRuleId", "preconditionRuleIds", "revisionRuleId"],
+            "properties": {
+              "safe": { "const": true },
+              "authorizationRuleId": { "type": "string", "pattern": "^authorize:action:" },
+              "preconditionRuleIds": { "type": "array", "items": { "type": "string", "pattern": "^require:action:" } },
+              "revisionRuleId": { "type": "string", "pattern": "^revision:action:" }
+            }
+          },
+          "revision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "staleRequiresExpectedRevision", "grantsAuthority"],
+            "properties": {
+              "kind": { "const": "opaque" },
+              "staleRequiresExpectedRevision": { "const": true },
+              "grantsAuthority": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  }
+}

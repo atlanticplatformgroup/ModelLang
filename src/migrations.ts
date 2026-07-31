@@ -672,6 +672,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     ...generateGatewayInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
+    generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),
     generated["004_grants.sql"]!.trim(),
     "SET LOCAL ROLE modellang_owner;",

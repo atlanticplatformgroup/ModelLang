@@ -9,7 +9,7 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.16.0",
+    "compilerVersion": "0.17.0",
     "irVersion": 9,
     "generator": "semantic-manifest"
   },
@@ -216,7 +216,6 @@
         "identityBinding",
         "authorization",
         "precondition",
-        "notFound",
         "invariant",
         "conflict"
       ]
@@ -334,8 +333,7 @@
       },
       "failureClasses": [
         "identityBinding",
-        "authorization",
-        "notFound"
+        "authorization"
       ]
     }
   ]

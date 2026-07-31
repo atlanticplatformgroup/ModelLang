@@ -8,6 +8,7 @@ export {
   TransitionError,
   InvariantError,
   ConflictError,
+  StaleError,
   NotFoundError,
   ValidationError,
   mapHttpProblem,
@@ -16,3 +17,4 @@ export type { ModelProblem } from "./errors.js";
 export * from "./http-client.js";
 export * from "./workflows.js";
 export * from "./ui.js";
+export * from "./capabilities.js";

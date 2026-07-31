@@ -3,7 +3,7 @@ import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ReservationsClient } from "../../generated/reservations/typescript/client.js";
 import {
-  ConflictError, NotFoundError, PreconditionError,
+  AuthorizationError, ConflictError, PreconditionError,
 } from "../../generated/reservations/typescript/errors.js";
 import {
   databaseUrl, installReservationsDatabase, loginUrl, poolFor,
@@ -116,7 +116,7 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     expect(firstRows.some((reservation) => reservation.id === secondId)).toBe(false);
     await expect(firstClient.reservationsForResource({
       resource: "20000000-0000-4000-8000-000000000099",
-    })).rejects.toBeInstanceOf(NotFoundError);
+    })).rejects.toBeInstanceOf(AuthorizationError);
   });
 
   it("serializes concurrent conflicting reservations to exactly one row and audit record", async () => {

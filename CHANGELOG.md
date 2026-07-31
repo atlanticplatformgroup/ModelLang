@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.0
+
+- Added enforcement decision plan v1 as the single generated source for action applicability and transactional action checks.
+- Added filtered public capability manifest v1 with stable action/input IDs, fixed outcomes, safe explanation rule IDs, opaque revisions, and explicit non-authority metadata.
+- Added authenticated, side-effect-free PostgreSQL applicability functions where authorization failure is `denied`, requirement failure is `notApplicable`, and missing action entities use the same denial projection.
+- Added explicit opaque revision comparison: `stale` requires caller-supplied state, while execution locks and re-evaluates current authorization and requirements before comparing and mutating.
+- Added stable action applicability routes, strict quoted `If-Match`, ETag projection, closed response validation, OpenAPI schemas, and typed `StaleError` transport mapping.
+- Added browser, server, gateway, UI, and workflow applicability helpers while keeping discovery, assessment, and execution as separate methods.
+- Added the baseline-checked transactional `007_upgrade_0_17.sql` artifact and integrated decision redeployment into safe and reviewed migrations.
+- Added normative contracts, schemas, golden artifacts, and live Procurement proofs for purity, safe explanations, denial/absence indistinguishability, explicit stale comparison, and execution-time re-evaluation.
+
 ## 0.16.0
 
 - Added a versioned reviewed-migration plan with exact released/current source hashes, stable-ID semantic acknowledgements, typed field values, and scalar enum mappings.

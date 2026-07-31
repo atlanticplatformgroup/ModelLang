@@ -109,6 +109,7 @@ describe("ModelLang 0.16 reviewed PostgreSQL migration", () => {
     await admin.query(generated["postgres/002_schema.sql"]!);
     await admin.query(generated["postgres/003_actions.sql"]!);
     await admin.query(generated["postgres/003_queries.sql"]!);
+    await admin.query(generated["postgres/003_decisions.sql"]!);
     await admin.query(generated["postgres/004_grants.sql"]!);
 
     const userId = "26000000-0000-4000-8000-000000000001";

@@ -4,6 +4,7 @@ import type {
   OperationValueType,
 } from "../operation-manifest.js";
 import { operationInputName } from "../operation-manifest.js";
+import type { CapabilityManifest } from "../capability-manifest.js";
 
 export interface HttpOutput {
   "openapi.json": string;
@@ -17,6 +18,11 @@ type JsonSchema = Record<string, unknown>;
 export function operationRoute(operation: Pick<ManifestOperation, "id" | "kind">): string {
   const stableId = operation.id.slice(operation.id.indexOf(":") + 1);
   return `/operations/${operation.kind === "action" ? "actions" : "queries"}/${stableId}`;
+}
+
+export function applicabilityRoute(operation: Pick<ManifestOperation, "id" | "kind">): string {
+  if (operation.kind !== "action") throw new Error(`E6103 Queries do not have applicability routes.`);
+  return `${operationRoute(operation)}/applicability`;
 }
 
 function componentName(manifest: OperationManifest, type: OperationValueType): string {
@@ -96,7 +102,12 @@ function operationResponses(operation: ManifestOperation): Record<string, unknow
   ]));
 }
 
-export function generateOpenApi(manifest: OperationManifest): Record<string, unknown> {
+function applicabilityResponses(operation: ManifestOperation): Record<string, unknown> {
+  const responses = operationResponses(operation);
+  return Object.fromEntries(["400", "401", "405", "413", "415", "500"].map((status) => [status, responses[status]]));
+}
+
+export function generateOpenApi(manifest: OperationManifest, capabilities: CapabilityManifest): Record<string, unknown> {
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
     entity.name,
     {
@@ -117,7 +128,7 @@ export function generateOpenApi(manifest: OperationManifest): Record<string, unk
     enumeration.name,
     { type: "string", enum: enumeration.members.map((member) => member.value) },
   ]));
-  const paths = Object.fromEntries(manifest.operations.map((operation) => {
+  const executionPaths = manifest.operations.map((operation) => {
     const outputEntity = manifest.entities.find((entity) => entity.id === operation.output.entityId);
     if (!outputEntity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
     const outputSchema = operation.output.cardinality === "one"
@@ -136,6 +147,7 @@ export function generateOpenApi(manifest: OperationManifest): Record<string, unk
           tags: [operation.kind === "action" ? "Actions" : "Queries"],
           security: [{ bearerAuth: [] }],
           "x-modellang-operation-id": operation.id,
+          ...(operation.kind === "action" ? { parameters: [{ $ref: "#/components/parameters/ExpectedRevision" }] } : {}),
           requestBody: {
             required: true,
             content: {
@@ -162,7 +174,48 @@ export function generateOpenApi(manifest: OperationManifest): Record<string, unk
         },
       },
     ];
-  }));
+  });
+  const applicabilityPaths = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => [
+    applicabilityRoute(operation),
+    {
+      post: {
+        operationId: `assess_${operation.id.slice(operation.id.indexOf(":") + 1)}`,
+        summary: `Assess ${operation.name}`,
+        tags: ["Applicability"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-operation-id": operation.id,
+        "x-modellang-grants-authority": false,
+        parameters: [{ $ref: "#/components/parameters/ExpectedRevision" }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: operation.input.map((parameter) => parameter.name),
+                properties: Object.fromEntries(operation.input.map((parameter) => [parameter.name, valueSchema(manifest, parameter.type)])),
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Authenticated applicability decision; this grants no authority",
+            headers: { ETag: { description: "Opaque current revision when visibility permits", schema: { type: "string" } } },
+            content: { "application/json": { schema: { $ref: "#/components/schemas/ApplicabilityDecision" } } },
+          },
+          ...applicabilityResponses(operation),
+        },
+      },
+    },
+  ]);
+  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths]);
+  const safeRuleIds = capabilities.actions.flatMap((action) => [
+    action.explanation.authorizationRuleId,
+    ...action.explanation.preconditionRuleIds,
+    action.explanation.revisionRuleId,
+  ]);
   return {
     openapi: "3.1.1",
     jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema",
@@ -173,6 +226,15 @@ export function generateOpenApi(manifest: OperationManifest): Record<string, unk
     },
     paths,
     components: {
+      parameters: {
+        ExpectedRevision: {
+          name: "If-Match",
+          in: "header",
+          required: false,
+          description: "Explicit opaque revision to compare; it grants no authority.",
+          schema: { type: "string", pattern: '^"rev:1:[0-9a-f]{32}"$' },
+        },
+      },
       securitySchemes: {
         bearerAuth: { type: "http", scheme: "bearer" },
       },
@@ -192,6 +254,55 @@ export function generateOpenApi(manifest: OperationManifest): Record<string, unk
             ruleId: { type: "string" },
           },
         },
+        ApplicabilityDecision: {
+          type: "object",
+          additionalProperties: false,
+          required: ["operationId", "status", "applicable", "authority"],
+          properties: {
+            operationId: { type: "string", pattern: "^action:" },
+            status: { enum: ["applicable", "denied", "notApplicable", "stale"] },
+            applicable: { type: "boolean" },
+            authority: { const: "none" },
+            revision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+            explanation: {
+              type: "object",
+              additionalProperties: false,
+              required: ["kind", "ruleId"],
+              properties: {
+                kind: { enum: ["authorization", "requirement", "revision"] },
+                ruleId: { enum: safeRuleIds },
+              },
+            },
+          },
+          allOf: [
+            {
+              if: { properties: { status: { const: "applicable" } }, required: ["status"] },
+              then: { properties: { applicable: { const: true } }, required: ["revision"], not: { required: ["explanation"] } },
+            },
+            {
+              if: { properties: { status: { const: "denied" } }, required: ["status"] },
+              then: {
+                properties: { applicable: { const: false }, explanation: { properties: { kind: { const: "authorization" } } } },
+                required: ["explanation"],
+                not: { required: ["revision"] },
+              },
+            },
+            {
+              if: { properties: { status: { const: "notApplicable" } }, required: ["status"] },
+              then: {
+                properties: { applicable: { const: false }, explanation: { properties: { kind: { const: "requirement" } } } },
+                required: ["revision", "explanation"],
+              },
+            },
+            {
+              if: { properties: { status: { const: "stale" } }, required: ["status"] },
+              then: {
+                properties: { applicable: { const: false }, explanation: { properties: { kind: { const: "revision" } } } },
+                required: ["revision", "explanation"],
+              },
+            },
+          ],
+        },
       },
     },
   };
@@ -201,6 +312,9 @@ function typeImports(manifest: OperationManifest): string[] {
   return [
     ...manifest.entities.map((entity) => entity.name),
     ...manifest.operations.map(operationInputName),
+    "ApplicabilityDecision",
+    "ApplicabilityOptions",
+    "ExecutionOptions",
   ];
 }
 
@@ -211,9 +325,18 @@ function returnType(manifest: OperationManifest, operation: ManifestOperation): 
 }
 
 function generateHttpClient(manifest: OperationManifest): string {
-  const methods = manifest.operations.map((operation) => `  async ${operation.name}(input: ${operationInputName(operation)}): Promise<${returnType(manifest, operation)}> {
+  const methods = manifest.operations.map((operation) => operation.kind === "action"
+    ? `  async ${operation.name}(input: ${operationInputName(operation)}, options: ExecutionOptions = {}): Promise<${returnType(manifest, operation)}> {
+    return this.call(${JSON.stringify(operationRoute(operation))}, input, options.expectedRevision);
+  }`
+    : `  async ${operation.name}(input: ${operationInputName(operation)}): Promise<${returnType(manifest, operation)}> {
     return this.call(${JSON.stringify(operationRoute(operation))}, input);
   }`).join("\n\n");
+  const assessments = manifest.operations.filter((operation) => operation.kind === "action").map((operation) =>
+    `  async assess${operation.name[0]!.toUpperCase()}${operation.name.slice(1)}(input: ${operationInputName(operation)}, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
+    return this.call(${JSON.stringify(applicabilityRoute(operation))}, input, options.expectedRevision);
+  }`,
+  ).join("\n\n");
   return `// Generated by ModelLang. Do not edit.
 import type { ${typeImports(manifest).join(", ")} } from "./types.js";
 import { AuthenticationError, mapHttpProblem } from "./errors.js";
@@ -236,7 +359,7 @@ export class ${manifest.model.name}HttpClient {
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   }
 
-  private async call<Result>(path: string, input: unknown): Promise<Result> {
+  private async call<Result>(path: string, input: unknown, expectedRevision?: string): Promise<Result> {
     const token = await this.options.accessToken();
     if (!token) throw new AuthenticationError("HTTP authentication is required", "ML_AUTHENTICATION");
     const response = await this.fetchImpl(\`\${this.baseUrl}\${path}\`, {
@@ -244,6 +367,7 @@ export class ${manifest.model.name}HttpClient {
       headers: {
         ...this.options.headers,
         authorization: \`Bearer \${token}\`,
+        ...(expectedRevision ? { "if-match": \`"\${expectedRevision}"\` } : {}),
         "content-type": "application/json",
         accept: "application/json, application/problem+json",
       },
@@ -257,17 +381,26 @@ export class ${manifest.model.name}HttpClient {
   }
 
 ${methods}
+
+${assessments}
 }
 `;
 }
 
-function generateHttpServer(manifest: OperationManifest): string {
+function generateHttpServer(manifest: OperationManifest, capabilities: CapabilityManifest): string {
   const definitions = manifest.operations.map((operation) => ({
     id: operation.id,
     route: operationRoute(operation),
+    endpoint: "execution",
     input: operation.input,
     output: operation.output,
-  }));
+  })).concat(manifest.operations.filter((operation) => operation.kind === "action").map((operation) => ({
+    id: operation.id,
+    route: applicabilityRoute(operation),
+    endpoint: "applicability",
+    input: operation.input,
+    output: operation.output,
+  })));
   const enumValues = Object.fromEntries(manifest.enums.map((enumeration) => [
     enumeration.id,
     enumeration.members.map((member) => member.value),
@@ -281,12 +414,21 @@ function generateHttpServer(manifest: OperationManifest): string {
     })),
   ]));
   const operationIds = manifest.operations.map((operation) => JSON.stringify(operation.id)).join(" | ");
+  const actionIds = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => JSON.stringify(operation.id)).join(" | ");
   const inputImports = manifest.operations.map(operationInputName);
-  const dispatch = manifest.operations.map((operation) =>
-    `      case ${JSON.stringify(operation.id)}: return client.${operation.name}(input as unknown as ${operationInputName(operation)});`,
+  const dispatch = manifest.operations.map((operation) => operation.kind === "action"
+    ? `      case ${JSON.stringify(operation.id)}: return client.${operation.name}(input as unknown as ${operationInputName(operation)}, options);`
+    : `      case ${JSON.stringify(operation.id)}: return client.${operation.name}(input as unknown as ${operationInputName(operation)});`).join("\n");
+  const assessDispatch = manifest.operations.filter((operation) => operation.kind === "action").map((operation) =>
+    `      case ${JSON.stringify(operation.id)}: return client.assess${operation.name[0]!.toUpperCase()}${operation.name.slice(1)}(input as unknown as ${operationInputName(operation)}, options);`,
   ).join("\n");
+  const safeExplanations = Object.fromEntries(capabilities.actions.map((action) => [action.operationId, {
+    authorization: action.explanation.authorizationRuleId,
+    requirements: action.explanation.preconditionRuleIds,
+    revision: action.explanation.revisionRuleId,
+  }]));
   return `// Generated by ModelLang. Do not edit.
-import type { ${inputImports.join(", ")} } from "./types.js";
+import type { ${[...inputImports, "ApplicabilityDecision", "ApplicabilityOptions", "ExecutionOptions"].join(", ")} } from "./types.js";
 import { ${manifest.model.name}Client } from "./client.js";
 import {
   AuthenticationError,
@@ -297,11 +439,13 @@ import {
   ModelOperationError,
   NotFoundError,
   PreconditionError,
+  StaleError,
   TransitionError,
   ValidationError,
 } from "./errors.js";
 
 export type ${manifest.model.name}OperationId = ${operationIds};
+export type ${manifest.model.name}ActionOperationId = ${actionIds};
 
 interface RuntimeValueType {
   kind: "scalar" | "entity" | "enum" | "enumSet" | "money";
@@ -316,6 +460,7 @@ interface RuntimeValueType {
 interface OperationDefinition {
   id: ${manifest.model.name}OperationId;
   route: string;
+  endpoint: "execution" | "applicability";
   input: readonly { name: string; type: RuntimeValueType }[];
   output: { entityId: string; cardinality: "one" | "many"; maxItems?: number };
 }
@@ -326,9 +471,14 @@ const entityDefinitions = ${JSON.stringify(entityDefinitions, null, 2)} as Reado
   string,
   readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
 >>;
+const safeExplanations = ${JSON.stringify(safeExplanations, null, 2)} as Readonly<Record<
+  ${manifest.model.name}ActionOperationId,
+  { authorization: string; requirements: readonly string[]; revision: string }
+>>;
 
 export interface ${manifest.model.name}OperationExecutor {
-  execute(operationId: ${manifest.model.name}OperationId, input: Readonly<Record<string, unknown>>): Promise<unknown>;
+  execute(operationId: ${manifest.model.name}OperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
+  assess(operationId: ${manifest.model.name}ActionOperationId, input: Readonly<Record<string, unknown>>, options?: ApplicabilityOptions): Promise<ApplicabilityDecision>;
 }
 
 export type ${manifest.model.name}Authenticator = (
@@ -344,9 +494,14 @@ export function create${manifest.model.name}DatabaseExecutor(
   client: ${manifest.model.name}Client,
 ): ${manifest.model.name}OperationExecutor {
   return {
-    async execute(operationId, input) {
+    async execute(operationId, input, options = {}) {
       switch (operationId) {
 ${dispatch}
+      }
+    },
+    async assess(operationId, input, options = {}) {
+      switch (operationId) {
+${assessDispatch}
       }
     },
   };
@@ -440,8 +595,46 @@ function validateOutput(definition: OperationDefinition, value: unknown): void {
   if (!valid) throw new Error(\`Operation executor returned an invalid result for '\${definition.id}'\`);
 }
 
+function expectedRevision(request: Request): string | undefined {
+  const header = request.headers.get("if-match");
+  if (header === null) return undefined;
+  const match = /^"(rev:1:[0-9a-f]{32})"$/.exec(header);
+  if (!match) throw new ValidationError("If-Match must contain one quoted ModelLang revision", "ML_VALIDATION", "transport:expected_revision");
+  return match[1];
+}
+
+function validateDecision(definition: OperationDefinition, value: unknown): ApplicabilityDecision {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(\`Applicability executor returned an invalid decision for '\${definition.id}'\`);
+  }
+  const decision = value as Record<string, unknown>;
+  const allowed = new Set(["operationId", "status", "applicable", "authority", "revision", "explanation"]);
+  const status = decision.status;
+  const explanation = decision.explanation as Record<string, unknown> | undefined;
+  const safe = safeExplanations[definition.id as ${manifest.model.name}ActionOperationId];
+  const ruleId = explanation?.ruleId;
+  const kind = explanation?.kind;
+  const expectedRule = kind === "authorization" ? safe?.authorization
+    : kind === "requirement" && typeof ruleId === "string" && safe?.requirements.includes(ruleId) ? ruleId
+      : kind === "revision" ? safe?.revision : undefined;
+  const valid = Object.keys(decision).every((key) => allowed.has(key))
+    && decision.operationId === definition.id
+    && ["applicable", "denied", "notApplicable", "stale"].includes(status as string)
+    && decision.applicable === (status === "applicable")
+    && decision.authority === "none"
+    && (status === "denied" ? decision.revision === undefined : typeof decision.revision === "string" && /^rev:1:[0-9a-f]{32}$/.test(decision.revision))
+    && (status === "applicable" ? explanation === undefined : !!explanation
+      && Object.keys(explanation).length === 2
+      && expectedRule !== undefined && ruleId === expectedRule
+      && ((status === "denied" && kind === "authorization")
+        || (status === "notApplicable" && kind === "requirement")
+        || (status === "stale" && kind === "revision")));
+  if (!valid) throw new Error(\`Applicability executor returned an invalid decision for '\${definition.id}'\`);
+  return value as ApplicabilityDecision;
+}
+
 function normalizedRuleId(error: ModelOperationError): string | undefined {
-  return error.ruleId && /^(?:authorize|require|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion):/.test(error.ruleId)
+  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion):/.test(error.ruleId)
     ? error.ruleId
     : undefined;
 }
@@ -467,6 +660,8 @@ function problem(error: unknown): { status: number; body: Record<string, unknown
     status = 409; kind = "precondition"; title = "An operation precondition failed."; code = "ML_PRECONDITION";
   } else if (error instanceof TransitionError) {
     status = 409; kind = "transition"; title = "The workflow transition is not legal."; code = "ML_WORKFLOW";
+  } else if (error instanceof StaleError) {
+    status = 409; kind = "stale"; title = "The expected revision is stale."; code = "ML_STALE";
   } else if (error instanceof ConflictError) {
     status = 409; kind = "conflict"; title = "The operation conflicts with current state."; code = "ML_CONFLICT";
   } else if (error instanceof NotFoundError) {
@@ -543,7 +738,21 @@ export function create${manifest.model.name}HttpHandler(
       const executor = await authenticate(bearer);
       if (!executor) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
       const input = validateInput(definition, await readJson(request, maxBodyBytes));
-      const result = await executor.execute(definition.id, input);
+      const revision = expectedRevision(request);
+      if (definition.endpoint === "applicability") {
+        const decision = validateDecision(
+          definition,
+          await executor.assess(definition.id as ${manifest.model.name}ActionOperationId, input, { expectedRevision: revision }),
+        );
+        return Response.json(decision, {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            ...(decision.revision ? { etag: \`"\${decision.revision}"\` } : {}),
+          },
+        });
+      }
+      const result = await executor.execute(definition.id, input, { expectedRevision: revision });
       validateOutput(definition, result);
       return Response.json(result, { status: 200, headers: { "content-type": "application/json" } });
     } catch (error) {
@@ -554,11 +763,11 @@ export function create${manifest.model.name}HttpHandler(
 `;
 }
 
-export function generateHttp(manifest: OperationManifest): HttpOutput {
+export function generateHttp(manifest: OperationManifest, capabilities: CapabilityManifest): HttpOutput {
   return {
-    "openapi.json": `${JSON.stringify(generateOpenApi(manifest), null, 2)}\n`,
+    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities), null, 2)}\n`,
     "typescript/http-client.ts": generateHttpClient(manifest),
-    "typescript/http-server.ts": generateHttpServer(manifest),
+    "typescript/http-server.ts": generateHttpServer(manifest, capabilities),
     "typescript/browser.ts": `export * from "./types.js";
 export {
   ModelOperationError,
@@ -569,6 +778,7 @@ export {
   TransitionError,
   InvariantError,
   ConflictError,
+  StaleError,
   NotFoundError,
   ValidationError,
   mapHttpProblem,
@@ -577,6 +787,7 @@ export type { ModelProblem } from "./errors.js";
 export * from "./http-client.js";
 export * from "./workflows.js";
 export * from "./ui.js";
+export * from "./capabilities.js";
 `,
   };
 }

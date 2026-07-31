@@ -1,7 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.16](./spec/0.16/LANGUAGE.md). It retains the complete 0.15 language and application boundary and adds stable-ID-complete reviewed semantic evolution without changing `.model` grammar, canonical IR9, public operation/UI contracts, caller identity, or enforcement semantics.
+The current normative specification is [ModelLang 0.17](./spec/0.17/LANGUAGE.md). It retains the complete 0.16 language and adds authenticated, side-effect-free action applicability generated from the same decision plan re-evaluated by transactional execution. The public capability contract is a filtered projection and applicability grants no authority.
 
+- [Authenticated applicability semantics](./spec/0.17/APPLICABILITY.md)
+- [0.17 unchanged grammar statement](./spec/0.17/GRAMMAR.ebnf)
+- [0.17 conformance requirements](./spec/0.17/CONFORMANCE.md)
+- [0.17 unstable applicability boundaries](./spec/0.17/UNSTABLE.md)
 - [Reviewed semantic-evolution semantics](./spec/0.16/REVIEWED_EVOLUTION.md)
 - [0.16 unchanged grammar statement](./spec/0.16/GRAMMAR.ebnf)
 - [0.16 conformance requirements](./spec/0.16/CONFORMANCE.md)

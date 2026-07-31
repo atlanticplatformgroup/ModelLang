@@ -146,6 +146,45 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal"() FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_reservations_internal"."resolve_principal_snapshot"()
+RETURNS TABLE ("principal_id" uuid)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_issuer text;
+  v_subject text;
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
+  ) THEN
+    v_issuer := pg_catalog.current_setting('modellang.gateway_issuer', true);
+    v_subject := pg_catalog.current_setting('modellang.gateway_subject', true);
+    IF v_issuer IS NULL OR v_issuer = '' OR v_subject IS NULL OR v_subject = '' THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+    END IF;
+    RETURN QUERY
+      SELECT binding."principal_id"
+      FROM "model_reservations_internal"."gateway_principal_binding" AS binding
+      WHERE binding."issuer" = v_issuer AND binding."subject" = v_subject;
+  ELSE
+    RETURN QUERY
+      SELECT binding."principal_id"
+      FROM "model_reservations_internal"."principal_binding" AS binding
+      WHERE binding."database_principal" = session_user;
+  END IF;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+END
+$modellang$;
+REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal_snapshot"() FROM PUBLIC;
 
 CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

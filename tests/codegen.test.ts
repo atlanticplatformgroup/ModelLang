@@ -94,6 +94,37 @@ describe("backends", () => {
     expect(output["typescript/gateway.ts"]).toContain('bind_gateway_identity"($1, $2)');
   });
 
+  it("separates the enforcement decision plan from the filtered public capability contract", async () => {
+    const output = generateAll(await procurement());
+    const decisions = JSON.parse(output["decisions.json"]!) as {
+      public: boolean;
+      audience: string;
+      actions: { authorization: { id: string; expression: object }; preconditions: { id: string; expression: object }[] }[];
+    };
+    const capabilities = JSON.parse(output["capabilities.json"]!) as {
+      view: { safeProjection: boolean; containsExpressions: boolean; containsCurrentState: boolean; grantsAuthority: boolean };
+      authentication: { callerInput: boolean };
+      actions: { operationId: string; outcomes: string[]; explanation: { authorizationRuleId: string; preconditionRuleIds: string[] }; revision: { staleRequiresExpectedRevision: boolean; grantsAuthority: boolean } }[];
+    };
+    const decisionSchema = JSON.parse(await readFile("schemas/decision-plan.schema.json", "utf8")) as object;
+    const capabilitySchema = JSON.parse(await readFile("schemas/capability-manifest.schema.json", "utf8")) as object;
+    expect(new Ajv2020({ allErrors: true, strict: true }).compile(decisionSchema)(decisions)).toBe(true);
+    expect(new Ajv2020({ allErrors: true, strict: true }).compile(capabilitySchema)(capabilities)).toBe(true);
+    expect(decisions).toMatchObject({ public: false, audience: "enforcement" });
+    expect(decisions.actions[0]!.authorization.expression).toBeDefined();
+    expect(capabilities).toMatchObject({
+      view: { safeProjection: true, containsExpressions: false, containsCurrentState: false, grantsAuthority: false },
+      authentication: { callerInput: false },
+    });
+    expect(JSON.stringify(capabilities)).not.toMatch(/expression|currentValue|sqlFunction|lockPlan/);
+    for (const capability of capabilities.actions) {
+      expect(capability.outcomes).toEqual(["applicable", "denied", "notApplicable", "stale"]);
+      expect(capability.revision).toEqual(expect.objectContaining({ staleRequiresExpectedRevision: true, grantsAuthority: false }));
+    }
+    expect(output["typescript/capabilities.ts"]).toContain("Safe public capability contract");
+    expect(output["typescript/http-server.ts"]).toContain("validateDecision");
+  });
+
   it("emits engineering-only semantic closure and deterministic artifact provenance", async () => {
     const output = generateAll(await procurement());
     const packageInfo = JSON.parse(await readFile("package.json", "utf8")) as { version: string };
@@ -152,6 +183,8 @@ describe("backends", () => {
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "decisions.json")?.role).toBe("contract");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "capabilities.json")?.role).toBe("contract");
     expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
   });
 
@@ -294,7 +327,10 @@ describe("backends", () => {
     const before = JSON.parse(beforeOutput["openapi.json"]!) as { paths: object };
     const after = JSON.parse(afterOutput["openapi.json"]!) as { paths: object };
     expect(Object.keys(before.paths)).toEqual(Object.keys(after.paths));
-    expect(Object.keys(after.paths)).toEqual(["/operations/actions/act_11111111111111111111111111111111"]);
+    expect(Object.keys(after.paths)).toEqual([
+      "/operations/actions/act_11111111111111111111111111111111",
+      "/operations/actions/act_11111111111111111111111111111111/applicability",
+    ]);
     const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     expect(beforeUi.actions[0]!.operationId).toBe(afterUi.actions[0]!.operationId);

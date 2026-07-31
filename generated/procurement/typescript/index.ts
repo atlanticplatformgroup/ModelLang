@@ -6,3 +6,4 @@ export * from "./http-client.js";
 export * from "./http-server.js";
 export * from "./workflows.js";
 export * from "./ui.js";
+export * from "./capabilities.js";

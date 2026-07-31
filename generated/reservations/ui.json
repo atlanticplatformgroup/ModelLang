@@ -194,7 +194,6 @@
         "identityBinding",
         "authorization",
         "precondition",
-        "notFound",
         "invariant",
         "conflict"
       ]
@@ -221,8 +220,7 @@
       "maxItems": 100,
       "errors": [
         "identityBinding",
-        "authorization",
-        "notFound"
+        "authorization"
       ]
     }
   ],

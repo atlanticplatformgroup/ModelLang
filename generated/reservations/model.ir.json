@@ -1195,6 +1195,34 @@
       "objectName": "model_reservations.reserve search_path=pg_catalog,pg_temp"
     },
     {
+      "id": "boundary:action:act_508ad810a19d4b79a5009871de5cd26b.applicability",
+      "purpose": "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.",
+      "layer": "PostgreSQL stable function",
+      "artifact": "postgres/003_decisions.sql",
+      "objectName": "model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 25,
+        "column": 1,
+        "endLine": 40,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+      "purpose": "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.",
+      "layer": "PostgreSQL action and applicability functions",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations.reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 25,
+        "column": 1,
+        "endLine": 40,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
       "purpose": "true",
       "layer": "PostgreSQL action guard",

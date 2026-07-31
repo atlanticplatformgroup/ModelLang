@@ -48,6 +48,25 @@ describe("generated UI boundary", () => {
     );
   });
 
+  it("assesses action applicability separately from execution", async () => {
+    const decision = {
+      operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+      status: "applicable",
+      applicable: true,
+      authority: "none",
+      revision: "rev:1:0123456789abcdef0123456789abcdef",
+    } as const;
+    const fetch = vi.fn(async () => Response.json(decision));
+    const client = new ProcurementHttpClient({ baseUrl: "https://example.test", accessToken: () => "valid", fetch });
+    const executor = createProcurementUiExecutor(client);
+    const result = await executor.assess(decision.operationId, { amount: { currency: "USD", amount: "10.00" } });
+    expect(result).toEqual(decision);
+    expect(fetch).toHaveBeenCalledWith(
+      "https://example.test/operations/actions/act_1e35db0451b1461e941af6283d86dca2/applicability",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
   it("fails closed for operation IDs absent from the generated manifest", async () => {
     const client = new ProcurementHttpClient({
       baseUrl: "https://example.test",

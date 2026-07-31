@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/decision-plan.schema.json",
+  "title": "ModelLang canonical decision plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "planVersion", "audience", "public", "compilerVersion", "irVersion", "model", "actions"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/decision-plan.schema.json" },
+    "planVersion": { "const": 1 },
+    "audience": { "const": "enforcement" },
+    "public": { "const": false },
+    "compilerVersion": { "type": "string" },
+    "irVersion": { "const": 9 },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId", "callableParameterIds", "callerParameterId", "entityLoads",
+          "authorization", "preconditions", "revision", "absenceProjection"
+        ],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^action:" },
+          "callableParameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:" } },
+          "callerParameterId": { "type": "string", "pattern": "^parameter:" },
+          "entityLoads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["parameterId", "entityId", "source", "executionLock", "order"],
+              "properties": {
+                "parameterId": { "type": "string", "pattern": "^parameter:" },
+                "entityId": { "type": "string", "pattern": "^entity:" },
+                "source": { "enum": ["authenticatedContext", "operationInput"] },
+                "executionLock": { "enum": ["share", "update"] },
+                "order": { "type": "integer", "minimum": 0 }
+              }
+            }
+          },
+          "authorization": { "$ref": "#/$defs/rule" },
+          "preconditions": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+          "revision": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["ruleId", "algorithm", "componentParameterIds", "grantsAuthority"],
+            "properties": {
+              "ruleId": { "type": "string", "pattern": "^revision:action:" },
+              "algorithm": { "const": "authoritativeRowVersion/1" },
+              "componentParameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:" } },
+              "grantsAuthority": { "const": false }
+            }
+          },
+          "absenceProjection": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["outcome", "explanationRuleId"],
+            "properties": {
+              "outcome": { "const": "denied" },
+              "explanationRuleId": { "type": "string", "pattern": "^authorize:action:" }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "expression"],
+      "properties": {
+        "id": { "type": "string" },
+        "expression": { "type": "object" }
+      }
+    }
+  }
+}

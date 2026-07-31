@@ -1,0 +1,99 @@
+{
+  "$schema": "https://modellang.dev/schemas/capability-manifest.schema.json",
+  "capabilityManifestVersion": 1,
+  "operationManifestVersion": 2,
+  "model": {
+    "id": "model:Procurement",
+    "name": "Procurement",
+    "version": "0.10.0",
+    "sourceHash": "sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62"
+  },
+  "view": {
+    "audience": "application",
+    "safeProjection": true,
+    "containsExpressions": false,
+    "containsCurrentState": false,
+    "grantsAuthority": false
+  },
+  "authentication": {
+    "required": true,
+    "callerInput": false
+  },
+  "actions": [
+    {
+      "operationId": "action:act_1e35db0451b1461e941af6283d86dca2",
+      "inputParameterIds": [
+        "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount"
+      ],
+      "outcomes": [
+        "applicable",
+        "denied",
+        "notApplicable",
+        "stale"
+      ],
+      "explanation": {
+        "safe": true,
+        "authorizationRuleId": "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
+        "preconditionRuleIds": [
+          "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount"
+        ],
+        "revisionRuleId": "revision:action:act_1e35db0451b1461e941af6283d86dca2"
+      },
+      "revision": {
+        "kind": "opaque",
+        "staleRequiresExpectedRevision": true,
+        "grantsAuthority": false
+      }
+    },
+    {
+      "operationId": "action:act_ed2374e822704c51a2925338253d05d2",
+      "inputParameterIds": [
+        "parameter:action:act_ed2374e822704c51a2925338253d05d2.request"
+      ],
+      "outcomes": [
+        "applicable",
+        "denied",
+        "notApplicable",
+        "stale"
+      ],
+      "explanation": {
+        "safe": true,
+        "authorizationRuleId": "authorize:action:act_ed2374e822704c51a2925338253d05d2",
+        "preconditionRuleIds": [
+          "require:action:act_ed2374e822704c51a2925338253d05d2.is_draft"
+        ],
+        "revisionRuleId": "revision:action:act_ed2374e822704c51a2925338253d05d2"
+      },
+      "revision": {
+        "kind": "opaque",
+        "staleRequiresExpectedRevision": true,
+        "grantsAuthority": false
+      }
+    },
+    {
+      "operationId": "action:act_d39dbb883b5f4019b9027b85add3de47",
+      "inputParameterIds": [
+        "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request"
+      ],
+      "outcomes": [
+        "applicable",
+        "denied",
+        "notApplicable",
+        "stale"
+      ],
+      "explanation": {
+        "safe": true,
+        "authorizationRuleId": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+        "preconditionRuleIds": [
+          "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted"
+        ],
+        "revisionRuleId": "revision:action:act_d39dbb883b5f4019b9027b85add3de47"
+      },
+      "revision": {
+        "kind": "opaque",
+        "staleRequiresExpectedRevision": true,
+        "grantsAuthority": false
+      }
+    }
+  ]
+}

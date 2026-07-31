@@ -3,6 +3,7 @@ import { ModelError, type Span } from "./diagnostics.js";
 import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
+import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
   ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl, TypeRef,
   WorkflowDecl,
@@ -1109,6 +1110,8 @@ function buildEnforcement(
       entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL action input validation", artifact: "postgres/003_actions.sql", objectName: fn, source: parameter.span });
     }
     entries.push({ id: `boundary:${action.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_actions.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
+    entries.push({ id: `boundary:${action.id}.applicability`, purpose: "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.", layer: "PostgreSQL stable function", artifact: "postgres/003_decisions.sql", objectName: `${schema}.${decisionFunctionName(action.id)}`, source: action.span });
+    entries.push({ id: decisionRevisionRuleId(action.id), purpose: "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.", layer: "PostgreSQL action and applicability functions", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
     entries.push({ id: `effect:${action.id}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });

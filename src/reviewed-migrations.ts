@@ -17,6 +17,7 @@ import {
 } from "./migrations.js";
 import { quoteIdent } from "./naming.js";
 import { semanticDiff, type SemanticChange, type SemanticDiff } from "./semantic-diff.js";
+import { decisionFunctionName } from "./decision-plan.js";
 
 export const REVIEWED_MIGRATION_SCHEMA = "https://modellang.dev/schemas/reviewed-migration-plan.schema.json" as const;
 
@@ -488,6 +489,8 @@ export function planReviewedMigration(
     `ALTER TABLE ${qname(internal, "gateway_principal_binding")} DROP CONSTRAINT IF EXISTS ${quoteIdent("gateway_principal_binding_principal_id_fkey")};`,
     ...[...previous.actions, ...previous.queries].map((operation) =>
       `DROP FUNCTION ${qname(schema, operation.naming.sqlFunction)}(${callableSignature(operation)});`),
+    ...previous.actions.map((action) =>
+      `DROP FUNCTION IF EXISTS ${qname(schema, decisionFunctionName(action.id))}(${[...action.callableParameters.map((id) => sqlType(action.parameters.find((parameter) => parameter.id === id)!.type)), "text"].join(", ")});`),
     `DROP TABLE ${previous.entities.map((entity) => qname(schema, entity.naming.sqlTable)).join(", ")};`,
     ...previous.workflows.map((workflow) => `DROP FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`),
     "RESET ROLE;",
@@ -500,6 +503,7 @@ export function planReviewedMigration(
     ...current.workflows.flatMap((workflow) => generateWorkflowStatements(current, workflow, true)),
     ...generateGatewayInfrastructureStatements(current),
     generated["003_actions.sql"]!.trim(),
+    generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),
     generated["004_grants.sql"]!.trim(),
     "SET LOCAL ROLE modellang_owner;",

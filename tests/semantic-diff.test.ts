@@ -63,7 +63,7 @@ describe("semantic change analysis", () => {
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
       diffVersion: 2,
-      compilerVersion: "0.16.0",
+      compilerVersion: "0.17.0",
       irVersion: 9,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });

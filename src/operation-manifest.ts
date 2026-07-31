@@ -154,9 +154,6 @@ function caller(operation: IRAction | IRQuery, ir: ModelIR): ManifestOperationBa
 function actionErrors(ir: ModelIR, action: IRAction): ManifestErrorKind[] {
   const errors: ManifestErrorKind[] = ["identityBinding", "authorization"];
   if (action.preconditions.length > 0) errors.push("precondition");
-  if (action.parameters.some((parameter) => action.callableParameters.includes(parameter.id) && parameter.type.startsWith("entity:"))) {
-    errors.push("notFound");
-  }
   if (action.parameters.some((parameter) => action.callableParameters.includes(parameter.id) && isMoneyType(parameter.type))) {
     errors.push("validation");
   }
@@ -173,9 +170,6 @@ function actionErrors(ir: ModelIR, action: IRAction): ManifestErrorKind[] {
 
 function queryErrors(query: IRQuery): ManifestErrorKind[] {
   const errors: ManifestErrorKind[] = ["identityBinding", "authorization"];
-  if (query.parameters.some((parameter) => query.callableParameters.includes(parameter.id) && parameter.type.startsWith("entity:"))) {
-    errors.push("notFound");
-  }
   if (query.parameters.some((parameter) => query.callableParameters.includes(parameter.id) && isMoneyType(parameter.type))) {
     errors.push("validation");
   }

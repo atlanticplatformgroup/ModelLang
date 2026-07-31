@@ -1,6 +1,6 @@
-# ModelLang 0.16 reference compiler
+# ModelLang 0.17 reference compiler
 
-ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, a trusted engineering semantic manifest, a framework-neutral UI manifest, deterministic artifact provenance, OpenAPI, a browser-safe HTTP client and typed UI/workflow executors, an authenticated server handler, guarded safe and explicitly reviewed schema evolution, stable-ID-aware semantic change reports, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, one canonical enforcement decision plan, a filtered public capability contract, authenticated side-effect-free applicability, a trusted engineering semantic manifest, a framework-neutral UI manifest, deterministic artifact provenance, OpenAPI, browser-safe HTTP and typed UI/workflow clients, an authenticated server handler, guarded safe and explicitly reviewed schema evolution, stable-ID-aware semantic change reports, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -61,9 +61,13 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.16 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.17 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v2 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, and stable workflow/transition/action/target bindings. It contains no HTTP paths, SQL names, database roles, connection details, PostgreSQL types, or UI concepts. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
+
+`decisions.json` is enforcement decision plan v1. It carries normalized authorization and ordered requirements, authoritative entity loads, execution locks, absence projection, and revision components. It is internal and expression-bearing. Both generated applicability functions and mutation functions consume this plan, so execution cannot drift from preflight logic.
+
+`capabilities.json` is public capability manifest v1, a filtered projection derived from the operation manifest and decision plan. It exposes action/input IDs, fixed applicability outcomes, safe explanation rule IDs, and opaque-revision behavior. It contains no expressions, current state, SQL details, or authority grant. The generated `typescript/capabilities.ts` embeds the same browser-safe contract.
 
 `semantic.json` is engineering semantic manifest v1. It exposes the static semantics already present in IR9: normalized authorization, precondition, and row-policy expressions; stable fact dependencies; read and lock sets; explicit effect assignments; linked invariants and exclusions; workflow transitions; failure classes; and source spans. It is deliberately marked unfiltered, current-state-free, and non-executable. It is not a browser artifact, an authorization decision, an agent capability view, or a preflight response.
 
@@ -79,14 +83,15 @@ The PostgreSQL backend emits:
 - initial-state and legal-edge workflow triggers;
 - internal model-version, source-hash, migration-kind, and reviewed-plan-hash history;
 - `SECURITY DEFINER` action functions;
+- pure authenticated `SECURITY DEFINER` action-applicability functions generated from the same decision plan;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
-- an idempotent administrative upgrade for existing 0.11 installations.
+- idempotent administrative upgrades for the 0.12 gateway and 0.17 applicability boundaries.
 
-The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field.
+The generated TypeScript clients expose only declared actions, queries, and action applicability. They have no generic table or mutation API. Caller identity is not an input field.
 
-- `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID routes, and its UI executor dispatches manifest operation IDs through that client. It contains no SQL, database adapter, Node.js, or PostgreSQL contract.
+- `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID execution and applicability routes, and its UI executor keeps assessment separate from execution. It contains no SQL, database adapter, Node.js, or PostgreSQL contract.
 - `typescript/ui.ts` embeds the readonly UI manifest and exports operation-ID-indexed input/result types, structural workflow availability, target-binding transition types, and fail-closed executors.
 - `typescript/http-server.ts` authenticates bearer context, validates exact closed input and output objects, enforces query result bounds, dispatches stable operation IDs, maps RFC 9457 problems, and can bridge to an existing caller-bound generated database client.
 - `typescript/gateway.ts` is a server-only shared-pool adapter. It binds verified issuer/subject claims for one transaction and never accepts a ModelLang principal ID.
@@ -112,6 +117,7 @@ Every action and query uses `POST` with a stable semantic-ID route:
 ```text
 /operations/actions/<act_stable_id>
 /operations/queries/<qry_stable_id>
+/operations/actions/<act_stable_id>/applicability
 ```
 
 Renaming a declaration changes its generated method name and OpenAPI summary, but not its route. Request objects reject unknown properties, including any caller-shaped property. The host validates the bearer credential and returns an executor already bound to the authenticated principal:
@@ -140,6 +146,23 @@ const procurement = new ProcurementHttpClient({
   accessToken: () => session.accessToken,
 });
 ```
+
+Applicability is a separate authenticated query. It reads current authoritative state, changes no model row, writes no action audit, and never grants execution authority:
+
+```ts
+const decision = await procurement.assessSubmitRequest({ request: request.id });
+
+if (decision.status === "applicable") {
+  // Execution still reloads, locks, authorizes, checks requirements, and applies
+  // the effect transactionally. The revision only requests an explicit comparison.
+  await procurement.submitRequest(
+    { request: request.id },
+    { expectedRevision: decision.revision },
+  );
+}
+```
+
+`authorize` failure is `denied`; `require` failure is `notApplicable`. Missing or invisible referenced entities use the same denial projection by default. Safe explanations contain only a category and stable rule ID allowlisted by `capabilities.json`. `stale` is possible only when an explicit opaque revision is supplied through generated options or a quoted HTTP `If-Match`. A successful applicability response is advisory and cannot bypass execution-time checks.
 
 The 0.12 shared-pool path verifies a bearer credential in the host, maps it to stable external claims, and lets the generated gateway executor own one complete database transaction:
 
@@ -194,6 +217,8 @@ const submitted = await workflows.executeTransition(submit.transitionId, request
 
 Availability is structural only: it matches the declared source state. It does not predict caller authorization, preconditions, concurrent state, or invariants. Execution still crosses authenticated HTTP and the complete PostgreSQL enforcement boundary, and callers must handle typed failures and stale-state refresh.
 
+Applications may call `ui.assess(...)` or `workflows.assessTransition(...)` to combine structural discovery with authenticated current-state applicability. These methods remain separate from `execute(...)` and `executeTransition(...)`; their results carry `authority: "none"`.
+
 ## Stable identity and safe schema evolution
 
 Durable declarations carry kind-specific opaque IDs:
@@ -235,7 +260,16 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The artifact is transactional and idempotent. It first verifies the installed model ID, version, and source hash, then changes only the internal identity/audit boundary, generated callables, roles, and grants; it does not alter model entity data or migration history. A mismatched artifact fails with `ML_MIGRATION_BASELINE`. A normal generated safe migration includes the same upgrade automatically. The credential applying either path must be able to create/alter roles and assume `modellang_owner`. Production issuer/subject bindings are then provisioned through a trusted administrative path; the example seed values are demo-only.
 
-The 0.10 safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. In 0.16, the supported subset of those changes can proceed only through a reviewed plan; unsupported transformations still fail closed rather than becoming compiler guesses.
+Existing installations can add the 0.17 decision/applicability functions without changing entity data or migration history:
+
+```bash
+psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f generated/procurement/postgres/007_upgrade_0_17.sql
+```
+
+This baseline-checked artifact transactionally redeploys actions from the canonical decision plan, installs applicability functions, and refreshes least-privilege grants. Safe and reviewed migrations redeploy the same boundary automatically.
+
+The 0.10 safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. In 0.17, the supported subset of those changes can proceed only through the unchanged reviewed plan; unsupported transformations still fail closed rather than becoming compiler guesses.
 
 ## Explicit language semantics
 
@@ -249,7 +283,7 @@ The 0.10 safe planner continues to refuse removals, existing semantic changes, r
 - `@generated(uuid)` and `@generated(now)` are valid only on required `UUID` and `DateTime` stored fields respectively. Actions cannot assign them. PostgreSQL supplies qualified column defaults and returns the values from the same create statement.
 - Generated fields are implicitly immutable. `@immutable` also prevents update effects from assigning ordinary stored fields while still allowing their explicit initial assignment during creation.
 - A query declares one source entity, query-level authorization, a per-row `where` policy, a required direct ordering field, and a fixed limit from 1 through 1000. The compiler adds ascending primary-key order as a deterministic tie-breaker. Authorization and filtering both use `IS TRUE`, so false and SQL unknown fail closed.
-- Query entity parameters are callable UUIDs but must resolve to existing rows. Query functions use a statement-level MVCC snapshot and do not lock result rows or write action-audit records.
+- Query entity parameters are callable UUIDs but must resolve to existing rows. Missing callable entities project as the query's authorization failure, matching the default absence/invisibility policy. Query functions use a statement-level MVCC snapshot and do not lock result rows or write action-audit records.
 - Invariants are exactly directional as written. The Procurement model uses `approval_fields_match_status`, which requires approval fields to be both populated exactly when a request is `APPROVED` and null for every other status.
 - Procurement also uses durable audit backstops: an approved request must snapshot `MANAGER` authority at or below 10,000 or `FINANCE` authority above 10,000, and its approver must differ from its requester.
 - `@snapshot` is valid on stored scalar, enum, and enum-set entity fields and marks a point-in-time audit copy. The compiler never auto-populates it: an action must explicitly assign either `null` or a compatible direct field value such as `actor.roles`. That value is copied into the row; later changes to the source field do not propagate.

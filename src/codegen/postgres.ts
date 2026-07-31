@@ -1,15 +1,18 @@
 import type { IRAction, IREntity, IREnumMember, IRExpression, IRField, IRParameter, IRQuery, IRWorkflow, ModelIR } from "../ir.js";
 import { isMoneyType, moneyMagnitudeLimit, moneyProfileFromType } from "../money.js";
 import { quoteIdent, snakeCase } from "../naming.js";
+import { decisionAction, decisionFunctionName, generateDecisionPlan, type ActionDecisionPlan, type DecisionPlan } from "../decision-plan.js";
 
 export interface PostgresOutput {
   "001_roles.sql": string;
   "002_schema.sql": string;
   "003_actions.sql": string;
+  "003_decisions.sql": string;
   "003_queries.sql": string;
   "004_grants.sql": string;
   "005_seed.sql": string;
   "006_upgrade_0_12.sql": string;
+  "007_upgrade_0_17.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -310,7 +313,52 @@ ${generateGatewayRoleStatements()}
 `;
 }
 
-export function generateGatewayInfrastructureStatements(ir: ModelIR): string[] {
+function generateSnapshotResolverStatements(ir: ModelIR): string[] {
+  const internal = ir.model.naming.internalSchema;
+  return [
+    `CREATE OR REPLACE FUNCTION ${qname(internal, "resolve_principal_snapshot")}()`,
+    `RETURNS TABLE (${quoteIdent("principal_id")} uuid)`,
+    "LANGUAGE plpgsql",
+    "STABLE",
+    "SECURITY DEFINER",
+    "SET search_path = pg_catalog, pg_temp",
+    "AS $modellang$",
+    "DECLARE",
+    "  v_issuer text;",
+    "  v_subject text;",
+    "BEGIN",
+    "  IF EXISTS (",
+    "    SELECT 1",
+    "    FROM pg_catalog.pg_auth_members AS membership",
+    "    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid",
+    "    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member",
+    "    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user",
+    "  ) THEN",
+    "    v_issuer := pg_catalog.current_setting('modellang.gateway_issuer', true);",
+    "    v_subject := pg_catalog.current_setting('modellang.gateway_subject', true);",
+    "    IF v_issuer IS NULL OR v_issuer = '' OR v_subject IS NULL OR v_subject = '' THEN",
+    "      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';",
+    "    END IF;",
+    "    RETURN QUERY",
+    `      SELECT binding.${quoteIdent("principal_id")}`,
+    `      FROM ${qname(internal, "gateway_principal_binding")} AS binding`,
+    `      WHERE binding.${quoteIdent("issuer")} = v_issuer AND binding.${quoteIdent("subject")} = v_subject;`,
+    "  ELSE",
+    "    RETURN QUERY",
+    `      SELECT binding.${quoteIdent("principal_id")}`,
+    `      FROM ${qname(internal, "principal_binding")} AS binding`,
+    `      WHERE binding.${quoteIdent("database_principal")} = session_user;`,
+    "  END IF;",
+    "  IF NOT FOUND THEN",
+    "    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';",
+    "  END IF;",
+    "END",
+    "$modellang$;",
+    `REVOKE ALL ON FUNCTION ${qname(internal, "resolve_principal_snapshot")}() FROM PUBLIC;`,
+  ];
+}
+
+export function generateGatewayInfrastructureStatements(ir: ModelIR, includeSnapshotResolver = true): string[] {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
   const principal = entityById(ir, ir.principal.entityId);
@@ -411,6 +459,7 @@ export function generateGatewayInfrastructureStatements(ir: ModelIR): string[] {
     "END",
     "$modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "resolve_principal")}() FROM PUBLIC;`,
+    ...(includeSnapshotResolver ? generateSnapshotResolverStatements(ir) : []),
   ];
 }
 
@@ -487,6 +536,61 @@ function functionSignature(ir: ModelIR, operation: IRAction | IRQuery): string {
   return `${qname(ir.model.naming.sqlSchema, operation.naming.sqlFunction)}(${callable.map((parameter) => sqlType(parameter.type)).join(", ")})`;
 }
 
+function decisionFunctionSignature(ir: ModelIR, action: IRAction): string {
+  const callable = action.parameters.filter((parameter) => action.callableParameters.includes(parameter.id));
+  return `${qname(ir.model.naming.sqlSchema, decisionFunctionName(action.id))}(${[...callable.map((parameter) => sqlType(parameter.type)), "text"].join(", ")})`;
+}
+
+function revisionInputSql(parameter: IRParameter, value: string): string {
+  if (parameter.type.startsWith("set:enum:")) {
+    return `pg_catalog.to_jsonb(ARRAY(SELECT member FROM pg_catalog.unnest(${value}) AS member ORDER BY member))`;
+  }
+  return `pg_catalog.to_jsonb(${value})`;
+}
+
+function revisionExpression(
+  ir: ModelIR,
+  action: IRAction,
+  decision: ActionDecisionPlan,
+  xminNames: Map<string, string>,
+): string {
+  const components = decision.revision.componentParameterIds.map((parameterId) => {
+    const parameter = action.parameters.find((candidate) => candidate.id === parameterId)!;
+    const value = parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
+    const pairs = [
+      `'parameterId', '${parameter.id.replaceAll("'", "''")}'`,
+      `'value', ${revisionInputSql(parameter, value)}`,
+    ];
+    const xmin = xminNames.get(parameter.id);
+    if (xmin) pairs.push(`'rowVersion', pg_catalog.to_jsonb(${xmin})`);
+    return `pg_catalog.jsonb_build_object(${pairs.join(", ")})`;
+  });
+  return `'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object(`
+    + `'sourceHash', '${ir.model.sourceHash.replaceAll("'", "''")}', `
+    + `'operationId', '${action.id.replaceAll("'", "''")}', `
+    + `'components', pg_catalog.jsonb_build_array(${components.join(", ")})`
+    + `)::text)`;
+}
+
+function decisionJson(
+  action: IRAction,
+  status: "applicable" | "denied" | "notApplicable" | "stale",
+  revision: string | undefined,
+  explanation: { kind: "authorization" | "requirement" | "revision"; ruleId: string } | undefined,
+): string {
+  const values = [
+    `'operationId', '${action.id.replaceAll("'", "''")}'`,
+    `'status', '${status}'`,
+    `'applicable', ${status === "applicable" ? "TRUE" : "FALSE"}`,
+    `'authority', 'none'`,
+  ];
+  if (revision) values.push(`'revision', ${revision}`);
+  if (explanation) {
+    values.push(`'explanation', pg_catalog.jsonb_build_object('kind', '${explanation.kind}', 'ruleId', '${explanation.ruleId.replaceAll("'", "''")}')`);
+  }
+  return `pg_catalog.jsonb_build_object(${values.join(", ")})`;
+}
+
 function rowJson(entity: IREntity, record: string): string {
   const values = entity.fields.flatMap((field) => {
     const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
@@ -513,24 +617,29 @@ function moneyParameterValidation(parameter: IRParameter): string[] {
   ];
 }
 
-function generateAction(ir: ModelIR, action: IRAction): string {
+function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionPlan): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
   const callable = action.parameters.filter((parameter) => action.callableParameters.includes(parameter.id));
   const recordNames = new Map<string, string>();
+  const xminNames = new Map<string, string>();
   for (const parameter of action.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     recordNames.set(parameter.id, `v_${snakeCase(parameter.name)}`);
+    xminNames.set(parameter.id, `v_${snakeCase(parameter.name)}_xmin`);
   }
   const returnEntity = entityById(ir, action.returnEntityId);
   const declarations = [
     "  v_principal_id uuid;",
     "  v_identity_issuer text;",
     "  v_identity_subject text;",
+    "  v_revision text;",
+    "  v_expected_revision text;",
     `  v_result ${qname(schema, returnEntity.naming.sqlTable)}%ROWTYPE;`,
   ];
   for (const parameter of action.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     const entity = entityById(ir, parameter.type);
     declarations.push(`  ${recordNames.get(parameter.id)} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`);
+    declarations.push(`  ${xminNames.get(parameter.id)} text;`);
   }
   const body: string[] = [
     `  SELECT identity.${quoteIdent("principal_id")}, identity.${quoteIdent("identity_issuer")}, identity.${quoteIdent("identity_subject")}`,
@@ -541,15 +650,15 @@ function generateAction(ir: ModelIR, action: IRAction): string {
   for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
     body.push(...moneyParameterValidation(parameter));
   }
-  const lockGroups = new Map<string, typeof action.lockPlan>();
-  for (const lock of action.lockPlan) {
-    const group = lockGroups.get(lock.entityId) ?? [];
-    group.push(lock);
-    lockGroups.set(lock.entityId, group);
+  const lockGroups = new Map<string, typeof decision.entityLoads>();
+  for (const load of decision.entityLoads) {
+    const group = lockGroups.get(load.entityId) ?? [];
+    group.push(load);
+    lockGroups.set(load.entityId, group);
   }
   for (const [entityId, locks] of lockGroups) {
     const entity = entityById(ir, entityId);
-    const mode = locks.some((lock) => lock.mode === "update") ? "UPDATE" : "SHARE";
+    const mode = locks.some((lock) => lock.executionLock === "update") ? "UPDATE" : "SHARE";
     const ids = locks.map((lock) => {
       const parameter = action.parameters.find((candidate) => candidate.id === lock.parameterId)!;
       return parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
@@ -561,30 +670,42 @@ function generateAction(ir: ModelIR, action: IRAction): string {
       "",
     );
   }
-  for (const lock of action.lockPlan) {
-    const parameter = action.parameters.find((candidate) => candidate.id === lock.parameterId)!;
+  for (const load of decision.entityLoads) {
+    const parameter = action.parameters.find((candidate) => candidate.id === load.parameterId)!;
     const entity = entityById(ir, parameter.type);
     const idValue = parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
     body.push(
       `  SELECT * INTO ${recordNames.get(parameter.id)}`,
-      `  FROM ${qname(schema, entity.naming.sqlTable)}`,
-      `  WHERE ${quoteIdent("id")} = ${idValue}`,
+      `  FROM ${qname(schema, entity.naming.sqlTable)} AS row_value`,
+      `  WHERE row_value.${quoteIdent("id")} = ${idValue}`,
       ";",
       "",
       "  IF NOT FOUND THEN",
-      `    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:${parameter.name}';`,
+      `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${decision.absenceProjection.explanationRuleId}';`,
       "  END IF;",
+      "",
+      `  SELECT row_value.xmin::text INTO ${xminNames.get(parameter.id)}`,
+      `  FROM ${qname(schema, entity.naming.sqlTable)} AS row_value`,
+      `  WHERE row_value.${quoteIdent("id")} = ${idValue};`,
       "",
     );
   }
   const context = { ir, action, recordNames };
   body.push(
-    `  IF NOT ((${lowerExpression(action.authorization.expression, context)}) IS TRUE) THEN`,
-    `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${action.authorization.id}';`,
+    `  v_revision := ${revisionExpression(ir, action, decision, xminNames)};`,
+    `  v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');`,
+    `  PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);`,
+    "",
+    `  IF NOT ((${lowerExpression(decision.authorization.expression, context)}) IS TRUE) THEN`,
+    `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${decision.authorization.id}';`,
+    "  END IF;",
+    "",
+    "  IF v_expected_revision IS NOT NULL AND v_expected_revision IS DISTINCT FROM v_revision THEN",
+    `    RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:${decision.revision.ruleId}';`,
     "  END IF;",
     "",
   );
-  for (const precondition of action.preconditions) {
+  for (const precondition of decision.preconditions) {
     body.push(
       `  IF NOT ((${lowerExpression(precondition.expression, context)}) IS TRUE) THEN`,
       `    RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:${precondition.id}';`,
@@ -645,11 +766,108 @@ REVOKE ALL ON FUNCTION ${functionSignature(ir, action)} FROM PUBLIC;
 `;
 }
 
-function generateActions(ir: ModelIR): string {
+function generateActions(ir: ModelIR, plan: DecisionPlan): string {
   return `-- Generated guarded action functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
-${ir.actions.map((action) => generateAction(ir, action)).join("\n")}
+${ir.actions.map((action) => generateAction(ir, action, decisionAction(plan, action.id))).join("\n")}
+RESET ROLE;
+`;
+}
+
+function generateDecision(ir: ModelIR, action: IRAction, decision: ActionDecisionPlan): string {
+  const schema = ir.model.naming.sqlSchema;
+  const internal = ir.model.naming.internalSchema;
+  const callable = action.parameters.filter((parameter) => action.callableParameters.includes(parameter.id));
+  const recordNames = new Map<string, string>();
+  const xminNames = new Map<string, string>();
+  const declarations = ["  v_principal_id uuid;", "  v_revision text;"];
+  for (const load of decision.entityLoads) {
+    const parameter = action.parameters.find((candidate) => candidate.id === load.parameterId)!;
+    const entity = entityById(ir, load.entityId);
+    const record = `v_${snakeCase(parameter.name)}`;
+    const xmin = `${record}_xmin`;
+    recordNames.set(parameter.id, record);
+    xminNames.set(parameter.id, xmin);
+    declarations.push(`  ${record} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`, `  ${xmin} text;`);
+  }
+  const body = [
+    `  SELECT identity.${quoteIdent("principal_id")} INTO v_principal_id`,
+    `  FROM ${qname(internal, "resolve_principal_snapshot")}() AS identity;`,
+    "",
+  ];
+  for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
+    body.push(...moneyParameterValidation(parameter));
+  }
+  for (const load of decision.entityLoads) {
+    const parameter = action.parameters.find((candidate) => candidate.id === load.parameterId)!;
+    const entity = entityById(ir, load.entityId);
+    const idValue = parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
+    body.push(
+      `  SELECT * INTO ${recordNames.get(parameter.id)}`,
+      `  FROM ${qname(schema, entity.naming.sqlTable)} AS row_value`,
+      `  WHERE row_value.${quoteIdent("id")} = ${idValue};`,
+      "",
+      `  SELECT row_value.xmin::text INTO ${xminNames.get(parameter.id)}`,
+      `  FROM ${qname(schema, entity.naming.sqlTable)} AS row_value`,
+      `  WHERE row_value.${quoteIdent("id")} = ${idValue};`,
+      "",
+    );
+  }
+  const revision = revisionExpression(ir, action, decision, xminNames);
+  body.push(`  v_revision := ${revision};`, "");
+  const missing = decision.entityLoads.map((load) => `${xminNames.get(load.parameterId)} IS NULL`).join(" OR ");
+  if (missing) {
+    body.push(
+      `  IF ${missing} THEN`,
+      `    RETURN ${decisionJson(action, "denied", undefined, { kind: "authorization", ruleId: decision.absenceProjection.explanationRuleId })};`,
+      "  END IF;",
+      "",
+    );
+  }
+  const context = { ir, action, recordNames };
+  body.push(
+    `  IF NOT ((${lowerExpression(decision.authorization.expression, context)}) IS TRUE) THEN`,
+    `    RETURN ${decisionJson(action, "denied", undefined, { kind: "authorization", ruleId: decision.authorization.id })};`,
+    "  END IF;",
+    "",
+    "  IF p_expected_revision IS NOT NULL AND p_expected_revision IS DISTINCT FROM v_revision THEN",
+    `    RETURN ${decisionJson(action, "stale", "v_revision", { kind: "revision", ruleId: decision.revision.ruleId })};`,
+    "  END IF;",
+    "",
+  );
+  for (const precondition of decision.preconditions) {
+    body.push(
+      `  IF NOT ((${lowerExpression(precondition.expression, context)}) IS TRUE) THEN`,
+      `    RETURN ${decisionJson(action, "notApplicable", "v_revision", { kind: "requirement", ruleId: precondition.id })};`,
+      "  END IF;",
+      "",
+    );
+  }
+  body.push(`  RETURN ${decisionJson(action, "applicable", "v_revision", undefined)};`);
+  return `CREATE OR REPLACE FUNCTION ${qname(schema, decisionFunctionName(action.id))}(${[...callable.map(parameterSql), "p_expected_revision text"].join(", ")})
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+${declarations.join("\n")}
+BEGIN
+${body.join("\n")}
+END
+$modellang$;
+
+REVOKE ALL ON FUNCTION ${decisionFunctionSignature(ir, action)} FROM PUBLIC;
+`;
+}
+
+function generateDecisions(ir: ModelIR, plan: DecisionPlan): string {
+  return `-- Generated pure applicability queries. These decisions grant no execution authority.
+SET ROLE modellang_owner;
+
+${ir.actions.map((action) => generateDecision(ir, action, decisionAction(plan, action.id))).join("\n")}
 RESET ROLE;
 `;
 }
@@ -691,7 +909,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       `  WHERE ${quoteIdent(idFieldForParameter.naming.sqlColumn)} = ${idValue};`,
       "",
       "  IF NOT FOUND THEN",
-      `    RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'ML_NOT_FOUND:${parameter.name}';`,
+      `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${query.authorization.id}';`,
       "  END IF;",
       "",
     );
@@ -744,7 +962,7 @@ RESET ROLE;
 `;
 }
 
-function generateGrants(ir: ModelIR): string {
+function generateGrants(ir: ModelIR, includeApplicability = true): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
   const lines = [
@@ -766,6 +984,10 @@ function generateGrants(ir: ModelIR): string {
     lines.push(
       `REVOKE ALL ON FUNCTION ${functionSignature(ir, action)} FROM PUBLIC;`,
       `GRANT EXECUTE ON FUNCTION ${functionSignature(ir, action)} TO modellang_app;`,
+    );
+    if (includeApplicability) lines.push(
+      `REVOKE ALL ON FUNCTION ${decisionFunctionSignature(ir, action)} FROM PUBLIC;`,
+      `GRANT EXECUTE ON FUNCTION ${decisionFunctionSignature(ir, action)} TO modellang_app;`,
     );
   }
   for (const query of ir.queries) {
@@ -848,7 +1070,7 @@ RESET ROLE;
 `;
 }
 
-function generateGatewayUpgrade(ir: ModelIR): string {
+function generateGatewayUpgrade(ir: ModelIR, plan: DecisionPlan): string {
   const internal = ir.model.naming.internalSchema;
   const modelId = ir.model.id.replaceAll("'", "''");
   const version = ir.model.version.replaceAll("'", "''");
@@ -878,25 +1100,64 @@ BEGIN
 END
 $modellang_upgrade$;
 
-${generateGatewayInfrastructureStatements(ir).join("\n")}
+${generateGatewayInfrastructureStatements(ir, false).join("\n")}
 RESET ROLE;
 
 -- Existing guarded callables must resolve both direct and gateway identities.
-${generateActions(ir).trim()}
+${generateActions(ir, plan).trim()}
 ${generateQueries(ir).trim()}
+${generateGrants(ir, false).trim()}
+COMMIT;
+`;
+}
+
+function generateApplicabilityUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.16 -> 0.17 applicability-boundary upgrade.
+-- Run as the same administrative role used for generated installation and migrations.
+BEGIN;
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateSnapshotResolverStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateActions(ir, plan).trim()}
+${generateDecisions(ir, plan).trim()}
 ${generateGrants(ir).trim()}
 COMMIT;
 `;
 }
 
-export function generatePostgres(ir: ModelIR): PostgresOutput {
+export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecisionPlan(ir)): PostgresOutput {
   return {
     "001_roles.sql": generateRoles(),
     "002_schema.sql": generateSchema(ir),
-    "003_actions.sql": generateActions(ir),
+    "003_actions.sql": generateActions(ir, plan),
+    "003_decisions.sql": generateDecisions(ir, plan),
     "003_queries.sql": generateQueries(ir),
     "004_grants.sql": generateGrants(ir),
     "005_seed.sql": generateSeed(ir),
-    "006_upgrade_0_12.sql": generateGatewayUpgrade(ir),
+    "006_upgrade_0_12.sql": generateGatewayUpgrade(ir, plan),
+    "007_upgrade_0_17.sql": generateApplicabilityUpgrade(ir, plan),
   };
 }

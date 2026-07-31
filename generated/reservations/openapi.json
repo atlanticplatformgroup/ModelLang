@@ -20,6 +20,11 @@
           }
         ],
         "x-modellang-operation-id": "action:act_508ad810a19d4b79a5009871de5cd26b",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ExpectedRevision"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -83,16 +88,6 @@
           },
           "403": {
             "description": "The authenticated caller is not authorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelProblem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "A referenced entity does not exist",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -242,8 +237,129 @@
               }
             }
           },
-          "404": {
-            "description": "A referenced entity does not exist",
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b/applicability": {
+      "post": {
+        "operationId": "assess_act_508ad810a19d4b79a5009871de5cd26b",
+        "summary": "Assess reserve",
+        "tags": [
+          "Applicability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "action:act_508ad810a19d4b79a5009871de5cd26b",
+        "x-modellang-grants-authority": false,
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ExpectedRevision"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "startsAt",
+                  "endsAt"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated applicability decision; this grants no authority",
+            "headers": {
+              "ETag": {
+                "description": "Opaque current revision when visibility permits",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicabilityDecision"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -297,6 +413,18 @@
     }
   },
   "components": {
+    "parameters": {
+      "ExpectedRevision": {
+        "name": "If-Match",
+        "in": "header",
+        "required": false,
+        "description": "Explicit opaque revision to compare; it grants no authority.",
+        "schema": {
+          "type": "string",
+          "pattern": "^\"rev:1:[0-9a-f]{32}\"$"
+        }
+      }
+    },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
@@ -409,6 +537,187 @@
             "type": "string"
           }
         }
+      },
+      "ApplicabilityDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "status",
+          "applicable",
+          "authority"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "pattern": "^action:"
+          },
+          "status": {
+            "enum": [
+              "applicable",
+              "denied",
+              "notApplicable",
+              "stale"
+            ]
+          },
+          "applicable": {
+            "type": "boolean"
+          },
+          "authority": {
+            "const": "none"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^rev:1:[0-9a-f]{32}$"
+          },
+          "explanation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "ruleId"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "authorization",
+                  "requirement",
+                  "revision"
+                ]
+              },
+              "ruleId": {
+                "enum": [
+                  "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                  "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                  "revision:action:act_508ad810a19d4b79a5009871de5cd26b"
+                ]
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "applicable"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "applicable": {
+                  "const": true
+                }
+              },
+              "required": [
+                "revision"
+              ],
+              "not": {
+                "required": [
+                  "explanation"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "denied"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "applicable": {
+                  "const": false
+                },
+                "explanation": {
+                  "properties": {
+                    "kind": {
+                      "const": "authorization"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "explanation"
+              ],
+              "not": {
+                "required": [
+                  "revision"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "notApplicable"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "applicable": {
+                  "const": false
+                },
+                "explanation": {
+                  "properties": {
+                    "kind": {
+                      "const": "requirement"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "revision",
+                "explanation"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "stale"
+                }
+              },
+              "required": [
+                "status"
+              ]
+            },
+            "then": {
+              "properties": {
+                "applicable": {
+                  "const": false
+                },
+                "explanation": {
+                  "properties": {
+                    "kind": {
+                      "const": "revision"
+                    }
+                  }
+                }
+              },
+              "required": [
+                "revision",
+                "explanation"
+              ]
+            }
+          }
+        ]
       }
     }
   }

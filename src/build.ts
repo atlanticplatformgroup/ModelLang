@@ -13,6 +13,8 @@ import { generateUiManifest } from "./ui-manifest.js";
 import { generateUi } from "./codegen/ui.js";
 import { generateSemanticManifest } from "./semantic-manifest.js";
 import { generateArtifactProvenance } from "./provenance.js";
+import { generateDecisionPlan } from "./decision-plan.js";
+import { generateCapabilityManifest } from "./capability-manifest.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -20,20 +22,24 @@ export interface GeneratedFiles {
 
 export function generateAll(ir: ModelIR): GeneratedFiles {
   const operationManifest = generateOperationManifest(ir);
+  const decisionPlan = generateDecisionPlan(ir);
+  const capabilityManifest = generateCapabilityManifest(operationManifest, decisionPlan);
   const uiManifest = generateUiManifest(operationManifest);
   const semanticManifest = generateSemanticManifest(ir, operationManifest);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
+    "decisions.json": stableJson(decisionPlan),
+    "capabilities.json": stableJson(capabilityManifest),
     "ui.json": stableJson(uiManifest),
     "semantic.json": stableJson(semanticManifest),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
   };
-  for (const [name, content] of Object.entries(generatePostgres(ir))) files[`postgres/${name}`] = content;
-  for (const [name, content] of Object.entries(generateTypeScript(ir))) files[`typescript/${name}`] = content;
-  Object.assign(files, generateHttp(operationManifest));
+  for (const [name, content] of Object.entries(generatePostgres(ir, decisionPlan))) files[`postgres/${name}`] = content;
+  for (const [name, content] of Object.entries(generateTypeScript(ir, decisionPlan, capabilityManifest))) files[`typescript/${name}`] = content;
+  Object.assign(files, generateHttp(operationManifest, capabilityManifest));
   Object.assign(files, generateUi(operationManifest, uiManifest));
   files["provenance.json"] = stableJson(generateArtifactProvenance(ir, files));
   return files;

@@ -516,6 +516,34 @@
       "objectName": "model_procurement.open_request search_path=pg_catalog,pg_temp"
     },
     {
+      "id": "boundary:action:act_1e35db0451b1461e941af6283d86dca2.applicability",
+      "purpose": "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.",
+      "layer": "PostgreSQL stable function",
+      "artifact": "postgres/003_decisions.sql",
+      "objectName": "model_procurement.decide_act_1e35db0451b1461e941af6283d86dca2",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 59,
+        "column": 1,
+        "endLine": 76,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "revision:action:act_1e35db0451b1461e941af6283d86dca2",
+      "purpose": "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.",
+      "layer": "PostgreSQL action and applicability functions",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.open_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 59,
+        "column": 1,
+        "endLine": 76,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
       "purpose": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
       "layer": "PostgreSQL action guard",
@@ -584,6 +612,34 @@
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.submit_request search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "boundary:action:act_ed2374e822704c51a2925338253d05d2.applicability",
+      "purpose": "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.",
+      "layer": "PostgreSQL stable function",
+      "artifact": "postgres/003_decisions.sql",
+      "objectName": "model_procurement.decide_act_ed2374e822704c51a2925338253d05d2",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 78,
+        "column": 1,
+        "endLine": 88,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "revision:action:act_ed2374e822704c51a2925338253d05d2",
+      "purpose": "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.",
+      "layer": "PostgreSQL action and applicability functions",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.submit_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 78,
+        "column": 1,
+        "endLine": 88,
+        "endColumn": 2
+      }
     },
     {
       "id": "authorize:action:act_ed2374e822704c51a2925338253d05d2",
@@ -661,6 +717,34 @@
       "layer": "PostgreSQL function configuration",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request search_path=pg_catalog,pg_temp"
+    },
+    {
+      "id": "boundary:action:act_d39dbb883b5f4019b9027b85add3de47.applicability",
+      "purpose": "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.",
+      "layer": "PostgreSQL stable function",
+      "artifact": "postgres/003_decisions.sql",
+      "objectName": "model_procurement.decide_act_d39dbb883b5f4019b9027b85add3de47",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 90,
+        "column": 1,
+        "endLine": 110,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "revision:action:act_d39dbb883b5f4019b9027b85add3de47",
+      "purpose": "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.",
+      "layer": "PostgreSQL action and applicability functions",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement.approve_request",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 90,
+        "column": 1,
+        "endLine": 110,
+        "endColumn": 2
+      }
     },
     {
       "id": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",

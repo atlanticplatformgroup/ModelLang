@@ -20,6 +20,14 @@ const purchaseRequest = {
   approvedBy: null,
   approvedByRoles: null,
 };
+const applicableDecision = {
+  operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+  status: "applicable",
+  applicable: true,
+  authority: "none",
+  revision: "rev:1:0123456789abcdef0123456789abcdef",
+} as const;
+const assess = async () => applicableDecision;
 
 function request(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request(openRoute, {
@@ -36,7 +44,7 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
 describe("generated HTTP boundary", () => {
   it("authenticates context and passes only validated callable input to the stable operation ID", async () => {
     const execute = vi.fn(async () => purchaseRequest);
-    const executor: ProcurementOperationExecutor = { execute };
+    const executor: ProcurementOperationExecutor = { execute, assess };
     const authenticate = vi.fn(async () => executor);
     const handler = createProcurementHttpHandler(authenticate);
 
@@ -48,12 +56,50 @@ describe("generated HTTP boundary", () => {
     expect(execute).toHaveBeenCalledWith(
       "action:act_1e35db0451b1461e941af6283d86dca2",
       { amount: { currency: "USD", amount: "10.00" } },
+      { expectedRevision: undefined },
     );
+  });
+
+  it("keeps applicability separate, authenticated, revision-aware, and non-authoritative", async () => {
+    const assessOperation = vi.fn(async () => applicableDecision);
+    const handler = createProcurementHttpHandler(async () => ({
+      execute: async () => purchaseRequest,
+      assess: assessOperation,
+    }));
+    const requests: Request[] = [];
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: (input, init) => {
+        const incoming = new Request(input, init);
+        requests.push(incoming.clone());
+        return handler(incoming);
+      },
+    });
+    const decision = await client.assessOpenRequest(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { expectedRevision: applicableDecision.revision },
+    );
+    expect(decision).toEqual(applicableDecision);
+    expect(decision.authority).toBe("none");
+    expect(requests[0]!.url).toBe(`${openRoute}/applicability`);
+    expect(requests[0]!.headers.get("if-match")).toBe(`"${applicableDecision.revision}"`);
+    expect(assessOperation).toHaveBeenCalledWith(
+      applicableDecision.operationId,
+      { amount: { currency: "USD", amount: "10.00" } },
+      { expectedRevision: applicableDecision.revision },
+    );
+
+    const malformed = await handler(request(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { "if-match": applicableDecision.revision },
+    ));
+    expect(malformed.status).toBe(400);
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {
     const execute = vi.fn();
-    const authenticate = vi.fn(async () => ({ execute } satisfies ProcurementOperationExecutor));
+    const authenticate = vi.fn(async () => ({ execute, assess } satisfies ProcurementOperationExecutor));
     const handler = createProcurementHttpHandler(authenticate, { maxBodyBytes: 100 });
 
     const unauthenticated = await handler(new Request(openRoute, {
@@ -92,6 +138,7 @@ describe("generated HTTP boundary", () => {
       async execute() {
         throw new AuthorizationError("raw backend detail", "42501", ruleId, new Error("secret SQL"));
       },
+      assess,
     }));
     const client = new ProcurementHttpClient({
       baseUrl: "https://example.test",
@@ -111,6 +158,7 @@ describe("generated HTTP boundary", () => {
       async execute() {
         throw new Error("password=do-not-expose");
       },
+      assess,
     }));
     const unexpected = await unexpectedHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
     expect(unexpected.status).toBe(500);
@@ -125,6 +173,7 @@ describe("generated HTTP boundary", () => {
       async execute() {
         return { ...purchaseRequest, databaseSecret: "do-not-expose" };
       },
+      assess,
     }));
     const malformedOutput = await malformedOutputHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
     expect(malformedOutput.status).toBe(500);

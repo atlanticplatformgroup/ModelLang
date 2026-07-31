@@ -17,7 +17,7 @@ import {
   ProcurementUiManifest,
 } from "../../generated/procurement/typescript/ui.js";
 import {
-  AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
+  AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, StaleError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
 import {
   databaseUrl, installDemoDatabase, loginUrl, poolFor,
@@ -275,11 +275,73 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     `);
     expect(functions.rows).toEqual([
       expect.objectContaining({ proname: "approve_request", pronargs: 1 }),
+      expect.objectContaining({ proname: "decide_act_1e35db0451b1461e941af6283d86dca2", pronargs: 2 }),
+      expect.objectContaining({ proname: "decide_act_d39dbb883b5f4019b9027b85add3de47", pronargs: 2 }),
+      expect.objectContaining({ proname: "decide_act_ed2374e822704c51a2925338253d05d2", pronargs: 2 }),
       expect.objectContaining({ proname: "my_requests", pronargs: 0 }),
       expect.objectContaining({ proname: "open_request", pronargs: 1 }),
       expect.objectContaining({ proname: "submit_request", pronargs: 1 }),
     ]);
     expect(functions.rows.map((row) => row.args).join(" ")).not.toMatch(/actor|principal/i);
+  });
+
+  it("separates authenticated applicability from execution without leaking entity existence", async () => {
+    const auditBefore = await admin.query<{ count: string }>("SELECT count(*)::text AS count FROM model_procurement_internal.action_audit");
+    const impossibleOpen = await clients.employeeOne.assessOpenRequest({ amount: usd("0") });
+    expect(impossibleOpen).toMatchObject({
+      operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+      status: "notApplicable",
+      applicable: false,
+      authority: "none",
+      revision: expect.stringMatching(/^rev:1:[0-9a-f]{32}$/),
+      explanation: {
+        kind: "requirement",
+        ruleId: "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount",
+      },
+    });
+
+    const own = await clients.manager.openRequest({ amount: usd("100") });
+    await clients.manager.submitRequest({ request: own.id });
+    const invisible = await clients.manager.assessApproveRequest({ request: randomUUID() });
+    const unauthorized = await clients.manager.assessApproveRequest({ request: own.id });
+    expect(invisible).toEqual(unauthorized);
+    expect(invisible).toEqual({
+      operationId: "action:act_d39dbb883b5f4019b9027b85add3de47",
+      status: "denied",
+      applicable: false,
+      authority: "none",
+      explanation: {
+        kind: "authorization",
+        ruleId: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+      },
+    });
+    const auditAfter = await admin.query<{ count: string }>("SELECT count(*)::text AS count FROM model_procurement_internal.action_audit");
+    expect(Number(auditAfter.rows[0]!.count) - Number(auditBefore.rows[0]!.count)).toBe(2);
+  });
+
+  it("uses explicit revisions only to report stale state and re-evaluates inside execution", async () => {
+    const opened = await clients.employeeOne.openRequest({ amount: usd("25") });
+    const decision = await clients.employeeOne.assessSubmitRequest({ request: opened.id });
+    expect(decision).toMatchObject({ status: "applicable", applicable: true, authority: "none" });
+    expect(decision.revision).toMatch(/^rev:1:[0-9a-f]{32}$/);
+
+    await admin.query("UPDATE model_procurement.purchase_request SET amount = amount WHERE id = $1", [opened.id]);
+    await expect(clients.employeeOne.submitRequest(
+      { request: opened.id },
+      { expectedRevision: decision.revision },
+    )).rejects.toMatchObject({ name: StaleError.name, ruleId: "revision:action:act_ed2374e822704c51a2925338253d05d2" });
+
+    const stale = await clients.employeeOne.assessSubmitRequest(
+      { request: opened.id },
+      { expectedRevision: decision.revision },
+    );
+    expect(stale).toMatchObject({
+      status: "stale",
+      applicable: false,
+      authority: "none",
+      explanation: { kind: "revision", ruleId: "revision:action:act_ed2374e822704c51a2925338253d05d2" },
+    });
+    await expect(clients.employeeOne.submitRequest({ request: opened.id })).resolves.toMatchObject({ status: "SUBMITTED" });
   });
 
   it("reapplies the transactional 0.12 backend upgrade without changing model data or history", async () => {
@@ -302,6 +364,27 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the transactional 0.17 applicability upgrade without changing model data or history", async () => {
+    const before = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/007_upgrade_0_17.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+    await expect(clients.employeeOne.assessOpenRequest({ amount: usd("10") }))
+      .resolves.toMatchObject({ status: "applicable", authority: "none" });
   });
 
   it("denies direct mutation, internal access, and owner role assumption", async () => {
@@ -541,8 +624,17 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       expect(low.requester).toBe("00000000-0000-4000-8000-000000000001");
       const workflow = ProcurementUiManifest.workflows[0]!;
       const submit = employeeWorkflow.available(workflow.workflowId, low.status)[0]!;
-      const submitted = await employeeWorkflow.executeTransition(submit.transitionId, low.id, {});
+      const submitDecision = await employeeWorkflow.assessTransition(submit.transitionId, low.id, {});
+      expect(submitDecision).toMatchObject({ status: "applicable", authority: "none" });
+      const submitted = await employeeWorkflow.executeTransition(
+        submit.transitionId,
+        low.id,
+        {},
+        { expectedRevision: submitDecision.revision },
+      );
       const approve = managerWorkflow.available(workflow.workflowId, submitted.status)[0]!;
+      expect(await managerWorkflow.assessTransition(approve.transitionId, low.id, {}))
+        .toMatchObject({ status: "applicable", authority: "none" });
       const approved = await managerWorkflow.executeTransition(approve.transitionId, low.id, {});
       expect(approved).toMatchObject({
         status: "APPROVED",
@@ -553,6 +645,10 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const highSubmit = employeeWorkflow.available(workflow.workflowId, high.status)[0]!;
       const highSubmitted = await employeeWorkflow.executeTransition(highSubmit.transitionId, high.id, {});
       const highApprove = managerWorkflow.available(workflow.workflowId, highSubmitted.status)[0]!;
+      expect(await managerWorkflow.assessTransition(highApprove.transitionId, high.id, {}))
+        .toMatchObject({ status: "denied", authority: "none" });
+      expect(await financeWorkflow.assessTransition(highApprove.transitionId, high.id, {}))
+        .toMatchObject({ status: "applicable", authority: "none" });
       await expect(managerWorkflow.executeTransition(highApprove.transitionId, high.id, {}))
         .rejects.toBeInstanceOf(AuthorizationError);
       expect((await financeWorkflow.executeTransition(highApprove.transitionId, high.id, {})).status).toBe("APPROVED");

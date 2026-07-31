@@ -250,7 +250,6 @@
         "identityBinding",
         "authorization",
         "precondition",
-        "notFound",
         "transition",
         "invariant"
       ]
@@ -283,7 +282,6 @@
         "identityBinding",
         "authorization",
         "precondition",
-        "notFound",
         "transition",
         "invariant"
       ]

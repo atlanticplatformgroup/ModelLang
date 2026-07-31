@@ -194,7 +194,6 @@
         "identityBinding",
         "authorization",
         "precondition",
-        "notFound",
         "invariant",
         "conflict"
       ]
@@ -226,8 +225,7 @@
       },
       "errors": [
         "identityBinding",
-        "authorization",
-        "notFound"
+        "authorization"
       ]
     }
   ],
