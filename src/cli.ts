@@ -10,12 +10,14 @@ import type { ModelIR } from "./ir.js";
 import { validateIR } from "./validate-ir.js";
 import { assignStableIds } from "./stable-ids.js";
 import { planMigration } from "./migrations.js";
+import { semanticDiff } from "./semantic-diff.js";
 
 function usage(): never {
   process.stderr.write(`Usage:
   modelc <check|build|print-ir|explain> <file> [--out <directory>] [--debug]
   modelc assign-ids <file>
   modelc migration <previous-ir.json> <current.model> --out <migration.sql>
+  modelc semantic-diff <previous-ir.json> <current.model> --out <semantic-diff.json>
 `);
   process.exit(2);
 }
@@ -31,7 +33,7 @@ async function main(): Promise<void> {
     process.stdout.write(`${assigned.assigned > 0 ? `Assigned ${assigned.assigned} stable IDs` : "All stable IDs already assigned"} in ${file}\n`);
     return;
   }
-  if (command === "migration") {
+  if (command === "migration" || command === "semantic-diff") {
     const currentArg = rest[0];
     const outIndex = rest.indexOf("--out");
     if (!currentArg || outIndex < 0 || !rest[outIndex + 1]) usage();
@@ -39,10 +41,16 @@ async function main(): Promise<void> {
     const previous = JSON.parse(await readFile(previousFile, "utf8")) as ModelIR;
     validateIR(previous);
     const current = await compileFile(resolve(currentArg));
-    const plan = planMigration(previous, current);
     const out = resolve(rest[outIndex + 1]!);
-    await writeFile(out, plan.sql, "utf8");
-    process.stdout.write(`Generated ${plan.operations.length} migration operation${plan.operations.length === 1 ? "" : "s"} into ${out}\n`);
+    if (command === "semantic-diff") {
+      const report = semanticDiff(previous, current);
+      await writeFile(out, stableJson(report), "utf8");
+      process.stdout.write(`Generated ${report.changes.length} semantic change${report.changes.length === 1 ? "" : "s"} into ${out}\n`);
+    } else {
+      const plan = planMigration(previous, current);
+      await writeFile(out, plan.sql, "utf8");
+      process.stdout.write(`Generated ${plan.operations.length} migration operation${plan.operations.length === 1 ? "" : "s"} into ${out}\n`);
+    }
     return;
   }
   if (!["check", "build", "print-ir", "explain"].includes(command)) usage();

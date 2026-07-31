@@ -1,0 +1,98 @@
+import { readFile } from "node:fs/promises";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import { describe, expect, it } from "vitest";
+import { compileText } from "../src/compiler.js";
+import { semanticDiff } from "../src/semantic-diff.js";
+
+const ids = {
+  user: "ent_11111111111111111111111111111111",
+  userId: "fld_11111111111111111111111111111111",
+  record: "ent_22222222222222222222222222222222",
+  recordId: "fld_22222222222222222222222222222222",
+  owner: "fld_33333333333333333333333333333333",
+  value: "fld_44444444444444444444444444444444",
+  note: "fld_55555555555555555555555555555555",
+  create: "act_11111111111111111111111111111111",
+  query: "qry_11111111111111111111111111111111",
+};
+
+function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean }): string {
+  return `model SemanticChange version "${options.version}";
+entity User @stableId("${ids.user}") {
+  id: UUID @id @stableId("${ids.userId}");
+}
+entity Record @stableId("${ids.record}") {
+  id: UUID @id @stableId("${ids.recordId}");
+  owner: User @stableId("${ids.owner}");
+  value: String @stableId("${ids.value}");
+  ${options.note ? `note: String? @stableId("${ids.note}");` : ""}
+}
+action ${options.actionName ?? "createRecord"} @stableId("${ids.create}")(
+  caller actor: User,
+  id: UUID,
+  value: String
+) -> Record {
+  authorize ${options.authorize ?? "false"};
+  ${options.precondition ?? ""}
+  create Record { id = id; owner = actor; value = value; ${options.assignNote ? "note = value;" : ""} }
+}
+query records @stableId("${ids.query}")(
+  caller actor: User
+) from Record as row {
+  authorize true;
+  where ${options.where ?? "row.owner == actor"};
+  orderBy row.id asc;
+  limit 10;
+}`;
+}
+
+describe("semantic change analysis", () => {
+  it("classifies identity, authority, validation, visibility, and structural changes without claiming migration safety", async () => {
+    const previous = compileText(model({ version: "1" }), "previous.model");
+    const current = compileText(model({
+      version: "2",
+      actionName: "openRecord",
+      authorize: "true",
+      precondition: 'require has_value: value != "";',
+      where: "true",
+      note: true,
+    }), "current.model");
+    const report = semanticDiff(previous, current);
+    const schema = JSON.parse(await readFile("schemas/semantic-diff.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
+    expect(report).toMatchObject({
+      diffVersion: 1,
+      compilerVersion: "0.15.0",
+      irVersion: 9,
+      migrationAuthority: "separateSafeMigrationPlanner",
+    });
+    expect(report.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "declarationAdded", area: "structure", classification: "additive" }),
+      expect.objectContaining({ kind: "identityPreservingRename", area: "identity", classification: "additive" }),
+      expect.objectContaining({ kind: "authorizationChanged", area: "authorization", classification: "expansive" }),
+      expect.objectContaining({ kind: "preconditionAdded", area: "validation", classification: "restrictive" }),
+      expect.objectContaining({ kind: "rowVisibilityChanged", area: "queryVisibility", classification: "expansive" }),
+    ]));
+    expect(report.summary).toEqual({ additive: 2, restrictive: 1, expansive: 2, breaking: 0, review: 0 });
+  });
+
+  it("reports removal and effect changes for review instead of stopping at the first unsafe change", () => {
+    const previous = compileText(model({ version: "1", note: true, assignNote: true }), "previous.model");
+    const current = compileText(model({ version: "2" }), "current.model");
+    const report = semanticDiff(previous, current);
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "declarationRemoved",
+      area: "structure",
+      classification: "breaking",
+      persistenceRisk: true,
+    }));
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "effectChanged",
+      area: "effect",
+      classification: "review",
+    }));
+    expect(report.summary.breaking).toBe(1);
+    expect(report.summary.review).toBe(1);
+  });
+});

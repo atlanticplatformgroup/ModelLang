@@ -1,6 +1,6 @@
-# ModelLang 0.14 reference compiler
+# ModelLang 0.15 reference compiler
 
-ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, a framework-neutral UI manifest, OpenAPI, a browser-safe HTTP client and typed UI/workflow executors, an authenticated server handler, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a workflow-aware transport-neutral operation manifest, a trusted engineering semantic manifest, a framework-neutral UI manifest, deterministic artifact provenance, OpenAPI, a browser-safe HTTP client and typed UI/workflow executors, an authenticated server handler, guarded additive schema evolution, stable-ID-aware semantic change reports, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -47,6 +47,7 @@ npx tsx src/cli.ts print-ir examples/procurement.model
 npx tsx src/cli.ts explain examples/procurement.model
 npx tsx src/cli.ts assign-ids examples/procurement.model
 npx tsx src/cli.ts migration previous-model.ir.json examples/procurement.model --out migration.sql
+npx tsx src/cli.ts semantic-diff previous-model.ir.json examples/procurement.model --out semantic-diff.json
 ```
 
 After `npm run build`, the executable is available as:
@@ -59,11 +60,15 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.14 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.15 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v2 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, and stable workflow/transition/action/target bindings. It contains no HTTP paths, SQL names, database roles, connection details, PostgreSQL types, or UI concepts. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
+`semantic.json` is engineering semantic manifest v1. It exposes the static semantics already present in IR9: normalized authorization, precondition, and row-policy expressions; stable fact dependencies; read and lock sets; explicit effect assignments; linked invariants and exclusions; workflow transitions; failure classes; and source spans. It is deliberately marked unfiltered, current-state-free, and non-executable. It is not a browser artifact, an authorization decision, an agent capability view, or a preflight response.
+
 `ui.json` is UI manifest v2 derived exclusively from operation manifest v2. It describes action fields, query filters and result tables, entity fields, enum options, workflow states and transitions, typed presentation hints, declared errors, query bounds, and humanized default labels. Stable semantic IDs are its binding keys. It is deliberately framework-neutral and does not claim caller authorization, invent entity option sources, or prescribe components.
+
+`provenance.json` records compiler version, generator profile, model and IR identity, and the role and SHA-256 content hash of every other generated artifact. It omits wall-clock timestamps and its own recursive hash, so identical compilation inputs remain byte-for-byte deterministic.
 
 The PostgreSQL backend emits:
 
@@ -214,6 +219,8 @@ The ID is semantic identity; the name is an editable source, API, and physical l
 
 The migration command compares a released IR with current source exclusively by ID. ModelLang 0.10 plans new enums and members, new entities, nullable or default-backed fields, actions, queries, workflows, and workflow transitions. It also retains transactional renames for tables, columns, invariant constraints, temporal-exclusion constraints, and action/query functions.
 
+The separate `semantic-diff` command is non-mutating and broader than migration planning. It reports all detected identity, structure, validation, authorization, query-visibility, lifecycle, effect, and persistence changes as additive, restrictive, expansive, breaking, or requiring review. It deliberately leaves migration authority with the guarded safe-migration planner and marks predicate changes as review when logical implication cannot be proven.
+
 Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
 
 For an existing 0.11 database that is not otherwise receiving a model migration, apply the generated 0.12 backend upgrade with the same administrative credential used for installation:
@@ -299,7 +306,7 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, additive migration planning and live row preservation, baseline-history rejection, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, operation/UI manifest schemas, workflow availability and target binding, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
+The full suite validates parsing and spans, additive migration planning and live row preservation, baseline-history rejection, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, operation/UI/semantic/provenance schemas, semantic change classification, workflow availability and target binding, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, artifact hashes, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
@@ -313,6 +320,7 @@ The full suite validates parsing and spans, additive migration planning and live
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
 - The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, retries, idempotency keys, package publication, deployment, and observability to the host.
 - UI manifest v2 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, pagination controls, optimistic concurrency, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
+- Engineering semantic manifest v1 is intentionally a trusted static artifact, not an authorization-filtered capability view. Applicability, decision explanations, freshness, idempotency, recovery, events, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.14 language is in [spec/0.14/LANGUAGE.md](./spec/0.14/LANGUAGE.md), with its [workflow application semantics](./spec/0.14/WORKFLOW_APPLICATIONS.md), [conformance requirements](./spec/0.14/CONFORMANCE.md), and [unstable boundaries](./spec/0.14/UNSTABLE.md). The [0.13 UI manifest](./spec/0.13/UI_MANIFEST.md), [0.12 gateway identity profile](./spec/0.12/GATEWAY_IDENTITY.md), [0.11 transport](./spec/0.11/TRANSPORT.md), and [0.10 safe evolution rules](./spec/0.10/SAFE_EVOLUTION.md) remain normative where 0.14 does not replace them. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.15 language is in [spec/0.15/LANGUAGE.md](./spec/0.15/LANGUAGE.md), with its [semantic closure, provenance, and change-analysis contract](./spec/0.15/SEMANTIC_CLOSURE.md), [conformance requirements](./spec/0.15/CONFORMANCE.md), and [unstable boundaries](./spec/0.15/UNSTABLE.md). The [0.14 workflow application boundary](./spec/0.14/WORKFLOW_APPLICATIONS.md), [0.13 UI manifest](./spec/0.13/UI_MANIFEST.md), [0.12 gateway identity profile](./spec/0.12/GATEWAY_IDENTITY.md), [0.11 transport](./spec/0.11/TRANSPORT.md), and [0.10 safe evolution rules](./spec/0.10/SAFE_EVOLUTION.md) remain normative where 0.15 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

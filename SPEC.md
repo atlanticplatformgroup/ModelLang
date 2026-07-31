@@ -1,7 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.14](./spec/0.14/LANGUAGE.md). It retains the 0.13 UI boundary and adds workflow-aware operation/UI manifests plus typed browser transition helpers.
+The current normative specification is [ModelLang 0.15](./spec/0.15/LANGUAGE.md). It retains the complete 0.14 application boundary and adds trusted engineering semantic closure, deterministic artifact provenance, and stable-ID-aware semantic change reports without changing public operation/UI contracts or enforcement.
 
+- [Semantic closure, provenance, and change-analysis semantics](./spec/0.15/SEMANTIC_CLOSURE.md)
+- [0.15 unchanged grammar statement](./spec/0.15/GRAMMAR.ebnf)
+- [0.15 conformance requirements](./spec/0.15/CONFORMANCE.md)
+- [0.15 unstable semantic boundaries](./spec/0.15/UNSTABLE.md)
 - [Workflow application-boundary semantics](./spec/0.14/WORKFLOW_APPLICATIONS.md)
 - [0.14 unchanged grammar statement](./spec/0.14/GRAMMAR.ebnf)
 - [0.14 conformance requirements](./spec/0.14/CONFORMANCE.md)
@@ -15,4 +19,5 @@ The current normative specification is [ModelLang 0.14](./spec/0.14/LANGUAGE.md)
 - [Generated-value and immutability semantics inherited from 0.7](./spec/0.7/GENERATED_VALUES.md)
 - [Declaration identity and rename semantics inherited from 0.6](./spec/0.6/DECLARATION_IDENTITY.md)
 - [Entity and field identity semantics inherited from 0.5](./spec/0.5/IDENTITY_AND_MIGRATIONS.md)
+- [Repository edition of The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md)
 - [Archived 0.1 proof-of-concept specification](./ModelLang_PoC_Spec_Revision_2.md)

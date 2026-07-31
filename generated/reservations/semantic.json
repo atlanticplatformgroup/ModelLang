@@ -1,0 +1,342 @@
+{
+  "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
+  "manifestVersion": 1,
+  "profile": "sml-transactional-core/1",
+  "audience": "engineering",
+  "view": {
+    "authorizationFiltered": false,
+    "currentState": false,
+    "executable": false
+  },
+  "provenance": {
+    "compilerVersion": "0.15.0",
+    "irVersion": 9,
+    "generator": "semantic-manifest"
+  },
+  "model": {
+    "id": "model:Reservations",
+    "name": "Reservations",
+    "version": "0.10.0",
+    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215",
+    "sourceFile": "examples/reservations.model"
+  },
+  "principal": {
+    "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+    "binding": "authenticatedContext",
+    "requestSupplied": false
+  },
+  "actions": [
+    {
+      "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
+      "name": "reserve",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 25,
+        "column": 1,
+        "endLine": 40,
+        "endColumn": 2
+      },
+      "caller": {
+        "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+        "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+        "source": "authenticatedContext"
+      },
+      "input": [
+        {
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "name": "resource",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+          }
+        },
+        {
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+          "name": "startsAt",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          }
+        },
+        {
+          "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
+          "name": "endsAt",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          }
+        }
+      ],
+      "output": {
+        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "cardinality": "one"
+      },
+      "authorization": {
+        "id": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "source": {
+          "file": "examples/reservations.model",
+          "line": 31,
+          "column": 13,
+          "endLine": 31,
+          "endColumn": 17
+        },
+        "dependencies": []
+      },
+      "preconditions": [
+        {
+          "id": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+          "name": "valid_interval",
+          "expression": {
+            "kind": "binary",
+            "operator": "<",
+            "left": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+              "name": "startsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "right": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
+              "name": "endsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "(startsAt < endsAt)",
+          "source": {
+            "file": "examples/reservations.model",
+            "line": 32,
+            "column": 3,
+            "endLine": 32,
+            "endColumn": 45
+          },
+          "dependencies": [
+            {
+              "kind": "parameter",
+              "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt"
+            },
+            {
+              "kind": "parameter",
+              "id": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt"
+            }
+          ]
+        }
+      ],
+      "readSet": {
+        "entityIds": [
+          "entity:ent_7cb2307972954d83a6f344764faaae39",
+          "entity:ent_82878bde58d948d4a84d85d01279e01d"
+        ],
+        "fieldIds": []
+      },
+      "lockPlan": [
+        {
+          "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+          "mode": "share",
+          "order": 0
+        },
+        {
+          "id": "lock:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+          "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+          "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+          "mode": "share",
+          "order": 1
+        }
+      ],
+      "effect": {
+        "kind": "create",
+        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "assignments": [
+          {
+            "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+            "expression": {
+              "kind": "entityValue",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource",
+              "name": "resource",
+              "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "nullable": false
+            }
+          },
+          {
+            "fieldId": "field:fld_8380b65e5a2a4c399a2743cee1a3a93a",
+            "expression": {
+              "kind": "entityValue",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
+              "name": "actor",
+              "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+              "type": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+              "nullable": false
+            }
+          },
+          {
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+            "expression": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt",
+              "name": "startsAt",
+              "type": "DateTime",
+              "nullable": false
+            }
+          },
+          {
+            "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+            "expression": {
+              "kind": "parameter",
+              "parameterId": "parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt",
+              "name": "endsAt",
+              "type": "DateTime",
+              "nullable": false
+            }
+          }
+        ]
+      },
+      "postconditions": {
+        "invariantIds": [],
+        "temporalExclusionIds": [
+          "exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba"
+        ]
+      },
+      "workflowTransitionIds": [],
+      "failureClasses": [
+        "identityBinding",
+        "authorization",
+        "precondition",
+        "notFound",
+        "invariant",
+        "conflict"
+      ]
+    }
+  ],
+  "queries": [
+    {
+      "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "name": "reservationsForResource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 42,
+        "column": 1,
+        "endLine": 50,
+        "endColumn": 2
+      },
+      "caller": {
+        "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
+        "entityId": "entity:ent_82878bde58d948d4a84d85d01279e01d",
+        "source": "authenticatedContext"
+      },
+      "input": [
+        {
+          "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
+          "name": "resource",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+          }
+        }
+      ],
+      "output": {
+        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "cardinality": "many",
+        "maxItems": 100
+      },
+      "authorization": {
+        "id": "authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "source": {
+          "file": "examples/reservations.model",
+          "line": 46,
+          "column": 13,
+          "endLine": 46,
+          "endColumn": 17
+        },
+        "dependencies": []
+      },
+      "rowPolicy": {
+        "id": "where:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "name": "where",
+        "expression": {
+          "kind": "binary",
+          "operator": "==",
+          "left": {
+            "kind": "fieldAccess",
+            "source": "queryRow",
+            "parameter": "reservation",
+            "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+            "fieldName": "resource",
+            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
+            "nullable": false
+          },
+          "right": {
+            "kind": "entityValue",
+            "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
+            "name": "resource",
+            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
+            "nullable": false
+          },
+          "type": "Boolean",
+          "nullable": false,
+          "comparisonSemantics": "entityIdentity"
+        },
+        "sourceExpression": "(reservation.resource == resource)",
+        "source": {
+          "file": "examples/reservations.model",
+          "line": 47,
+          "column": 9,
+          "endLine": 47,
+          "endColumn": 41
+        },
+        "dependencies": [
+          {
+            "kind": "field",
+            "id": "field:fld_8df4f409794e4c66acdbb162b6063d57"
+          },
+          {
+            "kind": "parameter",
+            "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource"
+          }
+        ]
+      },
+      "readSet": {
+        "entityIds": [
+          "entity:ent_7cb2307972954d83a6f344764faaae39",
+          "entity:ent_ba2d028e915841d1ab90adfa40d38404"
+        ],
+        "fieldIds": [
+          "field:fld_8df4f409794e4c66acdbb162b6063d57"
+        ]
+      },
+      "orderBy": {
+        "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+        "direction": "asc",
+        "identityTieBreaker": true
+      },
+      "failureClasses": [
+        "identityBinding",
+        "authorization",
+        "notFound"
+      ]
+    }
+  ]
+}

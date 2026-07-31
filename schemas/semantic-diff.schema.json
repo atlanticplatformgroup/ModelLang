@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/semantic-diff.schema.json",
+  "title": "ModelLang semantic diff",
+  "$defs": {
+    "model": {
+      "type": "object",
+      "required": ["modelId", "version", "sourceHash"],
+      "properties": {
+        "modelId": { "type": "string", "pattern": "^model:" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "classification": {
+      "enum": ["additive", "restrictive", "expansive", "breaking", "review"]
+    }
+  },
+  "type": "object",
+  "required": [
+    "$schema", "diffVersion", "compilerVersion", "irVersion", "previous", "current",
+    "changes", "summary", "migrationAuthority"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/semantic-diff.schema.json" },
+    "diffVersion": { "const": 1 },
+    "compilerVersion": { "type": "string" },
+    "irVersion": { "const": 9 },
+    "previous": { "$ref": "#/$defs/model" },
+    "current": { "$ref": "#/$defs/model" },
+    "changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind", "area", "classification", "subject", "persistenceRisk", "explanation"
+        ],
+        "properties": {
+          "kind": { "type": "string" },
+          "area": {
+            "enum": [
+              "identity", "structure", "validation", "authorization", "queryVisibility",
+              "lifecycle", "effect", "persistence"
+            ]
+          },
+          "classification": { "$ref": "#/$defs/classification" },
+          "subject": {
+            "type": "object",
+            "required": ["kind", "id", "name"],
+            "properties": {
+              "kind": { "type": "string" },
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "before": { "type": "string" },
+          "after": { "type": "string" },
+          "persistenceRisk": { "type": "boolean" },
+          "explanation": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["additive", "restrictive", "expansive", "breaking", "review"],
+      "properties": {
+        "additive": { "type": "integer", "minimum": 0 },
+        "restrictive": { "type": "integer", "minimum": 0 },
+        "expansive": { "type": "integer", "minimum": 0 },
+        "breaking": { "type": "integer", "minimum": 0 },
+        "review": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "migrationAuthority": { "const": "separateSafeMigrationPlanner" }
+  },
+  "additionalProperties": false
+}

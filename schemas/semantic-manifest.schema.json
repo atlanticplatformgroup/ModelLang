@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/semantic-manifest.schema.json",
+  "title": "ModelLang engineering semantic manifest",
+  "$defs": {
+    "span": {
+      "type": "object",
+      "required": ["file", "line", "column", "endLine", "endColumn"],
+      "properties": {
+        "file": { "type": "string" },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 1 },
+        "endLine": { "type": "integer", "minimum": 1 },
+        "endColumn": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "expression": {
+      "type": "object",
+      "required": ["kind", "type", "nullable"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "literal", "moneyLiteral", "nullLiteral", "parameter", "entityValue",
+            "fieldAccess", "enumLiteral", "unary", "binary", "nullComparison"
+          ]
+        },
+        "type": { "type": "string" },
+        "nullable": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "dependency": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["parameter", "field", "enumMember"] },
+        "id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "rule": {
+      "type": "object",
+      "required": ["id", "name", "expression", "sourceExpression", "source", "dependencies"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "expression": { "$ref": "#/$defs/expression" },
+        "sourceExpression": { "type": "string" },
+        "source": { "$ref": "#/$defs/span" },
+        "dependencies": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/dependency" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^parameter:" },
+        "name": { "type": "string" },
+        "type": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "caller": {
+      "type": "object",
+      "required": ["parameterId", "entityId", "source"],
+      "properties": {
+        "parameterId": { "type": "string", "pattern": "^parameter:" },
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "source": { "const": "authenticatedContext" }
+      },
+      "additionalProperties": false
+    },
+    "readSet": {
+      "type": "object",
+      "required": ["entityIds", "fieldIds"],
+      "properties": {
+        "entityIds": { "type": "array", "items": { "type": "string", "pattern": "^entity:" } },
+        "fieldIds": { "type": "array", "items": { "type": "string", "pattern": "^field:" } }
+      },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "identityBinding", "authorization", "precondition", "transition", "invariant",
+          "conflict", "notFound", "validation"
+        ]
+      }
+    }
+  },
+  "type": "object",
+  "required": [
+    "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
+    "model", "principal", "actions", "queries"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
+    "manifestVersion": { "const": 1 },
+    "profile": { "const": "sml-transactional-core/1" },
+    "audience": { "const": "engineering" },
+    "view": {
+      "type": "object",
+      "required": ["authorizationFiltered", "currentState", "executable"],
+      "properties": {
+        "authorizationFiltered": { "const": false },
+        "currentState": { "const": false },
+        "executable": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["compilerVersion", "irVersion", "generator"],
+      "properties": {
+        "compilerVersion": { "type": "string" },
+        "irVersion": { "const": 9 },
+        "generator": { "const": "semantic-manifest" }
+      },
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash", "sourceFile"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "sourceFile": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "principal": {
+      "type": "object",
+      "required": ["entityId", "binding", "requestSupplied"],
+      "properties": {
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "binding": { "const": "authenticatedContext" },
+        "requestSupplied": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "name", "source", "caller", "input", "output", "authorization",
+          "preconditions", "readSet", "lockPlan", "effect", "postconditions",
+          "workflowTransitionIds", "failureClasses"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^action:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "caller": { "$ref": "#/$defs/caller" },
+          "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+          "output": {
+            "type": "object",
+            "required": ["entityId", "cardinality"],
+            "properties": {
+              "entityId": { "type": "string", "pattern": "^entity:" },
+              "cardinality": { "const": "one" }
+            },
+            "additionalProperties": false
+          },
+          "authorization": { "$ref": "#/$defs/rule" },
+          "preconditions": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+          "readSet": { "$ref": "#/$defs/readSet" },
+          "lockPlan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "entityId", "mode", "order"],
+              "properties": {
+                "id": { "type": "string" },
+                "entityId": { "type": "string", "pattern": "^entity:" },
+                "parameterId": { "type": "string", "pattern": "^parameter:" },
+                "mode": { "enum": ["share", "update"] },
+                "order": { "type": "integer", "minimum": 0 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "effect": {
+            "type": "object",
+            "required": ["kind", "entityId", "assignments"],
+            "properties": {
+              "kind": { "enum": ["create", "update"] },
+              "entityId": { "type": "string", "pattern": "^entity:" },
+              "targetParameterId": { "type": "string", "pattern": "^parameter:" },
+              "assignments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["fieldId", "expression"],
+                  "properties": {
+                    "fieldId": { "type": "string", "pattern": "^field:" },
+                    "expression": { "$ref": "#/$defs/expression" }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "postconditions": {
+            "type": "object",
+            "required": ["invariantIds", "temporalExclusionIds"],
+            "properties": {
+              "invariantIds": { "type": "array", "items": { "type": "string", "pattern": "^invariant:" } },
+              "temporalExclusionIds": { "type": "array", "items": { "type": "string", "pattern": "^exclusion:" } }
+            },
+            "additionalProperties": false
+          },
+          "workflowTransitionIds": { "type": "array", "items": { "type": "string", "pattern": "^transition:" } },
+          "failureClasses": { "$ref": "#/$defs/errors" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id", "name", "source", "caller", "input", "output", "authorization",
+          "rowPolicy", "readSet", "orderBy", "failureClasses"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^query:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "caller": { "$ref": "#/$defs/caller" },
+          "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+          "output": {
+            "type": "object",
+            "required": ["entityId", "cardinality", "maxItems"],
+            "properties": {
+              "entityId": { "type": "string", "pattern": "^entity:" },
+              "cardinality": { "const": "many" },
+              "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
+            },
+            "additionalProperties": false
+          },
+          "authorization": { "$ref": "#/$defs/rule" },
+          "rowPolicy": { "$ref": "#/$defs/rule" },
+          "readSet": { "$ref": "#/$defs/readSet" },
+          "orderBy": {
+            "type": "object",
+            "required": ["fieldId", "direction", "identityTieBreaker"],
+            "properties": {
+              "fieldId": { "type": "string", "pattern": "^field:" },
+              "direction": { "enum": ["asc", "desc"] },
+              "identityTieBreaker": { "const": true }
+            },
+            "additionalProperties": false
+          },
+          "failureClasses": { "$ref": "#/$defs/errors" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

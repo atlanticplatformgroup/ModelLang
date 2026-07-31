@@ -3,6 +3,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { compileText } from "../src/compiler.js";
 import { generateAll } from "../src/build.js";
+import { createHash } from "node:crypto";
 
 async function procurement() {
   const source = await readFile("examples/procurement.model", "utf8");
@@ -91,6 +92,67 @@ describe("backends", () => {
     expect(output["typescript/http-server.ts"]).toContain("createProcurementDatabaseExecutor");
     expect(output["typescript/gateway.ts"]).toContain("createProcurementGatewayExecutor");
     expect(output["typescript/gateway.ts"]).toContain('bind_gateway_identity"($1, $2)');
+  });
+
+  it("emits engineering-only semantic closure and deterministic artifact provenance", async () => {
+    const output = generateAll(await procurement());
+    const packageInfo = JSON.parse(await readFile("package.json", "utf8")) as { version: string };
+    const semantic = JSON.parse(output["semantic.json"]!) as {
+      manifestVersion: number;
+      audience: string;
+      view: { authorizationFiltered: boolean; currentState: boolean; executable: boolean };
+      provenance: { compilerVersion: string; irVersion: number };
+      actions: {
+        name: string;
+        authorization: { id: string; dependencies: { kind: string; id: string }[] };
+        readSet: { entityIds: string[]; fieldIds: string[] };
+        effect: { kind: string; assignments: { fieldId: string }[] };
+        postconditions: { invariantIds: string[] };
+        workflowTransitionIds: string[];
+      }[];
+    };
+    const semanticSchema = JSON.parse(await readFile("schemas/semantic-manifest.schema.json", "utf8")) as object;
+    const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
+    expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
+    expect(semantic).toMatchObject({
+      manifestVersion: 1,
+      audience: "engineering",
+      view: { authorizationFiltered: false, currentState: false, executable: false },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 9 },
+    });
+    const approve = semantic.actions.find((action) => action.name === "approveRequest")!;
+    expect(approve.authorization.id).toBe("authorize:action:act_d39dbb883b5f4019b9027b85add3de47");
+    expect(approve.authorization.dependencies).toContainEqual({
+      kind: "parameter",
+      id: "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
+    });
+    expect(approve.readSet.fieldIds).toEqual(expect.arrayContaining([
+      "field:fld_04d9bc06877d4ec38a98196239c949b5",
+      "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+      "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+    ]));
+    expect(approve.effect).toMatchObject({ kind: "update" });
+    expect(approve.effect.assignments.map((assignment) => assignment.fieldId)).toEqual([
+      "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+      "field:fld_5da56f04460f4deba9ccda4f552c2b97",
+      "field:fld_577b4c94c9cd4b469aded37614712fba",
+    ]);
+    expect(approve.postconditions.invariantIds).toHaveLength(3);
+    expect(approve.workflowTransitionIds).toEqual(["transition:trn_efd18c8576154ba8b138c97b551afae3"]);
+
+    const provenance = JSON.parse(output["provenance.json"]!) as {
+      compilerVersion: string;
+      irVersion: number;
+      artifacts: { path: string; role: string; sha256: string }[];
+    };
+    const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
+    const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
+    expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 9 });
+    expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
+    const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
+    expect(operation.role).toBe("contract");
+    expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
   });
 
   it("derives a schema-valid framework-neutral UI manifest from the operation boundary", async () => {

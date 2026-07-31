@@ -11,6 +11,8 @@ import { enforcementJson, generateEnforcementMarkdown } from "./codegen/enforcem
 import { generateOperationManifest } from "./operation-manifest.js";
 import { generateUiManifest } from "./ui-manifest.js";
 import { generateUi } from "./codegen/ui.js";
+import { generateSemanticManifest } from "./semantic-manifest.js";
+import { generateArtifactProvenance } from "./provenance.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -19,10 +21,12 @@ export interface GeneratedFiles {
 export function generateAll(ir: ModelIR): GeneratedFiles {
   const operationManifest = generateOperationManifest(ir);
   const uiManifest = generateUiManifest(operationManifest);
+  const semanticManifest = generateSemanticManifest(ir, operationManifest);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
     "ui.json": stableJson(uiManifest),
+    "semantic.json": stableJson(semanticManifest),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
@@ -31,6 +35,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   for (const [name, content] of Object.entries(generateTypeScript(ir))) files[`typescript/${name}`] = content;
   Object.assign(files, generateHttp(operationManifest));
   Object.assign(files, generateUi(operationManifest, uiManifest));
+  files["provenance.json"] = stableJson(generateArtifactProvenance(ir, files));
   return files;
 }
 

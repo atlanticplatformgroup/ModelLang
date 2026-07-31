@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.15.0
+
+- Added engineering semantic manifest v1 with typed rules, stable dependencies, read sets, lock plans, explicit assignments, linked postconditions, workflow bindings, failure classes, and source spans.
+- Kept the full semantic manifest outside the browser/API contract and marked it unfiltered, current-state-free, and non-executable.
+- Added deterministic artifact provenance v1 with compiler, generator, model, IR, role, and SHA-256 identity for every generated artifact.
+- Added a non-mutating stable-ID-aware semantic diff that classifies identity, structure, validation, authorization, visibility, lifecycle, effect, and persistence changes without claiming general logical implication.
+- Added `modelc semantic-diff` while preserving the separate guarded migration planner as the only migration authority.
+- Preserved `.model` grammar, canonical IR9, operation manifest v2, UI manifest v2, HTTP routes and operation shapes, PostgreSQL enforcement, and schema-migration behavior.
+- Added versioned schemas, normative 0.15 contracts, golden artifacts, conformance coverage, and a repository edition of the whitepaper with explicit implementation status and profile gaps.
+
 ## 0.14.0
 
 - Added operation manifest v2 entity identity-field metadata and workflow metadata with stable workflow, transition, state, action, and callable target bindings.

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/artifact-provenance.schema.json",
+  "title": "ModelLang artifact provenance catalog",
+  "type": "object",
+  "required": [
+    "$schema", "provenanceVersion", "compilerVersion", "generatorProfile",
+    "model", "irVersion", "artifacts"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/artifact-provenance.schema.json" },
+    "provenanceVersion": { "const": 1 },
+    "compilerVersion": { "type": "string" },
+    "generatorProfile": { "const": "postgresql-http-ui/1" },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "irVersion": { "const": 9 },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "role", "sha256"],
+        "properties": {
+          "path": { "type": "string" },
+          "role": { "enum": ["canonical", "contract", "projection", "assurance"] },
+          "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
