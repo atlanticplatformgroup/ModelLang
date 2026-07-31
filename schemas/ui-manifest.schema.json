@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/ui-manifest.schema.json",
+  "title": "ModelLang UI manifest",
+  "$defs": {
+    "presentation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "properties": { "kind": { "enum": ["text", "integer", "decimal", "boolean", "uuid", "dateTime"] } },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "entityId"],
+          "properties": {
+            "kind": { "const": "entityReference" },
+            "entityId": { "type": "string", "pattern": "^entity:" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "enumId"],
+          "properties": {
+            "kind": { "enum": ["enum", "enumSet"] },
+            "enumId": { "type": "string", "pattern": "^enum:" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "currency", "precision", "scale"],
+          "properties": {
+            "kind": { "const": "money" },
+            "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+            "precision": { "type": "integer", "minimum": 1 },
+            "scale": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "inputField": {
+      "type": "object",
+      "required": ["parameterId", "name", "label", "required", "presentation"],
+      "properties": {
+        "parameterId": { "type": "string", "pattern": "^parameter:" },
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "required": { "const": true },
+        "presentation": { "$ref": "#/$defs/presentation" }
+      },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "identityBinding",
+          "authorization",
+          "precondition",
+          "transition",
+          "invariant",
+          "conflict",
+          "notFound",
+          "validation"
+        ]
+      }
+    }
+  },
+  "type": "object",
+  "required": [
+    "$schema",
+    "uiManifestVersion",
+    "operationManifestVersion",
+    "model",
+    "authentication",
+    "enums",
+    "entities",
+    "actions",
+    "queries"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
+    "uiManifestVersion": { "const": 1 },
+    "operationManifestVersion": { "const": 1 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "label", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "authentication": {
+      "type": "object",
+      "required": ["required", "callerInput"],
+      "properties": {
+        "required": { "const": true },
+        "callerInput": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "enums": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "label", "options"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^enum:" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "value", "label"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^enumMember:" },
+                "value": { "type": "string" },
+                "label": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "label", "fields"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^entity:" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["fieldId", "name", "label", "presentation", "nullable", "immutable", "snapshot"],
+              "properties": {
+                "fieldId": { "type": "string", "pattern": "^field:" },
+                "name": { "type": "string" },
+                "label": { "type": "string" },
+                "presentation": { "$ref": "#/$defs/presentation" },
+                "nullable": { "type": "boolean" },
+                "generated": { "enum": ["uuid", "now"] },
+                "immutable": { "type": "boolean" },
+                "snapshot": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operationId", "name", "label", "fields", "resultEntityId", "errors"],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^action:" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "fields": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
+          "resultEntityId": { "type": "string", "pattern": "^entity:" },
+          "errors": { "$ref": "#/$defs/errors" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "queries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operationId", "name", "label", "filters", "resultEntityId", "maxItems", "errors"],
+        "properties": {
+          "operationId": { "type": "string", "pattern": "^query:" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "filters": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
+          "resultEntityId": { "type": "string", "pattern": "^entity:" },
+          "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "errors": { "$ref": "#/$defs/errors" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -71,6 +71,67 @@ describe("backends", () => {
     expect(output["typescript/gateway.ts"]).toContain('bind_gateway_identity"($1, $2)');
   });
 
+  it("derives a schema-valid framework-neutral UI manifest from the operation boundary", async () => {
+    const output = generateAll(await procurement());
+    const manifest = JSON.parse(output["ui.json"]!) as {
+      uiManifestVersion: number;
+      operationManifestVersion: number;
+      authentication: { required: boolean; callerInput: boolean };
+      enums: { name: string; label: string; options: { value: string; label: string }[] }[];
+      entities: { name: string; fields: { name: string; generated?: string; snapshot: boolean; presentation: object }[] }[];
+      actions: { operationId: string; name: string; label: string; fields: { name: string; presentation: object }[] }[];
+      queries: { operationId: string; name: string; label: string; filters: object[]; maxItems: number }[];
+    };
+    const schema = JSON.parse(await readFile("schemas/ui-manifest.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(manifest).toMatchObject({
+      uiManifestVersion: 1,
+      operationManifestVersion: 1,
+      authentication: { required: true, callerInput: false },
+    });
+
+    const open = manifest.actions.find((action) => action.name === "openRequest")!;
+    expect(open).toMatchObject({
+      operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+      label: "Open request",
+    });
+    expect(open.fields).toEqual([expect.objectContaining({
+      name: "amount",
+      presentation: { kind: "money", currency: "USD", precision: 20, scale: 2 },
+    })]);
+    expect(open.fields.map((field) => field.name)).not.toContain("actor");
+
+    expect(manifest.queries.find((query) => query.name === "myRequests")).toMatchObject({
+      operationId: "query:qry_4406b045404a48449282db804f6167a8",
+      label: "My requests",
+      filters: [],
+      maxItems: 100,
+    });
+    expect(manifest.enums.find((enumeration) => enumeration.name === "RequestStatus")).toMatchObject({
+      label: "Request status",
+      options: [
+        { value: "DRAFT", label: "Draft" },
+        { value: "SUBMITTED", label: "Submitted" },
+        { value: "APPROVED", label: "Approved" },
+      ],
+    });
+    const request = manifest.entities.find((entity) => entity.name === "PurchaseRequest")!;
+    expect(request.fields.find((field) => field.name === "createdAt")).toMatchObject({
+      generated: "now",
+      presentation: { kind: "dateTime" },
+    });
+    expect(request.fields.find((field) => field.name === "approvedByRoles")).toMatchObject({
+      snapshot: true,
+      presentation: { kind: "enumSet" },
+    });
+
+    expect(output["typescript/ui.ts"]).toContain("createProcurementUiExecutor");
+    expect(output["typescript/ui.ts"]).toContain('case "action:act_1e35db0451b1461e941af6283d86dca2"');
+    expect(output["typescript/browser.ts"]).toContain('export * from "./ui.js"');
+    expect(`${output["ui.json"]}\n${output["typescript/ui.ts"]}`).not.toMatch(/SELECT |session_user|PostgreSQL|node:/);
+  });
+
   it("keeps stable-ID HTTP routes unchanged across operation renames", () => {
     const source = (name: string) => `model RouteProof version "1";
       entity User @stableId("ent_11111111111111111111111111111111") {
@@ -83,10 +144,17 @@ describe("backends", () => {
         authorize true;
         create Item { id = id; }
       }`;
-    const before = JSON.parse(generateAll(compileText(source("firstName")))["openapi.json"]!) as { paths: object };
-    const after = JSON.parse(generateAll(compileText(source("secondName")))["openapi.json"]!) as { paths: object };
+    const beforeOutput = generateAll(compileText(source("firstName")));
+    const afterOutput = generateAll(compileText(source("secondName")));
+    const before = JSON.parse(beforeOutput["openapi.json"]!) as { paths: object };
+    const after = JSON.parse(afterOutput["openapi.json"]!) as { paths: object };
     expect(Object.keys(before.paths)).toEqual(Object.keys(after.paths));
     expect(Object.keys(after.paths)).toEqual(["/operations/actions/act_11111111111111111111111111111111"]);
+    const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
+    const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
+    expect(beforeUi.actions[0]!.operationId).toBe(afterUi.actions[0]!.operationId);
+    expect(beforeUi.actions[0]!.label).toBe("First name");
+    expect(afterUi.actions[0]!.label).toBe("Second name");
   });
 
   it("emits atomic half-open temporal exclusion enforcement", async () => {

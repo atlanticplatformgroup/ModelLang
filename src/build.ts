@@ -9,6 +9,8 @@ import { generateHttp } from "./codegen/http.js";
 import { generateMermaid } from "./codegen/mermaid.js";
 import { enforcementJson, generateEnforcementMarkdown } from "./codegen/enforcement.js";
 import { generateOperationManifest } from "./operation-manifest.js";
+import { generateUiManifest } from "./ui-manifest.js";
+import { generateUi } from "./codegen/ui.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -16,9 +18,11 @@ export interface GeneratedFiles {
 
 export function generateAll(ir: ModelIR): GeneratedFiles {
   const operationManifest = generateOperationManifest(ir);
+  const uiManifest = generateUiManifest(operationManifest);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
+    "ui.json": stableJson(uiManifest),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
@@ -26,6 +30,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   for (const [name, content] of Object.entries(generatePostgres(ir))) files[`postgres/${name}`] = content;
   for (const [name, content] of Object.entries(generateTypeScript(ir))) files[`typescript/${name}`] = content;
   Object.assign(files, generateHttp(operationManifest));
+  Object.assign(files, generateUi(operationManifest, uiManifest));
   return files;
 }
 

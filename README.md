@@ -1,6 +1,6 @@
-# ModelLang 0.12 reference compiler
+# ModelLang 0.13 reference compiler
 
-ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a transport-neutral operation manifest, OpenAPI, a browser-safe HTTP client, an authenticated server handler, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a transport-neutral operation manifest, a framework-neutral UI manifest, OpenAPI, a browser-safe HTTP client and UI executor, an authenticated server handler, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -59,9 +59,11 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.12 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.13 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v1 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, declared action/query inputs and outputs, stable operation IDs, result cardinality, and authenticated caller context. It contains no HTTP paths, SQL names, database roles, connection details, or PostgreSQL types. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
+
+`ui.json` is UI manifest v1 derived exclusively from operation manifest v1. It describes action fields, query filters and result tables, entity fields, enum options, typed presentation hints, declared errors, query bounds, and humanized default labels. Stable semantic IDs are its binding keys. It is deliberately framework-neutral and does not claim caller authorization, invent entity option sources, or prescribe components.
 
 The PostgreSQL backend emits:
 
@@ -78,7 +80,8 @@ The PostgreSQL backend emits:
 
 The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field.
 
-- `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID routes and contains no SQL, database adapter, Node.js, or PostgreSQL contract.
+- `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID routes, and its UI executor dispatches manifest operation IDs through that client. It contains no SQL, database adapter, Node.js, or PostgreSQL contract.
+- `typescript/ui.ts` embeds the readonly UI manifest and exports operation-ID-indexed input/result types plus a fail-closed executor.
 - `typescript/http-server.ts` authenticates bearer context, validates exact closed input and output objects, enforces query result bounds, dispatches stable operation IDs, maps RFC 9457 problems, and can bridge to an existing caller-bound generated database client.
 - `typescript/gateway.ts` is a server-only shared-pool adapter. It binds verified issuer/subject claims for one transaction and never accepts a ModelLang principal ID.
 - `typescript/client.ts` remains the server-side PostgreSQL client. It never forwards caller identity as a SQL argument; the database resolves it through the authenticated session boundary.
@@ -144,6 +147,33 @@ const handler = createProcurementHttpHandler(async (token) => {
 ```
 
 The reference Procurement integration uses a single shared PostgreSQL pool and forces connection reuse across different callers and rollback paths. Token verification remains host-owned; request data can never select or override the ModelLang caller. The earlier direct-login executor remains supported.
+
+## Framework-neutral UI boundary
+
+A frontend can select descriptors by stable operation ID, render fields using their presentation discriminants, and execute through the authenticated browser client:
+
+```ts
+import {
+  createProcurementUiExecutor,
+  ProcurementHttpClient,
+  ProcurementUiManifest,
+} from "./generated/procurement/typescript/browser.js";
+
+const client = new ProcurementHttpClient({
+  baseUrl: "https://api.example.test",
+  accessToken: () => session.accessToken,
+});
+const ui = createProcurementUiExecutor(client);
+const openRequest = ProcurementUiManifest.actions.find(
+  (action) => action.operationId === "action:act_1e35db0451b1461e941af6283d86dca2",
+)!;
+
+const request = await ui.execute(openRequest.operationId, {
+  amount: { currency: "USD", amount: "125.00" },
+});
+```
+
+The manifest's `text`, `dateTime`, `enum`, `enumSet`, `entityReference`, and `money` presentations are data descriptions rather than prescribed HTML widgets. Default labels may be overlaid by stable ID for product copy or localization. Caller identity is never a form field, and operation visibility must not be treated as proof that the current caller is authorized. Relationship choices must come from a separately declared authorized query or trusted host data, never direct database access.
 
 ## Stable identity and safe schema evolution
 
@@ -256,7 +286,7 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates parsing and spans, additive migration planning and live row preservation, baseline-history rejection, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
+The full suite validates parsing and spans, additive migration planning and live row preservation, baseline-history rejection, workflow/action contracts and direct-SQL lifecycle backstops, stable-ID assignment and validation, exact money profiles and cross-currency rejection, generated-value authority and immutability, deterministic rename planning, UI-manifest schema and dispatch, duplicate and unknown declarations, caller rules, type/null semantics, query policies, deterministic ordering and limits, temporal exclusions, disallowed traversal, action assignments, lock planning, deterministic output, callable identity omission, execute-only privileges, read isolation, typed errors, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
@@ -266,10 +296,10 @@ The full suite validates parsing and spans, additive migration planning and live
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
-- Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and automatic UI generation.
+- Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and generated workflow controls.
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
 - The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, retries, idempotency keys, package publication, deployment, and observability to the host.
-- Frontend form/table generation, alternate transports, and AI/MCP generation remain deferred consumers of the same operation manifest.
+- UI manifest v1 intentionally omits framework components, layout, localization, entity option queries, authorization visibility, workflow controls, generic CRUD, pagination controls, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.12 language is in [spec/0.12/LANGUAGE.md](./spec/0.12/LANGUAGE.md), with its [gateway identity semantics](./spec/0.12/GATEWAY_IDENTITY.md), [conformance requirements](./spec/0.12/CONFORMANCE.md), and [unstable boundaries](./spec/0.12/UNSTABLE.md). The [0.11 transport](./spec/0.11/TRANSPORT.md) and [0.10 safe evolution rules](./spec/0.10/SAFE_EVOLUTION.md) remain normative where 0.12 does not replace them. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.13 language is in [spec/0.13/LANGUAGE.md](./spec/0.13/LANGUAGE.md), with its [UI manifest semantics](./spec/0.13/UI_MANIFEST.md), [conformance requirements](./spec/0.13/CONFORMANCE.md), and [unstable boundaries](./spec/0.13/UNSTABLE.md). The [0.12 gateway identity profile](./spec/0.12/GATEWAY_IDENTITY.md), [0.11 transport](./spec/0.11/TRANSPORT.md), and [0.10 safe evolution rules](./spec/0.10/SAFE_EVOLUTION.md) remain normative where 0.13 does not replace them. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

@@ -353,6 +353,6 @@ export function generateTypeScript(ir: ModelIR): TypeScriptOutput {
     "client.ts": generateClient(ir),
     "gateway.ts": generateGateway(ir),
     "workflows.ts": generateWorkflows(ir),
-    "index.ts": `export * from "./types.js";\nexport * from "./errors.js";\nexport * from "./client.js";\nexport * from "./gateway.js";\nexport * from "./http-client.js";\nexport * from "./http-server.js";\nexport * from "./workflows.js";\n`,
+    "index.ts": `export * from "./types.js";\nexport * from "./errors.js";\nexport * from "./client.js";\nexport * from "./gateway.js";\nexport * from "./http-client.js";\nexport * from "./http-server.js";\nexport * from "./workflows.js";\nexport * from "./ui.js";\n`,
   };
 }

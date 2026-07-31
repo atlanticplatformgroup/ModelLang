@@ -12,6 +12,10 @@ import {
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
 import {
+  createProcurementUiExecutor,
+  ProcurementUiManifest,
+} from "../../generated/procurement/typescript/ui.js";
+import {
   AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
 import {
@@ -524,9 +528,12 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const employee = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-one" });
       const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
       const finance = new ProcurementHttpClient({ baseUrl, accessToken: () => "finance" });
+      const employeeUi = createProcurementUiExecutor(employee);
+      const openDescriptor = ProcurementUiManifest.actions.find((action) => action.name === "openRequest")!;
+      const requestsDescriptor = ProcurementUiManifest.queries.find((query) => query.name === "myRequests")!;
 
       await expect(employee.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
-      const low = await employee.openRequest({ amount: usd("5000") });
+      const low = await employeeUi.execute(openDescriptor.operationId, { amount: usd("5000") });
       expect(low.requester).toBe("00000000-0000-4000-8000-000000000001");
       await employee.submitRequest({ request: low.id });
       const approved = await manager.approveRequest({ request: low.id });
@@ -539,7 +546,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await employee.submitRequest({ request: high.id });
       await expect(manager.approveRequest({ request: high.id })).rejects.toBeInstanceOf(AuthorizationError);
       expect((await finance.approveRequest({ request: high.id })).status).toBe("APPROVED");
-      expect((await employee.myRequests({})).map((request) => request.id)).toEqual(expect.arrayContaining([low.id, high.id]));
+      expect((await employeeUi.execute(requestsDescriptor.operationId, {})).map((request) => request.id))
+        .toEqual(expect.arrayContaining([low.id, high.id]));
 
       const beforeSpoof = (await employee.myRequests({})).length;
       const spoof = await fetch(`${baseUrl}/operations/actions/act_1e35db0451b1461e941af6283d86dca2`, {

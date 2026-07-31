@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.13.0
+
+- Added deterministic UI manifest v1 generation from operation manifest v1 without changing `.model`, canonical IR9, HTTP, migration, or PostgreSQL semantics.
+- Added stable-ID action-form, query-filter/table, enum-option, and entity-field descriptors with humanized default labels.
+- Added transport-neutral presentation metadata for scalars, entity references, enums, enum sets, exact money, generated fields, immutability, nullability, and snapshots.
+- Kept authenticated caller identity out of every form and filter and made the manifest explicitly declare `callerInput: false`.
+- Added a browser-safe generated TypeScript UI manifest and typed stable-ID executor over the existing authenticated HTTP client.
+- Made unknown UI operation IDs fail closed as typed ModelLang validation errors.
+- Added JSON Schema, golden, rename-stability, browser-safety, runtime dispatch, and live Procurement API integration coverage.
+
 ## 0.12.0
 
 - Added a dedicated non-login `modellang_gateway` PostgreSQL role for shared server credentials while preserving direct-login mode.

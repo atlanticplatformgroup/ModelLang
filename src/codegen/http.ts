@@ -576,6 +576,7 @@ export {
 export type { ModelProblem } from "./errors.js";
 export * from "./http-client.js";
 export * from "./workflows.js";
+export * from "./ui.js";
 `,
   };
 }
