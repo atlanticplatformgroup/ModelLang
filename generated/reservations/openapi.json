@@ -4,7 +4,7 @@
   "info": {
     "title": "Reservations ModelLang API",
     "version": "0.10.0",
-    "description": "Generated from ModelLang operation manifest v1 (sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215)."
+    "description": "Generated from ModelLang operation manifest v2 (sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {

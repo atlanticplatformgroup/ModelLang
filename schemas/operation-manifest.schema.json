@@ -126,6 +126,43 @@
         "errors": { "$ref": "#/$defs/errors" }
       },
       "additionalProperties": false
+    },
+    "workflowTarget": {
+      "type": "object",
+      "required": ["source", "parameterId", "name"],
+      "properties": {
+        "source": { "const": "operationInput" },
+        "parameterId": { "type": "string", "pattern": "^parameter:" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "workflowTransition": {
+      "type": "object",
+      "required": ["id", "name", "fromMemberId", "toMemberId", "actionId", "target"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^transition:" },
+        "name": { "type": "string" },
+        "fromMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "toMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "actionId": { "type": "string", "pattern": "^action:" },
+        "target": { "$ref": "#/$defs/workflowTarget" }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "object",
+      "required": ["id", "name", "entityId", "fieldId", "enumId", "initialMemberId", "transitions"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^workflow:" },
+        "name": { "type": "string" },
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "fieldId": { "type": "string", "pattern": "^field:" },
+        "enumId": { "type": "string", "pattern": "^enum:" },
+        "initialMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/workflowTransition" } }
+      },
+      "additionalProperties": false
     }
   },
   "type": "object",
@@ -136,11 +173,12 @@
     "authentication",
     "enums",
     "entities",
-    "operations"
+    "operations",
+    "workflows"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 1 },
+    "manifestVersion": { "const": 2 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -193,10 +231,11 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "fields"],
+        "required": ["id", "name", "idFieldId", "fields"],
         "properties": {
           "id": { "type": "string", "pattern": "^entity:" },
           "name": { "type": "string" },
+          "idFieldId": { "type": "string", "pattern": "^field:" },
           "fields": {
             "type": "array",
             "items": {
@@ -226,6 +265,10 @@
           { "$ref": "#/$defs/query" }
         ]
       }
+    },
+    "workflows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workflow" }
     }
   },
   "additionalProperties": false

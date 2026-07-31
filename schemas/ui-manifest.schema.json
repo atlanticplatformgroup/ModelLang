@@ -69,6 +69,82 @@
           "validation"
         ]
       }
+    },
+    "workflowTarget": {
+      "type": "object",
+      "required": ["source", "parameterId", "name"],
+      "properties": {
+        "source": { "const": "operationInput" },
+        "parameterId": { "type": "string", "pattern": "^parameter:" },
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "workflowState": {
+      "type": "object",
+      "required": ["memberId", "value", "label", "initial", "terminal"],
+      "properties": {
+        "memberId": { "type": "string", "pattern": "^enumMember:" },
+        "value": { "type": "string" },
+        "label": { "type": "string" },
+        "initial": { "type": "boolean" },
+        "terminal": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "workflowTransition": {
+      "type": "object",
+      "required": [
+        "transitionId",
+        "name",
+        "label",
+        "fromMemberId",
+        "fromValue",
+        "toMemberId",
+        "toValue",
+        "actionOperationId",
+        "target",
+        "fields"
+      ],
+      "properties": {
+        "transitionId": { "type": "string", "pattern": "^transition:" },
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "fromMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "fromValue": { "type": "string" },
+        "toMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "toValue": { "type": "string" },
+        "actionOperationId": { "type": "string", "pattern": "^action:" },
+        "target": { "$ref": "#/$defs/workflowTarget" },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/inputField" } }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "workflowId",
+        "name",
+        "label",
+        "entityId",
+        "stateFieldId",
+        "enumId",
+        "initialMemberId",
+        "states",
+        "transitions"
+      ],
+      "properties": {
+        "workflowId": { "type": "string", "pattern": "^workflow:" },
+        "name": { "type": "string" },
+        "label": { "type": "string" },
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "stateFieldId": { "type": "string", "pattern": "^field:" },
+        "enumId": { "type": "string", "pattern": "^enum:" },
+        "initialMemberId": { "type": "string", "pattern": "^enumMember:" },
+        "states": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/workflowState" } },
+        "transitions": { "type": "array", "items": { "$ref": "#/$defs/workflowTransition" } }
+      },
+      "additionalProperties": false
     }
   },
   "type": "object",
@@ -81,12 +157,13 @@
     "enums",
     "entities",
     "actions",
-    "queries"
+    "queries",
+    "workflows"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 1 },
-    "operationManifestVersion": { "const": 1 },
+    "uiManifestVersion": { "const": 2 },
+    "operationManifestVersion": { "const": 2 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -139,11 +216,12 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "label", "fields"],
+        "required": ["id", "name", "label", "idFieldId", "fields"],
         "properties": {
           "id": { "type": "string", "pattern": "^entity:" },
           "name": { "type": "string" },
           "label": { "type": "string" },
+          "idFieldId": { "type": "string", "pattern": "^field:" },
           "fields": {
             "type": "array",
             "items": {
@@ -198,6 +276,10 @@
         },
         "additionalProperties": false
       }
+    },
+    "workflows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workflow" }
     }
   },
   "additionalProperties": false

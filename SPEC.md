@@ -1,11 +1,12 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.13](./spec/0.13/LANGUAGE.md). It retains the 0.12 authenticated transport and gateway identity profile and adds a framework-neutral UI manifest and browser-safe stable-ID executor.
+The current normative specification is [ModelLang 0.14](./spec/0.14/LANGUAGE.md). It retains the 0.13 UI boundary and adds workflow-aware operation/UI manifests plus typed browser transition helpers.
 
-- [Framework-neutral UI manifest semantics](./spec/0.13/UI_MANIFEST.md)
-- [0.13 unchanged grammar statement](./spec/0.13/GRAMMAR.ebnf)
-- [0.13 conformance requirements](./spec/0.13/CONFORMANCE.md)
-- [0.13 unstable feature boundaries](./spec/0.13/UNSTABLE.md)
+- [Workflow application-boundary semantics](./spec/0.14/WORKFLOW_APPLICATIONS.md)
+- [0.14 unchanged grammar statement](./spec/0.14/GRAMMAR.ebnf)
+- [0.14 conformance requirements](./spec/0.14/CONFORMANCE.md)
+- [0.14 unstable feature boundaries](./spec/0.14/UNSTABLE.md)
+- [Framework-neutral UI manifest semantics inherited from 0.13](./spec/0.13/UI_MANIFEST.md)
 - [PostgreSQL gateway identity semantics inherited from 0.12](./spec/0.12/GATEWAY_IDENTITY.md)
 - [Operation transport semantics inherited from 0.11](./spec/0.11/TRANSPORT.md)
 - [Safe schema-evolution semantics](./spec/0.10/SAFE_EVOLUTION.md)

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.0
+
+- Added operation manifest v2 entity identity-field metadata and workflow metadata with stable workflow, transition, state, action, and callable target bindings.
+- Added UI manifest v2 workflow descriptors with initial/terminal states, stored state values, generated labels, edges, and additional transition fields.
+- Added typed browser helpers for structural state-based transition selection without claiming authorization or precondition success.
+- Added a browser-safe workflow executor that binds neutral entity `targetId` to the declared action parameter and dispatches through authenticated HTTP.
+- Kept caller identity out of transition input and made unknown workflow and transition IDs fail closed as typed validation errors.
+- Preserved `.model` grammar, canonical IR9, HTTP routes and operation shapes, PostgreSQL enforcement, and schema-migration behavior.
+- Added manifest-schema, golden, browser-safety, runtime target-binding, terminal-state, and live Procurement workflow integration coverage.
+
 ## 0.13.0
 
 - Added deterministic UI manifest v1 generation from operation manifest v1 without changing `.model`, canonical IR9, HTTP, migration, or PostgreSQL semantics.

@@ -25,10 +25,47 @@ export interface UiInputField {
   presentation: UiPresentation;
 }
 
+export interface UiWorkflowTarget {
+  source: "operationInput";
+  parameterId: string;
+  name: string;
+}
+
+export interface UiWorkflowTransition {
+  transitionId: string;
+  name: string;
+  label: string;
+  fromMemberId: string;
+  fromValue: string;
+  toMemberId: string;
+  toValue: string;
+  actionOperationId: string;
+  target: UiWorkflowTarget;
+  fields: UiInputField[];
+}
+
+export interface UiWorkflow {
+  workflowId: string;
+  name: string;
+  label: string;
+  entityId: string;
+  stateFieldId: string;
+  enumId: string;
+  initialMemberId: string;
+  states: {
+    memberId: string;
+    value: string;
+    label: string;
+    initial: boolean;
+    terminal: boolean;
+  }[];
+  transitions: UiWorkflowTransition[];
+}
+
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 1;
-  operationManifestVersion: 1;
+  uiManifestVersion: 2;
+  operationManifestVersion: 2;
   model: {
     id: string;
     name: string;
@@ -50,6 +87,7 @@ export interface UiManifest {
     id: string;
     name: string;
     label: string;
+    idFieldId: string;
     fields: {
       fieldId: string;
       name: string;
@@ -78,6 +116,7 @@ export interface UiManifest {
     maxItems: number;
     errors: ManifestErrorKind[];
   }[];
+  workflows: UiWorkflow[];
 }
 
 export function uiLabel(identifier: string): string {
@@ -123,12 +162,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 1) {
-    throw new Error(`E6201 UI generation requires operation manifest version 1, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 2) {
+    throw new Error(`E6201 UI generation requires operation manifest version 2, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 1,
+    uiManifestVersion: 2,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -152,6 +191,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
       id: entity.id,
       name: entity.name,
       label: uiLabel(entity.name),
+      idFieldId: entity.idFieldId,
       fields: entity.fields.map((field) => ({
         fieldId: field.id,
         name: field.name,
@@ -184,5 +224,51 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         maxItems: operation.output.maxItems,
         errors: operation.errors,
       })),
+    workflows: manifest.workflows.map((workflow) => {
+      const enumeration = manifest.enums.find((candidate) => candidate.id === workflow.enumId);
+      if (!enumeration) throw new Error(`E6203 Missing UI workflow enum '${workflow.enumId}'.`);
+      const member = (memberId: string) => {
+        const result = enumeration.members.find((candidate) => candidate.id === memberId);
+        if (!result) throw new Error(`E6204 Missing UI workflow member '${memberId}'.`);
+        return result;
+      };
+      const transitions: UiWorkflowTransition[] = workflow.transitions.map((transition) => {
+        const action = manifest.operations.find((candidate) => candidate.id === transition.actionId && candidate.kind === "action");
+        if (!action || action.kind !== "action") {
+          throw new Error(`E6205 Missing UI workflow action '${transition.actionId}'.`);
+        }
+        const from = member(transition.fromMemberId);
+        const to = member(transition.toMemberId);
+        return {
+          transitionId: transition.id,
+          name: transition.name,
+          label: uiLabel(transition.name),
+          fromMemberId: from.id,
+          fromValue: from.value,
+          toMemberId: to.id,
+          toValue: to.value,
+          actionOperationId: action.id,
+          target: transition.target,
+          fields: inputFields(action).filter((field) => field.parameterId !== transition.target.parameterId),
+        };
+      });
+      return {
+        workflowId: workflow.id,
+        name: workflow.name,
+        label: uiLabel(workflow.name),
+        entityId: workflow.entityId,
+        stateFieldId: workflow.fieldId,
+        enumId: workflow.enumId,
+        initialMemberId: workflow.initialMemberId,
+        states: enumeration.members.map((state) => ({
+          memberId: state.id,
+          value: state.value,
+          label: uiLabel(state.name),
+          initial: state.id === workflow.initialMemberId,
+          terminal: !workflow.transitions.some((transition) => transition.fromMemberId === state.id),
+        })),
+        transitions,
+      };
+    }),
   };
 }

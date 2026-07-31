@@ -6,8 +6,8 @@ import { ReservationsHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 1,
-  "operationManifestVersion": 1,
+  "uiManifestVersion": 2,
+  "operationManifestVersion": 2,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
@@ -25,6 +25,7 @@ export const ReservationsUiManifest = {
       "id": "entity:ent_82878bde58d948d4a84d85d01279e01d",
       "name": "User",
       "label": "User",
+      "idFieldId": "field:fld_968ff16b1c28419d9f2f7833635e5653",
       "fields": [
         {
           "fieldId": "field:fld_968ff16b1c28419d9f2f7833635e5653",
@@ -54,6 +55,7 @@ export const ReservationsUiManifest = {
       "id": "entity:ent_7cb2307972954d83a6f344764faaae39",
       "name": "Resource",
       "label": "Resource",
+      "idFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
       "fields": [
         {
           "fieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
@@ -83,6 +85,7 @@ export const ReservationsUiManifest = {
       "id": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "name": "Reservation",
       "label": "Reservation",
+      "idFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
       "fields": [
         {
           "fieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
@@ -228,7 +231,8 @@ export const ReservationsUiManifest = {
         "notFound"
       ]
     }
-  ]
+  ],
+  "workflows": []
 } as const;
 
 export type ReservationsUiOperationId = "action:act_508ad810a19d4b79a5009871de5cd26b" | "query:qry_94d8a56f4c2640fab58a4c2190c35c69";
@@ -264,6 +268,70 @@ export function createReservationsUiExecutor(client: ReservationsHttpClient): Re
           return await client.reservationsForResource(input as unknown as ReservationsForResourceInput) as ReservationsUiResultByOperationId[Id];
         default:
           throw new ValidationError("Unknown ModelLang UI operation", "ML_UI_OPERATION_NOT_FOUND", "ui:operation");
+      }
+    },
+  };
+}
+
+export type ReservationsUiWorkflowId = never;
+export type ReservationsUiTransitionId = never;
+export type ReservationsUiWorkflow = (typeof ReservationsUiManifest.workflows)[number];
+export type ReservationsUiWorkflowTransition =
+  ReservationsUiWorkflow extends { transitions: readonly (infer Transition)[] } ? Transition : never;
+
+export interface ReservationsUiWorkflowStateById {
+
+}
+
+export interface ReservationsUiTransitionInputById {
+
+}
+
+export interface ReservationsUiTransitionResultById {
+
+}
+
+/** Return state-matching edges only. Authorization and preconditions remain server-enforced. */
+export function availableReservationsUiTransitions<Id extends ReservationsUiWorkflowId>(
+  workflowId: Id,
+  state: ReservationsUiWorkflowStateById[Id],
+): readonly ReservationsUiWorkflowTransition[] {
+  const workflows = ReservationsUiManifest.workflows as readonly {
+    workflowId: string;
+    transitions: readonly { fromValue: string }[];
+  }[];
+  const workflow = workflows.find((candidate) => candidate.workflowId === workflowId);
+  if (!workflow) throw new ValidationError("Unknown ModelLang UI workflow", "ML_UI_WORKFLOW_NOT_FOUND", "ui:workflow");
+  return workflow.transitions.filter((transition) => transition.fromValue === state) as unknown as readonly ReservationsUiWorkflowTransition[];
+}
+
+export interface ReservationsUiWorkflowExecutor {
+  available<Id extends ReservationsUiWorkflowId>(
+    workflowId: Id,
+    state: ReservationsUiWorkflowStateById[Id],
+  ): readonly ReservationsUiWorkflowTransition[];
+  executeTransition<Id extends ReservationsUiTransitionId>(
+    transitionId: Id,
+    targetId: string,
+    input: ReservationsUiTransitionInputById[Id],
+  ): Promise<ReservationsUiTransitionResultById[Id]>;
+}
+
+/** Bind workflow targets and execute only declared transition actions through authenticated HTTP. */
+export function createReservationsUiWorkflowExecutor(
+  client: ReservationsHttpClient,
+): ReservationsUiWorkflowExecutor {
+  return {
+    available: availableReservationsUiTransitions,
+    async executeTransition<Id extends ReservationsUiTransitionId>(
+      transitionId: Id,
+      targetId: string,
+      input: ReservationsUiTransitionInputById[Id],
+    ): Promise<ReservationsUiTransitionResultById[Id]> {
+      switch (transitionId) {
+
+        default:
+          throw new ValidationError("Unknown ModelLang UI transition", "ML_UI_TRANSITION_NOT_FOUND", "ui:transition");
       }
     },
   };

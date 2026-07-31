@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 1;
+  manifestVersion: 2;
   model: {
     id: string;
     name: string;
@@ -33,6 +33,7 @@ export interface OperationManifest {
   entities: {
     id: string;
     name: string;
+    idFieldId: string;
     fields: {
       id: string;
       name: string;
@@ -44,6 +45,7 @@ export interface OperationManifest {
     }[];
   }[];
   operations: ManifestOperation[];
+  workflows: ManifestWorkflow[];
 }
 
 export interface ManifestParameter {
@@ -88,6 +90,29 @@ export type ManifestOperation =
       kind: "query";
       output: { entityId: string; cardinality: "many"; maxItems: number };
     });
+
+export interface ManifestWorkflowTarget {
+  source: "operationInput";
+  parameterId: string;
+  name: string;
+}
+
+export interface ManifestWorkflow {
+  id: string;
+  name: string;
+  entityId: string;
+  fieldId: string;
+  enumId: string;
+  initialMemberId: string;
+  transitions: {
+    id: string;
+    name: string;
+    fromMemberId: string;
+    toMemberId: string;
+    actionId: string;
+    target: ManifestWorkflowTarget;
+  }[];
+}
 
 export function operationValueType(type: string): OperationValueType {
   if (type.startsWith("entity:")) return { kind: "entity", entityId: type };
@@ -157,10 +182,42 @@ function queryErrors(query: IRQuery): ManifestErrorKind[] {
   return errors;
 }
 
+function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
+  return ir.workflows.map((workflow) => ({
+    id: workflow.id,
+    name: workflow.name,
+    entityId: workflow.entityId,
+    fieldId: workflow.fieldId,
+    enumId: workflow.enumId,
+    initialMemberId: workflow.initialMemberId,
+    transitions: workflow.transitions.map((transition) => {
+      const action = ir.actions.find((candidate) => candidate.id === transition.actionId);
+      if (!action || action.effect.kind !== "update") {
+        throw new Error(`E6003 Workflow transition '${transition.id}' has no update action '${transition.actionId}'.`);
+      }
+      const parameter = action.parameters.find((candidate) => candidate.name === action.effect.target);
+      if (!parameter) {
+        throw new Error(`E6004 Workflow action '${action.id}' has no target parameter '${action.effect.target}'.`);
+      }
+      if (parameter.caller || !action.callableParameters.includes(parameter.id)) {
+        throw new Error(`E6005 Workflow target '${parameter.id}' is not callable input.`);
+      }
+      return {
+        id: transition.id,
+        name: transition.name,
+        fromMemberId: transition.fromMemberId,
+        toMemberId: transition.toMemberId,
+        actionId: transition.actionId,
+        target: { source: "operationInput", parameterId: parameter.id, name: parameter.name },
+      };
+    }),
+  }));
+}
+
 export function generateOperationManifest(ir: ModelIR): OperationManifest {
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 1,
+    manifestVersion: 2,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -185,6 +242,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
     entities: ir.entities.map((entity) => ({
       id: entity.id,
       name: entity.name,
+      idFieldId: entity.idFieldId,
       fields: entity.fields.map((field) => ({
         id: field.id,
         name: field.name,
@@ -215,5 +273,6 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         errors: queryErrors(query),
       })),
     ],
+    workflows: manifestWorkflows(ir),
   };
 }

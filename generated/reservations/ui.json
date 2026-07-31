@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 1,
-  "operationManifestVersion": 1,
+  "uiManifestVersion": 2,
+  "operationManifestVersion": 2,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
@@ -19,6 +19,7 @@
       "id": "entity:ent_82878bde58d948d4a84d85d01279e01d",
       "name": "User",
       "label": "User",
+      "idFieldId": "field:fld_968ff16b1c28419d9f2f7833635e5653",
       "fields": [
         {
           "fieldId": "field:fld_968ff16b1c28419d9f2f7833635e5653",
@@ -48,6 +49,7 @@
       "id": "entity:ent_7cb2307972954d83a6f344764faaae39",
       "name": "Resource",
       "label": "Resource",
+      "idFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
       "fields": [
         {
           "fieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
@@ -77,6 +79,7 @@
       "id": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "name": "Reservation",
       "label": "Reservation",
+      "idFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
       "fields": [
         {
           "fieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
@@ -222,5 +225,6 @@
         "notFound"
       ]
     }
-  ]
+  ],
+  "workflows": []
 }

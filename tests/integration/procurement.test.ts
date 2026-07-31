@@ -13,6 +13,7 @@ import {
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
 import {
   createProcurementUiExecutor,
+  createProcurementUiWorkflowExecutor,
   ProcurementUiManifest,
 } from "../../generated/procurement/typescript/ui.js";
 import {
@@ -529,23 +530,32 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
       const finance = new ProcurementHttpClient({ baseUrl, accessToken: () => "finance" });
       const employeeUi = createProcurementUiExecutor(employee);
+      const employeeWorkflow = createProcurementUiWorkflowExecutor(employee);
+      const managerWorkflow = createProcurementUiWorkflowExecutor(manager);
+      const financeWorkflow = createProcurementUiWorkflowExecutor(finance);
       const openDescriptor = ProcurementUiManifest.actions.find((action) => action.name === "openRequest")!;
       const requestsDescriptor = ProcurementUiManifest.queries.find((query) => query.name === "myRequests")!;
 
       await expect(employee.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
       const low = await employeeUi.execute(openDescriptor.operationId, { amount: usd("5000") });
       expect(low.requester).toBe("00000000-0000-4000-8000-000000000001");
-      await employee.submitRequest({ request: low.id });
-      const approved = await manager.approveRequest({ request: low.id });
+      const workflow = ProcurementUiManifest.workflows[0]!;
+      const submit = employeeWorkflow.available(workflow.workflowId, low.status)[0]!;
+      const submitted = await employeeWorkflow.executeTransition(submit.transitionId, low.id, {});
+      const approve = managerWorkflow.available(workflow.workflowId, submitted.status)[0]!;
+      const approved = await managerWorkflow.executeTransition(approve.transitionId, low.id, {});
       expect(approved).toMatchObject({
         status: "APPROVED",
         approvedBy: "00000000-0000-4000-8000-000000000003",
       });
 
       const high = await employee.openRequest({ amount: usd("25000") });
-      await employee.submitRequest({ request: high.id });
-      await expect(manager.approveRequest({ request: high.id })).rejects.toBeInstanceOf(AuthorizationError);
-      expect((await finance.approveRequest({ request: high.id })).status).toBe("APPROVED");
+      const highSubmit = employeeWorkflow.available(workflow.workflowId, high.status)[0]!;
+      const highSubmitted = await employeeWorkflow.executeTransition(highSubmit.transitionId, high.id, {});
+      const highApprove = managerWorkflow.available(workflow.workflowId, highSubmitted.status)[0]!;
+      await expect(managerWorkflow.executeTransition(highApprove.transitionId, high.id, {}))
+        .rejects.toBeInstanceOf(AuthorizationError);
+      expect((await financeWorkflow.executeTransition(highApprove.transitionId, high.id, {})).status).toBe("APPROVED");
       expect((await employeeUi.execute(requestsDescriptor.operationId, {})).map((request) => request.id))
         .toEqual(expect.arrayContaining([low.id, high.id]));
 

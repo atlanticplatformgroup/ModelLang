@@ -36,21 +36,43 @@ describe("backends", () => {
     const manifest = JSON.parse(output["operations.json"]!) as {
       manifestVersion: number;
       authentication: { source: string; requestSupplied: boolean };
+      entities: { name: string; idFieldId: string }[];
       operations: { id: string; kind: string; name: string; input: { name: string }[]; caller: { requestSupplied: boolean } }[];
+      workflows: { id: string; transitions: { id: string; actionId: string; target: object }[] }[];
     };
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(1);
+    expect(manifest.manifestVersion).toBe(2);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
     }));
+    expect(manifest.entities.find((entity) => entity.name === "PurchaseRequest")?.idFieldId)
+      .toBe("field:fld_af918d24406040619a77b244a81ca5d3");
     expect(manifest.operations).toHaveLength(4);
     for (const operation of manifest.operations) {
       expect(operation.caller.requestSupplied).toBe(false);
       expect(operation.input.map((parameter) => parameter.name)).not.toContain("actor");
     }
+    expect(manifest.workflows).toEqual([expect.objectContaining({
+      id: "workflow:wfl_96a1115ba9bf42f2a206374822eeaa87",
+      transitions: [
+        expect.objectContaining({
+          id: "transition:trn_7787ccd311944f109b69e35967bcbe2c",
+          actionId: "action:act_ed2374e822704c51a2925338253d05d2",
+          target: {
+            source: "operationInput",
+            parameterId: "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
+            name: "request",
+          },
+        }),
+        expect.objectContaining({ id: "transition:trn_efd18c8576154ba8b138c97b551afae3" }),
+      ],
+    })]);
+    const reservationManifest = JSON.parse(generateAll(await reservations())["operations.json"]!) as { workflows: object[] };
+    expect(validate(reservationManifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(reservationManifest.workflows).toEqual([]);
 
     const openapi = JSON.parse(output["openapi.json"]!) as {
       openapi: string;
@@ -78,16 +100,22 @@ describe("backends", () => {
       operationManifestVersion: number;
       authentication: { required: boolean; callerInput: boolean };
       enums: { name: string; label: string; options: { value: string; label: string }[] }[];
-      entities: { name: string; fields: { name: string; generated?: string; snapshot: boolean; presentation: object }[] }[];
+      entities: { name: string; idFieldId: string; fields: { name: string; generated?: string; snapshot: boolean; presentation: object }[] }[];
       actions: { operationId: string; name: string; label: string; fields: { name: string; presentation: object }[] }[];
       queries: { operationId: string; name: string; label: string; filters: object[]; maxItems: number }[];
+      workflows: {
+        workflowId: string;
+        label: string;
+        states: { value: string; initial: boolean; terminal: boolean }[];
+        transitions: { transitionId: string; label: string; fromValue: string; toValue: string; actionOperationId: string; target: object; fields: object[] }[];
+      }[];
     };
     const schema = JSON.parse(await readFile("schemas/ui-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 1,
-      operationManifestVersion: 1,
+      uiManifestVersion: 2,
+      operationManifestVersion: 2,
       authentication: { required: true, callerInput: false },
     });
 
@@ -117,6 +145,7 @@ describe("backends", () => {
       ],
     });
     const request = manifest.entities.find((entity) => entity.name === "PurchaseRequest")!;
+    expect(request.idFieldId).toBe("field:fld_af918d24406040619a77b244a81ca5d3");
     expect(request.fields.find((field) => field.name === "createdAt")).toMatchObject({
       generated: "now",
       presentation: { kind: "dateTime" },
@@ -125,11 +154,65 @@ describe("backends", () => {
       snapshot: true,
       presentation: { kind: "enumSet" },
     });
+    expect(manifest.workflows).toEqual([expect.objectContaining({
+      workflowId: "workflow:wfl_96a1115ba9bf42f2a206374822eeaa87",
+      label: "Purchase request lifecycle",
+      states: [
+        expect.objectContaining({ value: "DRAFT", initial: true, terminal: false }),
+        expect.objectContaining({ value: "SUBMITTED", initial: false, terminal: false }),
+        expect.objectContaining({ value: "APPROVED", initial: false, terminal: true }),
+      ],
+      transitions: [
+        expect.objectContaining({
+          transitionId: "transition:trn_7787ccd311944f109b69e35967bcbe2c",
+          label: "Submit",
+          fromValue: "DRAFT",
+          toValue: "SUBMITTED",
+          actionOperationId: "action:act_ed2374e822704c51a2925338253d05d2",
+          target: expect.objectContaining({ source: "operationInput", name: "request" }),
+          fields: [],
+        }),
+        expect.objectContaining({ label: "Approve", fromValue: "SUBMITTED", toValue: "APPROVED" }),
+      ],
+    })]);
 
     expect(output["typescript/ui.ts"]).toContain("createProcurementUiExecutor");
+    expect(output["typescript/ui.ts"]).toContain("createProcurementUiWorkflowExecutor");
     expect(output["typescript/ui.ts"]).toContain('case "action:act_1e35db0451b1461e941af6283d86dca2"');
     expect(output["typescript/browser.ts"]).toContain('export * from "./ui.js"');
     expect(`${output["ui.json"]}\n${output["typescript/ui.ts"]}`).not.toMatch(/SELECT |session_user|PostgreSQL|node:/);
+
+    const reservationManifest = JSON.parse(generateAll(await reservations())["ui.json"]!) as { workflows: object[] };
+    expect(validate(reservationManifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(reservationManifest.workflows).toEqual([]);
+  });
+
+  it("removes only the bound workflow target from transition fields", () => {
+    const output = generateAll(compileText(`model TransitionFields version "1";
+      enum State { NEW, DONE }
+      entity User { id: UUID @id; }
+      entity Task {
+        id: UUID @id;
+        state: State = State.NEW;
+        note: String;
+      }
+      action finish(caller actor: User, task: Task, note: String) -> Task {
+        authorize true;
+        require is_new: task.state == State.NEW;
+        update task { state = State.DONE; note = note; }
+      }
+      workflow TaskLifecycle for Task.state {
+        initial State.NEW;
+        transition finish: State.NEW -> State.DONE by finish;
+      }`, "transition-fields.model"));
+    const ui = JSON.parse(output["ui.json"]!) as {
+      workflows: { transitions: { target: { name: string }; fields: { name: string; presentation: object }[] }[] }[];
+    };
+    expect(ui.workflows[0]!.transitions[0]).toMatchObject({
+      target: { source: "operationInput", name: "task" },
+      fields: [{ name: "note", presentation: { kind: "text" } }],
+    });
+    expect(output["typescript/ui.ts"]).toContain('Omit<FinishInput, "task">');
   });
 
   it("keeps stable-ID HTTP routes unchanged across operation renames", () => {
