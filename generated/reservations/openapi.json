@@ -1,0 +1,415 @@
+{
+  "openapi": "3.1.1",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "Reservations ModelLang API",
+    "version": "0.10.0",
+    "description": "Generated from ModelLang operation manifest v1 (sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215)."
+  },
+  "paths": {
+    "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
+      "post": {
+        "operationId": "act_508ad810a19d4b79a5009871de5cd26b",
+        "summary": "reserve",
+        "tags": [
+          "Actions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "action:act_508ad810a19d4b79a5009871de5cd26b",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "startsAt",
+                  "endsAt"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "reserve result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A referenced entity does not exist",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The result would violate a model invariant",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69": {
+      "post": {
+        "operationId": "qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "summary": "reservationsForResource",
+        "tags": [
+          "Queries"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "reservationsForResource result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": {
+                    "$ref": "#/components/schemas/Reservation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A referenced entity does not exist",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Resource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Reservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "resource",
+          "reservedBy",
+          "startsAt",
+          "endsAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "resource": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ModelProblem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

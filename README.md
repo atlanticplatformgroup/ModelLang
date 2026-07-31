@@ -1,6 +1,6 @@
-# ModelLang 0.10 reference compiler
+# ModelLang 0.11 reference compiler
 
-ModelLang compiles a small domain ontology into a PostgreSQL enforcement boundary. The compiler produces a typed canonical IR with persistent semantic identity, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, authenticated actions, bounded queries, enum-set permissions, a typed TypeScript client, a Mermaid graph, and a rule-to-enforcement map.
+ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a transport-neutral operation manifest, OpenAPI, a browser-safe HTTP client, an authenticated server handler, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
 Two canonical applications drive the language:
 
@@ -59,7 +59,9 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only backend input. ModelLang 0.10 deliberately retains IR version 9 so released 0.9 IR remains a valid migration baseline. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.11 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+
+`operations.json` is manifest v1 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, declared action/query inputs and outputs, stable operation IDs, result cardinality, and authenticated caller context. It contains no HTTP paths, SQL names, database roles, connection details, or PostgreSQL types. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
 The PostgreSQL backend emits:
 
@@ -72,7 +74,13 @@ The PostgreSQL backend emits:
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data.
 
-The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field and is never forwarded as a SQL argument. Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. PostgreSQL exclusion and workflow failures map to typed `ConflictError` and `TransitionError` values.
+The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field.
+
+- `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID routes and contains no SQL, database adapter, Node.js, or PostgreSQL contract.
+- `typescript/http-server.ts` authenticates bearer context, validates exact closed input and output objects, enforces query result bounds, dispatches stable operation IDs, maps RFC 9457 problems, and can bridge to an existing caller-bound generated database client.
+- `typescript/client.ts` remains the server-side PostgreSQL client. It never forwards caller identity as a SQL argument; the database resolves it from `session_user`.
+
+Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
 
 Generated values are equally absent from create assignments and public inputs. For example:
 
@@ -84,6 +92,44 @@ createdAt: DateTime @generated(now) @immutable;
 PostgreSQL creates both values inside the action transaction, and the returned typed entity includes them.
 
 Each generated subtree contains `model.mmd`, `enforcement.json`, and `enforcement.md`, making the relationship between declarations and executable enforcement visible.
+
+## HTTP application boundary
+
+Every action and query uses `POST` with a stable semantic-ID route:
+
+```text
+/operations/actions/<act_stable_id>
+/operations/queries/<qry_stable_id>
+```
+
+Renaming a declaration changes its generated method name and OpenAPI summary, but not its route. Request objects reject unknown properties, including any caller-shaped property. The host validates the bearer credential and returns an executor already bound to the authenticated principal:
+
+```ts
+import {
+  createProcurementDatabaseExecutor,
+  createProcurementHttpHandler,
+} from "./generated/procurement/typescript/http-server.js";
+
+const handler = createProcurementHttpHandler(async (token) => {
+  const callerBoundClient = await authenticateAndCreateClient(token);
+  return callerBoundClient
+    ? createProcurementDatabaseExecutor(callerBoundClient)
+    : null;
+});
+```
+
+The browser receives only the API base URL and a token provider:
+
+```ts
+import { ProcurementHttpClient } from "./generated/procurement/typescript/browser.js";
+
+const procurement = new ProcurementHttpClient({
+  baseUrl: "https://api.example.test",
+  accessToken: () => session.accessToken,
+});
+```
+
+The reference Procurement integration maps opaque demo bearer credentials to role-specific PostgreSQL pools on the server. Production token validation and the scalable database identity adapter are host responsibilities; request data can never select or override the ModelLang caller.
 
 ## Stable identity and safe schema evolution
 
@@ -195,6 +241,8 @@ The full suite validates parsing and spans, additive migration planning and live
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
 - Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and automatic UI generation.
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
+- The 0.11 HTTP profile intentionally leaves token issuers and lifecycle, cookie/CSRF/CORS policy, production identity-adapter scaling, caching, retries, idempotency keys, package publication, deployment, and observability to the host.
+- Frontend form/table generation, alternate transports, and AI/MCP generation remain deferred consumers of the same operation manifest.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.10 language is in [spec/0.10/LANGUAGE.md](./spec/0.10/LANGUAGE.md), with its [safe-evolution semantics](./spec/0.10/SAFE_EVOLUTION.md), [conformance requirements](./spec/0.10/CONFORMANCE.md), and [unstable boundaries](./spec/0.10/UNSTABLE.md). The [0.9 language](./spec/0.9/LANGUAGE.md) remains normative where 0.10 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.11 language is in [spec/0.11/LANGUAGE.md](./spec/0.11/LANGUAGE.md), with its [operation transport semantics](./spec/0.11/TRANSPORT.md), [conformance requirements](./spec/0.11/CONFORMANCE.md), and [unstable boundaries](./spec/0.11/UNSTABLE.md). The [0.10 language](./spec/0.10/LANGUAGE.md) remains normative where 0.11 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).

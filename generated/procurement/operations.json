@@ -1,0 +1,311 @@
+{
+  "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
+  "manifestVersion": 1,
+  "model": {
+    "id": "model:Procurement",
+    "name": "Procurement",
+    "version": "0.10.0",
+    "sourceHash": "sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62"
+  },
+  "authentication": {
+    "required": true,
+    "source": "authenticatedContext",
+    "principalEntityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+    "requestSupplied": false
+  },
+  "enums": [
+    {
+      "id": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+      "name": "Role",
+      "members": [
+        {
+          "id": "enumMember:emv_409f87bd5a4340d79e21d4d982175494",
+          "name": "EMPLOYEE",
+          "value": "EMPLOYEE"
+        },
+        {
+          "id": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+          "name": "MANAGER",
+          "value": "MANAGER"
+        },
+        {
+          "id": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+          "name": "FINANCE",
+          "value": "FINANCE"
+        }
+      ]
+    },
+    {
+      "id": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+      "name": "RequestStatus",
+      "members": [
+        {
+          "id": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+          "name": "DRAFT",
+          "value": "DRAFT"
+        },
+        {
+          "id": "enumMember:emv_9c6dc0cfd0bc4a25a89896ccb16f2fd1",
+          "name": "SUBMITTED",
+          "value": "SUBMITTED"
+        },
+        {
+          "id": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+          "name": "APPROVED",
+          "value": "APPROVED"
+        }
+      ]
+    }
+  ],
+  "entities": [
+    {
+      "id": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+      "name": "User",
+      "fields": [
+        {
+          "id": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_a261560f630d4e818f8f099868078535",
+          "name": "name",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+          "name": "roles",
+          "type": {
+            "kind": "enumSet",
+            "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b"
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        }
+      ]
+    },
+    {
+      "id": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+      "name": "PurchaseRequest",
+      "fields": [
+        {
+          "id": "field:fld_af918d24406040619a77b244a81ca5d3",
+          "name": "id",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false,
+          "generated": "uuid",
+          "immutable": true,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_b425073719d6446b9859fe6ca97b0ffe",
+          "name": "createdAt",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          },
+          "nullable": false,
+          "generated": "now",
+          "immutable": true,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_04d9bc06877d4ec38a98196239c949b5",
+          "name": "requester",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+          "name": "amount",
+          "type": {
+            "kind": "money",
+            "currency": "USD",
+            "precision": 20,
+            "scale": 2
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+          "name": "status",
+          "type": {
+            "kind": "enum",
+            "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f"
+          },
+          "nullable": false,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
+          "name": "approvedBy",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
+          },
+          "nullable": true,
+          "immutable": false,
+          "snapshot": false
+        },
+        {
+          "id": "field:fld_577b4c94c9cd4b469aded37614712fba",
+          "name": "approvedByRoles",
+          "type": {
+            "kind": "enumSet",
+            "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b"
+          },
+          "nullable": true,
+          "immutable": false,
+          "snapshot": true
+        }
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "id": "action:act_1e35db0451b1461e941af6283d86dca2",
+      "name": "openRequest",
+      "kind": "action",
+      "input": [
+        {
+          "id": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
+          "name": "amount",
+          "type": {
+            "kind": "money",
+            "currency": "USD",
+            "precision": 20,
+            "scale": 2
+          }
+        }
+      ],
+      "caller": {
+        "parameterId": "parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor",
+        "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+        "source": "authenticatedContext",
+        "requestSupplied": false
+      },
+      "output": {
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "cardinality": "one"
+      },
+      "errors": [
+        "identityBinding",
+        "authorization",
+        "precondition",
+        "validation",
+        "invariant"
+      ]
+    },
+    {
+      "id": "action:act_ed2374e822704c51a2925338253d05d2",
+      "name": "submitRequest",
+      "kind": "action",
+      "input": [
+        {
+          "id": "parameter:action:act_ed2374e822704c51a2925338253d05d2.request",
+          "name": "request",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702"
+          }
+        }
+      ],
+      "caller": {
+        "parameterId": "parameter:action:act_ed2374e822704c51a2925338253d05d2.actor",
+        "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+        "source": "authenticatedContext",
+        "requestSupplied": false
+      },
+      "output": {
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "cardinality": "one"
+      },
+      "errors": [
+        "identityBinding",
+        "authorization",
+        "precondition",
+        "notFound",
+        "transition",
+        "invariant"
+      ]
+    },
+    {
+      "id": "action:act_d39dbb883b5f4019b9027b85add3de47",
+      "name": "approveRequest",
+      "kind": "action",
+      "input": [
+        {
+          "id": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+          "name": "request",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702"
+          }
+        }
+      ],
+      "caller": {
+        "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
+        "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+        "source": "authenticatedContext",
+        "requestSupplied": false
+      },
+      "output": {
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "cardinality": "one"
+      },
+      "errors": [
+        "identityBinding",
+        "authorization",
+        "precondition",
+        "notFound",
+        "transition",
+        "invariant"
+      ]
+    },
+    {
+      "id": "query:qry_4406b045404a48449282db804f6167a8",
+      "name": "myRequests",
+      "kind": "query",
+      "input": [],
+      "caller": {
+        "parameterId": "parameter:query:qry_4406b045404a48449282db804f6167a8.actor",
+        "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+        "source": "authenticatedContext",
+        "requestSupplied": false
+      },
+      "output": {
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "cardinality": "many",
+        "maxItems": 100
+      },
+      "errors": [
+        "identityBinding",
+        "authorization"
+      ]
+    }
+  ]
+}

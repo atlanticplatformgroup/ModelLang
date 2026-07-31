@@ -1,0 +1,232 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/operation-manifest.schema.json",
+  "title": "ModelLang operation manifest",
+  "$defs": {
+    "valueType": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "name"],
+          "properties": {
+            "kind": { "const": "scalar" },
+            "name": { "enum": ["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "entityId"],
+          "properties": {
+            "kind": { "const": "entity" },
+            "entityId": { "type": "string", "pattern": "^entity:" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "enumId"],
+          "properties": {
+            "kind": { "enum": ["enum", "enumSet"] },
+            "enumId": { "type": "string", "pattern": "^enum:" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "currency", "precision", "scale"],
+          "properties": {
+            "kind": { "const": "money" },
+            "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+            "precision": { "type": "integer", "minimum": 1 },
+            "scale": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["id", "name", "type"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^parameter:" },
+        "name": { "type": "string" },
+        "type": { "$ref": "#/$defs/valueType" }
+      },
+      "additionalProperties": false
+    },
+    "caller": {
+      "type": "object",
+      "required": ["parameterId", "entityId", "source", "requestSupplied"],
+      "properties": {
+        "parameterId": { "type": "string", "pattern": "^parameter:" },
+        "entityId": { "type": "string", "pattern": "^entity:" },
+        "source": { "const": "authenticatedContext" },
+        "requestSupplied": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "errors": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "identityBinding",
+          "authorization",
+          "precondition",
+          "transition",
+          "invariant",
+          "conflict",
+          "notFound",
+          "validation"
+        ]
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "name", "kind", "input", "caller", "output", "errors"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^action:" },
+        "name": { "type": "string" },
+        "kind": { "const": "action" },
+        "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+        "caller": { "$ref": "#/$defs/caller" },
+        "output": {
+          "type": "object",
+          "required": ["entityId", "cardinality"],
+          "properties": {
+            "entityId": { "type": "string", "pattern": "^entity:" },
+            "cardinality": { "const": "one" }
+          },
+          "additionalProperties": false
+        },
+        "errors": { "$ref": "#/$defs/errors" }
+      },
+      "additionalProperties": false
+    },
+    "query": {
+      "type": "object",
+      "required": ["id", "name", "kind", "input", "caller", "output", "errors"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^query:" },
+        "name": { "type": "string" },
+        "kind": { "const": "query" },
+        "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+        "caller": { "$ref": "#/$defs/caller" },
+        "output": {
+          "type": "object",
+          "required": ["entityId", "cardinality", "maxItems"],
+          "properties": {
+            "entityId": { "type": "string", "pattern": "^entity:" },
+            "cardinality": { "const": "many" },
+            "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
+          },
+          "additionalProperties": false
+        },
+        "errors": { "$ref": "#/$defs/errors" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "$schema",
+    "manifestVersion",
+    "model",
+    "authentication",
+    "enums",
+    "entities",
+    "operations"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
+    "manifestVersion": { "const": 1 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "authentication": {
+      "type": "object",
+      "required": ["required", "source", "principalEntityId", "requestSupplied"],
+      "properties": {
+        "required": { "const": true },
+        "source": { "const": "authenticatedContext" },
+        "principalEntityId": { "type": "string", "pattern": "^entity:" },
+        "requestSupplied": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "enums": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "members"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^enum:" },
+          "name": { "type": "string" },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "value"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^enumMember:" },
+                "name": { "type": "string" },
+                "value": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "fields"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^entity:" },
+          "name": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "type", "nullable", "immutable", "snapshot"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^field:" },
+                "name": { "type": "string" },
+                "type": { "$ref": "#/$defs/valueType" },
+                "nullable": { "type": "boolean" },
+                "generated": { "enum": ["uuid", "now"] },
+                "immutable": { "type": "boolean" },
+                "snapshot": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/action" },
+          { "$ref": "#/$defs/query" }
+        ]
+      }
+    }
+  },
+  "additionalProperties": false
+}

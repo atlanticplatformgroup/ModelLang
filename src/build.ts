@@ -5,22 +5,27 @@ import type { ModelIR } from "./ir.js";
 import { stableJson } from "./ir.js";
 import { generatePostgres } from "./codegen/postgres.js";
 import { generateTypeScript } from "./codegen/typescript.js";
+import { generateHttp } from "./codegen/http.js";
 import { generateMermaid } from "./codegen/mermaid.js";
 import { enforcementJson, generateEnforcementMarkdown } from "./codegen/enforcement.js";
+import { generateOperationManifest } from "./operation-manifest.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
 }
 
 export function generateAll(ir: ModelIR): GeneratedFiles {
+  const operationManifest = generateOperationManifest(ir);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
+    "operations.json": stableJson(operationManifest),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
   };
   for (const [name, content] of Object.entries(generatePostgres(ir))) files[`postgres/${name}`] = content;
   for (const [name, content] of Object.entries(generateTypeScript(ir))) files[`typescript/${name}`] = content;
+  Object.assign(files, generateHttp(operationManifest));
   return files;
 }
 

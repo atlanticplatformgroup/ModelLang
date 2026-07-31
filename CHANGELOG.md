@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.0
+
+- Added deterministic operation manifest v1 generation from canonical IR9 without changing `.model` grammar or stored model shape.
+- Added stable-ID action and query HTTP routes, OpenAPI 3.1.1 output, closed JSON request schemas, and bearer authentication declarations.
+- Added a browser-safe generated TypeScript client that has no SQL, database adapter, Node.js, or PostgreSQL contract.
+- Added a Fetch-standard generated server handler with authenticated operation executors, exact runtime input validation, and a 1 MiB default request limit.
+- Kept caller identity out of request data and added a server-only bridge to generated caller-bound PostgreSQL clients.
+- Added RFC 9457 problem responses and browser reconstruction of typed ModelLang authentication, identity, authorization, precondition, transition, invariant, conflict, not-found, and validation errors.
+- Added manifest-schema, rename-stability, spoofing, error-sanitization, HTTP boundary, and live Procurement API integration tests.
+
 ## 0.10.0
 
 - Added transactional safe schema evolution while retaining canonical IR version 9 for 0.9 baseline compatibility.

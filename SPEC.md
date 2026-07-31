@@ -1,11 +1,12 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.10](./spec/0.10/LANGUAGE.md). It retains the 0.9 language and adds guarded, additive schema evolution.
+The current normative specification is [ModelLang 0.11](./spec/0.11/LANGUAGE.md). It retains the 0.10 language and adds a derived operation manifest and authenticated HTTP transport.
 
+- [Operation transport semantics](./spec/0.11/TRANSPORT.md)
+- [0.11 unchanged grammar statement](./spec/0.11/GRAMMAR.ebnf)
+- [0.11 conformance requirements](./spec/0.11/CONFORMANCE.md)
+- [0.11 unstable feature boundaries](./spec/0.11/UNSTABLE.md)
 - [Safe schema-evolution semantics](./spec/0.10/SAFE_EVOLUTION.md)
-- [0.10 unchanged grammar statement](./spec/0.10/GRAMMAR.ebnf)
-- [0.10 conformance requirements](./spec/0.10/CONFORMANCE.md)
-- [0.10 unstable feature boundaries](./spec/0.10/UNSTABLE.md)
 - [Workflow semantics](./spec/0.9/WORKFLOWS.md)
 - [Exact-money semantics](./spec/0.8/MONEY.md)
 - [Generated-value and immutability semantics inherited from 0.7](./spec/0.7/GENERATED_VALUES.md)

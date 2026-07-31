@@ -1,9 +1,17 @@
 import { randomUUID } from "node:crypto";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProcurementClient } from "../../generated/procurement/typescript/client.js";
+import { ProcurementHttpClient } from "../../generated/procurement/typescript/http-client.js";
 import {
-  AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
+  createProcurementDatabaseExecutor,
+  createProcurementHttpHandler,
+  type ProcurementAuthenticator,
+} from "../../generated/procurement/typescript/http-server.js";
+import {
+  AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
 import {
   databaseUrl, installDemoDatabase, loginUrl, poolFor,
@@ -21,6 +29,47 @@ let admin: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
+}
+
+async function withHttpServer(
+  authenticate: ProcurementAuthenticator,
+  run: (baseUrl: string) => Promise<void>,
+): Promise<void> {
+  const handler = createProcurementHttpHandler(authenticate);
+  const server = createServer((incoming, outgoing) => {
+    void (async () => {
+      const chunks: Buffer[] = [];
+      for await (const chunk of incoming) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(incoming.headers)) {
+        if (Array.isArray(value)) for (const item of value) headers.append(name, item);
+        else if (value !== undefined) headers.set(name, value);
+      }
+      const body = Buffer.concat(chunks).toString("utf8");
+      const request = new Request(`http://${incoming.headers.host}${incoming.url}`, {
+        method: incoming.method,
+        headers,
+        ...(body ? { body } : {}),
+      });
+      const response = await handler(request);
+      outgoing.statusCode = response.status;
+      response.headers.forEach((value, name) => outgoing.setHeader(name, value));
+      outgoing.end(Buffer.from(await response.arrayBuffer()));
+    })().catch((error: unknown) => {
+      outgoing.statusCode = 500;
+      outgoing.end(error instanceof Error ? error.message : String(error));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address() as AddressInfo;
+  try {
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
 }
 
 beforeAll(async () => {
@@ -415,5 +464,52 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       blocker.release();
       await Promise.all([first.end(), second.end()]);
     }
+  });
+
+  it("preserves authenticated Procurement semantics through generated HTTP and browser boundaries", async () => {
+    const executors = new Map([
+      ["employee-one", createProcurementDatabaseExecutor(clients.employeeOne)],
+      ["manager", createProcurementDatabaseExecutor(clients.manager)],
+      ["finance", createProcurementDatabaseExecutor(clients.finance)],
+    ]);
+    await withHttpServer(async (token) => executors.get(token) ?? null, async (baseUrl) => {
+      const employee = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-one" });
+      const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
+      const finance = new ProcurementHttpClient({ baseUrl, accessToken: () => "finance" });
+
+      await expect(employee.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
+      const low = await employee.openRequest({ amount: usd("5000") });
+      expect(low.requester).toBe("00000000-0000-4000-8000-000000000001");
+      await employee.submitRequest({ request: low.id });
+      const approved = await manager.approveRequest({ request: low.id });
+      expect(approved).toMatchObject({
+        status: "APPROVED",
+        approvedBy: "00000000-0000-4000-8000-000000000003",
+      });
+
+      const high = await employee.openRequest({ amount: usd("25000") });
+      await employee.submitRequest({ request: high.id });
+      await expect(manager.approveRequest({ request: high.id })).rejects.toBeInstanceOf(AuthorizationError);
+      expect((await finance.approveRequest({ request: high.id })).status).toBe("APPROVED");
+      expect((await employee.myRequests({})).map((request) => request.id)).toEqual(expect.arrayContaining([low.id, high.id]));
+
+      const beforeSpoof = (await employee.myRequests({})).length;
+      const spoof = await fetch(`${baseUrl}/operations/actions/act_1e35db0451b1461e941af6283d86dca2`, {
+        method: "POST",
+        headers: {
+          authorization: "Bearer employee-one",
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          actor: "00000000-0000-4000-8000-000000000004",
+          amount: usd("10"),
+        }),
+      });
+      expect(spoof.status).toBe(400);
+      expect((await employee.myRequests({})).length).toBe(beforeSpoof);
+
+      const invalid = new ProcurementHttpClient({ baseUrl, accessToken: () => "invalid" });
+      await expect(invalid.myRequests({})).rejects.toBeInstanceOf(AuthenticationError);
+    });
   });
 });

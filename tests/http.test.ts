@@ -1,0 +1,154 @@
+import { describe, expect, it, vi } from "vitest";
+import { ProcurementHttpClient } from "../generated/procurement/typescript/http-client.js";
+import {
+  createProcurementHttpHandler,
+  type ProcurementOperationExecutor,
+} from "../generated/procurement/typescript/http-server.js";
+import {
+  AuthorizationError,
+  ModelOperationError,
+  ValidationError,
+} from "../generated/procurement/typescript/errors.js";
+
+const openRoute = "https://example.test/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
+const purchaseRequest = {
+  id: "00000000-0000-4000-8000-000000000010",
+  createdAt: "2026-07-30T12:00:00Z",
+  requester: "00000000-0000-4000-8000-000000000001",
+  amount: { currency: "USD", amount: "10.00" },
+  status: "DRAFT",
+  approvedBy: null,
+  approvedByRoles: null,
+};
+
+function request(body: unknown, headers: Record<string, string> = {}): Request {
+  return new Request(openRoute, {
+    method: "POST",
+    headers: {
+      authorization: "Bearer valid",
+      "content-type": "application/json",
+      ...headers,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("generated HTTP boundary", () => {
+  it("authenticates context and passes only validated callable input to the stable operation ID", async () => {
+    const execute = vi.fn(async () => purchaseRequest);
+    const executor: ProcurementOperationExecutor = { execute };
+    const authenticate = vi.fn(async () => executor);
+    const handler = createProcurementHttpHandler(authenticate);
+
+    const response = await handler(request({ amount: { currency: "USD", amount: "10.00" } }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(purchaseRequest);
+    expect(authenticate).toHaveBeenCalledWith("valid");
+    expect(execute).toHaveBeenCalledWith(
+      "action:act_1e35db0451b1461e941af6283d86dca2",
+      { amount: { currency: "USD", amount: "10.00" } },
+    );
+  });
+
+  it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {
+    const execute = vi.fn();
+    const authenticate = vi.fn(async () => ({ execute } satisfies ProcurementOperationExecutor));
+    const handler = createProcurementHttpHandler(authenticate, { maxBodyBytes: 100 });
+
+    const unauthenticated = await handler(new Request(openRoute, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }));
+    expect(unauthenticated.status).toBe(401);
+    expect(authenticate).not.toHaveBeenCalled();
+
+    const spoofed = await handler(request({
+      actor: "00000000-0000-4000-8000-000000000004",
+      amount: { currency: "USD", amount: "10.00" },
+    }));
+    expect(spoofed.status).toBe(400);
+    expect(await spoofed.json()).toMatchObject({
+      type: "https://modellang.dev/problems/validation",
+      ruleId: "transport:request_body",
+    });
+
+    const malformed = await handler(new Request(openRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: "{",
+    }));
+    expect(malformed.status).toBe(400);
+
+    const tooLarge = await handler(request({ amount: { currency: "USD", amount: "1".repeat(200) } }));
+    expect(tooLarge.status).toBe(413);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("round-trips typed ModelLang failures and hides unexpected server details", async () => {
+    const ruleId = "authorize:action:act_1e35db0451b1461e941af6283d86dca2";
+    const authorizationHandler = createProcurementHttpHandler(async () => ({
+      async execute() {
+        throw new AuthorizationError("raw backend detail", "42501", ruleId, new Error("secret SQL"));
+      },
+    }));
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: (input, init) => authorizationHandler(new Request(input, init)),
+    });
+
+    await expect(client.openRequest({ amount: { currency: "USD", amount: "10.00" } })).rejects.toMatchObject({
+      name: AuthorizationError.name,
+      code: "ML_AUTHORIZATION",
+      ruleId,
+    });
+    const failure = await authorizationHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
+    expect(JSON.stringify(await failure.json())).not.toMatch(/raw backend detail|secret SQL|42501/);
+
+    const unexpectedHandler = createProcurementHttpHandler(async () => ({
+      async execute() {
+        throw new Error("password=do-not-expose");
+      },
+    }));
+    const unexpected = await unexpectedHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
+    expect(unexpected.status).toBe(500);
+    expect(await unexpected.json()).toEqual({
+      type: "https://modellang.dev/problems/internal",
+      title: "The operation failed unexpectedly.",
+      status: 500,
+      code: "ML_INTERNAL",
+    });
+
+    const malformedOutputHandler = createProcurementHttpHandler(async () => ({
+      async execute() {
+        return { ...purchaseRequest, databaseSecret: "do-not-expose" };
+      },
+    }));
+    const malformedOutput = await malformedOutputHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
+    expect(malformedOutput.status).toBe(500);
+    expect(JSON.stringify(await malformedOutput.json())).not.toContain("databaseSecret");
+  });
+
+  it("maps transport boundary failures to typed validation errors", async () => {
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: async () => Response.json({
+        type: "https://modellang.dev/problems/unsupported-media-type",
+        title: "Content-Type must be application/json.",
+        status: 415,
+        code: "ML_UNSUPPORTED_MEDIA_TYPE",
+      }, { status: 415, headers: { "content-type": "application/problem+json" } }),
+    });
+    await expect(client.myRequests({})).rejects.toBeInstanceOf(ValidationError);
+
+    const unknownClient = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: async () => Response.json({ title: "Unknown" }, { status: 502 }),
+    });
+    await expect(unknownClient.myRequests({})).rejects.toBeInstanceOf(ModelOperationError);
+  });
+});

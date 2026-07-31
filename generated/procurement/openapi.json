@@ -1,0 +1,729 @@
+{
+  "openapi": "3.1.1",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "info": {
+    "title": "Procurement ModelLang API",
+    "version": "0.10.0",
+    "description": "Generated from ModelLang operation manifest v1 (sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62)."
+  },
+  "paths": {
+    "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
+      "post": {
+        "operationId": "act_1e35db0451b1461e941af6283d86dca2",
+        "summary": "openRequest",
+        "tags": [
+          "Actions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "action:act_1e35db0451b1461e941af6283d86dca2",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "amount"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "currency",
+                      "amount"
+                    ],
+                    "properties": {
+                      "currency": {
+                        "const": "USD"
+                      },
+                      "amount": {
+                        "type": "string",
+                        "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                        "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "openRequest result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The result would violate a model invariant",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/actions/act_ed2374e822704c51a2925338253d05d2": {
+      "post": {
+        "operationId": "act_ed2374e822704c51a2925338253d05d2",
+        "summary": "submitRequest",
+        "tags": [
+          "Actions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "action:act_ed2374e822704c51a2925338253d05d2",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "submitRequest result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A referenced entity does not exist",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The result would violate a model invariant",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/actions/act_d39dbb883b5f4019b9027b85add3de47": {
+      "post": {
+        "operationId": "act_d39dbb883b5f4019b9027b85add3de47",
+        "summary": "approveRequest",
+        "tags": [
+          "Actions"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "action:act_d39dbb883b5f4019b9027b85add3de47",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "approveRequest result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PurchaseRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "A referenced entity does not exist",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The result would violate a model invariant",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/operations/queries/qry_4406b045404a48449282db804f6167a8": {
+      "post": {
+        "operationId": "qry_4406b045404a48449282db804f6167a8",
+        "summary": "myRequests",
+        "tags": [
+          "Queries"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "query:qry_4406b045404a48449282db804f6167a8",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "myRequests result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "maxItems": 100,
+                  "items": {
+                    "$ref": "#/components/schemas/PurchaseRequest"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Role": {
+        "type": "string",
+        "enum": [
+          "EMPLOYEE",
+          "MANAGER",
+          "FINANCE"
+        ]
+      },
+      "RequestStatus": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "SUBMITTED",
+          "APPROVED"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "roles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "uniqueItems": true
+          }
+        }
+      },
+      "PurchaseRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "requester",
+          "amount",
+          "status",
+          "approvedBy",
+          "approvedByRoles"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "readOnly": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "requester": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "currency",
+              "amount"
+            ],
+            "properties": {
+              "currency": {
+                "const": "USD"
+              },
+              "amount": {
+                "type": "string",
+                "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+              }
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          },
+          "approvedBy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approvedByRoles": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Role"
+                },
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Stored point-in-time snapshot."
+          }
+        }
+      },
+      "ModelProblem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer",
+            "minimum": 400,
+            "maximum": 599
+          },
+          "detail": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "ruleId": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

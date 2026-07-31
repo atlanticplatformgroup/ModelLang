@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, it } from "vitest";
 import { compileText } from "../src/compiler.js";
 import { generateAll } from "../src/build.js";
@@ -28,6 +29,62 @@ describe("backends", () => {
     for (const [path, expected] of Object.entries(reservationOutput)) {
       expect(await readFile(`generated/reservations/${path}`, "utf8"), `reservations/${path}`).toBe(expected);
     }
+  });
+
+  it("derives a transport-neutral operation manifest and stable HTTP boundary from canonical IR", async () => {
+    const output = generateAll(await procurement());
+    const manifest = JSON.parse(output["operations.json"]!) as {
+      manifestVersion: number;
+      authentication: { source: string; requestSupplied: boolean };
+      operations: { id: string; kind: string; name: string; input: { name: string }[]; caller: { requestSupplied: boolean } }[];
+    };
+    const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(manifest.manifestVersion).toBe(1);
+    expect(manifest.authentication).toEqual(expect.objectContaining({
+      source: "authenticatedContext",
+      requestSupplied: false,
+    }));
+    expect(manifest.operations).toHaveLength(4);
+    for (const operation of manifest.operations) {
+      expect(operation.caller.requestSupplied).toBe(false);
+      expect(operation.input.map((parameter) => parameter.name)).not.toContain("actor");
+    }
+
+    const openapi = JSON.parse(output["openapi.json"]!) as {
+      openapi: string;
+      paths: Record<string, { post: { summary: string; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } } } }>;
+    };
+    expect(openapi.openapi).toBe("3.1.1");
+    const openRoute = "/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
+    expect(openapi.paths[openRoute]?.post.summary).toBe("openRequest");
+    const requestSchema = openapi.paths[openRoute]!.post.requestBody.content["application/json"].schema;
+    expect(requestSchema.additionalProperties).toBe(false);
+    expect(requestSchema.properties).not.toHaveProperty("actor");
+
+    const browser = `${output["typescript/browser.ts"]}\n${output["typescript/http-client.ts"]}`;
+    expect(browser).not.toMatch(/QueryAdapter|SELECT |session_user|PostgreSQL|node:/);
+    expect(output["typescript/http-client.ts"]).toContain(`authorization: \`Bearer \${token}\``);
+    expect(output["typescript/http-server.ts"]).toContain("createProcurementDatabaseExecutor");
+  });
+
+  it("keeps stable-ID HTTP routes unchanged across operation renames", () => {
+    const source = (name: string) => `model RouteProof version "1";
+      entity User @stableId("ent_11111111111111111111111111111111") {
+        id: UUID @id @stableId("fld_11111111111111111111111111111111");
+      }
+      entity Item @stableId("ent_22222222222222222222222222222222") {
+        id: UUID @id @stableId("fld_22222222222222222222222222222222");
+      }
+      action ${name} @stableId("act_11111111111111111111111111111111")(caller actor: User, id: UUID) -> Item {
+        authorize true;
+        create Item { id = id; }
+      }`;
+    const before = JSON.parse(generateAll(compileText(source("firstName")))["openapi.json"]!) as { paths: object };
+    const after = JSON.parse(generateAll(compileText(source("secondName")))["openapi.json"]!) as { paths: object };
+    expect(Object.keys(before.paths)).toEqual(Object.keys(after.paths));
+    expect(Object.keys(after.paths)).toEqual(["/operations/actions/act_11111111111111111111111111111111"]);
   });
 
   it("emits atomic half-open temporal exclusion enforcement", async () => {
