@@ -1015,7 +1015,7 @@ function buildEnforcement(
 ): EnforcementEntry[] {
   const entries: EnforcementEntry[] = [{
     id: "boundary:principal_binding",
-    purpose: "Bind session_user to the model principal through an owner-controlled table.",
+    purpose: "Bind a direct database session identity to the model principal through an owner-controlled table.",
     layer: "PostgreSQL session identity",
     artifact: "postgres/002_schema.sql",
     objectName: `${internalSchema}.principal_binding`,
@@ -1025,6 +1025,24 @@ function buildEnforcement(
     layer: "PostgreSQL role",
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_owner NOLOGIN",
+  }, {
+    id: "boundary:gateway_role",
+    purpose: "Confine shared-credential identity activation to a dedicated non-login gateway role.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_gateway NOLOGIN",
+  }, {
+    id: "boundary:gateway_identity",
+    purpose: "Resolve verified issuer and subject claims through an owner-controlled binding inside one transaction.",
+    layer: "PostgreSQL transaction identity",
+    artifact: "postgres/002_schema.sql",
+    objectName: `${internalSchema}.gateway_principal_binding`,
+  }, {
+    id: "boundary:gateway_audit",
+    purpose: "Record gateway issuer and subject provenance symmetrically with the resolved principal.",
+    layer: "PostgreSQL audit",
+    artifact: "postgres/002_schema.sql",
+    objectName: `${internalSchema}.action_audit`,
   }, {
     id: "boundary:internal_schema",
     purpose: "Application principals cannot access principal bindings, audit storage, or migration history.",
@@ -1086,7 +1104,7 @@ function buildEnforcement(
   for (const action of actions) {
     const fn = `${schema}.${action.naming.sqlFunction}`;
     const caller = action.parameters.find((parameter) => parameter.id === action.callerParameterId)!;
-    entries.push({ id: `caller:${action.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_actions.sql", objectName: fn, source: caller.span });
+    entries.push({ id: `caller:${action.id}.${caller.name}`, purpose: "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.", layer: "PostgreSQL authenticated identity", artifact: "postgres/003_actions.sql", objectName: fn, source: caller.span });
     for (const parameter of action.parameters.filter((candidate) => isMoneyType(candidate.type))) {
       entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL action input validation", artifact: "postgres/003_actions.sql", objectName: fn, source: parameter.span });
     }
@@ -1099,7 +1117,7 @@ function buildEnforcement(
   for (const query of queries) {
     const fn = `${schema}.${query.naming.sqlFunction}`;
     const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId)!;
-    entries.push({ id: `caller:${query.id}.${caller.name}`, purpose: "Derive the semantic caller from session_user; no caller UUID is accepted.", layer: "PostgreSQL session identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
+    entries.push({ id: `caller:${query.id}.${caller.name}`, purpose: "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.", layer: "PostgreSQL authenticated identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
     for (const parameter of query.parameters.filter((candidate) => isMoneyType(candidate.type))) {
       entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL query input validation", artifact: "postgres/003_queries.sql", objectName: fn, source: parameter.span });
     }
@@ -1130,6 +1148,6 @@ function buildEnforcement(
       });
     }
   }
-  entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
+  entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   return entries;
 }

@@ -1,4 +1,4 @@
--- Generated guarded query functions. Caller identity is always session_user.
+-- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
 CREATE OR REPLACE FUNCTION "model_procurement"."my_requests"()
@@ -12,14 +12,8 @@ DECLARE
   v_result jsonb;
   v_actor "model_procurement"."user"%ROWTYPE;
 BEGIN
-  SELECT "principal_id" INTO v_principal_id
-  FROM "model_procurement_internal"."principal_binding"
-  WHERE "database_principal" = session_user
-  FOR SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
+  SELECT identity."principal_id" INTO v_principal_id
+  FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   SELECT * INTO v_actor
   FROM "model_procurement"."user"

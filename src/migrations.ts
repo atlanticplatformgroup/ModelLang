@@ -7,6 +7,8 @@ import {
   generateAddFieldStatements,
   generateEntityForeignKeyStatements,
   generateEntityTableStatement,
+  generateGatewayInfrastructureStatements,
+  generateGatewayRoleStatements,
   generatePostgres,
   generateRefreshEnumConstraintStatements,
   generateWorkflowStatements,
@@ -637,12 +639,16 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   const sql = [
     `-- ModelLang safe schema migration ${previous.model.version} -> ${current.model.version}`,
     "BEGIN;",
+    "-- Bootstrap the 0.12 shared gateway role before assuming the non-login owner role.",
+    generateGatewayRoleStatements(),
     ...(entityDiff.added.some((entity) => entity.temporalExclusions.length > 0)
       ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;"]
       : []),
     "SET LOCAL ROLE modellang_owner;",
     ...historyBootstrapStatements(previous, current),
     ...(structuralStatements.length ? structuralStatements : ["-- No structural schema changes detected."]),
+    "-- Upgrade the internal gateway identity and audit boundary after physical renames.",
+    ...generateGatewayInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),

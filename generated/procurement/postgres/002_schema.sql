@@ -86,6 +86,102 @@ CREATE TABLE "model_procurement_internal"."action_audit" (
   "occurred_at" timestamptz NOT NULL DEFAULT transaction_timestamp()
 );
 
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."gateway_principal_binding" (
+  "issuer" text NOT NULL,
+  "subject" text NOT NULL,
+  "principal_id" uuid NOT NULL REFERENCES "model_procurement"."user" ("id"),
+  PRIMARY KEY ("issuer", "subject"),
+  CONSTRAINT "ck_gateway_principal_binding_identity" CHECK (
+    pg_catalog.char_length("issuer") BETWEEN 1 AND 512
+    AND pg_catalog.char_length("subject") BETWEEN 1 AND 512
+  )
+);
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_issuer" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_subject" text;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass
+      AND conname = 'ck_action_audit_gateway_identity'
+  ) THEN
+    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_gateway_identity"
+      CHECK (("identity_issuer" IS NULL) = ("identity_subject" IS NULL));
+  END IF;
+END
+$modellang$;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."bind_gateway_identity"(p_issuer text, p_subject text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_GATEWAY_REQUIRED';
+  END IF;
+  IF p_issuer IS NULL OR pg_catalog.char_length(p_issuer) NOT BETWEEN 1 AND 512
+     OR p_subject IS NULL OR pg_catalog.char_length(p_subject) NOT BETWEEN 1 AND 512 THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:gateway_identity';
+  END IF;
+  PERFORM 1 FROM "model_procurement_internal"."gateway_principal_binding" AS binding
+  WHERE binding."issuer" = p_issuer AND binding."subject" = p_subject
+  FOR SHARE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+  PERFORM pg_catalog.set_config('modellang.gateway_issuer', p_issuer, true);
+  PERFORM pg_catalog.set_config('modellang.gateway_subject', p_subject, true);
+END
+$modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."bind_gateway_identity"(text, text) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."resolve_principal"()
+RETURNS TABLE ("principal_id" uuid, "identity_issuer" text, "identity_subject" text)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_issuer text;
+  v_subject text;
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
+  ) THEN
+    v_issuer := pg_catalog.current_setting('modellang.gateway_issuer', true);
+    v_subject := pg_catalog.current_setting('modellang.gateway_subject', true);
+    IF v_issuer IS NULL OR v_issuer = '' OR v_subject IS NULL OR v_subject = '' THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+    END IF;
+    RETURN QUERY
+      SELECT binding."principal_id", binding."issuer", binding."subject"
+      FROM "model_procurement_internal"."gateway_principal_binding" AS binding
+      WHERE binding."issuer" = v_issuer AND binding."subject" = v_subject
+      FOR SHARE;
+  ELSE
+    RETURN QUERY
+      SELECT binding."principal_id", NULL::text, NULL::text
+      FROM "model_procurement_internal"."principal_binding" AS binding
+      WHERE binding."database_principal" = session_user
+      FOR SHARE;
+  END IF;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
+  END IF;
+END
+$modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."resolve_principal"() FROM PUBLIC;
+
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "model_id" text NOT NULL,

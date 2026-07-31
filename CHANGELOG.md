@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+
+- Added a dedicated non-login `modellang_gateway` PostgreSQL role for shared server credentials while preserving direct-login mode.
+- Added owner-controlled `(issuer, subject)` bindings to model principals without adding caller identity to `.model` inputs, the operation manifest, OpenAPI, or browser clients.
+- Added transaction-local gateway identity activation and a generated resolver that ignores forged gateway settings from ordinary application roles.
+- Added a server-only generated TypeScript gateway executor that owns acquire, begin, bind, execute, commit-or-rollback, and release for one declared operation.
+- Added symmetric issuer/subject provenance to action audit rows while retaining database-principal and resolved-principal attribution.
+- Added an idempotent `006_upgrade_0_12.sql` artifact and integrated the same internal upgrade into guarded schema migrations.
+- Added live Procurement HTTP tests using one shared pool, including forced connection reuse, concurrent callers, rollback cleanup, unbound identities, direct-login spoof attempts, and gateway audit provenance.
+
 ## 0.11.0
 
 - Added deterministic operation manifest v1 generation from canonical IR9 without changing `.model` grammar or stored model shape.

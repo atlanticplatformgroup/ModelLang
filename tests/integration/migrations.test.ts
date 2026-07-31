@@ -199,8 +199,35 @@ describe("ModelLang 0.10 PostgreSQL safe evolution", () => {
     );
     await admin.query("SELECT model_evolution_integration.open($1)", [ticketId]);
 
+    // Simulate the internal boundary of a released 0.11 installation. The 0.12
+    // migration must add gateway infrastructure independently of model DDL.
+    await admin.query(`
+      DROP FUNCTION model_evolution_integration_internal.bind_gateway_identity(text, text);
+      DROP FUNCTION model_evolution_integration_internal.resolve_principal();
+      DROP TABLE model_evolution_integration_internal.gateway_principal_binding;
+      ALTER TABLE model_evolution_integration_internal.action_audit
+        DROP CONSTRAINT ck_action_audit_gateway_identity,
+        DROP COLUMN identity_issuer,
+        DROP COLUMN identity_subject;
+    `);
+
     const plan = planMigration(previous, current);
     await admin.query(plan.sql);
+
+    const gatewayBoundary = await admin.query<{ gateway_table: string; issuer_column: string }>(`
+      SELECT
+        pg_catalog.to_regclass('model_evolution_integration_internal.gateway_principal_binding')::text AS gateway_table,
+        (
+          SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'model_evolution_integration_internal'
+            AND table_name = 'action_audit'
+            AND column_name = 'identity_issuer'
+        ) AS issuer_column
+    `);
+    expect(gatewayBoundary.rows).toEqual([{
+      gateway_table: "model_evolution_integration_internal.gateway_principal_binding",
+      issuer_column: "identity_issuer",
+    }]);
 
     const preserved = await admin.query<{ id: string; status: string; note: string | null; priority: string }>(
       "SELECT id, status, note, priority::text FROM model_evolution_integration.ticket WHERE id = $1",

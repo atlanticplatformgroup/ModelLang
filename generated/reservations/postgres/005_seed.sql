@@ -13,4 +13,8 @@ INSERT INTO "model_reservations_internal"."principal_binding" ("database_princip
   ('ml_reserver_one', '10000000-0000-4000-8000-000000000001'),
   ('ml_reserver_two', '10000000-0000-4000-8000-000000000002');
 
+INSERT INTO "model_reservations_internal"."gateway_principal_binding" ("issuer", "subject", "principal_id") VALUES
+  ('https://auth.example.test', 'reserver-one', '10000000-0000-4000-8000-000000000001'),
+  ('https://auth.example.test', 'reserver-two', '10000000-0000-4000-8000-000000000002');
+
 RESET ROLE;

@@ -1,4 +1,4 @@
--- Generated guarded query functions. Caller identity is always session_user.
+-- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
 CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid)
@@ -13,14 +13,8 @@ DECLARE
   v_actor "model_reservations"."user"%ROWTYPE;
   v_resource "model_reservations"."resource"%ROWTYPE;
 BEGIN
-  SELECT "principal_id" INTO v_principal_id
-  FROM "model_reservations_internal"."principal_binding"
-  WHERE "database_principal" = session_user
-  FOR SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
+  SELECT identity."principal_id" INTO v_principal_id
+  FROM "model_reservations_internal"."resolve_principal"() AS identity;
 
   SELECT * INTO v_actor
   FROM "model_reservations"."user"

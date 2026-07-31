@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Client, Pool } from "pg";
@@ -6,10 +7,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProcurementClient } from "../../generated/procurement/typescript/client.js";
 import { ProcurementHttpClient } from "../../generated/procurement/typescript/http-client.js";
 import {
-  createProcurementDatabaseExecutor,
   createProcurementHttpHandler,
   type ProcurementAuthenticator,
 } from "../../generated/procurement/typescript/http-server.js";
+import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
 import {
   AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
@@ -26,6 +27,7 @@ const clients = {
   unbound: undefined as unknown as ProcurementClient,
 };
 let admin: Pool;
+let gateway: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -79,7 +81,8 @@ beforeAll(async () => {
   const manager = poolFor("ml_manager");
   const finance = poolFor("ml_finance");
   const unbound = poolFor("ml_unbound");
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound);
+  gateway = new Pool({ connectionString: loginUrl("ml_gateway"), max: 1 });
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -274,6 +277,28 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(functions.rows.map((row) => row.args).join(" ")).not.toMatch(/actor|principal/i);
   });
 
+  it("reapplies the transactional 0.12 backend upgrade without changing model data or history", async () => {
+    const before = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/006_upgrade_0_12.sql", "utf8");
+    const mismatched = upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`);
+    await expect(admin.query(mismatched)).rejects.toMatchObject({
+      code: "55000",
+      message: expect.stringContaining("ML_MIGRATION_BASELINE:"),
+    });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
   it("denies direct mutation, internal access, and owner role assumption", async () => {
     const application = new Client({ connectionString: loginUrl("ml_employee_one") });
     await application.connect();
@@ -285,6 +310,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         `DELETE FROM model_procurement.purchase_request WHERE false`,
         `TRUNCATE model_procurement.purchase_request`,
         `SELECT * FROM model_procurement_internal.principal_binding`,
+        `SELECT * FROM model_procurement_internal.gateway_principal_binding`,
+        `SELECT * FROM model_procurement_internal.action_audit`,
         `SELECT * FROM model_procurement_internal.schema_migrations`,
         `SET ROLE modellang_owner`,
       ]) {
@@ -299,6 +326,16 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       FROM pg_catalog.pg_roles owner WHERE owner.rolname = 'modellang_owner'
     `);
     expect(role.rows[0]).toEqual({ rolcanlogin: false, member: false });
+    const gatewayRole = await admin.query<{ rolcanlogin: boolean; direct_member: boolean }>(`
+      SELECT gateway.rolcanlogin,
+             EXISTS (
+               SELECT 1 FROM pg_catalog.pg_auth_members membership
+               JOIN pg_catalog.pg_roles member_role ON member_role.oid = membership.member
+               WHERE membership.roleid = gateway.oid AND member_role.rolname = 'ml_employee_one'
+             ) AS direct_member
+      FROM pg_catalog.pg_roles gateway WHERE gateway.rolname = 'modellang_gateway'
+    `);
+    expect(gatewayRole.rows[0]).toEqual({ rolcanlogin: false, direct_member: false });
   });
 
   it("uses approval invariants as final backstops and audits successes", async () => {
@@ -342,16 +379,24 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approver_differs_from_requester" });
 
     const id = (await clients.employeeOne.openRequest({ amount: usd("3") })).id;
-    const audit = await admin.query<{ database_principal: string; principal_id: string; count: string }>(
-      `SELECT database_principal, principal_id, count(*)::text AS count
+    const audit = await admin.query<{
+      database_principal: string;
+      principal_id: string;
+      identity_issuer: string | null;
+      identity_subject: string | null;
+      count: string;
+    }>(
+      `SELECT database_principal, principal_id, identity_issuer, identity_subject, count(*)::text AS count
        FROM model_procurement_internal.action_audit
        WHERE action_id = 'action:act_1e35db0451b1461e941af6283d86dca2' AND target_id = $1
-       GROUP BY database_principal, principal_id`,
+       GROUP BY database_principal, principal_id, identity_issuer, identity_subject`,
       [id],
     );
     expect(audit.rows).toEqual([{
       database_principal: "ml_employee_one",
       principal_id: "00000000-0000-4000-8000-000000000001",
+      identity_issuer: null,
+      identity_subject: null,
       count: "1",
     }]);
   });
@@ -467,12 +512,15 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("preserves authenticated Procurement semantics through generated HTTP and browser boundaries", async () => {
-    const executors = new Map([
-      ["employee-one", createProcurementDatabaseExecutor(clients.employeeOne)],
-      ["manager", createProcurementDatabaseExecutor(clients.manager)],
-      ["finance", createProcurementDatabaseExecutor(clients.finance)],
+    const identities = new Map([
+      ["employee-one", { issuer: "https://auth.example.test", subject: "employee-one" }],
+      ["manager", { issuer: "https://auth.example.test", subject: "manager" }],
+      ["finance", { issuer: "https://auth.example.test", subject: "finance" }],
     ]);
-    await withHttpServer(async (token) => executors.get(token) ?? null, async (baseUrl) => {
+    await withHttpServer(async (token) => {
+      const identity = identities.get(token);
+      return identity ? createProcurementGatewayExecutor(gateway, identity) : null;
+    }, async (baseUrl) => {
       const employee = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-one" });
       const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
       const finance = new ProcurementHttpClient({ baseUrl, accessToken: () => "finance" });
@@ -511,5 +559,91 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const invalid = new ProcurementHttpClient({ baseUrl, accessToken: () => "invalid" });
       await expect(invalid.myRequests({})).rejects.toBeInstanceOf(AuthenticationError);
     });
+  });
+
+  it("binds gateway identity per transaction without leaking across pooled requests or rollbacks", async () => {
+    const employee = createProcurementGatewayExecutor(gateway, {
+      issuer: "https://auth.example.test",
+      subject: "employee-one",
+    });
+    const manager = createProcurementGatewayExecutor(gateway, {
+      issuer: "https://auth.example.test",
+      subject: "manager",
+    });
+    const unbound = createProcurementGatewayExecutor(gateway, {
+      issuer: "https://auth.example.test",
+      subject: "unknown",
+    });
+
+    await expect(employee.execute("action:act_1e35db0451b1461e941af6283d86dca2", {
+      amount: usd("0"),
+    })).rejects.toBeInstanceOf(PreconditionError);
+
+    const [employeeRequest, managerRequest] = await Promise.all([
+      employee.execute("action:act_1e35db0451b1461e941af6283d86dca2", { amount: usd("101") }),
+      manager.execute("action:act_1e35db0451b1461e941af6283d86dca2", { amount: usd("102") }),
+    ]) as [{ id: string; requester: string }, { id: string; requester: string }];
+    expect(employeeRequest.requester).toBe("00000000-0000-4000-8000-000000000001");
+    expect(managerRequest.requester).toBe("00000000-0000-4000-8000-000000000003");
+    await expect(unbound.execute("query:qry_4406b045404a48449282db804f6167a8", {}))
+      .rejects.toBeInstanceOf(IdentityBindingError);
+
+    const connection = await gateway.connect();
+    try {
+      await expect(connection.query("SELECT * FROM model_procurement_internal.gateway_principal_binding"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(connection.query("SELECT * FROM model_procurement_internal.resolve_principal()"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(connection.query("SELECT model_procurement.my_requests()"))
+        .rejects.toMatchObject({ message: expect.stringContaining("ML_IDENTITY_UNBOUND") });
+    } finally {
+      connection.release();
+    }
+
+    const audit = await admin.query<{
+      target_id: string;
+      database_principal: string;
+      identity_issuer: string;
+      identity_subject: string;
+    }>(
+      `SELECT target_id, database_principal, identity_issuer, identity_subject
+       FROM model_procurement_internal.action_audit
+       WHERE target_id = ANY($1::uuid[])
+       ORDER BY target_id`,
+      [[employeeRequest.id, managerRequest.id]],
+    );
+    expect(audit.rows).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        target_id: employeeRequest.id,
+        database_principal: "ml_gateway",
+        identity_issuer: "https://auth.example.test",
+        identity_subject: "employee-one",
+      }),
+      expect.objectContaining({
+        target_id: managerRequest.id,
+        database_principal: "ml_gateway",
+        identity_issuer: "https://auth.example.test",
+        identity_subject: "manager",
+      }),
+    ]));
+  });
+
+  it("ignores forged gateway settings from direct-login application roles", async () => {
+    const connection = await pools[0]!.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query("SET LOCAL modellang.gateway_issuer = 'https://auth.example.test'");
+      await connection.query("SET LOCAL modellang.gateway_subject = 'finance'");
+      const request = await new ProcurementClient(connection).openRequest({ amount: usd("103") });
+      expect(request.requester).toBe("00000000-0000-4000-8000-000000000001");
+      await connection.query("COMMIT");
+      await expect(connection.query(
+        "SELECT model_procurement_internal.bind_gateway_identity($1, $2)",
+        ["https://auth.example.test", "finance"],
+      )).rejects.toMatchObject({ code: "42501" });
+    } finally {
+      await connection.query("ROLLBACK").catch(() => undefined);
+      connection.release();
+    }
   });
 });

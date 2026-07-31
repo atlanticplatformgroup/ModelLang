@@ -1,4 +1,4 @@
--- Generated guarded action functions. Caller identity is always session_user.
+-- Generated guarded action functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
 CREATE OR REPLACE FUNCTION "model_procurement"."open_request"("p_amount" numeric)
@@ -9,17 +9,14 @@ SET search_path = pg_catalog, pg_temp
 AS $modellang$
 DECLARE
   v_principal_id uuid;
+  v_identity_issuer text;
+  v_identity_subject text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
 BEGIN
-  SELECT "principal_id" INTO v_principal_id
-  FROM "model_procurement_internal"."principal_binding"
-  WHERE "database_principal" = session_user
-  FOR SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
+  SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
+  INTO v_principal_id, v_identity_issuer, v_identity_subject
+  FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   IF NOT (("p_amount" <> 'NaN'::numeric AND pg_catalog.scale("p_amount") <= 2 AND pg_catalog.abs("p_amount") < 1000000000000000000) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount';
@@ -50,8 +47,8 @@ BEGIN
   VALUES (v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
-  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id");
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
+  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
@@ -67,18 +64,15 @@ SET search_path = pg_catalog, pg_temp
 AS $modellang$
 DECLARE
   v_principal_id uuid;
+  v_identity_issuer text;
+  v_identity_subject text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
   v_request "model_procurement"."purchase_request"%ROWTYPE;
 BEGIN
-  SELECT "principal_id" INTO v_principal_id
-  FROM "model_procurement_internal"."principal_binding"
-  WHERE "database_principal" = session_user
-  FOR SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
+  SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
+  INTO v_principal_id, v_identity_issuer, v_identity_subject
+  FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   PERFORM "id" FROM "model_procurement"."user"
   WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
@@ -119,8 +113,8 @@ BEGIN
   WHERE "id" = v_request."id"
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
-  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id");
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
+  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
@@ -136,18 +130,15 @@ SET search_path = pg_catalog, pg_temp
 AS $modellang$
 DECLARE
   v_principal_id uuid;
+  v_identity_issuer text;
+  v_identity_subject text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
   v_request "model_procurement"."purchase_request"%ROWTYPE;
 BEGIN
-  SELECT "principal_id" INTO v_principal_id
-  FROM "model_procurement_internal"."principal_binding"
-  WHERE "database_principal" = session_user
-  FOR SHARE;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
+  SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
+  INTO v_principal_id, v_identity_issuer, v_identity_subject
+  FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   PERFORM "id" FROM "model_procurement"."user"
   WHERE "id" = ANY (ARRAY[v_principal_id]::uuid[])
@@ -190,8 +181,8 @@ BEGIN
   WHERE "id" = v_request."id"
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id")
-  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id");
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
+  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END

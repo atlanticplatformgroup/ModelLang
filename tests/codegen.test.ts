@@ -67,6 +67,8 @@ describe("backends", () => {
     expect(browser).not.toMatch(/QueryAdapter|SELECT |session_user|PostgreSQL|node:/);
     expect(output["typescript/http-client.ts"]).toContain(`authorization: \`Bearer \${token}\``);
     expect(output["typescript/http-server.ts"]).toContain("createProcurementDatabaseExecutor");
+    expect(output["typescript/gateway.ts"]).toContain("createProcurementGatewayExecutor");
+    expect(output["typescript/gateway.ts"]).toContain('bind_gateway_identity"($1, $2)');
   });
 
   it("keeps stable-ID HTTP routes unchanged across operation renames", () => {
@@ -211,9 +213,36 @@ describe("backends", () => {
     expect(queries).not.toMatch(/"p_actor"/);
     expect(client).not.toMatch(/input\.actor|actor:/);
     expect(types).not.toMatch(/\n  actor:/);
-    expect(actions).toContain("session_user");
-    expect(queries).toContain("session_user");
+    expect(actions).toContain('"resolve_principal"()');
+    expect(queries).toContain('"resolve_principal"()');
+    expect(output["postgres/002_schema.sql"]).toContain("session_user");
     expect(actions).toContain('v_actor."id" = v_request."requester_id"');
+  });
+
+  it("generates a transaction-scoped shared gateway without exposing principal IDs", async () => {
+    const output = generateAll(await procurement());
+    const roles = output["postgres/001_roles.sql"];
+    const schema = output["postgres/002_schema.sql"];
+    const grants = output["postgres/004_grants.sql"];
+    const gateway = output["typescript/gateway.ts"];
+    expect(roles).toContain("CREATE ROLE modellang_gateway NOLOGIN");
+    expect(roles).toContain("GRANT modellang_app TO modellang_gateway");
+    expect(schema).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."gateway_principal_binding"');
+    expect(schema).toContain('"issuer" text NOT NULL');
+    expect(schema).toContain('"subject" text NOT NULL');
+    expect(schema).toContain("pg_catalog.set_config('modellang.gateway_issuer', p_issuer, true)");
+    expect(schema).toContain("FROM pg_catalog.pg_auth_members AS membership");
+    expect(schema).toContain("identity_role.rolname = session_user");
+    expect(grants).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."bind_gateway_identity"(text, text) TO modellang_gateway');
+    expect(grants).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway');
+    expect(grants).toContain('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway');
+    expect(gateway).toContain('await connection.query("BEGIN")');
+    expect(gateway).toContain('await connection.query("COMMIT")');
+    expect(gateway).toContain('connection.query("ROLLBACK")');
+    expect(gateway).not.toMatch(/principalId|principal_id/);
+    expect(output["typescript/browser.ts"]).not.toContain("Gateway");
+    expect(output["postgres/006_upgrade_0_12.sql"]).toContain("0.11 -> 0.12");
+    expect(output["postgres/006_upgrade_0_12.sql"]).toContain("ML_MIGRATION_BASELINE:");
   });
 
   it("emits safe privileged functions and an execute-only application boundary", async () => {
@@ -268,6 +297,9 @@ describe("backends", () => {
     const markdown = generateAll(await procurement())["enforcement.md"];
     for (const expected of [
       "boundary:principal_binding",
+      "boundary:gateway_role",
+      "boundary:gateway_identity",
+      "boundary:gateway_audit",
       "boundary:migration_history",
       "invariant:inv_b70e8aa03e6d498f8b0bccf413636b19",
       "invariant:inv_91184dc547c24978a48362a679eeb836",

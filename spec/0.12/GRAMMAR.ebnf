@@ -1,0 +1,3 @@
+(* ModelLang 0.12 introduces no source grammar productions. *)
+
+All productions are inherited unchanged from the ModelLang 0.10 grammar.

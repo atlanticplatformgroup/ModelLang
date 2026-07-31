@@ -13,4 +13,10 @@ INSERT INTO "model_procurement_internal"."principal_binding" ("database_principa
   ('ml_manager', '00000000-0000-4000-8000-000000000003'),
   ('ml_finance', '00000000-0000-4000-8000-000000000004');
 
+INSERT INTO "model_procurement_internal"."gateway_principal_binding" ("issuer", "subject", "principal_id") VALUES
+  ('https://auth.example.test', 'employee-one', '00000000-0000-4000-8000-000000000001'),
+  ('https://auth.example.test', 'employee-two', '00000000-0000-4000-8000-000000000002'),
+  ('https://auth.example.test', 'manager', '00000000-0000-4000-8000-000000000003'),
+  ('https://auth.example.test', 'finance', '00000000-0000-4000-8000-000000000004');
+
 RESET ROLE;

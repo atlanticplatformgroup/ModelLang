@@ -13,3 +13,16 @@ $modellang$;
 ALTER ROLE modellang_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
 ALTER ROLE modellang_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
 REVOKE modellang_owner FROM modellang_app;
+
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_gateway') THEN
+    CREATE ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+  END IF;
+END
+$modellang$;
+
+ALTER ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+REVOKE modellang_owner FROM modellang_gateway;
+REVOKE modellang_gateway FROM modellang_app;
+GRANT modellang_app TO modellang_gateway;

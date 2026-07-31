@@ -434,6 +434,27 @@ describe("ModelLang 0.6 rename migration planning", () => {
     expect(planMigration(previous, current)).toEqual(plan);
   });
 
+  it("renames the principal table before installing a missing 0.12 gateway boundary", () => {
+    const source = (version: string, principal: string) => `model PrincipalRename version "${version}";
+entity ${principal} @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+action createPrincipal @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(
+  caller actor: ${principal}, id: UUID
+) -> ${principal} {
+  authorize true;
+  create ${principal} { id = id; }
+}`;
+    const plan = planMigration(
+      compileText(source("1.0.0", "User"), "principal-v1.model"),
+      compileText(source("2.0.0", "Account"), "principal-v2.model"),
+    );
+    const rename = plan.sql.indexOf('ALTER TABLE "model_principal_rename"."user" RENAME TO "account";');
+    const gateway = plan.sql.indexOf('CREATE TABLE IF NOT EXISTS "model_principal_rename_internal"."gateway_principal_binding"');
+    expect(rename).toBeGreaterThan(-1);
+    expect(gateway).toBeGreaterThan(rename);
+  });
+
   it("renames stable enums, constraints, actions, and queries without name matching", () => {
     const source = (names: {
       enumName: string;

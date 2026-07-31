@@ -13,7 +13,7 @@
   "enforcement": [
     {
       "id": "boundary:principal_binding",
-      "purpose": "Bind session_user to the model principal through an owner-controlled table.",
+      "purpose": "Bind a direct database session identity to the model principal through an owner-controlled table.",
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.principal_binding"
@@ -24,6 +24,27 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_owner NOLOGIN"
+    },
+    {
+      "id": "boundary:gateway_role",
+      "purpose": "Confine shared-credential identity activation to a dedicated non-login gateway role.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_gateway NOLOGIN"
+    },
+    {
+      "id": "boundary:gateway_identity",
+      "purpose": "Resolve verified issuer and subject claims through an owner-controlled binding inside one transaction.",
+      "layer": "PostgreSQL transaction identity",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.gateway_principal_binding"
+    },
+    {
+      "id": "boundary:gateway_audit",
+      "purpose": "Record gateway issuer and subject provenance symmetrically with the resolved principal.",
+      "layer": "PostgreSQL audit",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.action_audit"
     },
     {
       "id": "boundary:internal_schema",
@@ -433,8 +454,8 @@
     },
     {
       "id": "caller:action:act_508ad810a19d4b79a5009871de5cd26b.actor",
-      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
-      "layer": "PostgreSQL session identity",
+      "purpose": "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.",
+      "layer": "PostgreSQL authenticated identity",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations.reserve",
       "source": {
@@ -510,8 +531,8 @@
     },
     {
       "id": "caller:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
-      "purpose": "Derive the semantic caller from session_user; no caller UUID is accepted.",
-      "layer": "PostgreSQL session identity",
+      "purpose": "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.",
+      "layer": "PostgreSQL authenticated identity",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
@@ -601,7 +622,7 @@
     },
     {
       "id": "boundary:audit",
-      "purpose": "Record each successful action with database and model principal identities.",
+      "purpose": "Record each successful action with database and model principal identities plus gateway provenance when present.",
       "layer": "PostgreSQL audit",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations_internal.action_audit"

@@ -1,4 +1,4 @@
-# ModelLang 0.11 reference compiler
+# ModelLang 0.12 reference compiler
 
 ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, a transport-neutral operation manifest, OpenAPI, a browser-safe HTTP client, an authenticated server handler, guarded additive schema evolution, explicit action-backed workflows, exact currency-typed money, database-owned generated values, constrained tables, a server-side database client, a Mermaid graph, and a rule-to-enforcement map.
 
@@ -59,26 +59,29 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.11 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.12 retains IR version 9, so released 0.9 and 0.10 IR remain valid migration baselines. IR9 separates persistent semantic identity from editable names, resolves workflow states and action bindings by ID, represents database generation and mutability independently from ordinary defaults, and preserves exact money profiles and literals. Typed expressions and generated enforcement refer to declarations by ID. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v1 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, declared action/query inputs and outputs, stable operation IDs, result cardinality, and authenticated caller context. It contains no HTTP paths, SQL names, database roles, connection details, or PostgreSQL types. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
 The PostgreSQL backend emits:
 
 - roles and ownership;
+- direct-login and shared-gateway identity bindings;
 - entity tables, foreign keys, enum checks, annotations, invariants, and temporal exclusion constraints;
 - initial-state and legal-edge workflow triggers;
 - internal model-version and source-hash migration history;
 - `SECURITY DEFINER` action functions;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
-- example-only deterministic seed data.
+- example-only deterministic seed data;
+- an idempotent administrative upgrade for existing 0.11 installations.
 
 The generated TypeScript clients expose only declared actions and queries. They have no generic table or mutation API. Caller identity is not an input field.
 
 - `typescript/browser.ts` is the browser-safe entry point. Its HTTP client sends JSON to stable-ID routes and contains no SQL, database adapter, Node.js, or PostgreSQL contract.
 - `typescript/http-server.ts` authenticates bearer context, validates exact closed input and output objects, enforces query result bounds, dispatches stable operation IDs, maps RFC 9457 problems, and can bridge to an existing caller-bound generated database client.
-- `typescript/client.ts` remains the server-side PostgreSQL client. It never forwards caller identity as a SQL argument; the database resolves it from `session_user`.
+- `typescript/gateway.ts` is a server-only shared-pool adapter. It binds verified issuer/subject claims for one transaction and never accepts a ModelLang principal ID.
+- `typescript/client.ts` remains the server-side PostgreSQL client. It never forwards caller identity as a SQL argument; the database resolves it through the authenticated session boundary.
 
 Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
 
@@ -129,7 +132,18 @@ const procurement = new ProcurementHttpClient({
 });
 ```
 
-The reference Procurement integration maps opaque demo bearer credentials to role-specific PostgreSQL pools on the server. Production token validation and the scalable database identity adapter are host responsibilities; request data can never select or override the ModelLang caller.
+The 0.12 shared-pool path verifies a bearer credential in the host, maps it to stable external claims, and lets the generated gateway executor own one complete database transaction:
+
+```ts
+import { createProcurementGatewayExecutor } from "./generated/procurement/typescript/gateway.js";
+
+const handler = createProcurementHttpHandler(async (token) => {
+  const identity = await verifyAccessToken(token); // { issuer, subject } or null
+  return identity ? createProcurementGatewayExecutor(gatewayPool, identity) : null;
+});
+```
+
+The reference Procurement integration uses a single shared PostgreSQL pool and forces connection reuse across different callers and rollback paths. Token verification remains host-owned; request data can never select or override the ModelLang caller. The earlier direct-login executor remains supported.
 
 ## Stable identity and safe schema evolution
 
@@ -159,12 +173,21 @@ The migration command compares a released IR with current source exclusively by 
 
 Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
 
+For an existing 0.11 database that is not otherwise receiving a model migration, apply the generated 0.12 backend upgrade with the same administrative credential used for installation:
+
+```bash
+psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f generated/procurement/postgres/006_upgrade_0_12.sql
+```
+
+The artifact is transactional and idempotent. It first verifies the installed model ID, version, and source hash, then changes only the internal identity/audit boundary, generated callables, roles, and grants; it does not alter model entity data or migration history. A mismatched artifact fails with `ML_MIGRATION_BASELINE`. A normal generated safe migration includes the same upgrade automatically. The credential applying either path must be able to create/alter roles and assume `modellang_owner`. Production issuer/subject bindings are then provisioned through a trusted administrative path; the example seed values are demo-only.
+
 Version 0.10 refuses removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. These cases need explicit backfill or transformation semantics rather than compiler guesses.
 
 ## Explicit language semantics
 
 - Entity equality is identity equality. `actor == request.requester` compares the two `User` primary keys, never every field on the two rows. The canonical IR marks this as `entityIdentity`, and PostgreSQL lowers it to UUID comparison.
-- `caller actor: User` is semantic context, not a user-supplied action or query argument. It is omitted from both the generated SQL and TypeScript callable signatures, then resolved from `session_user` through the owner-controlled principal-binding table.
+- `caller actor: User` is semantic context, not a user-supplied action or query argument. It is omitted from both the generated SQL and TypeScript callable signatures. A direct login resolves through the owner-controlled `session_user` binding; a gateway transaction resolves through an owner-controlled `{issuer, subject}` binding.
 - A `workflow` targets one required stored enum field, declares its initial state, and binds each legal edge to one update action. The compiler verifies that the action has a named source-state requirement and writes the declared destination, rejects undeclared state writes, and requires every enum state to be reachable.
 - PostgreSQL workflow triggers require initial-state inserts and reject skipped or otherwise undeclared update edges. They are durable state-shape backstops; transition authorization, locking, assignments, and auditing remain explicit in the bound generated action.
 - Added fields on existing entities must be nullable or have a constant/database-generated default. Added enum members refresh existing constraints, and added workflow edges replace the trigger function without weakening its initial-state or edge checks.
@@ -185,7 +208,7 @@ Version 0.10 refuses removals, existing semantic changes, required fields withou
 
 ## Security guarantee and trust boundary
 
-For a session authenticated as a provisioned application login possessing only `modellang_app` privileges, every generated state change is attributed to the model principal bound to `session_user` and constrained by generated authorization, preconditions, invariants, deterministic row locks, and table privileges.
+For a direct session authenticated as a provisioned application login possessing only `modellang_app` privileges, or a server session explicitly provisioned through `modellang_gateway`, every generated state change is attributed to an owner-bound model principal and constrained by generated authorization, preconditions, invariants, deterministic row locks, and table privileges.
 
 The proof relies on these operational assumptions:
 
@@ -194,9 +217,13 @@ The proof relies on these operational assumptions:
 - Application logins are not members of `modellang_owner` and cannot `SET ROLE` into it.
 - Migration credentials are isolated from normal application runtime credentials.
 - Principal bindings are provisioned only through a trusted administrative path.
+- The host cryptographically verifies issuer/subject credentials before constructing a gateway executor.
+- The shared gateway database credential is confined to trusted server code and never reaches a browser or caller.
 - Database authentication is already trustworthy; this PoC does not solve password, secret, host, or infrastructure compromise.
 
-The principal-binding table is owned by `modellang_owner` in an internal schema inaccessible to application roles. Action functions use `session_user`, not `current_user`, because a security-definer function changes `current_user` to its owner. An unbound session fails before authorization.
+Both principal-binding tables are owned by `modellang_owner`; runtime roles cannot read or modify them. Direct identity uses `session_user`, not `current_user`, because a security-definer function changes `current_user` to its owner. Gateway identity is accepted only for an explicit member of `modellang_gateway`, activated transaction-locally, and discarded by commit or rollback. An unbound session fails before authorization.
+
+Gateway action audits preserve the database principal, resolved model principal, issuer, and subject. Direct-login audit rows keep issuer and subject null. Ordinary app roles cannot override their direct binding by setting gateway-shaped PostgreSQL configuration values.
 
 Application roles can use the model schema and execute generated action and query functions. They cannot directly select, insert, update, delete, or truncate model tables; create objects in generated schemas; read principal bindings; or assume the owner role. PostgreSQL superusers, object owners, and migration authorities remain outside the guarantee by design.
 
@@ -235,14 +262,14 @@ The full suite validates parsing and spans, additive migration planning and live
 
 - Enums use text plus named `CHECK` constraints for deterministic DDL and explicit migration control.
 - Expressions support literals, paths, Boolean operators, and comparisons only. Money is exact and currency-typed, but arithmetic, allocation, tax, exchange, rounding, string operations, aggregates, and computed values require explicit future semantics.
-- One PostgreSQL login per demo user is the identity adapter. A production gateway may replace it only if callers still cannot choose arbitrary principal IDs.
+- Direct per-user PostgreSQL logins remain a supported adapter. The generated 0.12 gateway is the shared-pool adapter and accepts only verified issuer/subject claims, never arbitrary principal IDs.
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit joins, traversal, projections, aggregates, optional parameters, caller-controlled sorting and limits, pagination, full-text search, and read-audit policy in 0.3.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
 - Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and automatic UI generation.
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
-- The 0.11 HTTP profile intentionally leaves token issuers and lifecycle, cookie/CSRF/CORS policy, production identity-adapter scaling, caching, retries, idempotency keys, package publication, deployment, and observability to the host.
+- The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, retries, idempotency keys, package publication, deployment, and observability to the host.
 - Frontend form/table generation, alternate transports, and AI/MCP generation remain deferred consumers of the same operation manifest.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.11 language is in [spec/0.11/LANGUAGE.md](./spec/0.11/LANGUAGE.md), with its [operation transport semantics](./spec/0.11/TRANSPORT.md), [conformance requirements](./spec/0.11/CONFORMANCE.md), and [unstable boundaries](./spec/0.11/UNSTABLE.md). The [0.10 language](./spec/0.10/LANGUAGE.md) remains normative where 0.11 does not replace it. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
+The normative 0.12 language is in [spec/0.12/LANGUAGE.md](./spec/0.12/LANGUAGE.md), with its [gateway identity semantics](./spec/0.12/GATEWAY_IDENTITY.md), [conformance requirements](./spec/0.12/CONFORMANCE.md), and [unstable boundaries](./spec/0.12/UNSTABLE.md). The [0.11 transport](./spec/0.11/TRANSPORT.md) and [0.10 safe evolution rules](./spec/0.10/SAFE_EVOLUTION.md) remain normative where 0.12 does not replace them. The original proof-of-concept requirements remain archived in [ModelLang_PoC_Spec_Revision_2.md](./ModelLang_PoC_Spec_Revision_2.md).
