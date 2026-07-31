@@ -20,7 +20,8 @@ import {
 export type SemanticDependency =
   | { kind: "parameter"; id: string }
   | { kind: "field"; id: string }
-  | { kind: "enumMember"; id: string };
+  | { kind: "enumMember"; id: string }
+  | { kind: "policy"; id: string };
 
 export interface SemanticRule {
   id: string;
@@ -38,8 +39,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 1;
-  profile: "sml-transactional-core/1";
+  manifestVersion: 2;
+  profile: "sml-transactional-core/2";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -48,7 +49,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 9;
+    irVersion: 10;
     generator: "semantic-manifest";
   };
   model: {
@@ -63,8 +64,20 @@ export interface SemanticManifest {
     binding: "authenticatedContext";
     requestSupplied: false;
   };
+  policies: SemanticPolicy[];
   actions: SemanticAction[];
   queries: SemanticQuery[];
+}
+
+export interface SemanticPolicy {
+  id: string;
+  name: string;
+  source: IRSpan;
+  parameters: { id: string; name: string; type: string }[];
+  evaluation: "exactlyOneBranch";
+  branches: SemanticRule[];
+  usedBy: { operationId: string; ruleId: string; usage: "authorization" | "precondition" | "queryAuthorization" | "rowPolicy" }[];
+  coverage: { applicability: boolean; execution: boolean; durableEvidence: boolean };
 }
 
 export interface SemanticAction {
@@ -132,6 +145,10 @@ function expressionDependencies(expression: IRExpression): SemanticDependency[] 
       case "enumLiteral":
         add({ kind: "enumMember", id: node.memberId });
         return;
+      case "policyCall":
+        add({ kind: "policy", id: node.policyId });
+        node.arguments.forEach(visit);
+        return;
       case "unary":
         visit(node.operand);
         return;
@@ -185,10 +202,25 @@ function readSet(ir: ModelIR, rules: IRRule[], expressions: IRExpression[] = [])
       if (entity) entityIds.add(entity.id);
     }
     if (dependency.kind === "parameter") {
-      const parameter = [...ir.actions, ...ir.queries]
+      const parameter = [...ir.actions, ...ir.queries, ...ir.policies]
         .flatMap((operation) => operation.parameters)
         .find((candidate) => candidate.id === dependency.id);
       if (parameter?.type.startsWith("entity:")) entityIds.add(parameter.type);
+    }
+    if (dependency.kind === "policy") {
+      const policy = ir.policies.find((candidate) => candidate.id === dependency.id);
+      if (policy) {
+        for (const parameter of policy.parameters) if (parameter.type.startsWith("entity:")) entityIds.add(parameter.type);
+        for (const branch of policy.branches) {
+          for (const child of expressionDependencies(branch.expression)) {
+            if (child.kind === "field") {
+              fieldIds.add(child.id);
+              const entity = ir.entities.find((candidate) => candidate.fields.some((field) => field.id === child.id));
+              if (entity) entityIds.add(entity.id);
+            }
+          }
+        }
+      }
     }
   }
   return {
@@ -274,9 +306,23 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
 }
 
 export function generateSemanticManifest(ir: ModelIR, operations: OperationManifest): SemanticManifest {
+  const uses = (policyId: string): SemanticPolicy["usedBy"] => {
+    const result: SemanticPolicy["usedBy"] = [];
+    const has = (expression: IRExpression): boolean => expressionDependencies(expression)
+      .some((dependency) => dependency.kind === "policy" && dependency.id === policyId);
+    for (const action of ir.actions) {
+      if (has(action.authorization.expression)) result.push({ operationId: action.id, ruleId: action.authorization.id, usage: "authorization" });
+      for (const rule of action.preconditions) if (has(rule.expression)) result.push({ operationId: action.id, ruleId: rule.id, usage: "precondition" });
+    }
+    for (const query of ir.queries) {
+      if (has(query.authorization.expression)) result.push({ operationId: query.id, ruleId: query.authorization.id, usage: "queryAuthorization" });
+      if (has(query.rowPolicy.expression)) result.push({ operationId: query.id, ruleId: query.rowPolicy.id, usage: "rowPolicy" });
+    }
+    return result;
+  };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 1,
+    manifestVersion: 2,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -301,6 +347,20 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
       binding: "authenticatedContext",
       requestSupplied: false,
     },
+    policies: ir.policies.map((policy) => ({
+      id: policy.id,
+      name: policy.name,
+      source: policy.span,
+      parameters: policy.parameters.map(({ id, name, type }) => ({ id, name, type })),
+      evaluation: "exactlyOneBranch",
+      branches: policy.branches.map(semanticRule),
+      usedBy: uses(policy.id),
+      coverage: {
+        applicability: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "precondition"),
+        execution: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "precondition"),
+        durableEvidence: uses(policy.id).some((use) => use.usage === "authorization"),
+      },
+    })),
     actions: ir.actions.map((action) => actionEntry(ir, operations, action)),
     queries: ir.queries.map((query) => queryEntry(ir, operations, query)),
   };

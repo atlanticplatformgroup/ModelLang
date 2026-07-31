@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.17](./spec/0.17/LANGUAGE.md). It retains the complete 0.16 language and adds authenticated, side-effect-free action applicability generated from the same decision plan re-evaluated by transactional execution. The public capability contract is a filtered projection and applicability grants no authority.
+The current normative specification is [ModelLang 0.18](./spec/0.18/LANGUAGE.md). It retains the complete 0.17 boundary and adds stable-ID reusable policies with closed exact-authority branches plus private transactional execution evidence. Public applicability remains filtered and grants no authority.
+
+- [Reusable policy and durable evidence semantics](./spec/0.18/POLICY_DECISIONS.md)
+- [0.18 grammar additions](./spec/0.18/GRAMMAR.ebnf)
+- [0.18 conformance requirements](./spec/0.18/CONFORMANCE.md)
+- [0.18 unstable policy boundaries](./spec/0.18/UNSTABLE.md)
 
 - [Authenticated applicability semantics](./spec/0.17/APPLICABILITY.md)
 - [0.17 unchanged grammar statement](./spec/0.17/GRAMMAR.ebnf)

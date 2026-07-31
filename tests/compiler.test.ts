@@ -43,6 +43,68 @@ describe("lexer and parser", () => {
 });
 
 describe("semantic analysis", () => {
+  it("lowers reusable closed policies with stable exact authority branches", () => {
+    const ir = compileText(`model PolicyProof version "0.18.0";
+      enum Role { EMPLOYEE, MANAGER }
+      entity User { id: UUID @id; role: Role; }
+      entity Item { id: UUID @id; owner: User; value: Int; }
+      policy MayManage(actor: User, item: Item) {
+        allow manager: actor.role == Role.MANAGER;
+      }
+      action updateItem(caller actor: User, item: Item) -> Item {
+        authorize actor != item.owner and MayManage(actor, item);
+        require still_allowed: MayManage(actor, item);
+        update item { value = 2; }
+      }`, "policy.model");
+    expect(ir.irVersion).toBe(10);
+    expect(ir.policies).toEqual([
+      expect.objectContaining({
+        id: "policy:MayManage",
+        branches: [expect.objectContaining({ id: "policyBranch:MayManage.manager" })],
+      }),
+    ]);
+    expect(ir.actions[0]!.authorization.expression).toMatchObject({
+      kind: "binary",
+      operator: "and",
+      right: { kind: "policyCall", policyId: "policy:MayManage", type: "Boolean", nullable: false },
+    });
+    expect(ir.enforcement.map((entry) => entry.id)).toEqual(expect.arrayContaining([
+      "policy:MayManage",
+      "policyBranch:MayManage.manager",
+      "boundary:decision_evidence",
+    ]));
+  });
+
+  it.each([
+    ["unknown policy", "Missing(actor, item)", "E2416"],
+    ["policy argument mismatch", "MayManage(item, actor)", "E2418"],
+    ["policy under or", "true or MayManage(actor, item)", "E2422"],
+    ["multiple authority policies", "MayManage(actor, item) and MayManage(actor, item)", "E2423"],
+  ])("rejects %s", (_name, authorization, code) => {
+    const source = `model PolicyFailure version "0.18.0";
+      enum Role { MANAGER }
+      entity User { id: UUID @id; role: Role; }
+      entity Item { id: UUID @id; owner: User; value: Int; }
+      policy MayManage(actor: User, item: Item) { allow manager: actor.role == Role.MANAGER; }
+      action updateItem(caller actor: User, item: Item) -> Item {
+        authorize ${authorization};
+        update item { value = 2; }
+      }`;
+    expect(failure(source).code).toBe(code);
+  });
+
+  it("rejects recursive policy composition", () => {
+    const source = `model PolicyCycle version "0.18.0";
+      entity User { id: UUID @id; }
+      policy First(actor: User) { allow first: Second(actor); }
+      policy Second(actor: User) { allow second: First(actor); }
+      action updateUser(caller actor: User) -> User {
+        authorize First(actor);
+        update actor { id = actor.id; }
+      }`;
+    expect(failure(source).code).toBe("E2420");
+  });
+
   it("models database-generated values as immutable stored fields outside the callable ABI", () => {
     const ir = compileText(`model Generated version "0.7.0";
       entity User { id: UUID @id; }
@@ -56,7 +118,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -176,7 +238,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -246,7 +308,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -279,7 +341,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -383,7 +445,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -460,9 +522,9 @@ workflow TaskLifecycle for Task.state {
 }`;
 
 describe("ModelLang 0.9 workflows", () => {
-  it("lowers initial state, action-backed transitions, and enforcement targets into IR9", () => {
+  it("lowers initial state, action-backed transitions, and enforcement targets into the current IR", () => {
     const ir = compileText(workflowModel, "workflow.model");
-    expect(ir.irVersion).toBe(9);
+    expect(ir.irVersion).toBe(10);
     expect(ir.workflows).toEqual([
       expect.objectContaining({
         id: "workflow:TaskLifecycle",

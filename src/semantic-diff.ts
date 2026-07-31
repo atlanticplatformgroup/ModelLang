@@ -2,6 +2,7 @@ import type {
   IRAction,
   IREntity,
   IREnum,
+  IRPolicy,
   IRQuery,
   IRWorkflow,
   ModelIR,
@@ -38,9 +39,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 2;
+  diffVersion: 3;
   compilerVersion: string;
-  irVersion: 9;
+  irVersion: 10;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -421,6 +422,37 @@ function compareWorkflows(changes: SemanticChange[], previous: IRWorkflow[], cur
   }
 }
 
+function comparePolicies(changes: SemanticChange[], previous: IRPolicy[], current: IRPolicy[]): void {
+  for (const pair of pairById(changes, "policy", previous, current, "authorization", "additive", "breaking", false)) {
+    compareNamed(changes, "policy", pair.previous, pair.current);
+    const previousParameters = pair.previous.parameters.map(({ id, name, type }) => ({ id, name, type }));
+    const currentParameters = pair.current.parameters.map(({ id, name, type }) => ({ id, name, type }));
+    if (!same(previousParameters, currentParameters)) addChange(changes, {
+      kind: "policySignatureChanged",
+      area: "authorization",
+      classification: "breaking",
+      subject: subject("policy", pair.current),
+      before: text(previousParameters),
+      after: text(currentParameters),
+      persistenceRisk: false,
+      explanation: "The reusable policy parameter contract changed.",
+    });
+    for (const branchPair of pairById(changes, "policyBranch", pair.previous.branches, pair.current.branches, "authorization", "review", "review", false)) {
+      compareNamed(changes, "policyBranch", branchPair.previous, branchPair.current);
+      if (!same(branchPair.previous.expression, branchPair.current.expression)) addChange(changes, {
+        kind: "policyBranchChanged",
+        area: "authorization",
+        classification: "review",
+        subject: subject("policyBranch", branchPair.current),
+        before: branchPair.previous.sourceExpression,
+        after: branchPair.current.sourceExpression,
+        persistenceRisk: false,
+        explanation: "The authority branch changed; implication and overlap cannot be proven by the current analyzer.",
+      });
+    }
+  }
+}
+
 export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff {
   const changes: SemanticChange[] = [];
   if (previous.model.id !== current.model.id) addChange(changes, {
@@ -440,6 +472,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
     compareInvariants(changes, pair.previous, pair.current);
     compareExclusions(changes, pair.previous, pair.current);
   }
+  comparePolicies(changes, (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [], current.policies);
   compareActions(changes, previous.actions, current.actions);
   compareQueries(changes, previous.queries, current.queries);
   compareWorkflows(changes, previous.workflows, current.workflows);
@@ -453,7 +486,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 2,
+    diffVersion: 3,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

@@ -13,6 +13,8 @@ DECLARE
   v_identity_subject text;
   v_revision text;
   v_expected_revision text;
+  v_authority_policy_id text;
+  v_authority_id text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
   v_actor_xmin text;
@@ -42,7 +44,7 @@ BEGIN
   FROM "model_procurement"."user" AS row_value
   WHERE row_value."id" = v_principal_id;
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62', 'operationId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount', 'value', pg_catalog.to_jsonb("p_amount"))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'operationId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount', 'value', pg_catalog.to_jsonb("p_amount"))))::text);
   v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');
   PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);
 
@@ -62,8 +64,8 @@ BEGIN
   VALUES (v_actor."id", "p_amount", 'DRAFT', NULL, NULL)
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
-  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence")
+  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.11.0', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.11.0', 'sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615'), 'actionId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))));
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
@@ -83,6 +85,8 @@ DECLARE
   v_identity_subject text;
   v_revision text;
   v_expected_revision text;
+  v_authority_policy_id text;
+  v_authority_id text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
   v_actor_xmin text;
@@ -127,7 +131,7 @@ BEGIN
   FROM "model_procurement"."purchase_request" AS row_value
   WHERE row_value."id" = "p_request";
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62', 'operationId', 'action:act_ed2374e822704c51a2925338253d05d2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'operationId', 'action:act_ed2374e822704c51a2925338253d05d2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
   v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');
   PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);
 
@@ -148,8 +152,8 @@ BEGIN
   WHERE "id" = v_request."id"
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
-  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence")
+  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.11.0', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.11.0', 'sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615'), 'actionId', 'action:act_ed2374e822704c51a2925338253d05d2', 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_ed2374e822704c51a2925338253d05d2.is_draft', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))));
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END
@@ -169,6 +173,8 @@ DECLARE
   v_identity_subject text;
   v_revision text;
   v_expected_revision text;
+  v_authority_policy_id text;
+  v_authority_id text;
   v_result "model_procurement"."purchase_request"%ROWTYPE;
   v_actor "model_procurement"."user"%ROWTYPE;
   v_actor_xmin text;
@@ -213,17 +219,20 @@ BEGIN
   FROM "model_procurement"."purchase_request" AS row_value
   WHERE row_value."id" = "p_request";
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62', 'operationId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'operationId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
   v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');
   PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);
 
-  IF NOT ((((v_actor."id" <> v_request."requester_id") AND (((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles"))) OR ((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles")))))) IS TRUE) THEN
+  IF NOT ((((v_actor."id" <> v_request."requester_id") AND (((CASE WHEN ((((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles")))) IS TRUE) THEN 1 ELSE 0 END) + (CASE WHEN ((((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles")))) IS TRUE) THEN 1 ELSE 0 END)) = 1))) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_d39dbb883b5f4019b9027b85add3de47';
   END IF;
 
   IF v_expected_revision IS NOT NULL AND v_expected_revision IS DISTINCT FROM v_revision THEN
     RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:revision:action:act_d39dbb883b5f4019b9027b85add3de47';
   END IF;
+
+  v_authority_policy_id := 'policy:pol_a3a80ffeec774402be92cddaafd0f069';
+  v_authority_id := CASE WHEN ((((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles")))) IS TRUE) THEN 'policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688' WHEN ((((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles")))) IS TRUE) THEN 'policyBranch:pbr_6b38447b5bf944769d1d737c069c7420' ELSE NULL END;
 
   IF NOT (((v_request."status" = 'SUBMITTED')) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'ML_PRECONDITION:require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted';
@@ -236,8 +245,8 @@ BEGIN
   WHERE "id" = v_request."id"
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
-  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
+  INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence")
+  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.11.0', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.11.0', 'sourceHash', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615'), 'actionId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))));
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles");
 END

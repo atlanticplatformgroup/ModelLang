@@ -22,7 +22,7 @@
         "kind": {
           "enum": [
             "literal", "moneyLiteral", "nullLiteral", "parameter", "entityValue",
-            "fieldAccess", "enumLiteral", "unary", "binary", "nullComparison"
+            "fieldAccess", "enumLiteral", "policyCall", "unary", "binary", "nullComparison"
           ]
         },
         "type": { "type": "string" },
@@ -34,7 +34,7 @@
       "type": "object",
       "required": ["kind", "id"],
       "properties": {
-        "kind": { "enum": ["parameter", "field", "enumMember"] },
+        "kind": { "enum": ["parameter", "field", "enumMember", "policy"] },
         "id": { "type": "string" }
       },
       "additionalProperties": false
@@ -98,12 +98,12 @@
   "type": "object",
   "required": [
     "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
-    "model", "principal", "actions", "queries"
+    "model", "principal", "policies", "actions", "queries"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 1 },
-    "profile": { "const": "sml-transactional-core/1" },
+    "manifestVersion": { "const": 2 },
+    "profile": { "const": "sml-transactional-core/2" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-        "irVersion": { "const": 9 },
+        "irVersion": { "const": 10 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -146,6 +146,33 @@
         "requestSupplied": { "const": false }
       },
       "additionalProperties": false
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "source", "parameters", "evaluation", "branches", "usedBy", "coverage"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^policy:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "parameters": { "type": "array" },
+          "evaluation": { "const": "exactlyOneBranch" },
+          "branches": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/rule" } },
+          "usedBy": { "type": "array" },
+          "coverage": {
+            "type": "object",
+            "required": ["applicability", "execution", "durableEvidence"],
+            "properties": {
+              "applicability": { "type": "boolean" },
+              "execution": { "type": "boolean" },
+              "durableEvidence": { "type": "boolean" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "actions": {
       "type": "array",

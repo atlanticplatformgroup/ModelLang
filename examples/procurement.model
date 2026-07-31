@@ -1,4 +1,4 @@
-model Procurement version "0.10.0";
+model Procurement version "0.11.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -54,6 +54,17 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
     or approvedBy != requester;
 }
 
+// Policy branches are closed, stable authorities. Exactly one must match.
+policy ApprovalAuthority @stableId("pol_a3a80ffeec774402be92cddaafd0f069")(
+  actor: User,
+  request: PurchaseRequest
+) {
+  allow manager @stableId("pbr_0d694c9a0a274dc79c6168e47d259688"):
+    request.amount <= USD 10000 and Role.MANAGER in actor.roles;
+  allow finance @stableId("pbr_6b38447b5bf944769d1d737c069c7420"):
+    request.amount > USD 10000 and Role.FINANCE in actor.roles;
+}
+
 // Opening a request is an explicit capability of every declared business role.
 // It does not depend on managers or finance users also carrying EMPLOYEE in seed data.
 action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
@@ -93,12 +104,7 @@ action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
 ) -> PurchaseRequest {
   authorize
     actor != request.requester
-    and
-    (
-      (request.amount <= USD 10000 and Role.MANAGER in actor.roles)
-      or
-      (request.amount > USD 10000 and Role.FINANCE in actor.roles)
-    );
+    and ApprovalAuthority(actor, request);
 
   require is_submitted: request.status == RequestStatus.SUBMITTED;
 

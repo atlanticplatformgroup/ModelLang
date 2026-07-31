@@ -3,111 +3,66 @@ ModelLang continuation handoff
 
 Repository: /Users/nscipione/Code/ModelLang
 Branch: main
-Current release: ModelLang 0.17.0
-Release commit: 2690353 (feat: release ModelLang 0.17 authenticated applicability)
-Example model versions: Procurement 0.10.0 and Reservations 0.10.0
+Current release: ModelLang 0.18.0
+Example model versions: Procurement 0.11.0 and Reservations 0.10.0
 Expected starting state: clean working tree
 
-ModelLang is a declarative language written in .model files. The compiler is implemented in TypeScript, but TypeScript is not the ModelLang source language.
+Read first:
 
-Before proposing or changing anything, inspect these in order:
-
-1. README.md
-2. SPEC.md
-3. Every file in spec/0.17/, especially spec/0.17/APPLICABILITY.md
+1. README.md and SPEC.md
+2. Every file in spec/0.18/, especially POLICY_DECISIONS.md
+3. spec/0.17/APPLICABILITY.md
 4. spec/0.16/REVIEWED_EVOLUTION.md and spec/0.10/SAFE_EVOLUTION.md
-5. docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md, especially Implementation Status, Sections 4.6, 4.14, 6.4, 7.3, 8, and Appendix B.5
-6. The latest commit with: git show --stat --summary 2690353 and git show 2690353
-7. The canonical examples in examples/procurement.model and examples/reservations.model
+5. docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md
+6. examples/procurement.model and examples/reservations.model
 
-For the 0.17 architecture, inspect:
+Released 0.18 architecture
+--------------------------
 
-- src/decision-plan.ts
-- src/capability-manifest.ts
-- src/build.ts
-- src/codegen/postgres.ts
-- src/codegen/http.ts
-- src/codegen/typescript.ts
-- src/codegen/ui.ts
-- src/operation-manifest.ts
-- schemas/decision-plan.schema.json
-- schemas/capability-manifest.schema.json
-- generated/procurement/decisions.json
-- generated/procurement/capabilities.json
-- generated/procurement/postgres/003_decisions.sql
-- generated/procurement/postgres/007_upgrade_0_17.sql
-- tests/codegen.test.ts
-- tests/http.test.ts
-- tests/ui.test.ts
-- tests/integration/procurement.test.ts
+- Canonical IR10 adds stable reusable policies, typed parameters, stable authority branches, and identity-based policy calls.
+- Policy v1 is pure Boolean and closed. Exactly one true `allow` branch succeeds; zero or multiple true branches fail closed and null never grants authority.
+- Policies may compose acyclically. Recursion, effects, callbacks, dynamic selection, and backend syntax are prohibited.
+- Action authorization may contain at most one positive conjunctive policy call. The unique successful branch is exact executed authority.
+- Decision plan v2 is the one internal expression-bearing input to both applicability and execution.
+- Applicability remains authenticated, pure, advisory, and public-safe. Every response still carries `authority: "none"`.
+- Capability manifest v1, operation manifest v2, UI manifest v2, and HTTP routes remain unchanged and expose no policy IDs, expressions, evidence, or current facts.
+- Successful action execution privately records model/source identity, action and authorization rule IDs, executed outcome, and exact policy/branch authority when present.
+- Evidence, effect, and action audit share one transaction. Failed or rolled-back execution leaves no success evidence.
+- Historical pre-0.18 audit rows remain evidence-unknown; authority is never reconstructed from role snapshots.
+- Engineering semantic manifest v2 reports policy use and applicability/execution/evidence coverage.
+- Semantic diff v3 compares policies and branches by stable ID. Safe migration permits identity-preserving renames but not semantic policy changes; reviewed migration requires explicit acknowledgements.
+- IR9 remains accepted as a released evolution baseline when the current source compiles to IR10.
+- `008_upgrade_0_18.sql` is the baseline-checked idempotent evidence-boundary upgrade.
 
-Semantics that must remain locked:
+Semantics that remain locked
+----------------------------
 
-- Entity equality means primary-key identity equality.
-- caller actor comes only from authenticated context and is never caller-supplied input.
-- @snapshot is explicitly assigned stored point-in-time data.
+- Entity equality is primary-key identity equality.
+- Caller identity comes only from authenticated context and is never caller input.
+- `@snapshot` is explicitly assigned stored point-in-time data.
 - Money is exact and currency-typed.
 - Generated UUID/timestamp fields are database-owned.
 - Durable declarations have stable semantic IDs.
 - Workflows bind legal state transitions to actions.
-- PostgreSQL is the first enforcement backend; canonical IR remains the backend boundary.
-- Discovery, applicability, and execution are separate concepts.
-- Applicability is a pure authenticated query over current authoritative state.
-- authorize failure is denied; require failure is notApplicable.
-- Missing and invisible entity references share the authorization-denial projection by default.
-- Public explanations are safe projections keyed only by allowlisted stable rule IDs.
-- Applicability and execution consume one canonical generated decision plan.
-- Execution locks, reloads, and re-evaluates the plan inside the mutation transaction.
-- Applicability success and opaque revisions grant no authority.
-- stale is possible only when an explicit expected revision is compared.
-- The public capability manifest is filtered and must never expose compiler engineering semantics, expressions, current values, SQL details, or full decision traces.
+- PostgreSQL is the first enforcement backend; canonical IR is the backend boundary.
+- Discovery, applicability, and execution are separate.
+- `authorize` failure is denied; `require` failure is notApplicable.
+- Missing and invisible entity references share authorization denial by default.
+- Public explanations contain only allowlisted stable action-rule IDs.
+- Execution locks, reloads, and re-evaluates the canonical plan inside the mutation transaction.
+- Applicability, opaque revisions, policy IDs, authority IDs, and audit evidence grant no authority.
+- `stale` requires an explicit expected revision comparison.
+- Generated artifacts are committed golden fixtures and remain byte-for-byte synchronized.
 
-Current verification baseline:
+Verification contract
+---------------------
 
-- TypeScript build passes.
-- Canonical model checks pass.
-- 162 tests pass, including live PostgreSQL, safe migration, reviewed migration, applicability, gateway, HTTP, and UI coverage.
-- Procurement and Reservations demos pass.
-- Generated artifacts are committed golden fixtures and must remain byte-for-byte synchronized with generators.
+Before the next release run:
 
-Recommended next milestone: ModelLang 0.18 — reusable policies and durable decision evidence
--------------------------------------------------------------------------------------------
+- npm run build
+- npm run model:check
+- npm test
+- npm run demo
+- npm run demo:reservations
 
-Goal: close the gap between a safe applicability answer and precise, auditable evidence of which declared authority justified an executed action. Do not start MCP/agent generation yet.
-
-Proposed scope:
-
-1. Add first-class, stable-ID reusable policy declarations to .model.
-2. Allow authorize and require rules to invoke typed policies without adding imperative callbacks or backend-specific syntax.
-3. Extend the canonical decision representation so policy identity, composition, and result branches are shared by applicability and execution.
-4. Record durable execution decision evidence transactionally with action audit: action ID, model/source identity, stable policy/rule IDs, outcome, and the exact authority used.
-5. Keep public applicability explanations filtered and allowlisted. Do not expose evaluated facts, arbitrary reason strings, internal expressions, or full traces.
-6. Update Procurement so approval evidence distinguishes MANAGER authority from FINANCE authority instead of treating the caller's complete role snapshot as the exact decision basis.
-7. Generate policy-to-enforcement and policy-coverage reporting.
-8. Add compiler, schema, golden, transport, migration, and live PostgreSQL tests proving policy reuse, deterministic evidence, applicability/execution agreement, transaction rollback, and exact approval authority.
-
-Architectural decisions to specify before implementation:
-
-- Policy declaration and invocation syntax.
-- Whether policy v1 is Boolean-only or returns a closed structured decision; prefer the smallest type-safe design that can represent exact authority without arbitrary payloads.
-- Stable identity, parameter typing, scoping, composition, evaluation order, null/fail-closed behavior, and prohibition of recursion and side effects.
-- How an authorization expression identifies one exact successful authority when multiple branches could pass.
-- Which evidence is durable, which is public, and which remains internal; include confidentiality and retention implications.
-- How action_audit evolves without breaking existing installations, safe migrations, reviewed migrations, or the 0.17 upgrade path.
-- Whether canonical IR must advance from IR9. Do not advance it unless the source semantics cannot be represented compatibly.
-- Whether operation manifest v2, UI manifest v2, capability manifest v1, and HTTP routes can remain unchanged. Prefer preserving them unless the public contract genuinely changes.
-- How policy renames and semantic changes participate in stable-ID diffing and both guarded migration authorities.
-
-Implementation constraints:
-
-- Preserve every 0.17 semantic and security boundary.
-- Keep PostgreSQL concepts out of browser/public contracts.
-- Do not let audit evidence, applicability results, revisions, or policy IDs become capability tokens.
-- Do not infer exact authority from expression text at runtime. Make it explicit and typed in the semantic representation.
-- Fail closed for unsupported policy constructs and ambiguous evidence.
-- Update normative spec, schemas, README, changelog, repository whitepaper, generated golden artifacts, and version metadata together.
-- Run npm run build, npm run model:check, npm test, npm run demo, and npm run demo:reservations before release.
-- Commit the finished milestone on main using the historical release style, for example:
-  feat: release ModelLang 0.18 policy decisions
-
-Start by reviewing the 0.18 proposal against the whitepaper and existing 0.17 decision-plan boundary. Lock the architectural decisions above, then implement only once the scope is coherent.
+Do not begin MCP or agent generation by exposing `decisions.json` or private evidence. Any future agent-facing contract must be a separately filtered, authorization-aware projection.

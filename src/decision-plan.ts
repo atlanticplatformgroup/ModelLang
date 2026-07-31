@@ -4,6 +4,16 @@ import { MODELLANG_COMPILER_VERSION } from "./version.js";
 export interface DecisionRule {
   id: string;
   expression: IRExpression;
+  policyIds: string[];
+}
+
+export interface DecisionPolicy {
+  id: string;
+  parameterIds: string[];
+  evaluation: "exactlyOneBranch";
+  nullBehavior: "false";
+  ambiguousBehavior: "deny";
+  branches: { id: string; expression: IRExpression }[];
 }
 
 export interface DecisionEntityLoad {
@@ -20,6 +30,7 @@ export interface ActionDecisionPlan {
   callerParameterId: string;
   entityLoads: DecisionEntityLoad[];
   authorization: DecisionRule;
+  authorityPolicyId?: string;
   preconditions: DecisionRule[];
   revision: {
     ruleId: string;
@@ -35,12 +46,13 @@ export interface ActionDecisionPlan {
 
 export interface DecisionPlan {
   $schema: "https://modellang.dev/schemas/decision-plan.schema.json";
-  planVersion: 1;
+  planVersion: 2;
   audience: "enforcement";
   public: false;
   compilerVersion: string;
-  irVersion: 9;
+  irVersion: 10;
   model: { id: string; version: string; sourceHash: string };
+  policies: DecisionPolicy[];
   actions: ActionDecisionPlan[];
 }
 
@@ -54,14 +66,35 @@ export function decisionFunctionName(actionId: string): string {
 }
 
 export function generateDecisionPlan(ir: ModelIR): DecisionPlan {
+  const policyIds = (expression: IRExpression): string[] => {
+    const found = new Set<string>();
+    const visit = (node: IRExpression): void => {
+      if (node.kind === "policyCall") {
+        found.add(node.policyId);
+        for (const argument of node.arguments) visit(argument);
+      } else if (node.kind === "unary") visit(node.operand);
+      else if (node.kind === "binary") { visit(node.left); visit(node.right); }
+      else if (node.kind === "nullComparison") visit(node.operand);
+    };
+    visit(expression);
+    return [...found].sort();
+  };
   return {
     $schema: "https://modellang.dev/schemas/decision-plan.schema.json",
-    planVersion: 1,
+    planVersion: 2,
     audience: "enforcement",
     public: false,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: ir.irVersion,
     model: { id: ir.model.id, version: ir.model.version, sourceHash: ir.model.sourceHash },
+    policies: ir.policies.map((policy) => ({
+      id: policy.id,
+      parameterIds: policy.parameters.map((parameter) => parameter.id),
+      evaluation: "exactlyOneBranch",
+      nullBehavior: "false",
+      ambiguousBehavior: "deny",
+      branches: policy.branches.map((branch) => ({ id: branch.id, expression: branch.expression })),
+    })),
     actions: ir.actions.map((action) => {
       const locks = new Map(action.lockPlan.map((lock) => [lock.parameterId, lock.mode]));
       const entityLoads = action.parameters
@@ -78,8 +111,9 @@ export function generateDecisionPlan(ir: ModelIR): DecisionPlan {
         callableParameterIds: [...action.callableParameters],
         callerParameterId: action.callerParameterId,
         entityLoads,
-        authorization: { id: action.authorization.id, expression: action.authorization.expression },
-        preconditions: action.preconditions.map((rule) => ({ id: rule.id, expression: rule.expression })),
+        authorization: { id: action.authorization.id, expression: action.authorization.expression, policyIds: policyIds(action.authorization.expression) },
+        ...(policyIds(action.authorization.expression)[0] ? { authorityPolicyId: policyIds(action.authorization.expression)[0] } : {}),
+        preconditions: action.preconditions.map((rule) => ({ id: rule.id, expression: rule.expression, policyIds: policyIds(rule.expression) })),
         revision: {
           ruleId: decisionRevisionRuleId(action.id),
           algorithm: "authoritativeRowVersion/1",

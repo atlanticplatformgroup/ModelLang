@@ -59,6 +59,36 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal_snapshot"() FROM PUBLIC;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authorization_rule_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_outcome" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "policy_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authority_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_evidence" jsonb;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass
+      AND conname = 'ck_action_audit_decision_evidence'
+  ) THEN
+    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_decision_evidence" CHECK (
+      ("decision_evidence" IS NULL
+       AND "model_id" IS NULL AND "model_version" IS NULL
+       AND "source_hash" IS NULL AND "authorization_rule_id" IS NULL
+       AND "decision_outcome" IS NULL AND "policy_id" IS NULL AND "authority_id" IS NULL)
+      OR
+      ("decision_evidence" IS NOT NULL
+       AND "model_id" IS NOT NULL AND "model_version" IS NOT NULL
+       AND "source_hash" ~ '^sha256:[0-9a-f]{64}$'
+       AND "authorization_rule_id" IS NOT NULL AND "decision_outcome" = 'executed'
+       AND (("policy_id" IS NULL) = ("authority_id" IS NULL)))
+    );
+  END IF;
+END
+$modellang$;
 RESET ROLE;
 
 -- Generated guarded action functions. Caller identity is resolved from direct login or transaction-bound gateway context.
@@ -76,6 +106,8 @@ DECLARE
   v_identity_subject text;
   v_revision text;
   v_expected_revision text;
+  v_authority_policy_id text;
+  v_authority_id text;
   v_result "model_reservations"."reservation"%ROWTYPE;
   v_actor "model_reservations"."user"%ROWTYPE;
   v_actor_xmin text;
@@ -140,8 +172,8 @@ BEGIN
   VALUES (v_resource."id", v_actor."id", "p_starts_at", "p_ends_at")
   RETURNING * INTO v_result;
 
-  INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject")
-  VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject);
+  INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence")
+  VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Reservations', '0.10.0', 'sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Reservations', 'version', '0.10.0', 'sourceHash', 'sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215'), 'actionId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))));
 
   RETURN jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at");
 END

@@ -152,6 +152,45 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       approvedByRoles: ["EMPLOYEE", "FINANCE"],
     });
 
+    const evidence = await admin.query<{
+      target_id: string;
+      model_id: string;
+      model_version: string;
+      authorization_rule_id: string;
+      policy_id: string;
+      authority_id: string;
+      decision_outcome: string;
+      decision_evidence: { outcome: string; authorization: { authorityId: string } };
+    }>(
+      `SELECT target_id, model_id, model_version, authorization_rule_id, policy_id,
+              authority_id, decision_outcome, decision_evidence
+       FROM model_procurement_internal.action_audit
+       WHERE action_id = 'action:act_d39dbb883b5f4019b9027b85add3de47'
+         AND target_id = ANY($1::uuid[])
+       ORDER BY target_id`,
+      [[low, high]],
+    );
+    const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
+    expect(byTarget.get(low)).toMatchObject({
+      model_id: "model:Procurement",
+      model_version: "0.11.0",
+      authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+      policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
+      decision_outcome: "executed",
+      decision_evidence: {
+        outcome: "executed",
+        authorization: { authorityId: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688" },
+      },
+    });
+    expect(byTarget.get(high)).toMatchObject({
+      policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      authority_id: "policyBranch:pbr_6b38447b5bf944769d1d737c069c7420",
+      decision_evidence: {
+        authorization: { authorityId: "policyBranch:pbr_6b38447b5bf944769d1d737c069c7420" },
+      },
+    });
+
     const managerRequest = await clients.manager.openRequest({ amount: usd("25") });
     expect(managerRequest).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000003",
@@ -385,6 +424,51 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
     await expect(clients.employeeOne.assessOpenRequest({ amount: usd("10") }))
       .resolves.toMatchObject({ status: "applicable", authority: "none" });
+  });
+
+  it("reapplies the transactional 0.18 decision-evidence upgrade without changing model data or history", async () => {
+    const before = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/008_upgrade_0_18.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("rolls back durable decision evidence with the action transaction", async () => {
+    const connection = new Client({ connectionString: loginUrl("ml_manager") });
+    await connection.connect();
+    let target = "";
+    try {
+      await connection.query("BEGIN");
+      const result = await new ProcurementClient(connection).openRequest({ amount: usd("19") });
+      target = result.id;
+      const inside = await connection.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit WHERE target_id = $1`,
+        [target],
+      ).catch(() => ({ rows: [{ count: "private" }] }));
+      expect(inside.rows[0]!.count).toBe("private");
+      await connection.query("ROLLBACK");
+      const persisted = await admin.query<{ rows: string; evidence: string }>(`
+        SELECT
+          (SELECT count(*)::text FROM model_procurement.purchase_request WHERE id = $1) AS rows,
+          (SELECT count(*)::text FROM model_procurement_internal.action_audit WHERE target_id = $1) AS evidence
+      `, [target]);
+      expect(persisted.rows[0]).toEqual({ rows: "0", evidence: "0" });
+    } finally {
+      await connection.query("ROLLBACK").catch(() => undefined);
+      await connection.end();
+    }
   });
 
   it("denies direct mutation, internal access, and owner role assumption", async () => {

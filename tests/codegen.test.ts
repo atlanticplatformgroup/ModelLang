@@ -97,9 +97,11 @@ describe("backends", () => {
   it("separates the enforcement decision plan from the filtered public capability contract", async () => {
     const output = generateAll(await procurement());
     const decisions = JSON.parse(output["decisions.json"]!) as {
+      planVersion: number;
+      policies: { id: string; evaluation: string; ambiguousBehavior: string; branches: { id: string }[] }[];
       public: boolean;
       audience: string;
-      actions: { authorization: { id: string; expression: object }; preconditions: { id: string; expression: object }[] }[];
+      actions: { operationId: string; authorityPolicyId?: string; authorization: { id: string; expression: object }; preconditions: { id: string; expression: object }[] }[];
     };
     const capabilities = JSON.parse(output["capabilities.json"]!) as {
       view: { safeProjection: boolean; containsExpressions: boolean; containsCurrentState: boolean; grantsAuthority: boolean };
@@ -110,19 +112,33 @@ describe("backends", () => {
     const capabilitySchema = JSON.parse(await readFile("schemas/capability-manifest.schema.json", "utf8")) as object;
     expect(new Ajv2020({ allErrors: true, strict: true }).compile(decisionSchema)(decisions)).toBe(true);
     expect(new Ajv2020({ allErrors: true, strict: true }).compile(capabilitySchema)(capabilities)).toBe(true);
-    expect(decisions).toMatchObject({ public: false, audience: "enforcement" });
+    expect(decisions).toMatchObject({ planVersion: 2, public: false, audience: "enforcement" });
+    expect(decisions.policies).toEqual([expect.objectContaining({
+      id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      evaluation: "exactlyOneBranch",
+      ambiguousBehavior: "deny",
+      branches: [
+        { id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688", expression: expect.any(Object) },
+        { id: "policyBranch:pbr_6b38447b5bf944769d1d737c069c7420", expression: expect.any(Object) },
+      ],
+    })]);
+    expect(decisions.actions.find((action) => action.operationId.endsWith("d39dbb883b5f4019b9027b85add3de47")))
+      .toMatchObject({ authorityPolicyId: "policy:pol_a3a80ffeec774402be92cddaafd0f069" });
     expect(decisions.actions[0]!.authorization.expression).toBeDefined();
     expect(capabilities).toMatchObject({
       view: { safeProjection: true, containsExpressions: false, containsCurrentState: false, grantsAuthority: false },
       authentication: { callerInput: false },
     });
-    expect(JSON.stringify(capabilities)).not.toMatch(/expression|currentValue|sqlFunction|lockPlan/);
+    expect(JSON.stringify(capabilities)).not.toMatch(/expression|currentValue|sqlFunction|lockPlan|policyId|authorityId|decisionEvidence/);
     for (const capability of capabilities.actions) {
       expect(capability.outcomes).toEqual(["applicable", "denied", "notApplicable", "stale"]);
       expect(capability.revision).toEqual(expect.objectContaining({ staleRequiresExpectedRevision: true, grantsAuthority: false }));
     }
     expect(output["typescript/capabilities.ts"]).toContain("Safe public capability contract");
     expect(output["typescript/http-server.ts"]).toContain("validateDecision");
+    expect(output["postgres/003_actions.sql"]).toContain('"decision_evidence"');
+    expect(output["postgres/003_actions.sql"]).toContain("policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688");
+    expect(output["postgres/008_upgrade_0_18.sql"]).toContain("durable decision-evidence upgrade");
   });
 
   it("emits engineering-only semantic closure and deterministic artifact provenance", async () => {
@@ -133,6 +149,7 @@ describe("backends", () => {
       audience: string;
       view: { authorizationFiltered: boolean; currentState: boolean; executable: boolean };
       provenance: { compilerVersion: string; irVersion: number };
+      policies: { id: string; usedBy: { operationId: string; usage: string }[]; coverage: { applicability: boolean; execution: boolean; durableEvidence: boolean } }[];
       actions: {
         name: string;
         authorization: { id: string; dependencies: { kind: string; id: string }[] };
@@ -146,11 +163,19 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 1,
+      manifestVersion: 2,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 9 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 10 },
     });
+    expect(semantic.policies).toEqual([expect.objectContaining({
+      id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      usedBy: [expect.objectContaining({
+        operationId: "action:act_d39dbb883b5f4019b9027b85add3de47",
+        usage: "authorization",
+      })],
+      coverage: { applicability: true, execution: true, durableEvidence: true },
+    })]);
     const approve = semantic.actions.find((action) => action.name === "approveRequest")!;
     expect(approve.authorization.id).toBe("authorize:action:act_d39dbb883b5f4019b9027b85add3de47");
     expect(approve.authorization.dependencies).toContainEqual({
@@ -179,7 +204,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 9 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 10 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -575,7 +600,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.10.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.11.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

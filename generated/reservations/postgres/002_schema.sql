@@ -185,6 +185,36 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal_snapshot"() FROM PUBLIC;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authorization_rule_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_outcome" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "policy_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authority_id" text;
+ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_evidence" jsonb;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass
+      AND conname = 'ck_action_audit_decision_evidence'
+  ) THEN
+    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_decision_evidence" CHECK (
+      ("decision_evidence" IS NULL
+       AND "model_id" IS NULL AND "model_version" IS NULL
+       AND "source_hash" IS NULL AND "authorization_rule_id" IS NULL
+       AND "decision_outcome" IS NULL AND "policy_id" IS NULL AND "authority_id" IS NULL)
+      OR
+      ("decision_evidence" IS NOT NULL
+       AND "model_id" IS NOT NULL AND "model_version" IS NOT NULL
+       AND "source_hash" ~ '^sha256:[0-9a-f]{64}$'
+       AND "authorization_rule_id" IS NOT NULL AND "decision_outcome" = 'executed'
+       AND (("policy_id" IS NULL) = ("authority_id" IS NULL)))
+    );
+  END IF;
+END
+$modellang$;
 
 CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

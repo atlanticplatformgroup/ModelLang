@@ -1,15 +1,16 @@
 {
   "$schema": "https://modellang.dev/schemas/decision-plan.schema.json",
-  "planVersion": 1,
+  "planVersion": 2,
   "audience": "enforcement",
   "public": false,
-  "compilerVersion": "0.17.0",
-  "irVersion": 9,
+  "compilerVersion": "0.18.0",
+  "irVersion": 10,
   "model": {
     "id": "model:Reservations",
     "version": "0.10.0",
     "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215"
   },
+  "policies": [],
   "actions": [
     {
       "operationId": "action:act_508ad810a19d4b79a5009871de5cd26b",
@@ -42,7 +43,8 @@
           "value": true,
           "type": "Boolean",
           "nullable": false
-        }
+        },
+        "policyIds": []
       },
       "preconditions": [
         {
@@ -66,7 +68,8 @@
             },
             "type": "Boolean",
             "nullable": false
-          }
+          },
+          "policyIds": []
         }
       ],
       "revision": {

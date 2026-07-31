@@ -1,10 +1,10 @@
 {
-  "irVersion": 9,
+  "irVersion": 10,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.10.0",
-    "sourceHash": "sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62",
+    "version": "0.11.0",
+    "sourceHash": "sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -878,6 +878,201 @@
       }
     }
   ],
+  "policies": [
+    {
+      "id": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      "name": "ApprovalAuthority",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "pol_a3a80ffeec774402be92cddaafd0f069"
+      },
+      "parameters": [
+        {
+          "id": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.actor",
+          "name": "actor",
+          "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+          "caller": false,
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 59,
+            "column": 3,
+            "endLine": 59,
+            "endColumn": 14
+          },
+          "naming": {
+            "sqlParameter": "p_actor",
+            "typescriptProperty": "actor"
+          }
+        },
+        {
+          "id": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.request",
+          "name": "request",
+          "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+          "caller": false,
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 60,
+            "column": 3,
+            "endLine": 60,
+            "endColumn": 27
+          },
+          "naming": {
+            "sqlParameter": "p_request",
+            "typescriptProperty": "request"
+          }
+        }
+      ],
+      "branches": [
+        {
+          "id": "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
+          "name": "manager",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pbr_0d694c9a0a274dc79c6168e47d259688"
+          },
+          "expression": {
+            "kind": "binary",
+            "operator": "and",
+            "left": {
+              "kind": "binary",
+              "operator": "<=",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.request",
+                "parameter": "request",
+                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                "fieldName": "amount",
+                "type": "money:USD:20:2",
+                "nullable": false
+              },
+              "right": {
+                "kind": "moneyLiteral",
+                "currency": "USD",
+                "amount": "10000",
+                "precision": 20,
+                "scale": 2,
+                "type": "money:USD:20:2",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false
+            },
+            "right": {
+              "kind": "binary",
+              "operator": "in",
+              "left": {
+                "kind": "enumLiteral",
+                "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "memberId": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
+                "memberName": "MANAGER",
+                "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "nullable": false
+              },
+              "right": {
+                "kind": "fieldAccess",
+                "source": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.actor",
+                "parameter": "actor",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                "fieldName": "roles",
+                "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false,
+              "comparisonSemantics": "setMembership"
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "((request.amount <= USD 10000) and (Role.MANAGER in actor.roles))",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 62,
+            "column": 3,
+            "endLine": 63,
+            "endColumn": 65
+          }
+        },
+        {
+          "id": "policyBranch:pbr_6b38447b5bf944769d1d737c069c7420",
+          "name": "finance",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pbr_6b38447b5bf944769d1d737c069c7420"
+          },
+          "expression": {
+            "kind": "binary",
+            "operator": "and",
+            "left": {
+              "kind": "binary",
+              "operator": ">",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.request",
+                "parameter": "request",
+                "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+                "fieldName": "amount",
+                "type": "money:USD:20:2",
+                "nullable": false
+              },
+              "right": {
+                "kind": "moneyLiteral",
+                "currency": "USD",
+                "amount": "10000",
+                "precision": 20,
+                "scale": 2,
+                "type": "money:USD:20:2",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false
+            },
+            "right": {
+              "kind": "binary",
+              "operator": "in",
+              "left": {
+                "kind": "enumLiteral",
+                "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "memberId": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
+                "memberName": "FINANCE",
+                "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "nullable": false
+              },
+              "right": {
+                "kind": "fieldAccess",
+                "source": "parameter:policy:pol_a3a80ffeec774402be92cddaafd0f069.actor",
+                "parameter": "actor",
+                "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
+                "fieldName": "roles",
+                "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
+                "nullable": false
+              },
+              "type": "Boolean",
+              "nullable": false,
+              "comparisonSemantics": "setMembership"
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "((request.amount > USD 10000) and (Role.FINANCE in actor.roles))",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 64,
+            "column": 3,
+            "endLine": 65,
+            "endColumn": 64
+          }
+        }
+      ],
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 58,
+        "column": 1,
+        "endLine": 66,
+        "endColumn": 2
+      }
+    }
+  ],
   "actions": [
     {
       "id": "action:act_1e35db0451b1461e941af6283d86dca2",
@@ -895,9 +1090,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 60,
+            "line": 71,
             "column": 3,
-            "endLine": 60,
+            "endLine": 71,
             "endColumn": 21
           },
           "naming": {
@@ -912,9 +1107,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 61,
+            "line": 72,
             "column": 3,
-            "endLine": 61,
+            "endLine": 72,
             "endColumn": 21
           },
           "naming": {
@@ -1018,9 +1213,9 @@
         "sourceExpression": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 64,
+          "line": 75,
           "column": 5,
-          "endLine": 66,
+          "endLine": 77,
           "endColumn": 35
         }
       },
@@ -1053,9 +1248,9 @@
           "sourceExpression": "(amount > USD 0)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 67,
+            "line": 78,
             "column": 3,
-            "endLine": 67,
+            "endLine": 78,
             "endColumn": 43
           }
         }
@@ -1132,9 +1327,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 59,
+        "line": 70,
         "column": 1,
-        "endLine": 76,
+        "endLine": 87,
         "endColumn": 2
       },
       "naming": {
@@ -1158,9 +1353,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 79,
+            "line": 90,
             "column": 3,
-            "endLine": 79,
+            "endLine": 90,
             "endColumn": 21
           },
           "naming": {
@@ -1175,9 +1370,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 80,
+            "line": 91,
             "column": 3,
-            "endLine": 80,
+            "endLine": 91,
             "endColumn": 27
           },
           "naming": {
@@ -1221,9 +1416,9 @@
         "sourceExpression": "(actor == request.requester)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 82,
+          "line": 93,
           "column": 13,
-          "endLine": 82,
+          "endLine": 93,
           "endColumn": 39
         }
       },
@@ -1257,9 +1452,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 83,
+            "line": 94,
             "column": 3,
-            "endLine": 83,
+            "endLine": 94,
             "endColumn": 59
           }
         }
@@ -1303,9 +1498,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 78,
+        "line": 89,
         "column": 1,
-        "endLine": 88,
+        "endLine": 99,
         "endColumn": 2
       },
       "naming": {
@@ -1329,9 +1524,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 91,
+            "line": 102,
             "column": 3,
-            "endLine": 91,
+            "endLine": 102,
             "endColumn": 21
           },
           "naming": {
@@ -1346,9 +1541,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 92,
+            "line": 103,
             "column": 3,
-            "endLine": 92,
+            "endLine": 103,
             "endColumn": 27
           },
           "naming": {
@@ -1393,129 +1588,39 @@
             "comparisonSemantics": "entityIdentity"
           },
           "right": {
-            "kind": "binary",
-            "operator": "or",
-            "left": {
-              "kind": "binary",
-              "operator": "and",
-              "left": {
-                "kind": "binary",
-                "operator": "<=",
-                "left": {
-                  "kind": "fieldAccess",
-                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
-                  "parameter": "request",
-                  "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
-                  "fieldName": "amount",
-                  "type": "money:USD:20:2",
-                  "nullable": false
-                },
-                "right": {
-                  "kind": "moneyLiteral",
-                  "currency": "USD",
-                  "amount": "10000",
-                  "precision": 20,
-                  "scale": 2,
-                  "type": "money:USD:20:2",
-                  "nullable": false
-                },
-                "type": "Boolean",
+            "kind": "policyCall",
+            "policyId": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+            "arguments": [
+              {
+                "kind": "entityValue",
+                "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
+                "name": "actor",
+                "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+                "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
                 "nullable": false
               },
-              "right": {
-                "kind": "binary",
-                "operator": "in",
-                "left": {
-                  "kind": "enumLiteral",
-                  "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "memberId": "enumMember:emv_dd1ac9d5f2134b998a9d4fec76df5e3e",
-                  "memberName": "MANAGER",
-                  "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "nullable": false
-                },
-                "right": {
-                  "kind": "fieldAccess",
-                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
-                  "parameter": "actor",
-                  "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
-                  "fieldName": "roles",
-                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "nullable": false
-                },
-                "type": "Boolean",
-                "nullable": false,
-                "comparisonSemantics": "setMembership"
-              },
-              "type": "Boolean",
-              "nullable": false
-            },
-            "right": {
-              "kind": "binary",
-              "operator": "and",
-              "left": {
-                "kind": "binary",
-                "operator": ">",
-                "left": {
-                  "kind": "fieldAccess",
-                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
-                  "parameter": "request",
-                  "fieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
-                  "fieldName": "amount",
-                  "type": "money:USD:20:2",
-                  "nullable": false
-                },
-                "right": {
-                  "kind": "moneyLiteral",
-                  "currency": "USD",
-                  "amount": "10000",
-                  "precision": 20,
-                  "scale": 2,
-                  "type": "money:USD:20:2",
-                  "nullable": false
-                },
-                "type": "Boolean",
+              {
+                "kind": "entityValue",
+                "parameterId": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request",
+                "name": "request",
+                "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+                "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
                 "nullable": false
-              },
-              "right": {
-                "kind": "binary",
-                "operator": "in",
-                "left": {
-                  "kind": "enumLiteral",
-                  "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "memberId": "enumMember:emv_be7e2d336369444cb7bd75c42668afa6",
-                  "memberName": "FINANCE",
-                  "type": "enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "nullable": false
-                },
-                "right": {
-                  "kind": "fieldAccess",
-                  "source": "parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor",
-                  "parameter": "actor",
-                  "fieldId": "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
-                  "fieldName": "roles",
-                  "type": "set:enum:enm_025acdd67483499fbd780d0e19867e9b",
-                  "nullable": false
-                },
-                "type": "Boolean",
-                "nullable": false,
-                "comparisonSemantics": "setMembership"
-              },
-              "type": "Boolean",
-              "nullable": false
-            },
+              }
+            ],
             "type": "Boolean",
             "nullable": false
           },
           "type": "Boolean",
           "nullable": false
         },
-        "sourceExpression": "((actor != request.requester) and (((request.amount <= USD 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > USD 10000) and (Role.FINANCE in actor.roles))))",
+        "sourceExpression": "((actor != request.requester) and ApprovalAuthority(actor, request))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 95,
+          "line": 106,
           "column": 5,
-          "endLine": 100,
-          "endColumn": 66
+          "endLine": 107,
+          "endColumn": 42
         }
       },
       "preconditions": [
@@ -1548,9 +1653,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 103,
+            "line": 109,
             "column": 3,
-            "endLine": 103,
+            "endLine": 109,
             "endColumn": 67
           }
         }
@@ -1619,9 +1724,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 101,
         "column": 1,
-        "endLine": 110,
+        "endLine": 116,
         "endColumn": 2
       },
       "naming": {
@@ -1647,9 +1752,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 121,
+            "line": 127,
             "column": 3,
-            "endLine": 121,
+            "endLine": 127,
             "endColumn": 21
           },
           "naming": {
@@ -1674,9 +1779,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 123,
+          "line": 129,
           "column": 13,
-          "endLine": 123,
+          "endLine": 129,
           "endColumn": 17
         }
       },
@@ -1710,9 +1815,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 124,
+          "line": 130,
           "column": 9,
-          "endLine": 124,
+          "endLine": 130,
           "endColumn": 35
         }
       },
@@ -1724,9 +1829,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 120,
+        "line": 126,
         "column": 1,
-        "endLine": 127,
+        "endLine": 133,
         "endColumn": 2
       },
       "naming": {
@@ -1760,9 +1865,9 @@
           "actionId": "action:act_ed2374e822704c51a2925338253d05d2",
           "span": {
             "file": "examples/procurement.model",
-            "line": 114,
+            "line": 120,
             "column": 3,
-            "endLine": 115,
+            "endLine": 121,
             "endColumn": 69
           }
         },
@@ -1778,18 +1883,18 @@
           "actionId": "action:act_d39dbb883b5f4019b9027b85add3de47",
           "span": {
             "file": "examples/procurement.model",
-            "line": 116,
+            "line": 122,
             "column": 3,
-            "endLine": 117,
+            "endLine": 123,
             "endColumn": 73
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 112,
+        "line": 118,
         "column": 1,
-        "endLine": 118,
+        "endLine": 124,
         "endColumn": 2
       },
       "naming": {
@@ -1849,6 +1954,48 @@
       "layer": "PostgreSQL migration history",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.schema_migrations"
+    },
+    {
+      "id": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      "purpose": "Evaluate reusable policy ApprovalAuthority as a closed Boolean decision with exactly one successful authority branch.",
+      "layer": "Canonical decision plan",
+      "artifact": "decisions.json",
+      "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 58,
+        "column": 1,
+        "endLine": 66,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
+      "purpose": "((request.amount <= USD 10000) and (Role.MANAGER in actor.roles))",
+      "layer": "PostgreSQL policy branch",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 62,
+        "column": 3,
+        "endLine": 63,
+        "endColumn": 65
+      }
+    },
+    {
+      "id": "policyBranch:pbr_6b38447b5bf944769d1d737c069c7420",
+      "purpose": "((request.amount > USD 10000) and (Role.FINANCE in actor.roles))",
+      "layer": "PostgreSQL policy branch",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 64,
+        "column": 3,
+        "endLine": 65,
+        "endColumn": 64
+      }
     },
     {
       "id": "required:field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
@@ -2278,9 +2425,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 60,
+        "line": 71,
         "column": 3,
-        "endLine": 60,
+        "endLine": 71,
         "endColumn": 21
       }
     },
@@ -2292,9 +2439,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 61,
+        "line": 72,
         "column": 3,
-        "endLine": 61,
+        "endLine": 72,
         "endColumn": 21
       }
     },
@@ -2313,9 +2460,9 @@
       "objectName": "model_procurement.decide_act_1e35db0451b1461e941af6283d86dca2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 59,
+        "line": 70,
         "column": 1,
-        "endLine": 76,
+        "endLine": 87,
         "endColumn": 2
       }
     },
@@ -2327,9 +2474,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 59,
+        "line": 70,
         "column": 1,
-        "endLine": 76,
+        "endLine": 87,
         "endColumn": 2
       }
     },
@@ -2341,9 +2488,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 64,
+        "line": 75,
         "column": 5,
-        "endLine": 66,
+        "endLine": 77,
         "endColumn": 35
       }
     },
@@ -2355,9 +2502,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 67,
+        "line": 78,
         "column": 3,
-        "endLine": 67,
+        "endLine": 78,
         "endColumn": 43
       }
     },
@@ -2369,9 +2516,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 59,
+        "line": 70,
         "column": 1,
-        "endLine": 76,
+        "endLine": 87,
         "endColumn": 2
       }
     },
@@ -2390,9 +2537,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 79,
+        "line": 90,
         "column": 3,
-        "endLine": 79,
+        "endLine": 90,
         "endColumn": 21
       }
     },
@@ -2411,9 +2558,9 @@
       "objectName": "model_procurement.decide_act_ed2374e822704c51a2925338253d05d2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 78,
+        "line": 89,
         "column": 1,
-        "endLine": 88,
+        "endLine": 99,
         "endColumn": 2
       }
     },
@@ -2425,9 +2572,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 78,
+        "line": 89,
         "column": 1,
-        "endLine": 88,
+        "endLine": 99,
         "endColumn": 2
       }
     },
@@ -2439,9 +2586,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 82,
+        "line": 93,
         "column": 13,
-        "endLine": 82,
+        "endLine": 93,
         "endColumn": 39
       }
     },
@@ -2453,9 +2600,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 83,
+        "line": 94,
         "column": 3,
-        "endLine": 83,
+        "endLine": 94,
         "endColumn": 59
       }
     },
@@ -2467,9 +2614,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 78,
+        "line": 89,
         "column": 1,
-        "endLine": 88,
+        "endLine": 99,
         "endColumn": 2
       }
     },
@@ -2495,9 +2642,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 91,
+        "line": 102,
         "column": 3,
-        "endLine": 91,
+        "endLine": 102,
         "endColumn": 21
       }
     },
@@ -2516,9 +2663,9 @@
       "objectName": "model_procurement.decide_act_d39dbb883b5f4019b9027b85add3de47",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 101,
         "column": 1,
-        "endLine": 110,
+        "endLine": 116,
         "endColumn": 2
       }
     },
@@ -2530,24 +2677,24 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 101,
         "column": 1,
-        "endLine": 110,
+        "endLine": 116,
         "endColumn": 2
       }
     },
     {
       "id": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
-      "purpose": "((actor != request.requester) and (((request.amount <= USD 10000) and (Role.MANAGER in actor.roles)) or ((request.amount > USD 10000) and (Role.FINANCE in actor.roles))))",
+      "purpose": "((actor != request.requester) and ApprovalAuthority(actor, request))",
       "layer": "PostgreSQL action guard",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 95,
+        "line": 106,
         "column": 5,
-        "endLine": 100,
-        "endColumn": 66
+        "endLine": 107,
+        "endColumn": 42
       }
     },
     {
@@ -2558,9 +2705,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 103,
+        "line": 109,
         "column": 3,
-        "endLine": 103,
+        "endLine": 109,
         "endColumn": 67
       }
     },
@@ -2572,9 +2719,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 101,
         "column": 1,
-        "endLine": 110,
+        "endLine": 116,
         "endColumn": 2
       }
     },
@@ -2600,9 +2747,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 121,
+        "line": 127,
         "column": 3,
-        "endLine": 121,
+        "endLine": 127,
         "endColumn": 21
       }
     },
@@ -2621,9 +2768,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 123,
+        "line": 129,
         "column": 13,
-        "endLine": 123,
+        "endLine": 129,
         "endColumn": 17
       }
     },
@@ -2635,9 +2782,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 124,
+        "line": 130,
         "column": 9,
-        "endLine": 124,
+        "endLine": 130,
         "endColumn": 35
       }
     },
@@ -2649,9 +2796,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 120,
+        "line": 126,
         "column": 1,
-        "endLine": 127,
+        "endLine": 133,
         "endColumn": 2
       }
     },
@@ -2663,9 +2810,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 120,
+        "line": 126,
         "column": 1,
-        "endLine": 127,
+        "endLine": 133,
         "endColumn": 2
       }
     },
@@ -2677,9 +2824,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 120,
+        "line": 126,
         "column": 1,
-        "endLine": 127,
+        "endLine": 133,
         "endColumn": 2
       }
     },
@@ -2691,9 +2838,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 112,
+        "line": 118,
         "column": 1,
-        "endLine": 118,
+        "endLine": 124,
         "endColumn": 2
       }
     },
@@ -2705,9 +2852,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 114,
+        "line": 120,
         "column": 3,
-        "endLine": 115,
+        "endLine": 121,
         "endColumn": 69
       }
     },
@@ -2719,9 +2866,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 116,
+        "line": 122,
         "column": 3,
-        "endLine": 117,
+        "endLine": 123,
         "endColumn": 73
       }
     },
@@ -2731,6 +2878,13 @@
       "layer": "PostgreSQL audit",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement_internal.action_audit"
+    },
+    {
+      "id": "boundary:decision_evidence",
+      "purpose": "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.",
+      "layer": "PostgreSQL audit",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.action_audit.decision_evidence"
     }
   ]
 }

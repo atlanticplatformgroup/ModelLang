@@ -6,6 +6,8 @@ export type StableIdKind =
   | "field"
   | "enum"
   | "enumMember"
+  | "policy"
+  | "policyBranch"
   | "action"
   | "query"
   | "invariant"
@@ -24,6 +26,8 @@ function generatedId(kind: StableIdKind): string {
     field: "fld",
     enum: "enm",
     enumMember: "emv",
+    policy: "pol",
+    policyBranch: "pbr",
     action: "act",
     query: "qry",
     invariant: "inv",
@@ -79,6 +83,15 @@ export function assignStableIds(
         edits.push({
           offset: transition.nameSpan.end.offset,
           text: ` @stableId("${createId("transition")}")`,
+        });
+      }
+    }
+    if (declaration.kind === "policy") {
+      for (const branch of declaration.branches) {
+        if (branch.stableId) continue;
+        edits.push({
+          offset: branch.nameSpan.end.offset,
+          text: ` @stableId("${createId("policyBranch")}")`,
         });
       }
     }

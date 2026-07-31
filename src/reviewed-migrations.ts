@@ -5,6 +5,7 @@ import {
   generateEntityForeignKeyStatements,
   generateEntityTableStatement,
   generateGatewayInfrastructureStatements,
+  generateDecisionEvidenceInfrastructureStatements,
   generateGatewayRoleStatements,
   generatePostgres,
   generateWorkflowStatements,
@@ -361,7 +362,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (previous.irVersion !== 9 || current.irVersion !== 9) fail(current, "E2901", "Reviewed migration planning requires canonical IR version 9 inputs.");
+  if (![9, 10].includes(Number(previous.irVersion)) || current.irVersion !== 10) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10 baseline and canonical IR10 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -502,6 +503,7 @@ export function planReviewedMigration(
     `ALTER TABLE ${qname(internal, "gateway_principal_binding")} ADD CONSTRAINT ${quoteIdent("gateway_principal_binding_principal_id_fkey")} FOREIGN KEY (${quoteIdent("principal_id")}) REFERENCES ${qname(schema, principal.naming.sqlTable)} (${quoteIdent("id")});`,
     ...current.workflows.flatMap((workflow) => generateWorkflowStatements(current, workflow, true)),
     ...generateGatewayInfrastructureStatements(current),
+    ...generateDecisionEvidenceInfrastructureStatements(current),
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),

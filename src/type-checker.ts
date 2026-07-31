@@ -1,21 +1,22 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
-  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, Program, QueryDecl, TypeRef,
+  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
 
 interface Scope {
-  kind: "invariant" | "action" | "query";
+  kind: "invariant" | "policy" | "action" | "query";
   entity?: EntityDecl;
   action?: ActionDecl;
   query?: QueryDecl;
+  policy?: PolicyDecl;
   queryEntity?: EntityDecl;
   rowAlias?: string;
   allowQueryRow?: boolean;
@@ -25,10 +26,13 @@ interface Scope {
 interface Symbols {
   enums: Map<string, Extract<Declaration, { kind: "enum" }>>;
   entities: Map<string, EntityDecl>;
+  policies: Map<string, PolicyDecl>;
   actions: Map<string, ActionDecl>;
   queries: Map<string, QueryDecl>;
   workflows: Map<string, WorkflowDecl>;
   fields: Map<string, Map<string, FieldDecl>>;
+  loweredPolicies: Map<string, IRPolicy>;
+  policyStack: string[];
 }
 
 function irSpan(span: Span, file: string): IRSpan {
@@ -47,6 +51,7 @@ function expressionText(expression: Expression): string {
       return expression.literalKind === "string" ? JSON.stringify(expression.value) : String(expression.value);
     case "moneyLiteral": return `${expression.currency} ${expression.amount}`;
     case "path": return expression.parts.join(".");
+    case "call": return `${expression.name}(${expression.arguments.map(expressionText).join(", ")})`;
     case "unary": return `not ${expressionText(expression.operand)}`;
     case "binary": return `(${expressionText(expression.left)} ${expression.operator} ${expressionText(expression.right)})`;
   }
@@ -86,6 +91,14 @@ function enumMemberId(
 
 function actionId(action: ActionDecl): string {
   return `action:${String(action.stableId?.value ?? action.name)}`;
+}
+
+function policyId(policy: PolicyDecl): string {
+  return `policy:${String(policy.stableId?.value ?? policy.name)}`;
+}
+
+function policyBranchId(policy: PolicyDecl, branch: PolicyDecl["branches"][number]): string {
+  return `policyBranch:${String(branch.stableId?.value ?? `${policy.name}.${branch.name}`)}`;
 }
 
 function queryId(query: QueryDecl): string {
@@ -155,12 +168,13 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     naming: { sqlCheckPrefix: `ck_enum_${snakeCase(declaration.name)}`, typescriptName: declaration.name },
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
+  const policies = [...symbols.policies.values()].map((policy) => lowerPolicy(policy, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
-  const enforcement = buildEnforcement(enums, entities, actions, queries, workflows, schema, internalSchema);
+  const enforcement = buildEnforcement(enums, entities, policies, actions, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 9,
+    irVersion: 10,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -172,6 +186,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     principal: { entityId: entityId(symbols.entities.get(principalName)!), bindingMechanism: "session_user" },
     enums,
     entities,
+    policies,
     actions,
     queries,
     workflows,
@@ -182,6 +197,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
 function collectSymbols(program: Program, file: string): Symbols {
   const enums = new Map<string, Extract<Declaration, { kind: "enum" }>>();
   const entities = new Map<string, EntityDecl>();
+  const policies = new Map<string, PolicyDecl>();
   const actions = new Map<string, ActionDecl>();
   const queries = new Map<string, QueryDecl>();
   const workflows = new Map<string, WorkflowDecl>();
@@ -192,6 +208,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     top.set(declaration.name, declaration);
     if (declaration.kind === "enum") enums.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
+    if (declaration.kind === "policy") policies.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
     if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
@@ -219,10 +236,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, actions, queries, workflows, fields };
+  return { enums, entities, policies, actions, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
+type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "pol" | "pbr" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -233,6 +250,20 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
   }
   for (const action of symbols.actions.values()) {
     if (action.stableId) validateStableId(action.stableId, "act", stableIds, file);
+  }
+  for (const policy of symbols.policies.values()) {
+    if (policy.stableId) validateStableId(policy.stableId, "pol", stableIds, file);
+    const parameterNames = new Set<string>();
+    for (const parameter of policy.parameters) {
+      if (parameterNames.has(parameter.name)) throw new ModelError("E2424", `Duplicate policy parameter '${policy.name}.${parameter.name}'.`, parameter.span, file);
+      parameterNames.add(parameter.name);
+    }
+    const branchNames = new Set<string>();
+    for (const branch of policy.branches) {
+      if (branchNames.has(branch.name)) throw new ModelError("E2425", `Duplicate policy branch '${policy.name}.${branch.name}'.`, branch.span, file);
+      branchNames.add(branch.name);
+      if (branch.stableId) validateStableId(branch.stableId, "pbr", stableIds, file);
+    }
   }
   for (const query of symbols.queries.values()) {
     if (query.stableId) validateStableId(query.stableId, "qry", stableIds, file);
@@ -344,6 +375,8 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
       fld: "field",
       enm: "enum",
       emv: "enum member",
+      pol: "policy",
+      pbr: "policy branch",
       act: "action",
       qry: "query",
       inv: "invariant",
@@ -373,6 +406,59 @@ function resolvedType(type: TypeRef, symbols: Symbols): string {
 
 function fieldType(field: FieldDecl, symbols: Symbols): string {
   return resolvedType(field.type, symbols);
+}
+
+function lowerPolicy(policy: PolicyDecl, symbols: Symbols, file: string): IRPolicy {
+  const id = policyId(policy);
+  const cached = symbols.loweredPolicies.get(id);
+  if (cached) return cached;
+  if (symbols.policyStack.includes(id)) {
+    const cycle = [...symbols.policyStack.slice(symbols.policyStack.indexOf(id)), id].join(" -> ");
+    throw new ModelError("E2420", `Policy recursion is not allowed (${cycle}).`, policy.span, file);
+  }
+  symbols.policyStack.push(id);
+  try {
+    const parameters: IRParameter[] = policy.parameters.map((parameter) => {
+      if (parameter.type.collection === "set") throw new ModelError("E2421", "Set-valued policy parameters are not supported in policy v1.", parameter.type.span, file);
+      if (!parameter.type.moneyCurrency && !scalars.has(parameter.type.name)
+        && !symbols.enums.has(parameter.type.name) && !symbols.entities.has(parameter.type.name)) {
+        throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
+      }
+      return {
+        id: `parameter:${id}.${parameter.name}`,
+        name: parameter.name,
+        type: resolvedType(parameter.type, symbols),
+        caller: false,
+        span: irSpan(parameter.span, file),
+        naming: { sqlParameter: `p_${snakeCase(parameter.name)}`, typescriptProperty: parameter.name },
+      };
+    });
+    const scope: Scope = { kind: "policy", policy, parameters: new Map(parameters.map((parameter) => [parameter.name, parameter])) };
+    const branches = policy.branches.map((branch) => {
+      const expression = typeExpression(branch.expression, scope, symbols, file);
+      requireBoolean(expression, branch.expression.span, file, `Policy branch '${policy.name}.${branch.name}'`);
+      return {
+        id: policyBranchId(policy, branch),
+        name: branch.name,
+        identity: identity(branch.stableId),
+        expression,
+        sourceExpression: expressionText(branch.expression),
+        span: irSpan(branch.span, file),
+      };
+    });
+    const result: IRPolicy = {
+      id,
+      name: policy.name,
+      identity: identity(policy.stableId),
+      parameters,
+      branches,
+      span: irSpan(policy.span, file),
+    };
+    symbols.loweredPolicies.set(id, result);
+    return result;
+  } finally {
+    symbols.policyStack.pop();
+  }
 }
 
 function lowerEntity(entity: EntityDecl, symbols: Symbols, file: string): IREntity {
@@ -472,6 +558,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   const scope: Scope = { kind: "action", action, parameters: parameterMap };
   const authorization = typeExpression(action.authorize, scope, symbols, file);
   requireBoolean(authorization, action.authorize.span, file, "Authorization");
+  validateAuthorizationPolicyUse(authorization, action.authorize.span, file);
   const preconditionNames = new Set<string>();
   const preconditions = action.requires.map((requirement) => {
     if (preconditionNames.has(requirement.name)) throw new ModelError("E2306", `Duplicate precondition '${requirement.name}'.`, requirement.span, file);
@@ -859,6 +946,23 @@ function typeExpression(expression: Expression, scope: Scope, symbols: Symbols, 
     return { kind: "literal", value: expression.value as string | number | boolean, type, nullable: false };
   }
   if (expression.kind === "path") return typePath(expression, scope, symbols, file);
+  if (expression.kind === "call") {
+    const declaration = symbols.policies.get(expression.name);
+    if (!declaration) throw new ModelError("E2416", `Unknown policy '${expression.name}'.`, expression.span, file);
+    const policy = lowerPolicy(declaration, symbols, file);
+    if (expression.arguments.length !== policy.parameters.length) {
+      throw new ModelError("E2417", `Policy '${policy.name}' expects ${policy.parameters.length} arguments, received ${expression.arguments.length}.`, expression.span, file);
+    }
+    const args = expression.arguments.map((argument, index) => {
+      const typed = typeExpression(argument, scope, symbols, file);
+      const parameter = policy.parameters[index]!;
+      if (!compatibleTypes(parameter.type, typed.type) || typed.nullable) {
+        throw new ModelError("E2418", `Policy argument '${parameter.name}' requires non-null ${parameter.type}, not ${typed.nullable ? "nullable " : ""}${typed.type}.`, argument.span, file);
+      }
+      return typed;
+    });
+    return { kind: "policyCall", policyId: policy.id, arguments: args, type: "Boolean", nullable: false };
+  }
   if (expression.kind === "unary") {
     const operand = typeExpression(expression.operand, scope, symbols, file);
     requireBoolean(operand, expression.operand.span, file, "'not'");
@@ -994,6 +1098,38 @@ function requireBoolean(expression: IRExpression, span: Span, file: string, subj
   if (expression.type !== "Boolean") throw new ModelError("E2414", `${subject} expression must be Boolean, not ${expression.type}.`, span, file);
 }
 
+function containsPolicyCall(expression: IRExpression): boolean {
+  if (expression.kind === "policyCall") return true;
+  if (expression.kind === "unary") return containsPolicyCall(expression.operand);
+  if (expression.kind === "binary") return containsPolicyCall(expression.left) || containsPolicyCall(expression.right);
+  if (expression.kind === "nullComparison") return containsPolicyCall(expression.operand);
+  return false;
+}
+
+function validateAuthorizationPolicyUse(expression: IRExpression, span: Span, file: string): void {
+  let calls = 0;
+  const visit = (node: IRExpression, conjunctive: boolean): void => {
+    if (node.kind === "policyCall") {
+      calls += 1;
+      if (!conjunctive) throw new ModelError("E2422", "An authorization policy call must occur positively in a conjunction, not under 'or' or 'not'.", span, file);
+      return;
+    }
+    if (node.kind === "unary") {
+      if (containsPolicyCall(node.operand)) visit(node.operand, false);
+      return;
+    }
+    if (node.kind === "binary") {
+      const next = conjunctive && node.operator === "and";
+      visit(node.left, next);
+      visit(node.right, next);
+    }
+  };
+  if (expression.kind === "policyCall") visit(expression, true);
+  else if (expression.kind === "binary" && expression.operator === "and") visit(expression, true);
+  else visit(expression, false);
+  if (calls > 1) throw new ModelError("E2423", "An action authorization may invoke at most one top-level policy so executed authority is exact.", span, file);
+}
+
 function collectEntityParameters(expression: IRExpression, found: Set<string>): void {
   if (expression.kind === "entityValue") found.add(expression.parameterId);
   if (expression.kind === "fieldAccess" && expression.source.startsWith("parameter:")) found.add(expression.source);
@@ -1002,12 +1138,16 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
     collectEntityParameters(expression.left, found);
     collectEntityParameters(expression.right, found);
   }
+  if (expression.kind === "policyCall") {
+    for (const argument of expression.arguments) collectEntityParameters(argument, found);
+  }
   if (expression.kind === "nullComparison") collectEntityParameters(expression.operand, found);
 }
 
 function buildEnforcement(
   enums: IREnum[],
   entities: IREntity[],
+  policies: IRPolicy[],
   actions: IRAction[],
   queries: IRQuery[],
   workflows: IRWorkflow[],
@@ -1057,6 +1197,24 @@ function buildEnforcement(
     artifact: "postgres/002_schema.sql",
     objectName: `${internalSchema}.schema_migrations`,
   }];
+  for (const policy of policies) {
+    entries.push({
+      id: policy.id,
+      purpose: `Evaluate reusable policy ${policy.name} as a closed Boolean decision with exactly one successful authority branch.`,
+      layer: "Canonical decision plan",
+      artifact: "decisions.json",
+      objectName: policy.id,
+      source: policy.span,
+    });
+    for (const branch of policy.branches) entries.push({
+      id: branch.id,
+      purpose: branch.sourceExpression,
+      layer: "PostgreSQL policy branch",
+      artifact: "postgres/003_actions.sql",
+      objectName: policy.id,
+      source: branch.span,
+    });
+  }
   for (const entity of entities) {
     for (const field of entity.fields) {
       if (!field.optional) entries.push({ id: `required:${field.id}`, purpose: `${field.name} is required.`, layer: "PostgreSQL constraint", artifact: "postgres/002_schema.sql", objectName: `${schema}.${entity.naming.sqlTable}.${field.naming.sqlColumn} NOT NULL`, source: field.span });
@@ -1152,5 +1310,6 @@ function buildEnforcement(
     }
   }
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
+  entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });
   return entries;
 }

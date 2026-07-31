@@ -13,6 +13,7 @@ export interface PostgresOutput {
   "005_seed.sql": string;
   "006_upgrade_0_12.sql": string;
   "007_upgrade_0_17.sql": string;
+  "008_upgrade_0_18.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -126,6 +127,8 @@ interface ExpressionContext {
   query?: IRQuery;
   selfEntity?: IREntity;
   recordNames?: Map<string, string>;
+  policyBindings?: Map<string, string>;
+  policyRecordBindings?: Map<string, string>;
 }
 
 function lowerExpression(expression: IRExpression, context: ExpressionContext): string {
@@ -134,21 +137,26 @@ function lowerExpression(expression: IRExpression, context: ExpressionContext): 
     case "moneyLiteral": return sqlLiteral(expression, context.ir);
     case "nullLiteral": return "NULL";
     case "enumLiteral": return sqlLiteral(expression, context.ir);
+    case "policyCall": return lowerPolicyCall(expression, context);
     case "parameter": {
+      const binding = context.policyBindings?.get(expression.parameterId);
+      if (binding) return binding;
       const parameter = context.action?.parameters.find((candidate) => candidate.id === expression.parameterId)
         ?? context.query?.parameters.find((candidate) => candidate.id === expression.parameterId);
       if (!parameter) throw new Error(`E4005 Missing parameter ${expression.parameterId}`);
       return quoteIdent(parameter.naming.sqlParameter);
     }
     case "entityValue": {
-      const record = context.recordNames?.get(expression.parameterId);
+      const binding = context.policyBindings?.get(expression.parameterId);
+      if (binding) return binding;
+      const record = context.recordNames?.get(expression.parameterId) ?? context.policyRecordBindings?.get(expression.parameterId);
       if (!record) throw new Error(`E4006 Missing entity record ${expression.parameterId}`);
       return `${record}.${quoteIdent("id")}`;
     }
     case "fieldAccess": {
       const { field } = fieldById(context.ir, expression.fieldId);
       if (expression.source === "self") return quoteIdent(field.naming.sqlColumn);
-      const record = context.recordNames?.get(expression.source);
+      const record = context.recordNames?.get(expression.source) ?? context.policyRecordBindings?.get(expression.source);
       if (!record) throw new Error(`E4007 Missing field record ${expression.source}`);
       return `${record}.${quoteIdent(field.naming.sqlColumn)}`;
     }
@@ -161,6 +169,46 @@ function lowerExpression(expression: IRExpression, context: ExpressionContext): 
     case "nullComparison":
       return `(${lowerExpression(expression.operand, context)} ${expression.operator === "isNull" ? "IS NULL" : "IS NOT NULL"})`;
   }
+}
+
+function policyContext(
+  expression: Extract<IRExpression, { kind: "policyCall" }>,
+  context: ExpressionContext,
+): { policy: ModelIR["policies"][number]; context: ExpressionContext } {
+  const policy = context.ir.policies.find((candidate) => candidate.id === expression.policyId);
+  if (!policy) throw new Error(`E4011 Missing policy ${expression.policyId}`);
+  const bindings = new Map(context.policyBindings);
+  const recordBindings = new Map(context.policyRecordBindings);
+  policy.parameters.forEach((parameter, index) => {
+    const argument = expression.arguments[index]!;
+    bindings.set(parameter.id, `(${lowerExpression(argument, context)})`);
+    if (argument.kind === "entityValue") {
+      const record = context.recordNames?.get(argument.parameterId) ?? context.policyRecordBindings?.get(argument.parameterId);
+      if (record) recordBindings.set(parameter.id, record);
+    }
+  });
+  return { policy, context: { ...context, policyBindings: bindings, policyRecordBindings: recordBindings } };
+}
+
+function lowerPolicyCall(expression: Extract<IRExpression, { kind: "policyCall" }>, context: ExpressionContext): string {
+  const resolved = policyContext(expression, context);
+  const matches = resolved.policy.branches.map((branch) =>
+    `(CASE WHEN ((${lowerExpression(branch.expression, resolved.context)}) IS TRUE) THEN 1 ELSE 0 END)`);
+  return `((${matches.join(" + ")}) = 1)`;
+}
+
+function policyAuthorityBranchSql(expression: Extract<IRExpression, { kind: "policyCall" }>, context: ExpressionContext): string {
+  const resolved = policyContext(expression, context);
+  return `CASE ${resolved.policy.branches.map((branch) =>
+    `WHEN ((${lowerExpression(branch.expression, resolved.context)}) IS TRUE) THEN '${branch.id.replaceAll("'", "''")}'`).join(" ")} ELSE NULL END`;
+}
+
+function authorityPolicyCall(expression: IRExpression): Extract<IRExpression, { kind: "policyCall" }> | undefined {
+  if (expression.kind === "policyCall") return expression;
+  if (expression.kind === "binary") return authorityPolicyCall(expression.left) ?? authorityPolicyCall(expression.right);
+  if (expression.kind === "unary") return authorityPolicyCall(expression.operand);
+  if (expression.kind === "nullComparison") return authorityPolicyCall(expression.operand);
+  return undefined;
 }
 
 function sqlOperator(operator: Exclude<Extract<IRExpression, { kind: "binary" }>["operator"], "in">): string {
@@ -463,6 +511,43 @@ export function generateGatewayInfrastructureStatements(ir: ModelIR, includeSnap
   ];
 }
 
+export function generateDecisionEvidenceInfrastructureStatements(ir: ModelIR): string[] {
+  const audit = qname(ir.model.naming.internalSchema, "action_audit");
+  const constraint = quoteIdent("ck_action_audit_decision_evidence");
+  return [
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("model_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("model_version")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("source_hash")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("authorization_rule_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("decision_outcome")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("policy_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("authority_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("decision_evidence")} jsonb;`,
+    "DO $modellang$",
+    "BEGIN",
+    "  IF NOT EXISTS (",
+    "    SELECT 1 FROM pg_catalog.pg_constraint",
+    `    WHERE conrelid = '${audit}'::regclass`,
+    "      AND conname = 'ck_action_audit_decision_evidence'",
+    "  ) THEN",
+    `    ALTER TABLE ${audit} ADD CONSTRAINT ${constraint} CHECK (`,
+    `      (${quoteIdent("decision_evidence")} IS NULL`,
+    `       AND ${quoteIdent("model_id")} IS NULL AND ${quoteIdent("model_version")} IS NULL`,
+    `       AND ${quoteIdent("source_hash")} IS NULL AND ${quoteIdent("authorization_rule_id")} IS NULL`,
+    `       AND ${quoteIdent("decision_outcome")} IS NULL AND ${quoteIdent("policy_id")} IS NULL AND ${quoteIdent("authority_id")} IS NULL)`,
+    "      OR",
+    `      (${quoteIdent("decision_evidence")} IS NOT NULL`,
+    `       AND ${quoteIdent("model_id")} IS NOT NULL AND ${quoteIdent("model_version")} IS NOT NULL`,
+    `       AND ${quoteIdent("source_hash")} ~ '^sha256:[0-9a-f]{64}$'`,
+    `       AND ${quoteIdent("authorization_rule_id")} IS NOT NULL AND ${quoteIdent("decision_outcome")} = 'executed'`,
+    `       AND ((${quoteIdent("policy_id")} IS NULL) = (${quoteIdent("authority_id")} IS NULL)))`,
+    "    );",
+    "  END IF;",
+    "END",
+    "$modellang$;",
+  ];
+}
+
 function generateSchema(ir: ModelIR): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
@@ -504,6 +589,7 @@ function generateSchema(ir: ModelIR): string {
     ");",
     "",
     ...generateGatewayInfrastructureStatements(ir),
+    ...generateDecisionEvidenceInfrastructureStatements(ir),
     "",
     `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -617,6 +703,17 @@ function moneyParameterValidation(parameter: IRParameter): string[] {
   ];
 }
 
+function decisionEvidenceSql(ir: ModelIR, action: IRAction, decision: ActionDecisionPlan): string {
+  const requirements = decision.preconditions.map((rule) =>
+    `pg_catalog.jsonb_build_object('ruleId', '${rule.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array(${rule.policyIds.map((id) => `'${id.replaceAll("'", "''")}'`).join(", ")}))`);
+  return `pg_catalog.jsonb_build_object(`
+    + `'version', 1, 'outcome', 'executed', `
+    + `'model', pg_catalog.jsonb_build_object('id', '${ir.model.id.replaceAll("'", "''")}', 'version', '${ir.model.version.replaceAll("'", "''")}', 'sourceHash', '${ir.model.sourceHash.replaceAll("'", "''")}'), `
+    + `'actionId', '${action.id.replaceAll("'", "''")}', `
+    + `'authorization', pg_catalog.jsonb_build_object('ruleId', '${decision.authorization.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), `
+    + `'requirements', pg_catalog.jsonb_build_array(${requirements.join(", ")}))`;
+}
+
 function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionPlan): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
@@ -634,6 +731,8 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     "  v_identity_subject text;",
     "  v_revision text;",
     "  v_expected_revision text;",
+    "  v_authority_policy_id text;",
+    "  v_authority_id text;",
     `  v_result ${qname(schema, returnEntity.naming.sqlTable)}%ROWTYPE;`,
   ];
   for (const parameter of action.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
@@ -705,6 +804,15 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     "  END IF;",
     "",
   );
+  const authorityCall = authorityPolicyCall(decision.authorization.expression);
+  if (decision.authorityPolicyId) {
+    if (!authorityCall || authorityCall.policyId !== decision.authorityPolicyId) throw new Error(`E4012 Missing exact authority policy for ${action.id}`);
+    body.push(
+      `  v_authority_policy_id := '${decision.authorityPolicyId.replaceAll("'", "''")}';`,
+      `  v_authority_id := ${policyAuthorityBranchSql(authorityCall, context)};`,
+      "",
+    );
+  }
   for (const precondition of decision.preconditions) {
     body.push(
       `  IF NOT ((${lowerExpression(precondition.expression, context)}) IS TRUE) THEN`,
@@ -744,8 +852,8 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     );
   }
   body.push(
-    `  INSERT INTO ${qname(internal, "action_audit")} (${quoteIdent("action_id")}, ${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("identity_issuer")}, ${quoteIdent("identity_subject")})`,
-    `  VALUES ('${action.id}', session_user, v_principal_id, v_result.${quoteIdent("id")}, v_identity_issuer, v_identity_subject);`,
+    `  INSERT INTO ${qname(internal, "action_audit")} (${quoteIdent("action_id")}, ${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("identity_issuer")}, ${quoteIdent("identity_subject")}, ${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("authorization_rule_id")}, ${quoteIdent("decision_outcome")}, ${quoteIdent("policy_id")}, ${quoteIdent("authority_id")}, ${quoteIdent("decision_evidence")})`,
+    `  VALUES ('${action.id}', session_user, v_principal_id, v_result.${quoteIdent("id")}, v_identity_issuer, v_identity_subject, '${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${decision.authorization.id.replaceAll("'", "''")}', 'executed', v_authority_policy_id, v_authority_id, ${decisionEvidenceSql(ir, action, decision)});`,
     "",
     `  RETURN ${rowJson(returnEntity, "v_result")};`,
   );
@@ -1101,6 +1209,7 @@ END
 $modellang_upgrade$;
 
 ${generateGatewayInfrastructureStatements(ir, false).join("\n")}
+${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 -- Existing guarded callables must resolve both direct and gateway identities.
@@ -1139,6 +1248,44 @@ BEGIN
 END
 $modellang_upgrade$;
 ${generateSnapshotResolverStatements(ir).join("\n")}
+${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateActions(ir, plan).trim()}
+${generateDecisions(ir, plan).trim()}
+${generateGrants(ir).trim()}
+COMMIT;
+`;
+}
+
+function generateDecisionEvidenceUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.17 -> 0.18 durable decision-evidence upgrade.
+-- Historical action audit rows remain explicitly evidence-unknown; new executions record complete evidence.
+BEGIN;
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -1159,5 +1306,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "005_seed.sql": generateSeed(ir),
     "006_upgrade_0_12.sql": generateGatewayUpgrade(ir, plan),
     "007_upgrade_0_17.sql": generateApplicabilityUpgrade(ir, plan),
+    "008_upgrade_0_18.sql": generateDecisionEvidenceUpgrade(ir, plan),
   };
 }

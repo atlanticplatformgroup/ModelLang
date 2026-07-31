@@ -1,0 +1,10 @@
+declaration       = inherited_declaration | policy_decl ;
+policy_decl       = "policy", IDENTIFIER, [ stable_id ], "(",
+                    [ policy_parameter, { ",", policy_parameter } ], ")", "{",
+                    policy_branch, { policy_branch }, "}" ;
+policy_parameter  = IDENTIFIER, ":", type_ref ;
+policy_branch     = "allow", IDENTIFIER, [ stable_id ], ":", expression, ";" ;
+primary           = inherited_primary | policy_call ;
+policy_call       = IDENTIFIER, "(", [ expression, { ",", expression } ], ")" ;
+
+All productions not replaced above are inherited from the ModelLang 0.17 grammar chain.

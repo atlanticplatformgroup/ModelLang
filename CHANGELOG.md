@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.18.0
+
+- Added first-class stable-ID `policy` declarations with typed parameters, pure composition, and closed named `allow` authority branches.
+- Defined exact-one policy evaluation: zero matches deny, multiple matches fail closed, null never grants authority, recursion and side effects are prohibited, and action authorization admits one positive conjunctive authority policy.
+- Advanced the canonical boundary to IR10 and enforcement decision plan v2 so policy identity, calls, branch expressions, ambiguity behavior, and rule use are shared by applicability and execution.
+- Added private durable execution evidence with model/source identity, stable action/rule/policy/authority IDs, executed outcome, and ordered passed requirements, written transactionally with action audit.
+- Kept operation manifest v2, UI manifest v2, capability manifest v1, HTTP routes, safe public explanations, and applicability responses unchanged; public decisions continue to carry `authority: "none"` and grant no authority.
+- Updated Procurement approval to use a reusable exact manager/finance policy while retaining the broader role snapshot only as contextual domain history.
+- Added engineering semantic manifest v2 policy use/coverage reporting, enforcement mapping, and semantic diff v3 policy/branch identity analysis.
+- Added the baseline-checked idempotent `008_upgrade_0_18.sql` evidence upgrade and integrated evidence infrastructure with safe and reviewed migrations, including IR9 baseline compatibility.
+- Added compiler, schema, golden, transport, migration, and live PostgreSQL proofs for policy typing, recursion/ambiguity fail-closed behavior, applicability/execution agreement, exact authority, private evidence, upgrade idempotence, and rollback atomicity.
+
 ## 0.17.0
 
 - Added enforcement decision plan v1 as the single generated source for action applicability and transactional action checks.

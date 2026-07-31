@@ -4,14 +4,14 @@
   "title": "ModelLang canonical decision plan",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "planVersion", "audience", "public", "compilerVersion", "irVersion", "model", "actions"],
+  "required": ["$schema", "planVersion", "audience", "public", "compilerVersion", "irVersion", "model", "policies", "actions"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/decision-plan.schema.json" },
-    "planVersion": { "const": 1 },
+    "planVersion": { "const": 2 },
     "audience": { "const": "enforcement" },
     "public": { "const": false },
     "compilerVersion": { "type": "string" },
-    "irVersion": { "const": 9 },
+    "irVersion": { "const": 10 },
     "model": {
       "type": "object",
       "additionalProperties": false,
@@ -20,6 +20,34 @@
         "id": { "type": "string", "pattern": "^model:" },
         "version": { "type": "string" },
         "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "parameterIds", "evaluation", "nullBehavior", "ambiguousBehavior", "branches"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^policy:" },
+          "parameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:policy:" } },
+          "evaluation": { "const": "exactlyOneBranch" },
+          "nullBehavior": { "const": "false" },
+          "ambiguousBehavior": { "const": "deny" },
+          "branches": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "expression"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^policyBranch:" },
+                "expression": { "type": "object" }
+              }
+            }
+          }
+        }
       }
     },
     "actions": {
@@ -51,6 +79,7 @@
             }
           },
           "authorization": { "$ref": "#/$defs/rule" },
+          "authorityPolicyId": { "type": "string", "pattern": "^policy:" },
           "preconditions": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
           "revision": {
             "type": "object",
@@ -80,10 +109,11 @@
     "rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "expression"],
+      "required": ["id", "expression", "policyIds"],
       "properties": {
         "id": { "type": "string" },
-        "expression": { "type": "object" }
+        "expression": { "type": "object" },
+        "policyIds": { "type": "array", "items": { "type": "string", "pattern": "^policy:" } }
       }
     }
   }

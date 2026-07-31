@@ -654,6 +654,13 @@
       "layer": "PostgreSQL audit",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations_internal.action_audit"
+    },
+    {
+      "id": "boundary:decision_evidence",
+      "purpose": "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.",
+      "layer": "PostgreSQL audit",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations_internal.action_audit.decision_evidence"
     }
   ]
 }

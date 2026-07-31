@@ -3,7 +3,7 @@ import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
   ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, ExclusionDecl,
   Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
-  WorkflowDecl,
+  PolicyDecl, WorkflowDecl,
 } from "./syntax-ast.js";
 
 const binaryPrecedence: Partial<Record<string, number>> = {
@@ -56,10 +56,11 @@ class Parser {
     while (!this.at("eof")) {
       if (this.atWord("enum")) declarations.push(this.parseEnum());
       else if (this.atWord("entity")) declarations.push(this.parseEntity());
+      else if (this.atWord("policy")) declarations.push(this.parsePolicy());
       else if (this.atWord("action")) declarations.push(this.parseAction());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
       else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
-      else this.fail("E1103", "Expected enum, entity, action, query, or workflow declaration.");
+      else this.fail("E1103", "Expected enum, entity, policy, action, query, or workflow declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -244,6 +245,48 @@ class Parser {
     const effect = this.parseEffect();
     const end = this.expect("}");
     return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, effect, span: this.span(start, end) };
+  }
+
+  private parsePolicy(): PolicyDecl {
+    const start = this.expectWord("policy");
+    const name = this.identifier("Expected policy name.");
+    const stableId = this.at("@") ? this.parseStableId("policy declaration") : undefined;
+    this.expect("(");
+    const parameters: ParameterDecl[] = [];
+    if (!this.at(")")) {
+      do {
+        const parameterStart = this.current();
+        if (this.atWord("caller")) this.fail("E1120", "Policy parameters cannot declare caller binding.");
+        const parameterName = this.identifier("Expected policy parameter name.");
+        this.expect(":");
+        const type = this.parseTypeRef();
+        parameters.push({ name: parameterName.text, type, caller: false, span: this.span(parameterStart, type.span) });
+        if (!this.at(",")) break;
+        this.take();
+      } while (!this.at(")"));
+    }
+    this.expect(")");
+    this.expect("{");
+    const branches: PolicyDecl["branches"] = [];
+    while (!this.at("}")) {
+      const branchStart = this.expectWord("allow");
+      const branchName = this.identifier("Expected policy authority branch name.");
+      const branchStableId = this.at("@") ? this.parseStableId("policy authority branch") : undefined;
+      this.expect(":");
+      const expression = this.parseExpression();
+      const branchEnd = this.expect(";");
+      branches.push({
+        kind: "allow",
+        name: branchName.text,
+        nameSpan: branchName.span,
+        stableId: branchStableId,
+        expression,
+        span: this.span(branchStart, branchEnd),
+      });
+    }
+    const end = this.expect("}");
+    if (branches.length === 0) this.fail("E1121", "A policy must declare at least one allow branch.");
+    return { kind: "policy", name: name.text, nameSpan: name.span, stableId, parameters, branches, span: this.span(start, end) };
   }
 
   private parseQuery(): QueryDecl {
@@ -451,6 +494,20 @@ class Parser {
       };
     }
     if (this.at("identifier")) {
+      if (this.lookahead(1).kind === "(") {
+        const name = this.take();
+        this.expect("(");
+        const args: Expression[] = [];
+        if (!this.at(")")) {
+          do {
+            args.push(this.parseExpression());
+            if (!this.at(",")) break;
+            this.take();
+          } while (!this.at(")"));
+        }
+        const end = this.expect(")");
+        return { kind: "call", name: name.text, arguments: args, span: this.span(name, end) };
+      }
       return this.parsePath();
     }
     this.fail("E1108", "Expected expression.");

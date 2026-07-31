@@ -85,6 +85,52 @@ function modelError(operation: () => unknown): ModelError {
 }
 
 describe("reviewed semantic migrations", () => {
+  it("requires stable-ID acknowledgement for policy semantic changes", () => {
+    const policySource = (version: string, predicate: string) => `model ReviewedPolicy version "${version}";
+enum Role @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  MANAGER @stableId("emv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+}
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  role: Role @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @generated(uuid) @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+policy MayCreate @stableId("pol_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(actor: User) {
+  allow manager @stableId("pbr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"): ${predicate};
+}
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) -> Record {
+  authorize MayCreate(actor);
+  create Record { }
+}`;
+    const previous = compileText(policySource("1", "actor.role == Role.MANAGER"), "previous-policy.model");
+    const current = compileText(policySource("2", "true"), "current-policy.model");
+    const changes = semanticDiff(previous, current).changes.filter((change) => change.classification !== "additive");
+    expect(changes).toEqual([expect.objectContaining({
+      kind: "policyBranchChanged",
+      subject: expect.objectContaining({ id: "policyBranch:pbr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+    })]);
+    const plan: ReviewedMigrationPlanDocument = {
+      $schema: REVIEWED_MIGRATION_SCHEMA,
+      planVersion: 1,
+      strategy: "transactionalRebuild",
+      description: "Reviewed policy authority expansion.",
+      from: { modelId: previous.model.id, version: previous.model.version, sourceHash: previous.model.sourceHash },
+      to: { modelId: current.model.id, version: current.model.version, sourceHash: current.model.sourceHash },
+      acknowledgements: changes.map((change) => ({
+        changeKind: change.kind,
+        subjectId: change.subject.id,
+        disposition: "accepted",
+        reason: "Authority change approved through the reviewed path.",
+      })),
+      fieldValues: [],
+      enumMappings: [],
+    };
+    expect(planReviewedMigration(previous, current, plan).sql).toContain("ck_action_audit_decision_evidence");
+    expect(modelError(() => planReviewedMigration(previous, current, { ...plan, acknowledgements: [] })).code).toBe("E2904");
+  });
+
   it("validates the public plan schema and hashes semantic JSON canonically", async () => {
     const previous = compileText(source("1.0.0", false), "previous.model");
     const current = compileText(source("2.0.0", true), "current.model");

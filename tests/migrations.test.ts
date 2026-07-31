@@ -107,6 +107,23 @@ workflow TicketLifecycle @stableId("wfl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") for T
 }
 
 describe("ModelLang 0.6 stable IDs", () => {
+  it("assigns stable IDs to reusable policies and authority branches", () => {
+    const source = `model PolicyIds version "1";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id @generated(uuid); }
+policy MayCreate(actor: User) { allow authenticated: actor == actor; }
+action make(caller actor: User) -> Record { authorize MayCreate(actor); create Record { } }`;
+    const assigned = assignStableIds(source, "policy-ids.model", (kind) => {
+      const prefix: Record<StableIdKind, string> = {
+        entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
+        action: "act", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
+      };
+      return `${prefix[kind]}_${kind === "policy" ? "a" : kind === "policyBranch" ? "b" : "c".repeat(1)}${"0".repeat(31)}`;
+    });
+    expect(assigned.source).toMatch(/policy MayCreate @stableId\("pol_[0-9a-f]{32}"\)/);
+    expect(assigned.source).toMatch(/allow authenticated @stableId\("pbr_[0-9a-f]{32}"\):/);
+  });
+
   it("assigns every missing durable declaration ID and is idempotent", () => {
     const source = `model IDs version "1";
 entity User {
@@ -165,7 +182,7 @@ workflow TaskLifecycle for Task.state {
   transition submit: State.DRAFT -> State.SUBMITTED by submit;
 }`;
     const prefix: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv",
+      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
       action: "act", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -207,7 +224,7 @@ query bookings(caller actor: User) from Booking as booking {
     const seen: StableIdKind[] = [];
     const counters = new Map<StableIdKind, number>();
     const prefixes: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv",
+      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
       action: "act", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -220,7 +237,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "invariant", "exclusion", "action", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(9);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(10);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -313,6 +330,21 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
+  it("accepts a released IR9 artifact as the previous baseline for an IR10 migration", () => {
+    const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
+    const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
+    legacy.irVersion = 9;
+    delete legacy.policies;
+    const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
+
+    const plan = planMigration(legacy as unknown as typeof previous, current);
+
+    expect(plan.previousVersion).toBe("1.0.0");
+    expect(plan.currentVersion).toBe("2.0.0");
+    expect(plan.operations).toContainEqual(expect.objectContaining({ kind: "addEntity" }));
+    expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
+  });
+
   it("plans enum, entity, field, callable, and workflow additions as one guarded transaction", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
@@ -380,6 +412,38 @@ describe("ModelLang 0.10 safe schema evolution", () => {
 });
 
 describe("ModelLang 0.6 rename migration planning", () => {
+  it("tracks stable policy and authority-branch renames while refusing semantic policy changes", () => {
+    const policyModel = (version: string, policyName: string, branchName: string, expression: string) => `model PolicyEvolution version "${version}";
+enum Role @stableId("enm_11111111111111111111111111111111") {
+  MANAGER @stableId("emv_11111111111111111111111111111111")
+}
+entity User @stableId("ent_11111111111111111111111111111111") {
+  id: UUID @id @stableId("fld_11111111111111111111111111111111");
+  role: Role @stableId("fld_22222222222222222222222222222222");
+}
+entity Record @stableId("ent_22222222222222222222222222222222") {
+  id: UUID @id @generated(uuid) @stableId("fld_33333333333333333333333333333333");
+}
+policy ${policyName} @stableId("pol_11111111111111111111111111111111")(actor: User) {
+  allow ${branchName} @stableId("pbr_11111111111111111111111111111111"): ${expression};
+}
+action make @stableId("act_11111111111111111111111111111111")(caller actor: User) -> Record {
+  authorize ${policyName}(actor);
+  create Record { }
+}`;
+    const previous = compileText(policyModel("1", "MayApprove", "manager", "actor.role == Role.MANAGER"), "previous.model");
+    const renamed = compileText(policyModel("2", "ApprovalAuthority", "managerAuthority", "actor.role == Role.MANAGER"), "current.model");
+    const plan = planMigration(previous, renamed);
+    expect(plan.operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "renamePolicy", policyId: "policy:pol_11111111111111111111111111111111" }),
+      expect.objectContaining({ kind: "renamePolicyBranch", branchId: "policyBranch:pbr_11111111111111111111111111111111" }),
+    ]));
+    expect(plan.sql).toContain("stable decision identity is unchanged");
+
+    const changed = compileText(policyModel("2", "MayApprove", "manager", "false"), "changed.model");
+    expect(error(() => planMigration(previous, changed)).code).toBe("E2807");
+  });
+
   it("fails closed when a stable workflow changes", () => {
     const source = readFileSync("examples/procurement.model", "utf8");
     const previous = compileText(source, "examples/procurement.model");

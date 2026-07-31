@@ -15,7 +15,7 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | ActionDecl | QueryDecl | WorkflowDecl;
+export type Declaration = EnumDecl | EntityDecl | PolicyDecl | ActionDecl | QueryDecl | WorkflowDecl;
 
 export interface EnumDecl {
   kind: "enum";
@@ -82,6 +82,25 @@ export interface ParameterDecl {
   name: string;
   type: TypeRef;
   caller: boolean;
+  span: Span;
+}
+
+export interface PolicyBranchDecl {
+  kind: "allow";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  expression: Expression;
+  span: Span;
+}
+
+export interface PolicyDecl {
+  kind: "policy";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  parameters: ParameterDecl[];
+  branches: PolicyBranchDecl[];
   span: Span;
 }
 
@@ -167,5 +186,6 @@ export type Expression =
   | { kind: "literal"; value: string | number | boolean | null; literalKind: "string" | "number" | "boolean" | "null"; span: Span }
   | { kind: "moneyLiteral"; currency: string; amount: string; span: Span }
   | { kind: "path"; parts: string[]; span: Span }
+  | { kind: "call"; name: string; arguments: Expression[]; span: Span }
   | { kind: "unary"; operator: "not"; operand: Expression; span: Span }
   | { kind: "binary"; operator: "or" | "and" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: Expression; right: Expression; span: Span };

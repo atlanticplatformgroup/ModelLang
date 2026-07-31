@@ -1,4 +1,4 @@
--- source sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62
+-- source sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -220,6 +220,36 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."resolve_principal_snapshot"() FROM PUBLIC;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authorization_rule_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_outcome" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "policy_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authority_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_evidence" jsonb;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass
+      AND conname = 'ck_action_audit_decision_evidence'
+  ) THEN
+    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_decision_evidence" CHECK (
+      ("decision_evidence" IS NULL
+       AND "model_id" IS NULL AND "model_version" IS NULL
+       AND "source_hash" IS NULL AND "authorization_rule_id" IS NULL
+       AND "decision_outcome" IS NULL AND "policy_id" IS NULL AND "authority_id" IS NULL)
+      OR
+      ("decision_evidence" IS NOT NULL
+       AND "model_id" IS NOT NULL AND "model_version" IS NOT NULL
+       AND "source_hash" ~ '^sha256:[0-9a-f]{64}$'
+       AND "authorization_rule_id" IS NOT NULL AND "decision_outcome" = 'executed'
+       AND (("policy_id" IS NULL) = ("authority_id" IS NULL)))
+    );
+  END IF;
+END
+$modellang$;
 
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -236,6 +266,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.10.0', 'sha256:c91f61fa1431e7e5f22a14dcfc4e06430a2134a2533c8150150dbc2a01f46f62', 'installation');
+VALUES ('model:Procurement', '0.11.0', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'installation');
 RESET ROLE;
 

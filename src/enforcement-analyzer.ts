@@ -102,6 +102,11 @@ export function assertEnforceable(ir: ModelIR): void {
   requireEntry(ir, "boundary:internal_schema");
   requireEntry(ir, "boundary:migration_history");
   requireEntry(ir, "boundary:audit");
+  requireEntry(ir, "boundary:decision_evidence");
+  for (const policy of ir.policies) {
+    requireEntry(ir, policy.id, policy.span);
+    for (const branch of policy.branches) requireEntry(ir, branch.id, branch.span);
+  }
   for (const entity of ir.entities) {
     for (const field of entity.fields) {
       if (isMoneyType(field.type)) {

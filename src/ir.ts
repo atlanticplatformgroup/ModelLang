@@ -24,6 +24,7 @@ export type IRExpression =
   | { kind: "entityValue"; parameterId: string; name: string; entityId: string; type: string; nullable: false }
   | { kind: "fieldAccess"; source: string; parameter?: string; fieldId: string; fieldName: string; type: string; nullable: boolean }
   | { kind: "enumLiteral"; enumId: string; memberId: string; memberName: string; type: string; nullable: false }
+  | { kind: "policyCall"; policyId: string; arguments: IRExpression[]; type: "Boolean"; nullable: false }
   | { kind: "unary"; operator: "not"; operand: IRExpression; type: "Boolean"; nullable: boolean }
   | { kind: "binary"; operator: "and" | "or" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "in"; left: IRExpression; right: IRExpression; type: "Boolean"; nullable: boolean; comparisonSemantics?: "entityIdentity" | "setMembership" }
   | { kind: "nullComparison"; operator: "isNull" | "isNotNull"; operand: IRExpression; type: "Boolean"; nullable: false };
@@ -113,6 +114,24 @@ export interface IRRule {
   name: string;
   expression: IRExpression;
   sourceExpression: string;
+  span: IRSpan;
+}
+
+export interface IRPolicyBranch {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  expression: IRExpression;
+  sourceExpression: string;
+  span: IRSpan;
+}
+
+export interface IRPolicy {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  parameters: IRParameter[];
+  branches: IRPolicyBranch[];
   span: IRSpan;
 }
 
@@ -207,7 +226,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 9;
+  irVersion: 10;
   model: {
     id: string;
     name: string;
@@ -219,6 +238,7 @@ export interface ModelIR {
   principal: { entityId: string; bindingMechanism: "session_user" };
   enums: IREnum[];
   entities: IREntity[];
+  policies: IRPolicy[];
   actions: IRAction[];
   queries: IRQuery[];
   workflows: IRWorkflow[];

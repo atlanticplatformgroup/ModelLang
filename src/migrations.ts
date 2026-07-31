@@ -1,12 +1,13 @@
 import { ModelError, internalSpan } from "./diagnostics.js";
 import type {
   IRAction, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRQuery,
-  IRTemporalExclusion, IRWorkflow, IRWorkflowTransition, ModelIR,
+  IRPolicy, IRTemporalExclusion, IRWorkflow, IRWorkflowTransition, ModelIR,
 } from "./ir.js";
 import {
   generateAddFieldStatements,
   generateEntityForeignKeyStatements,
   generateEntityTableStatement,
+  generateDecisionEvidenceInfrastructureStatements,
   generateGatewayInfrastructureStatements,
   generateGatewayRoleStatements,
   generatePostgres,
@@ -20,6 +21,8 @@ export type RenameOperation =
   | { kind: "renameEntity"; entityId: string; from: string; to: string }
   | { kind: "renameField"; entityId: string; fieldId: string; table: string; from: string; to: string }
   | { kind: "renameEnum"; enumId: string; from: string; to: string }
+  | { kind: "renamePolicy"; policyId: string; from: string; to: string }
+  | { kind: "renamePolicyBranch"; policyId: string; branchId: string; from: string; to: string }
   | { kind: "renameInvariant"; entityId: string; invariantId: string; table: string; from: string; to: string }
   | { kind: "renameExclusion"; entityId: string; exclusionId: string; table: string; from: string; to: string; validFrom: string; validTo: string }
   | { kind: "renameAction"; actionId: string; from: string; to: string; parameterTypes: string[] }
@@ -29,6 +32,7 @@ export type AdditiveOperation =
   | { kind: "addEnum"; enumId: string; name: string }
   | { kind: "addEnumMember"; enumId: string; memberId: string; name: string }
   | { kind: "addEntity"; entityId: string; name: string; table: string }
+  | { kind: "addPolicy"; policyId: string; name: string }
   | { kind: "addField"; entityId: string; fieldId: string; name: string; table: string; column: string }
   | { kind: "addAction"; actionId: string; name: string }
   | { kind: "addQuery"; queryId: string; name: string }
@@ -90,6 +94,10 @@ export function requireExplicitIds(ir: ModelIR): void {
     for (const exclusion of entity.temporalExclusions) requireExplicit(ir, exclusion, `exclusion in '${entity.name}'`, "exclusion");
   }
   for (const action of ir.actions) requireExplicit(ir, action, "action", "action");
+  for (const policy of (ir as ModelIR & { policies?: IRPolicy[] }).policies ?? []) {
+    requireExplicit(ir, policy, "policy", "policy");
+    for (const branch of policy.branches) requireExplicit(ir, branch, `branch in policy '${policy.name}'`, "policyBranch");
+  }
   for (const query of ir.queries) requireExplicit(ir, query, "query", "query");
   for (const workflow of ir.workflows) {
     requireExplicit(ir, workflow, "workflow", "workflow");
@@ -152,6 +160,16 @@ function entityStructure(entity: IREntity): unknown {
 
 function actionStructure(action: IRAction): unknown {
   const { name: _name, identity: _identity, ...structure } = action;
+  return structure;
+}
+
+function policyStructure(policy: IRPolicy): unknown {
+  const { name: _name, identity: _identity, branches: _branches, ...structure } = policy;
+  return structure;
+}
+
+function policyBranchStructure(branch: IRPolicy["branches"][number]): unknown {
+  const { name: _name, identity: _identity, ...structure } = branch;
   return structure;
 }
 
@@ -337,8 +355,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (previous.irVersion !== 9 || current.irVersion !== 9) {
-    fail(current, "E2803", "Migration planning requires canonical IR version 9 inputs.");
+  if (![9, 10].includes(Number(previous.irVersion)) || current.irVersion !== 10) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10 baseline and canonical IR10 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -504,6 +522,32 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
+  const previousPolicies = (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [];
+  const policyDiff = additiveDiff(previousPolicies, current.policies, "Policy", current);
+  for (const policy of policyDiff.added) operations.push({ kind: "addPolicy", policyId: policy.id, name: policy.name });
+  const previousPoliciesById = byId(previousPolicies);
+  for (const currentPolicy of policyDiff.existing) {
+    const previousPolicy = previousPoliciesById.get(currentPolicy.id)!;
+    if (!same(policyStructure(previousPolicy), policyStructure(currentPolicy))) {
+      fail(current, "E2807", `Policy signature changed for '${currentPolicy.name}'; only its name may change in a safe migration.`);
+    }
+    if (previousPolicy.name !== currentPolicy.name) operations.push({
+      kind: "renamePolicy", policyId: currentPolicy.id, from: previousPolicy.name, to: currentPolicy.name,
+    });
+    const branches = additiveDiff(previousPolicy.branches, currentPolicy.branches, `Branch in policy '${currentPolicy.name}'`, current);
+    if (branches.added.length) fail(current, "E2807", `Adding a branch to existing policy '${currentPolicy.name}' requires reviewed authority migration.`);
+    const previousBranches = byId(previousPolicy.branches);
+    for (const branch of branches.existing) {
+      const previousBranch = previousBranches.get(branch.id)!;
+      if (!same(policyBranchStructure(previousBranch), policyBranchStructure(branch))) {
+        fail(current, "E2807", `Policy branch semantics changed for '${currentPolicy.name}.${branch.name}'; only its name may change in a safe migration.`);
+      }
+      if (previousBranch.name !== branch.name) operations.push({
+        kind: "renamePolicyBranch", policyId: currentPolicy.id, branchId: branch.id, from: previousBranch.name, to: branch.name,
+      });
+    }
+  }
+
   const actionDiff = additiveDiff(previous.actions, current.actions, "Action", current);
   for (const action of actionDiff.added) {
     operations.push({ kind: "addAction", actionId: action.id, name: action.name });
@@ -603,6 +647,10 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
         return [`ALTER TABLE ${schema}.${quoteIdent(operation.table)} RENAME COLUMN ${quoteIdent(operation.from)} TO ${quoteIdent(operation.to)};`];
       case "renameEnum":
         return [`-- Semantic enum rename ${operation.from} -> ${operation.to}; stored values are unchanged.`];
+      case "renamePolicy":
+        return [`-- Semantic policy rename ${operation.from} -> ${operation.to}; stable decision identity is unchanged.`];
+      case "renamePolicyBranch":
+        return [`-- Semantic policy authority rename ${operation.from} -> ${operation.to}; durable authority identity is unchanged.`];
       case "renameInvariant":
         return [`ALTER TABLE ${schema}.${quoteIdent(operation.table)} RENAME CONSTRAINT ${quoteIdent(operation.from)} TO ${quoteIdent(operation.to)};`];
       case "renameExclusion":
@@ -670,6 +718,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     ...(structuralStatements.length ? structuralStatements : ["-- No structural schema changes detected."]),
     "-- Upgrade the internal gateway identity and audit boundary after physical renames.",
     ...generateGatewayInfrastructureStatements(current),
+    ...generateDecisionEvidenceInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),

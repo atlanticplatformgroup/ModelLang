@@ -47,6 +47,35 @@ query records @stableId("${ids.query}")(
 }
 
 describe("semantic change analysis", () => {
+  it("tracks policy identity-preserving renames and reviewed authority changes", () => {
+    const source = (version: string, policyName: string, branchName: string, predicate: string) => `model PolicyDiff version "${version}";
+enum Role @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  MANAGER @stableId("emv_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+}
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  role: Role @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @generated(uuid) @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+policy ${policyName} @stableId("pol_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(actor: User) {
+  allow ${branchName} @stableId("pbr_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"): ${predicate};
+}
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) -> Record {
+  authorize ${policyName}(actor);
+  create Record { }
+}`;
+    const previous = compileText(source("1", "MayApprove", "manager", "actor.role == Role.MANAGER"), "previous.model");
+    const current = compileText(source("2", "ApprovalAuthority", "managerAuthority", "true"), "current.model");
+    const report = semanticDiff(previous, current);
+    expect(report.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "identityPreservingRename", subject: expect.objectContaining({ kind: "policy" }) }),
+      expect.objectContaining({ kind: "identityPreservingRename", subject: expect.objectContaining({ kind: "policyBranch" }) }),
+      expect.objectContaining({ kind: "policyBranchChanged", classification: "review" }),
+    ]));
+  });
+
   it("classifies identity, authority, validation, visibility, and structural changes without claiming migration safety", async () => {
     const previous = compileText(model({ version: "1" }), "previous.model");
     const current = compileText(model({
@@ -62,9 +91,9 @@ describe("semantic change analysis", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 2,
-      compilerVersion: "0.17.0",
-      irVersion: 9,
+      diffVersion: 3,
+      compilerVersion: "0.18.0",
+      irVersion: 10,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
