@@ -27,19 +27,19 @@ async function main(): Promise<void> {
       resource,
       startsAt: "2031-01-10T10:00:00.000Z",
       endsAt: "2031-01-10T11:00:00.000Z",
-    });
+    }, { idempotencyKey: "demo-reserve-first" });
     line(3, "Reserve Conference Room A from 10:00 to 11:00", "PASS");
     await second.reserve({
       resource,
       startsAt: "2031-01-10T11:00:00.000Z",
       endsAt: "2031-01-10T12:00:00.000Z",
-    });
+    }, { idempotencyKey: "demo-reserve-adjacent" });
     line(4, "Reserve adjacent half-open interval from 11:00 to 12:00", "PASS");
     const conflict = await second.reserve({
       resource,
       startsAt: "2031-01-10T10:30:00.000Z",
       endsAt: "2031-01-10T11:30:00.000Z",
-    }).catch((error: unknown) => error);
+    }, { idempotencyKey: "demo-reserve-conflict" }).catch((error: unknown) => error);
     if (!(conflict instanceof ConflictError)) throw new Error("Overlapping reservation unexpectedly succeeded");
     line(5, "Attempt overlapping reservation from 10:30 to 11:30", "REJECTED as designed");
     const visible = await first.reservationsForResource({ resource });

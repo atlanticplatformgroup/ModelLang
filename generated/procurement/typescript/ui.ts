@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 2,
-  "operationManifestVersion": 2,
+  "uiManifestVersion": 3,
+  "operationManifestVersion": 3,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.11.0",
-    "sourceHash": "sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615",
+    "version": "0.12.0",
+    "sourceHash": "sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad",
     "label": "Procurement"
   },
   "authentication": {
@@ -226,10 +226,15 @@ export const ProcurementUiManifest = {
       "errors": [
         "identityBinding",
         "authorization",
+        "idempotency",
         "precondition",
         "validation",
         "invariant"
-      ]
+      ],
+      "reliability": {
+        "idempotency": "required",
+        "scope": "authenticatedPrincipal"
+      }
     },
     {
       "operationId": "action:act_ed2374e822704c51a2925338253d05d2",
@@ -254,7 +259,11 @@ export const ProcurementUiManifest = {
         "precondition",
         "transition",
         "invariant"
-      ]
+      ],
+      "reliability": {
+        "idempotency": "unsupported",
+        "scope": "authenticatedPrincipal"
+      }
     },
     {
       "operationId": "action:act_d39dbb883b5f4019b9027b85add3de47",
@@ -279,7 +288,11 @@ export const ProcurementUiManifest = {
         "precondition",
         "transition",
         "invariant"
-      ]
+      ],
+      "reliability": {
+        "idempotency": "unsupported",
+        "scope": "authenticatedPrincipal"
+      }
     }
   ],
   "queries": [

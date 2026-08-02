@@ -242,9 +242,17 @@ class Parser {
       const end = this.expect(";");
       requires.push({ name: requireName.text, expression, span: this.span(requireStart, end) });
     }
+    let idempotency: ActionDecl["idempotency"];
+    if (this.atWord("idempotency")) {
+      const idempotencyStart = this.take();
+      this.expectWord("required");
+      const idempotencyEnd = this.expect(";");
+      idempotency = { mode: "required", span: this.span(idempotencyStart, idempotencyEnd) };
+      if (this.atWord("idempotency")) this.fail("E1122", "An action may declare idempotency at most once.");
+    }
     const effect = this.parseEffect();
     const end = this.expect("}");
-    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, effect, span: this.span(start, end) };
+    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effect, span: this.span(start, end) };
   }
 
   private parsePolicy(): PolicyDecl {

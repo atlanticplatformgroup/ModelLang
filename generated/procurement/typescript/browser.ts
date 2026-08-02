@@ -8,6 +8,7 @@ export {
   TransitionError,
   InvariantError,
   ConflictError,
+  IdempotencyConflictError,
   StaleError,
   NotFoundError,
   ValidationError,

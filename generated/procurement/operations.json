@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 2,
+  "manifestVersion": 3,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.11.0",
-    "sourceHash": "sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615"
+    "version": "0.12.0",
+    "sourceHash": "sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad"
   },
   "authentication": {
     "required": true,
@@ -214,9 +214,16 @@
         "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "cardinality": "one"
       },
+      "reliability": {
+        "idempotency": "required",
+        "scope": "authenticatedPrincipal",
+        "replay": "storedResult",
+        "fingerprint": "canonicalSha256"
+      },
       "errors": [
         "identityBinding",
         "authorization",
+        "idempotency",
         "precondition",
         "validation",
         "invariant"
@@ -245,6 +252,12 @@
       "output": {
         "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "cardinality": "one"
+      },
+      "reliability": {
+        "idempotency": "unsupported",
+        "scope": "authenticatedPrincipal",
+        "replay": "none",
+        "fingerprint": "none"
       },
       "errors": [
         "identityBinding",
@@ -277,6 +290,12 @@
       "output": {
         "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
         "cardinality": "one"
+      },
+      "reliability": {
+        "idempotency": "unsupported",
+        "scope": "authenticatedPrincipal",
+        "replay": "none",
+        "fingerprint": "none"
       },
       "errors": [
         "identityBinding",

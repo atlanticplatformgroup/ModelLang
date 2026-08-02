@@ -132,6 +132,7 @@ export interface ActionDecl {
   returnType: TypeRef;
   authorize: Expression;
   requires: RequireDecl[];
+  idempotency?: { mode: "required"; span: Span };
   effect: Effect;
   span: Span;
 }

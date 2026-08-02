@@ -64,8 +64,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 2;
-  operationManifestVersion: 2;
+  uiManifestVersion: 3;
+  operationManifestVersion: 3;
   model: {
     id: string;
     name: string;
@@ -106,6 +106,10 @@ export interface UiManifest {
     fields: UiInputField[];
     resultEntityId: string;
     errors: ManifestErrorKind[];
+    reliability: {
+      idempotency: "required" | "unsupported";
+      scope: "authenticatedPrincipal";
+    };
   }[];
   queries: {
     operationId: string;
@@ -162,12 +166,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 2) {
-    throw new Error(`E6201 UI generation requires operation manifest version 2, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 3) {
+    throw new Error(`E6201 UI generation requires operation manifest version 3, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 2,
+    uiManifestVersion: 3,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -212,6 +216,10 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         fields: inputFields(operation),
         resultEntityId: operation.output.entityId,
         errors: operation.errors,
+        reliability: {
+          idempotency: operation.reliability.idempotency,
+          scope: operation.reliability.scope,
+        },
       })),
     queries: manifest.operations
       .filter((operation) => operation.kind === "query")

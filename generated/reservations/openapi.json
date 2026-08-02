@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.10.0",
-    "description": "Generated from ModelLang operation manifest v2 (sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215)."
+    "version": "0.11.0",
+    "description": "Generated from ModelLang operation manifest v3 (sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -23,8 +23,18 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ExpectedRevision"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CausationId"
           }
         ],
+        "x-modellang-idempotency": "required",
         "requestBody": {
           "required": true,
           "content": {
@@ -58,6 +68,14 @@
         "responses": {
           "200": {
             "description": "reserve result",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Resolved command correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -422,6 +440,34 @@
         "schema": {
           "type": "string",
           "pattern": "^\"rev:1:[0-9a-f]{32}\"$"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Principal-scoped retry key; it grants no authority.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "CausationId": {
+        "name": "X-Causation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         }
       }
     },

@@ -20,7 +20,7 @@ export class ProcurementHttpClient {
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   }
 
-  private async call<Result>(path: string, input: unknown, expectedRevision?: string): Promise<Result> {
+  private async call<Result>(path: string, input: unknown, options: ExecutionOptions = {}): Promise<Result> {
     const token = await this.options.accessToken();
     if (!token) throw new AuthenticationError("HTTP authentication is required", "ML_AUTHENTICATION");
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -28,7 +28,10 @@ export class ProcurementHttpClient {
       headers: {
         ...this.options.headers,
         authorization: `Bearer ${token}`,
-        ...(expectedRevision ? { "if-match": `"${expectedRevision}"` } : {}),
+        ...(options.expectedRevision ? { "if-match": `"${options.expectedRevision}"` } : {}),
+        ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+        ...(options.correlationId ? { "x-correlation-id": options.correlationId } : {}),
+        ...(options.causationId ? { "x-causation-id": options.causationId } : {}),
         "content-type": "application/json",
         accept: "application/json, application/problem+json",
       },
@@ -42,15 +45,15 @@ export class ProcurementHttpClient {
   }
 
   async openRequest(input: OpenRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
-    return this.call("/operations/actions/act_1e35db0451b1461e941af6283d86dca2", input, options.expectedRevision);
+    return this.call("/operations/actions/act_1e35db0451b1461e941af6283d86dca2", input, options);
   }
 
   async submitRequest(input: SubmitRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
-    return this.call("/operations/actions/act_ed2374e822704c51a2925338253d05d2", input, options.expectedRevision);
+    return this.call("/operations/actions/act_ed2374e822704c51a2925338253d05d2", input, options);
   }
 
   async approveRequest(input: ApproveRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
-    return this.call("/operations/actions/act_d39dbb883b5f4019b9027b85add3de47", input, options.expectedRevision);
+    return this.call("/operations/actions/act_d39dbb883b5f4019b9027b85add3de47", input, options);
   }
 
   async myRequests(input: MyRequestsInput): Promise<PurchaseRequest[]> {
@@ -58,14 +61,14 @@ export class ProcurementHttpClient {
   }
 
   async assessOpenRequest(input: OpenRequestInput, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
-    return this.call("/operations/actions/act_1e35db0451b1461e941af6283d86dca2/applicability", input, options.expectedRevision);
+    return this.call("/operations/actions/act_1e35db0451b1461e941af6283d86dca2/applicability", input, { expectedRevision: options.expectedRevision });
   }
 
   async assessSubmitRequest(input: SubmitRequestInput, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
-    return this.call("/operations/actions/act_ed2374e822704c51a2925338253d05d2/applicability", input, options.expectedRevision);
+    return this.call("/operations/actions/act_ed2374e822704c51a2925338253d05d2/applicability", input, { expectedRevision: options.expectedRevision });
   }
 
   async assessApproveRequest(input: ApproveRequestInput, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
-    return this.call("/operations/actions/act_d39dbb883b5f4019b9027b85add3de47/applicability", input, options.expectedRevision);
+    return this.call("/operations/actions/act_d39dbb883b5f4019b9027b85add3de47/applicability", input, { expectedRevision: options.expectedRevision });
   }
 }

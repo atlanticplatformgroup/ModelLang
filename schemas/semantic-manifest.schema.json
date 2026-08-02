@@ -90,7 +90,7 @@
       "items": {
         "enum": [
           "identityBinding", "authorization", "precondition", "transition", "invariant",
-          "conflict", "notFound", "validation"
+          "conflict", "idempotency", "notFound", "validation"
         ]
       }
     }
@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 2 },
-    "profile": { "const": "sml-transactional-core/2" },
+    "manifestVersion": { "const": 3 },
+    "profile": { "const": "sml-transactional-core/3" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-        "irVersion": { "const": 10 },
+        "irVersion": { "const": 11 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -181,7 +181,7 @@
         "required": [
           "id", "name", "source", "caller", "input", "output", "authorization",
           "preconditions", "readSet", "lockPlan", "effect", "postconditions",
-          "workflowTransitionIds", "failureClasses"
+          "workflowTransitionIds", "reliability", "failureClasses"
         ],
         "properties": {
           "id": { "type": "string", "pattern": "^action:" },
@@ -248,6 +248,18 @@
             "additionalProperties": false
           },
           "workflowTransitionIds": { "type": "array", "items": { "type": "string", "pattern": "^transition:" } },
+          "reliability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["idempotency", "scope", "replay", "durableReceipt", "correlation"],
+            "properties": {
+              "idempotency": { "enum": ["required", "unsupported"] },
+              "scope": { "const": "authenticatedPrincipal" },
+              "replay": { "enum": ["storedResult", "none"] },
+              "durableReceipt": { "type": "boolean" },
+              "correlation": { "const": true }
+            }
+          },
           "failureClasses": { "$ref": "#/$defs/errors" }
         },
         "additionalProperties": false

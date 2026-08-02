@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.18](./spec/0.18/LANGUAGE.md). It retains the complete 0.17 boundary and adds stable-ID reusable policies with closed exact-authority branches plus private transactional execution evidence. Public applicability remains filtered and grants no authority.
+The current normative specification is [ModelLang 0.19](./spec/0.19/LANGUAGE.md). It retains the complete 0.18 boundary and adds required action idempotency with private principal-scoped transactional receipts, canonical request fingerprints, exact committed-result replay, and correlation/causation links. Public applicability remains side-effect free and grants no authority.
 
-- [Reusable policy and durable evidence semantics](./spec/0.18/POLICY_DECISIONS.md)
-- [0.18 grammar additions](./spec/0.18/GRAMMAR.ebnf)
-- [0.18 conformance requirements](./spec/0.18/CONFORMANCE.md)
-- [0.18 unstable policy boundaries](./spec/0.18/UNSTABLE.md)
+- [Reliable command semantics](./spec/0.19/RELIABLE_COMMANDS.md)
+- [0.19 grammar additions](./spec/0.19/GRAMMAR.ebnf)
+- [0.19 conformance requirements](./spec/0.19/CONFORMANCE.md)
+- [0.19 unstable reliability boundaries](./spec/0.19/UNSTABLE.md)
 
 - [Authenticated applicability semantics](./spec/0.17/APPLICABILITY.md)
 - [0.17 unchanged grammar statement](./spec/0.17/GRAMMAR.ebnf)

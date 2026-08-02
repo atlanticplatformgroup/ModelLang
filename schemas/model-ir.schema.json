@@ -154,7 +154,18 @@
       "properties": {
         "id": { "type": "string", "pattern": "^action:" },
         "name": { "type": "string" },
-        "identity": { "$ref": "#/$defs/identity" }
+        "identity": { "$ref": "#/$defs/identity" },
+        "idempotency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "scope", "replay", "fingerprint"],
+          "properties": {
+            "mode": { "const": "required" },
+            "scope": { "const": "authenticatedPrincipal" },
+            "replay": { "const": "storedResult" },
+            "fingerprint": { "const": "canonicalSha256" }
+          }
+        }
       }
     },
     "policyBranch": {
@@ -223,7 +234,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "policies", "actions", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 10 },
+    "irVersion": { "const": 11 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

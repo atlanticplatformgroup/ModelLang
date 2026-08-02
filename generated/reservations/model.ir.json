@@ -1,10 +1,10 @@
 {
-  "irVersion": 10,
+  "irVersion": 11,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.10.0",
-    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215",
+    "version": "0.11.0",
+    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -523,6 +523,12 @@
           }
         }
       ],
+      "idempotency": {
+        "mode": "required",
+        "scope": "authenticatedPrincipal",
+        "replay": "storedResult",
+        "fingerprint": "canonicalSha256"
+      },
       "effect": {
         "kind": "create",
         "target": "Reservation",
@@ -598,7 +604,7 @@
         "file": "examples/reservations.model",
         "line": 25,
         "column": 1,
-        "endLine": 40,
+        "endLine": 41,
         "endColumn": 2
       },
       "naming": {
@@ -624,9 +630,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 43,
+            "line": 44,
             "column": 3,
-            "endLine": 43,
+            "endLine": 44,
             "endColumn": 21
           },
           "naming": {
@@ -641,9 +647,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 44,
+            "line": 45,
             "column": 3,
-            "endLine": 44,
+            "endLine": 45,
             "endColumn": 21
           },
           "naming": {
@@ -670,9 +676,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 46,
+          "line": 47,
           "column": 13,
-          "endLine": 46,
+          "endLine": 47,
           "endColumn": 17
         }
       },
@@ -706,9 +712,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "span": {
           "file": "examples/reservations.model",
-          "line": 47,
+          "line": 48,
           "column": 9,
-          "endLine": 47,
+          "endLine": 48,
           "endColumn": 41
         }
       },
@@ -720,9 +726,9 @@
       "limit": 100,
       "span": {
         "file": "examples/reservations.model",
-        "line": 42,
+        "line": 43,
         "column": 1,
-        "endLine": 50,
+        "endLine": 51,
         "endColumn": 2
       },
       "naming": {
@@ -1205,7 +1211,21 @@
         "file": "examples/reservations.model",
         "line": 25,
         "column": 1,
-        "endLine": 40,
+        "endLine": 41,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "idempotency:action:act_508ad810a19d4b79a5009871de5cd26b",
+      "purpose": "Serialize principal-scoped retries and replay the one committed result from a private transactional receipt.",
+      "layer": "PostgreSQL command receipt",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations_internal.command_receipt",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 25,
+        "column": 1,
+        "endLine": 41,
         "endColumn": 2
       }
     },
@@ -1219,7 +1239,7 @@
         "file": "examples/reservations.model",
         "line": 25,
         "column": 1,
-        "endLine": 40,
+        "endLine": 41,
         "endColumn": 2
       }
     },
@@ -1261,7 +1281,7 @@
         "file": "examples/reservations.model",
         "line": 25,
         "column": 1,
-        "endLine": 40,
+        "endLine": 41,
         "endColumn": 2
       }
     },
@@ -1287,9 +1307,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 44,
         "column": 3,
-        "endLine": 43,
+        "endLine": 44,
         "endColumn": 21
       }
     },
@@ -1308,9 +1328,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 47,
         "column": 13,
-        "endLine": 46,
+        "endLine": 47,
         "endColumn": 17
       }
     },
@@ -1322,9 +1342,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 48,
         "column": 9,
-        "endLine": 47,
+        "endLine": 48,
         "endColumn": 41
       }
     },
@@ -1336,9 +1356,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 42,
+        "line": 43,
         "column": 1,
-        "endLine": 50,
+        "endLine": 51,
         "endColumn": 2
       }
     },
@@ -1350,9 +1370,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 42,
+        "line": 43,
         "column": 1,
-        "endLine": 50,
+        "endLine": 51,
         "endColumn": 2
       }
     },
@@ -1364,9 +1384,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 42,
+        "line": 43,
         "column": 1,
-        "endLine": 50,
+        "endLine": 51,
         "endColumn": 2
       }
     },
@@ -1383,6 +1403,13 @@
       "layer": "PostgreSQL audit",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations_internal.action_audit.decision_evidence"
+    },
+    {
+      "id": "boundary:command_receipts",
+      "purpose": "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.",
+      "layer": "PostgreSQL receipt boundary",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.command_receipt"
     }
   ]
 }

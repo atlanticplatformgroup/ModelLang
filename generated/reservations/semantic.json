@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 2,
-  "profile": "sml-transactional-core/2",
+  "manifestVersion": 3,
+  "profile": "sml-transactional-core/3",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.18.0",
-    "irVersion": 10,
+    "compilerVersion": "0.19.0",
+    "irVersion": 11,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.10.0",
-    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215",
+    "version": "0.11.0",
+    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -34,7 +34,7 @@
         "file": "examples/reservations.model",
         "line": 25,
         "column": 1,
-        "endLine": 40,
+        "endLine": 41,
         "endColumn": 2
       },
       "caller": {
@@ -213,9 +213,17 @@
         ]
       },
       "workflowTransitionIds": [],
+      "reliability": {
+        "idempotency": "required",
+        "scope": "authenticatedPrincipal",
+        "replay": "storedResult",
+        "durableReceipt": true,
+        "correlation": true
+      },
       "failureClasses": [
         "identityBinding",
         "authorization",
+        "idempotency",
         "precondition",
         "invariant",
         "conflict"
@@ -228,9 +236,9 @@
       "name": "reservationsForResource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 42,
+        "line": 43,
         "column": 1,
-        "endLine": 50,
+        "endLine": 51,
         "endColumn": 2
       },
       "caller": {
@@ -265,9 +273,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/reservations.model",
-          "line": 46,
+          "line": 47,
           "column": 13,
-          "endLine": 46,
+          "endLine": 47,
           "endColumn": 17
         },
         "dependencies": []
@@ -302,9 +310,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "source": {
           "file": "examples/reservations.model",
-          "line": 47,
+          "line": 48,
           "column": 9,
-          "endLine": 47,
+          "endLine": 48,
           "endColumn": 41
         },
         "dependencies": [

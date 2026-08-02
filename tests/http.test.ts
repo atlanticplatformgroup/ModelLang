@@ -6,6 +6,7 @@ import {
 } from "../generated/procurement/typescript/http-server.js";
 import {
   AuthorizationError,
+  IdempotencyConflictError,
   ModelOperationError,
   ValidationError,
 } from "../generated/procurement/typescript/errors.js";
@@ -35,6 +36,7 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
     headers: {
       authorization: "Bearer valid",
       "content-type": "application/json",
+      "idempotency-key": "http-test-key",
       ...headers,
     },
     body: JSON.stringify(body),
@@ -52,11 +54,17 @@ describe("generated HTTP boundary", () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual(purchaseRequest);
+    expect(response.headers.get("x-correlation-id")).toBe("http-test-key");
     expect(authenticate).toHaveBeenCalledWith("valid");
     expect(execute).toHaveBeenCalledWith(
       "action:act_1e35db0451b1461e941af6283d86dca2",
       { amount: { currency: "USD", amount: "10.00" } },
-      { expectedRevision: undefined },
+      {
+        expectedRevision: undefined,
+        idempotencyKey: "http-test-key",
+        correlationId: "http-test-key",
+        causationId: undefined,
+      },
     );
   });
 
@@ -110,6 +118,48 @@ describe("generated HTTP boundary", () => {
     expect(unauthenticated.status).toBe(401);
     expect(authenticate).not.toHaveBeenCalled();
 
+    const missingKey = await handler(new Request(openRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({ amount: { currency: "USD", amount: "10.00" } }),
+    }));
+    expect(missingKey.status).toBe(400);
+    expect(await missingKey.json()).toMatchObject({ code: "ML_IDEMPOTENCY_REQUIRED" });
+
+    const malformedKey = await handler(request(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { "idempotency-key": "contains spaces" },
+    ));
+    expect(malformedKey.status).toBe(400);
+    expect(await malformedKey.json()).toMatchObject({ code: "ML_VALIDATION" });
+
+    const applicabilityMetadata = await handler(new Request(`${openRoute}/applicability`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid",
+        "content-type": "application/json",
+        "idempotency-key": "not-an-applicability-input",
+      },
+      body: JSON.stringify({ amount: { currency: "USD", amount: "10.00" } }),
+    }));
+    expect(applicabilityMetadata.status).toBe(400);
+    expect(await applicabilityMetadata.json()).toMatchObject({ code: "ML_IDEMPOTENCY_UNSUPPORTED" });
+
+    const unsupportedKey = await handler(new Request(
+      "https://example.test/operations/actions/act_ed2374e822704c51a2925338253d05d2",
+      {
+        method: "POST",
+        headers: {
+          authorization: "Bearer valid",
+          "content-type": "application/json",
+          "idempotency-key": "unsafe-assumption",
+        },
+        body: JSON.stringify({ request: "00000000-0000-4000-8000-000000000010" }),
+      },
+    ));
+    expect(unsupportedKey.status).toBe(400);
+    expect(await unsupportedKey.json()).toMatchObject({ code: "ML_IDEMPOTENCY_UNSUPPORTED" });
+
     const spoofed = await handler(request({
       actor: "00000000-0000-4000-8000-000000000004",
       amount: { currency: "USD", amount: "10.00" },
@@ -146,7 +196,10 @@ describe("generated HTTP boundary", () => {
       fetch: (input, init) => authorizationHandler(new Request(input, init)),
     });
 
-    await expect(client.openRequest({ amount: { currency: "USD", amount: "10.00" } })).rejects.toMatchObject({
+    await expect(client.openRequest(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { idempotencyKey: "authorization-failure" },
+    )).rejects.toMatchObject({
       name: AuthorizationError.name,
       code: "ML_AUTHORIZATION",
       ruleId,
@@ -178,6 +231,22 @@ describe("generated HTTP boundary", () => {
     const malformedOutput = await malformedOutputHandler(request({ amount: { currency: "USD", amount: "10.00" } }));
     expect(malformedOutput.status).toBe(500);
     expect(JSON.stringify(await malformedOutput.json())).not.toContain("databaseSecret");
+
+    const idempotencyClient = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: async () => Response.json({
+        type: "https://modellang.dev/problems/idempotency-conflict",
+        title: "The idempotency key conflicts with an earlier command.",
+        status: 409,
+        code: "ML_IDEMPOTENCY_CONFLICT",
+        ruleId: "idempotency:action:act_1e35db0451b1461e941af6283d86dca2",
+      }, { status: 409, headers: { "content-type": "application/problem+json" } }),
+    });
+    await expect(idempotencyClient.openRequest(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { idempotencyKey: "conflict" },
+    )).rejects.toBeInstanceOf(IdempotencyConflictError);
   });
 
   it("maps transport boundary failures to typed validation errors", async () => {

@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.11.0",
-    "description": "Generated from ModelLang operation manifest v2 (sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615)."
+    "version": "0.12.0",
+    "description": "Generated from ModelLang operation manifest v3 (sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -23,8 +23,18 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ExpectedRevision"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CausationId"
           }
         ],
+        "x-modellang-idempotency": "required",
         "requestBody": {
           "required": true,
           "content": {
@@ -62,6 +72,14 @@
         "responses": {
           "200": {
             "description": "openRequest result",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Resolved command correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -179,8 +197,15 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ExpectedRevision"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CausationId"
           }
         ],
+        "x-modellang-idempotency": "unsupported",
         "requestBody": {
           "required": true,
           "content": {
@@ -204,6 +229,14 @@
         "responses": {
           "200": {
             "description": "submitRequest result",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Resolved command correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -321,8 +354,15 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ExpectedRevision"
+          },
+          {
+            "$ref": "#/components/parameters/CorrelationId"
+          },
+          {
+            "$ref": "#/components/parameters/CausationId"
           }
         ],
+        "x-modellang-idempotency": "unsupported",
         "requestBody": {
           "required": true,
           "content": {
@@ -346,6 +386,14 @@
         "responses": {
           "200": {
             "description": "approveRequest result",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Resolved command correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
@@ -949,6 +997,34 @@
         "schema": {
           "type": "string",
           "pattern": "^\"rev:1:[0-9a-f]{32}\"$"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "description": "Principal-scoped retry key; it grants no authority.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "CorrelationId": {
+        "name": "X-Correlation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "CausationId": {
+        "name": "X-Causation-ID",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
         }
       }
     },

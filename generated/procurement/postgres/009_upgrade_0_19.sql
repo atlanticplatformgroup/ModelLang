@@ -1,19 +1,6 @@
--- Idempotent ModelLang 0.11 -> 0.12 PostgreSQL gateway-boundary upgrade.
--- Run as the same administrative role used for generated installation and migrations.
+-- Idempotent ModelLang 0.18 -> 0.19 reliable-command upgrade.
+-- Historical audit rows remain correlation- and receipt-unknown; new reliable commands write complete receipts.
 BEGIN;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_gateway') THEN
-    CREATE ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-  END IF;
-END
-$modellang$;
-
-ALTER ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-REVOKE modellang_owner FROM modellang_gateway;
-REVOKE modellang_gateway FROM modellang_app;
-GRANT modellang_app TO modellang_gateway;
-
 SET LOCAL ROLE modellang_owner;
 DO $modellang_upgrade$
 DECLARE
@@ -33,132 +20,6 @@ BEGIN
   END IF;
 END
 $modellang_upgrade$;
-
-CREATE TABLE IF NOT EXISTS "model_procurement_internal"."gateway_principal_binding" (
-  "issuer" text NOT NULL,
-  "subject" text NOT NULL,
-  "principal_id" uuid NOT NULL REFERENCES "model_procurement"."user" ("id"),
-  PRIMARY KEY ("issuer", "subject"),
-  CONSTRAINT "ck_gateway_principal_binding_identity" CHECK (
-    pg_catalog.char_length("issuer") BETWEEN 1 AND 512
-    AND pg_catalog.char_length("subject") BETWEEN 1 AND 512
-  )
-);
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_issuer" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_subject" text;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass
-      AND conname = 'ck_action_audit_gateway_identity'
-  ) THEN
-    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_gateway_identity"
-      CHECK (("identity_issuer" IS NULL) = ("identity_subject" IS NULL));
-  END IF;
-END
-$modellang$;
-CREATE OR REPLACE FUNCTION "model_procurement_internal"."bind_gateway_identity"(p_issuer text, p_subject text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_auth_members AS membership
-    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
-    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
-    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
-  ) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_GATEWAY_REQUIRED';
-  END IF;
-  IF p_issuer IS NULL OR pg_catalog.char_length(p_issuer) NOT BETWEEN 1 AND 512
-     OR p_subject IS NULL OR pg_catalog.char_length(p_subject) NOT BETWEEN 1 AND 512 THEN
-    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:gateway_identity';
-  END IF;
-  PERFORM 1 FROM "model_procurement_internal"."gateway_principal_binding" AS binding
-  WHERE binding."issuer" = p_issuer AND binding."subject" = p_subject
-  FOR SHARE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
-  PERFORM pg_catalog.set_config('modellang.gateway_issuer', p_issuer, true);
-  PERFORM pg_catalog.set_config('modellang.gateway_subject', p_subject, true);
-END
-$modellang$;
-REVOKE ALL ON FUNCTION "model_procurement_internal"."bind_gateway_identity"(text, text) FROM PUBLIC;
-CREATE OR REPLACE FUNCTION "model_procurement_internal"."resolve_principal"()
-RETURNS TABLE ("principal_id" uuid, "identity_issuer" text, "identity_subject" text)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-DECLARE
-  v_issuer text;
-  v_subject text;
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_auth_members AS membership
-    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
-    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
-    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
-  ) THEN
-    v_issuer := pg_catalog.current_setting('modellang.gateway_issuer', true);
-    v_subject := pg_catalog.current_setting('modellang.gateway_subject', true);
-    IF v_issuer IS NULL OR v_issuer = '' OR v_subject IS NULL OR v_subject = '' THEN
-      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-    END IF;
-    RETURN QUERY
-      SELECT binding."principal_id", binding."issuer", binding."subject"
-      FROM "model_procurement_internal"."gateway_principal_binding" AS binding
-      WHERE binding."issuer" = v_issuer AND binding."subject" = v_subject
-      FOR SHARE;
-  ELSE
-    RETURN QUERY
-      SELECT binding."principal_id", NULL::text, NULL::text
-      FROM "model_procurement_internal"."principal_binding" AS binding
-      WHERE binding."database_principal" = session_user
-      FOR SHARE;
-  END IF;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
-END
-$modellang$;
-REVOKE ALL ON FUNCTION "model_procurement_internal"."resolve_principal"() FROM PUBLIC;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authorization_rule_id" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_outcome" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "policy_id" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authority_id" text;
-ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_evidence" jsonb;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass
-      AND conname = 'ck_action_audit_decision_evidence'
-  ) THEN
-    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_decision_evidence" CHECK (
-      ("decision_evidence" IS NULL
-       AND "model_id" IS NULL AND "model_version" IS NULL
-       AND "source_hash" IS NULL AND "authorization_rule_id" IS NULL
-       AND "decision_outcome" IS NULL AND "policy_id" IS NULL AND "authority_id" IS NULL)
-      OR
-      ("decision_evidence" IS NOT NULL
-       AND "model_id" IS NOT NULL AND "model_version" IS NOT NULL
-       AND "source_hash" ~ '^sha256:[0-9a-f]{64}$'
-       AND "authorization_rule_id" IS NOT NULL AND "decision_outcome" = 'executed'
-       AND (("policy_id" IS NULL) = ("authority_id" IS NULL)))
-    );
-  END IF;
-END
-$modellang$;
 CREATE TABLE IF NOT EXISTS "model_procurement_internal"."command_receipt" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "model_id" text NOT NULL,
@@ -209,7 +70,6 @@ END
 $modellang$;
 RESET ROLE;
 
--- Existing guarded callables must resolve both direct and gateway identities.
 -- Generated guarded action functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
@@ -586,56 +446,6 @@ $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement"."approve_request"(uuid) FROM PUBLIC;
 
 RESET ROLE;
--- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
-SET ROLE modellang_owner;
-
-CREATE OR REPLACE FUNCTION "model_procurement"."my_requests"()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-DECLARE
-  v_principal_id uuid;
-  v_result jsonb;
-  v_actor "model_procurement"."user"%ROWTYPE;
-BEGIN
-  SELECT identity."principal_id" INTO v_principal_id
-  FROM "model_procurement_internal"."resolve_principal"() AS identity;
-
-  SELECT * INTO v_actor
-  FROM "model_procurement"."user"
-  WHERE "id" = v_principal_id;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_4406b045404a48449282db804f6167a8';
-  END IF;
-
-  IF NOT ((TRUE) IS TRUE) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_4406b045404a48449282db804f6167a8';
-  END IF;
-
-  SELECT COALESCE(
-    pg_catalog.jsonb_agg(v_query."item" ORDER BY v_query."sort_value" ASC, v_query."identity" ASC),
-    '[]'::jsonb
-  ) INTO v_result
-  FROM (
-    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'requester', v_row."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_row."amount"::numeric(20, 2))::text), 'status', v_row."status", 'approvedBy', v_row."approved_by_id", 'approvedByRoles', v_row."approved_by_roles") AS "item",
-           v_row."id" AS "sort_value",
-           v_row."id" AS "identity"
-    FROM "model_procurement"."purchase_request" AS v_row
-    WHERE (((v_row."requester_id" = v_actor."id")) IS TRUE)
-    ORDER BY v_row."id" ASC, v_row."id" ASC
-    LIMIT 100
-  ) AS v_query;
-
-  RETURN v_result;
-END
-$modellang$;
-
-REVOKE ALL ON FUNCTION "model_procurement"."my_requests"() FROM PUBLIC;
-
-RESET ROLE;
 -- Generated least-privilege application boundary.
 REVOKE CREATE ON SCHEMA "model_procurement" FROM PUBLIC, modellang_app, modellang_gateway;
 REVOKE ALL ON SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway;
@@ -647,10 +457,16 @@ REVOKE ALL ON TABLE "model_procurement"."purchase_request" FROM PUBLIC, modellan
 
 REVOKE ALL ON FUNCTION "model_procurement"."open_request"(numeric) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_procurement"."open_request"(numeric) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_procurement"."decide_act_1e35db0451b1461e941af6283d86dca2"(numeric, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_procurement"."decide_act_1e35db0451b1461e941af6283d86dca2"(numeric, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_procurement"."submit_request"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_procurement"."submit_request"(uuid) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_procurement"."decide_act_ed2374e822704c51a2925338253d05d2"(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_procurement"."decide_act_ed2374e822704c51a2925338253d05d2"(uuid, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_procurement"."approve_request"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_procurement"."approve_request"(uuid) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_procurement"."decide_act_d39dbb883b5f4019b9027b85add3de47"(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_procurement"."decide_act_d39dbb883b5f4019b9027b85add3de47"(uuid, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_procurement"."my_requests"() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_procurement"."my_requests"() TO modellang_app;
 REVOKE ALL ON ALL TABLES IN SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway;

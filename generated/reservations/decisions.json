@@ -3,12 +3,12 @@
   "planVersion": 2,
   "audience": "enforcement",
   "public": false,
-  "compilerVersion": "0.18.0",
-  "irVersion": 10,
+  "compilerVersion": "0.19.0",
+  "irVersion": 11,
   "model": {
     "id": "model:Reservations",
-    "version": "0.10.0",
-    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215"
+    "version": "0.11.0",
+    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418"
   },
   "policies": [],
   "actions": [

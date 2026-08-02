@@ -161,6 +161,12 @@ export interface IRAction {
   returnEntityId: string;
   authorization: IRRule;
   preconditions: IRRule[];
+  idempotency?: {
+    mode: "required";
+    scope: "authenticatedPrincipal";
+    replay: "storedResult";
+    fingerprint: "canonicalSha256";
+  };
   effect: IREffect;
   lockPlan: IRLock[];
   span: IRSpan;
@@ -226,7 +232,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 10;
+  irVersion: 11;
   model: {
     id: string;
     name: string;

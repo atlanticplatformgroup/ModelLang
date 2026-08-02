@@ -85,6 +85,48 @@ function modelError(operation: () => unknown): ModelError {
 }
 
 describe("reviewed semantic migrations", () => {
+  it("requires acknowledgement for an action idempotency change", () => {
+    const reliabilitySource = (version: string, reliable: boolean) => `model ReviewedReliability version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @generated(uuid) @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+}
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) -> Record {
+  authorize true;
+  ${reliable ? "idempotency required;" : ""}
+  create Record { }
+}`;
+    const previous = compileText(reliabilitySource("1", false), "previous-reliability.model");
+    const current = compileText(reliabilitySource("2", true), "current-reliability.model");
+    const changes = semanticDiff(previous, current).changes.filter((change) => change.classification !== "additive");
+    expect(changes).toEqual([expect.objectContaining({
+      kind: "idempotencyChanged",
+      area: "executionReliability",
+      classification: "breaking",
+      subject: expect.objectContaining({ id: "action:act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+    })]);
+    const plan: ReviewedMigrationPlanDocument = {
+      $schema: REVIEWED_MIGRATION_SCHEMA,
+      planVersion: 1,
+      strategy: "transactionalRebuild",
+      description: "Reviewed reliable-command boundary change.",
+      from: { modelId: previous.model.id, version: previous.model.version, sourceHash: previous.model.sourceHash },
+      to: { modelId: current.model.id, version: current.model.version, sourceHash: current.model.sourceHash },
+      acknowledgements: [{
+        changeKind: "idempotencyChanged",
+        subjectId: "action:act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        disposition: "accepted",
+        reason: "Callers and retention policy are ready for required command keys.",
+      }],
+      fieldValues: [],
+      enumMappings: [],
+    };
+    expect(planReviewedMigration(previous, current, plan).sql).toContain("command_receipt");
+    expect(modelError(() => planReviewedMigration(previous, current, { ...plan, acknowledgements: [] })).code).toBe("E2904");
+  });
+
   it("requires stable-ID acknowledgement for policy semantic changes", () => {
     const policySource = (version: string, predicate: string) => `model ReviewedPolicy version "${version}";
 enum Role @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {

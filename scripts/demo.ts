@@ -53,17 +53,26 @@ async function main(): Promise<void> {
   const finance = new ProcurementClient(financePool);
   const unbound = new ProcurementClient(unboundPool);
   try {
-    const low = (await employee.openRequest({ amount: { currency: "USD", amount: "5000.00" } })).id;
+    const low = (await employee.openRequest(
+      { amount: { currency: "USD", amount: "5000.00" } },
+      { idempotencyKey: "demo-low" },
+    )).id;
     line(5, "Employee login opens a 5,000 request", "PASS");
     await employee.submitRequest({ request: low });
     line(6, "Owner employee login submits the request", "PASS");
     await manager.approveRequest({ request: low });
     line(7, "Manager login approves the 5,000 request", "PASS");
 
-    const managerOwned = (await manager.openRequest({ amount: { currency: "USD", amount: "50.00" } })).id;
+    const managerOwned = (await manager.openRequest(
+      { amount: { currency: "USD", amount: "50.00" } },
+      { idempotencyKey: "demo-manager" },
+    )).id;
     line(8, "Multi-role manager opens an employee request", "PASS");
 
-    const high = (await employee.openRequest({ amount: { currency: "USD", amount: "25000.00" } })).id;
+    const high = (await employee.openRequest(
+      { amount: { currency: "USD", amount: "25000.00" } },
+      { idempotencyKey: "demo-high" },
+    )).id;
     line(9, "Employee login opens a 25,000 request", "PASS");
     await employee.submitRequest({ request: high });
     line(10, "Owner employee login submits the request", "PASS");
@@ -80,7 +89,10 @@ async function main(): Promise<void> {
     }
     line(13, "Employee query excludes the manager's request", "PASS");
 
-    await expectError(unbound.openRequest({ amount: { currency: "USD", amount: "10.00" } }), IdentityBindingError);
+    await expectError(unbound.openRequest(
+      { amount: { currency: "USD", amount: "10.00" } },
+      { idempotencyKey: "demo-unbound" },
+    ), IdentityBindingError);
     line(14, "Unbound login attempts an action", "REJECTED as designed");
     try {
       await employeePool.query("SELECT * FROM model_procurement.purchase_request");

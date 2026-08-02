@@ -1,10 +1,10 @@
 {
-  "irVersion": 10,
+  "irVersion": 11,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.11.0",
-    "sourceHash": "sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615",
+    "version": "0.12.0",
+    "sourceHash": "sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1255,6 +1255,12 @@
           }
         }
       ],
+      "idempotency": {
+        "mode": "required",
+        "scope": "authenticatedPrincipal",
+        "replay": "storedResult",
+        "fingerprint": "canonicalSha256"
+      },
       "effect": {
         "kind": "create",
         "target": "PurchaseRequest",
@@ -1329,7 +1335,7 @@
         "file": "examples/procurement.model",
         "line": 70,
         "column": 1,
-        "endLine": 87,
+        "endLine": 88,
         "endColumn": 2
       },
       "naming": {
@@ -1353,9 +1359,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 90,
+            "line": 91,
             "column": 3,
-            "endLine": 90,
+            "endLine": 91,
             "endColumn": 21
           },
           "naming": {
@@ -1370,9 +1376,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 91,
+            "line": 92,
             "column": 3,
-            "endLine": 91,
+            "endLine": 92,
             "endColumn": 27
           },
           "naming": {
@@ -1416,9 +1422,9 @@
         "sourceExpression": "(actor == request.requester)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 93,
+          "line": 94,
           "column": 13,
-          "endLine": 93,
+          "endLine": 94,
           "endColumn": 39
         }
       },
@@ -1452,9 +1458,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 94,
+            "line": 95,
             "column": 3,
-            "endLine": 94,
+            "endLine": 95,
             "endColumn": 59
           }
         }
@@ -1498,9 +1504,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 89,
+        "line": 90,
         "column": 1,
-        "endLine": 99,
+        "endLine": 100,
         "endColumn": 2
       },
       "naming": {
@@ -1524,9 +1530,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 102,
+            "line": 103,
             "column": 3,
-            "endLine": 102,
+            "endLine": 103,
             "endColumn": 21
           },
           "naming": {
@@ -1541,9 +1547,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 103,
+            "line": 104,
             "column": 3,
-            "endLine": 103,
+            "endLine": 104,
             "endColumn": 27
           },
           "naming": {
@@ -1617,9 +1623,9 @@
         "sourceExpression": "((actor != request.requester) and ApprovalAuthority(actor, request))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 106,
+          "line": 107,
           "column": 5,
-          "endLine": 107,
+          "endLine": 108,
           "endColumn": 42
         }
       },
@@ -1653,9 +1659,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 109,
+            "line": 110,
             "column": 3,
-            "endLine": 109,
+            "endLine": 110,
             "endColumn": 67
           }
         }
@@ -1724,9 +1730,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 101,
+        "line": 102,
         "column": 1,
-        "endLine": 116,
+        "endLine": 117,
         "endColumn": 2
       },
       "naming": {
@@ -1752,9 +1758,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 127,
+            "line": 128,
             "column": 3,
-            "endLine": 127,
+            "endLine": 128,
             "endColumn": 21
           },
           "naming": {
@@ -1779,9 +1785,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 129,
+          "line": 130,
           "column": 13,
-          "endLine": 129,
+          "endLine": 130,
           "endColumn": 17
         }
       },
@@ -1815,9 +1821,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 130,
+          "line": 131,
           "column": 9,
-          "endLine": 130,
+          "endLine": 131,
           "endColumn": 35
         }
       },
@@ -1829,9 +1835,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 126,
+        "line": 127,
         "column": 1,
-        "endLine": 133,
+        "endLine": 134,
         "endColumn": 2
       },
       "naming": {
@@ -1865,9 +1871,9 @@
           "actionId": "action:act_ed2374e822704c51a2925338253d05d2",
           "span": {
             "file": "examples/procurement.model",
-            "line": 120,
+            "line": 121,
             "column": 3,
-            "endLine": 121,
+            "endLine": 122,
             "endColumn": 69
           }
         },
@@ -1883,18 +1889,18 @@
           "actionId": "action:act_d39dbb883b5f4019b9027b85add3de47",
           "span": {
             "file": "examples/procurement.model",
-            "line": 122,
+            "line": 123,
             "column": 3,
-            "endLine": 123,
+            "endLine": 124,
             "endColumn": 73
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 118,
+        "line": 119,
         "column": 1,
-        "endLine": 124,
+        "endLine": 125,
         "endColumn": 2
       },
       "naming": {
@@ -2462,7 +2468,21 @@
         "file": "examples/procurement.model",
         "line": 70,
         "column": 1,
-        "endLine": 87,
+        "endLine": 88,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "idempotency:action:act_1e35db0451b1461e941af6283d86dca2",
+      "purpose": "Serialize principal-scoped retries and replay the one committed result from a private transactional receipt.",
+      "layer": "PostgreSQL command receipt",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.command_receipt",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 70,
+        "column": 1,
+        "endLine": 88,
         "endColumn": 2
       }
     },
@@ -2476,7 +2496,7 @@
         "file": "examples/procurement.model",
         "line": 70,
         "column": 1,
-        "endLine": 87,
+        "endLine": 88,
         "endColumn": 2
       }
     },
@@ -2518,7 +2538,7 @@
         "file": "examples/procurement.model",
         "line": 70,
         "column": 1,
-        "endLine": 87,
+        "endLine": 88,
         "endColumn": 2
       }
     },
@@ -2537,9 +2557,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 91,
         "column": 3,
-        "endLine": 90,
+        "endLine": 91,
         "endColumn": 21
       }
     },
@@ -2558,9 +2578,9 @@
       "objectName": "model_procurement.decide_act_ed2374e822704c51a2925338253d05d2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 89,
+        "line": 90,
         "column": 1,
-        "endLine": 99,
+        "endLine": 100,
         "endColumn": 2
       }
     },
@@ -2572,9 +2592,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 89,
+        "line": 90,
         "column": 1,
-        "endLine": 99,
+        "endLine": 100,
         "endColumn": 2
       }
     },
@@ -2586,9 +2606,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 93,
+        "line": 94,
         "column": 13,
-        "endLine": 93,
+        "endLine": 94,
         "endColumn": 39
       }
     },
@@ -2600,9 +2620,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 94,
+        "line": 95,
         "column": 3,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 59
       }
     },
@@ -2614,9 +2634,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 89,
+        "line": 90,
         "column": 1,
-        "endLine": 99,
+        "endLine": 100,
         "endColumn": 2
       }
     },
@@ -2642,9 +2662,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 102,
+        "line": 103,
         "column": 3,
-        "endLine": 102,
+        "endLine": 103,
         "endColumn": 21
       }
     },
@@ -2663,9 +2683,9 @@
       "objectName": "model_procurement.decide_act_d39dbb883b5f4019b9027b85add3de47",
       "source": {
         "file": "examples/procurement.model",
-        "line": 101,
+        "line": 102,
         "column": 1,
-        "endLine": 116,
+        "endLine": 117,
         "endColumn": 2
       }
     },
@@ -2677,9 +2697,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 101,
+        "line": 102,
         "column": 1,
-        "endLine": 116,
+        "endLine": 117,
         "endColumn": 2
       }
     },
@@ -2691,9 +2711,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 106,
+        "line": 107,
         "column": 5,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 42
       }
     },
@@ -2705,9 +2725,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 3,
-        "endLine": 109,
+        "endLine": 110,
         "endColumn": 67
       }
     },
@@ -2719,9 +2739,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 101,
+        "line": 102,
         "column": 1,
-        "endLine": 116,
+        "endLine": 117,
         "endColumn": 2
       }
     },
@@ -2747,9 +2767,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 128,
         "column": 3,
-        "endLine": 127,
+        "endLine": 128,
         "endColumn": 21
       }
     },
@@ -2768,9 +2788,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 129,
+        "line": 130,
         "column": 13,
-        "endLine": 129,
+        "endLine": 130,
         "endColumn": 17
       }
     },
@@ -2782,9 +2802,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 130,
+        "line": 131,
         "column": 9,
-        "endLine": 130,
+        "endLine": 131,
         "endColumn": 35
       }
     },
@@ -2796,9 +2816,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 126,
+        "line": 127,
         "column": 1,
-        "endLine": 133,
+        "endLine": 134,
         "endColumn": 2
       }
     },
@@ -2810,9 +2830,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 126,
+        "line": 127,
         "column": 1,
-        "endLine": 133,
+        "endLine": 134,
         "endColumn": 2
       }
     },
@@ -2824,9 +2844,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 126,
+        "line": 127,
         "column": 1,
-        "endLine": 133,
+        "endLine": 134,
         "endColumn": 2
       }
     },
@@ -2838,9 +2858,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 118,
+        "line": 119,
         "column": 1,
-        "endLine": 124,
+        "endLine": 125,
         "endColumn": 2
       }
     },
@@ -2852,9 +2872,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 120,
+        "line": 121,
         "column": 3,
-        "endLine": 121,
+        "endLine": 122,
         "endColumn": 69
       }
     },
@@ -2866,9 +2886,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 122,
+        "line": 123,
         "column": 3,
-        "endLine": 123,
+        "endLine": 124,
         "endColumn": 73
       }
     },
@@ -2885,6 +2905,13 @@
       "layer": "PostgreSQL audit",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement_internal.action_audit.decision_evidence"
+    },
+    {
+      "id": "boundary:command_receipts",
+      "purpose": "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.",
+      "layer": "PostgreSQL receipt boundary",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.command_receipt"
     }
   ]
 }

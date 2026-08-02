@@ -65,6 +65,7 @@
           "transition",
           "invariant",
           "conflict",
+          "idempotency",
           "notFound",
           "validation"
         ]
@@ -162,8 +163,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 2 },
-    "operationManifestVersion": { "const": 2 },
+    "uiManifestVersion": { "const": 3 },
+    "operationManifestVersion": { "const": 3 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -248,14 +249,23 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["operationId", "name", "label", "fields", "resultEntityId", "errors"],
+        "required": ["operationId", "name", "label", "fields", "resultEntityId", "errors", "reliability"],
         "properties": {
           "operationId": { "type": "string", "pattern": "^action:" },
           "name": { "type": "string" },
           "label": { "type": "string" },
           "fields": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
           "resultEntityId": { "type": "string", "pattern": "^entity:" },
-          "errors": { "$ref": "#/$defs/errors" }
+          "errors": { "$ref": "#/$defs/errors" },
+          "reliability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["idempotency", "scope"],
+            "properties": {
+              "idempotency": { "enum": ["required", "unsupported"] },
+              "scope": { "const": "authenticatedPrincipal" }
+            }
+          }
         },
         "additionalProperties": false
       }

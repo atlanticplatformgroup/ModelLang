@@ -16,6 +16,12 @@ let secondPool: Pool;
 let firstClient: ReservationsClient;
 let secondClient: ReservationsClient;
 let admin: Pool;
+let commandSequence = 0;
+
+function commandOptions(label = "reservation"): { idempotencyKey: string } {
+  commandSequence += 1;
+  return { idempotencyKey: `${label}-${commandSequence}` };
+}
 
 beforeAll(async () => {
   await installReservationsDatabase();
@@ -52,7 +58,7 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       resource,
       startsAt: "2030-01-10T10:00:00.000Z",
       endsAt: "2030-01-10T11:00:00.000Z",
-    });
+    }, commandOptions());
     expect(first).toMatchObject({
       resource,
       reservedBy: "10000000-0000-4000-8000-000000000001",
@@ -65,12 +71,12 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       resource,
       startsAt: "2030-01-10T11:00:00.000Z",
       endsAt: "2030-01-10T12:00:00.000Z",
-    })).resolves.toMatchObject({ resource });
+    }, commandOptions())).resolves.toMatchObject({ resource });
     const overlapError = await secondClient.reserve({
       resource,
       startsAt: "2030-01-10T10:30:00.000Z",
       endsAt: "2030-01-10T11:30:00.000Z",
-    }).catch((error: unknown) => error);
+    }, commandOptions()).catch((error: unknown) => error);
     expect(overlapError).toBeInstanceOf(ConflictError);
     expect(overlapError).toMatchObject({
       code: "23P01",
@@ -83,7 +89,7 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       resource,
       startsAt: "2030-02-01T10:00:00.000Z",
       endsAt: "2030-02-01T10:00:00.000Z",
-    })).rejects.toBeInstanceOf(PreconditionError);
+    }, commandOptions())).rejects.toBeInstanceOf(PreconditionError);
     await expect(admin.query(
       `INSERT INTO model_reservations.reservation
        (id, resource_id, reserved_by_id, starts_at, ends_at)
@@ -100,12 +106,12 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       resource,
       startsAt: "2031-01-01T09:00:00.000Z",
       endsAt: "2031-01-01T10:00:00.000Z",
-    })).id;
+    }, commandOptions())).id;
     const secondId = (await secondClient.reserve({
       resource: otherResource,
       startsAt: "2031-01-01T09:00:00.000Z",
       endsAt: "2031-01-01T10:00:00.000Z",
-    })).id;
+    }, commandOptions())).id;
 
     const firstRows = await firstClient.reservationsForResource({ resource });
     const secondRows = await firstClient.reservationsForResource({ resource: otherResource });
@@ -129,14 +135,14 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
         resource,
         startsAt: "2030-03-01T09:00:00.000Z",
         endsAt: "2030-03-01T10:00:00.000Z",
-      })).id;
+      }, commandOptions("concurrent-first"))).id;
 
       const secondPid = (await second.query<{ pid: number }>("SELECT pg_backend_pid() AS pid")).rows[0]!.pid;
       const conflicting = new ReservationsClient(second).reserve({
         resource,
         startsAt: "2030-03-01T09:30:00.000Z",
         endsAt: "2030-03-01T10:30:00.000Z",
-      });
+      }, commandOptions("concurrent-second"));
       await waitUntilLockWaiting(secondPid);
       await first.query("COMMIT");
       await expect(conflicting).rejects.toBeInstanceOf(ConflictError);

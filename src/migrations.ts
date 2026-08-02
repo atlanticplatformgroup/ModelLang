@@ -8,6 +8,7 @@ import {
   generateEntityForeignKeyStatements,
   generateEntityTableStatement,
   generateDecisionEvidenceInfrastructureStatements,
+  generateCommandReceiptInfrastructureStatements,
   generateGatewayInfrastructureStatements,
   generateGatewayRoleStatements,
   generatePostgres,
@@ -355,8 +356,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10].includes(Number(previous.irVersion)) || current.irVersion !== 10) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10 baseline and canonical IR10 current input.");
+  if (![9, 10, 11].includes(Number(previous.irVersion)) || current.irVersion !== 11) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11 baseline and canonical IR11 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -719,6 +720,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     "-- Upgrade the internal gateway identity and audit boundary after physical renames.",
     ...generateGatewayInfrastructureStatements(current),
     ...generateDecisionEvidenceInfrastructureStatements(current),
+    ...generateCommandReceiptInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),

@@ -52,7 +52,12 @@ function generateTypes(ir: ModelIR): string {
     "  readonly revision?: string;",
     "  readonly explanation?: { readonly kind: ApplicabilityExplanationKind; readonly ruleId: string };",
     "}",
-    "export interface ExecutionOptions { readonly expectedRevision?: string; }",
+    "export interface ExecutionOptions {",
+    "  readonly expectedRevision?: string;",
+    "  readonly idempotencyKey?: string;",
+    "  readonly correlationId?: string;",
+    "  readonly causationId?: string;",
+    "}",
     "export interface ApplicabilityOptions { readonly expectedRevision?: string; }",
     "",
   ];
@@ -115,6 +120,7 @@ export class PreconditionError extends ModelDatabaseError {}
 export class TransitionError extends ModelDatabaseError {}
 export class InvariantError extends ModelDatabaseError {}
 export class ConflictError extends ModelDatabaseError {}
+export class IdempotencyConflictError extends ConflictError {}
 export class StaleError extends ConflictError {}
 export class NotFoundError extends ModelDatabaseError {}
 export class ValidationError extends ModelDatabaseError {}
@@ -131,6 +137,8 @@ export function mapDatabaseError(error: unknown): ModelOperationError {
   if (message.startsWith("ML_WORKFLOW:")) return new TransitionError(message, value.code, suffix, error);
   if (message.startsWith("ML_NOT_FOUND:")) return new NotFoundError(message, value.code, suffix, error);
   if (message.startsWith("ML_VALIDATION:")) return new ValidationError(message, value.code, suffix, error);
+  if (message.startsWith("ML_IDEMPOTENCY_REQUIRED:") || message.startsWith("ML_IDEMPOTENCY_UNSUPPORTED:")) return new ValidationError(message, value.code, suffix, error);
+  if (message.startsWith("ML_IDEMPOTENCY_CONFLICT:")) return new IdempotencyConflictError(message, value.code, suffix, error);
   if (message.startsWith("ML_STALE:")) return new StaleError(message, value.code, suffix, error);
   if (value?.code === "23P01") return new ConflictError(message, value.code, value.constraint, error);
   if (value?.code === "23514" || value?.code === "23502" || value?.code === "23503" || value?.code === "23505") {
@@ -161,6 +169,7 @@ export function mapHttpProblem(problem: unknown, httpStatus: number): ModelOpera
   if (type.endsWith("/transition")) return new TransitionError(message, code, ruleId, problem);
   if (type.endsWith("/invariant")) return new InvariantError(message, code, ruleId, problem);
   if (type.endsWith("/conflict")) return new ConflictError(message, code, ruleId, problem);
+  if (type.endsWith("/idempotency-conflict")) return new IdempotencyConflictError(message, code, ruleId, problem);
   if (type.endsWith("/stale")) return new StaleError(message, code, ruleId, problem);
   if (type.endsWith("/not-found")) return new NotFoundError(message, code, ruleId, problem);
   if (type.endsWith("/validation")) return new ValidationError(message, code, ruleId, problem);
@@ -185,13 +194,19 @@ function actionMethod(ir: ModelIR, action: IRAction): string {
   });
   const schema = ir.model.naming.sqlSchema.replaceAll('"', '""');
   const fn = action.naming.sqlFunction.replaceAll('"', '""');
-  const revisionPlaceholder = `$${args.length + 1}`;
-  const sql = `WITH expected AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', ${revisionPlaceholder}, true)) SELECT "${schema}"."${fn}"(${args.map((arg) => arg.placeholder).join(", ")}) AS value FROM expected`;
+  const metadataStart = args.length + 1;
+  const sql = `WITH execution_context AS MATERIALIZED (SELECT `
+    + `pg_catalog.set_config('modellang.expected_revision', $${metadataStart}, true), `
+    + `pg_catalog.set_config('modellang.idempotency_key', $${metadataStart + 1}, true), `
+    + `pg_catalog.set_config('modellang.correlation_id', $${metadataStart + 2}, true), `
+    + `pg_catalog.set_config('modellang.causation_id', $${metadataStart + 3}, true)) `
+    + `SELECT "${schema}"."${fn}"(${args.map((arg) => arg.placeholder).join(", ")}) AS value FROM execution_context`;
   return `  async ${action.name}(input: ${operationInputName(action)}, options: ExecutionOptions = {}): Promise<${returnEntity.name}> {
     try {
+      const metadata = executionMetadata(options, ${action.idempotency ? "true" : "false"}, ${JSON.stringify(`idempotency:${action.id}`)});
       const result = await this.adapter.query<{ value: ${returnEntity.name} }>(
         ${JSON.stringify(sql)},
-        [${[...args.map((arg) => clientParameterValue(arg.parameter)), 'options.expectedRevision ?? ""'].join(", ")}],
+        [${[...args.map((arg) => clientParameterValue(arg.parameter)), 'options.expectedRevision ?? ""', "metadata.idempotencyKey", "metadata.correlationId", "metadata.causationId"].join(", ")}],
       );
       return result.rows[0]!.value;
     } catch (error) {
@@ -277,14 +292,35 @@ function moneyAmount(
   return value.amount;
 }
 ` : "";
+  const executionHelper = `
+const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+function executionMetadata(options: ExecutionOptions, required: boolean, ruleId: string): {
+  idempotencyKey: string;
+  correlationId: string;
+  causationId: string;
+} {
+  const key = options.idempotencyKey ?? "";
+  if (required && !key) throw new ValidationError("An idempotency key is required", "ML_IDEMPOTENCY_REQUIRED", ruleId);
+  if (!required && key) throw new ValidationError("This action does not support idempotency keys", "ML_IDEMPOTENCY_UNSUPPORTED", ruleId);
+  const correlation = options.correlationId ?? (required ? key : "");
+  const causation = options.causationId ?? "";
+  if ((key && !commandMetadataPattern.test(key))
+    || (correlation && !commandMetadataPattern.test(correlation))
+    || (causation && !commandMetadataPattern.test(causation))) {
+    throw new ValidationError("Command metadata is invalid", "ML_VALIDATION", ruleId);
+  }
+  return { idempotencyKey: key, correlationId: correlation, causationId: causation };
+}
+`;
   return `// Generated by ModelLang. Do not edit.
 import type { ${imports.join(", ")} } from "./types.js";
-import { ${hasMoneyInputs ? "ValidationError, " : ""}mapDatabaseError } from "./errors.js";
+import { ValidationError, mapDatabaseError } from "./errors.js";
 
 export interface QueryAdapter {
   query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
 }
 ${moneyHelper}
+${executionHelper}
 
 export class ${ir.model.name}Client {
   constructor(private readonly adapter: QueryAdapter) {}

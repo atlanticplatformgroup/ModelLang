@@ -7,7 +7,7 @@ import { writeGeneratedAtomically } from "./build.js";
 import { enforcementText } from "./codegen/enforcement.js";
 import { readFile, writeFile } from "node:fs/promises";
 import type { ModelIR } from "./ir.js";
-import { validateIR } from "./validate-ir.js";
+import { validateEvolutionIR } from "./validate-ir.js";
 import { assignStableIds } from "./stable-ids.js";
 import { planMigration } from "./migrations.js";
 import { semanticDiff } from "./semantic-diff.js";
@@ -41,7 +41,7 @@ async function main(): Promise<void> {
     if (!currentArg || outIndex < 0 || !rest[outIndex + 1]) usage();
     const previousFile = resolve(fileArg);
     const previous = JSON.parse(await readFile(previousFile, "utf8")) as ModelIR;
-    validateIR(previous);
+    validateEvolutionIR(previous);
     const current = await compileFile(resolve(currentArg));
     const out = resolve(rest[outIndex + 1]!);
     if (command === "semantic-diff") {

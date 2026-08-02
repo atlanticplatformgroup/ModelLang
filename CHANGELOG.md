@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.19.0
+
+- Added the `idempotency required;` action declaration and advanced the canonical backend boundary to IR11.
+- Added private principal/action/key-scoped PostgreSQL command receipts claimed in the mutation transaction, canonical SHA-256 typed-input fingerprints, exact committed-result replay, and fail-closed `ML_IDEMPOTENCY_CONFLICT` behavior.
+- Added correlation and causation execution metadata, transactional receipt/audit/evidence links, rollback cleanup, and concurrency serialization for equivalent retries.
+- Advanced operation manifest to v3, capability manifest to v2, UI manifest to v3, engineering semantic manifest to v3, and semantic diff to v4 with static reliability projections and guarded idempotency-change classification.
+- Added generated TypeScript execution options and typed idempotency errors plus HTTP `Idempotency-Key`, `X-Correlation-ID`, and `X-Causation-ID` handling without changing stable operation routes or JSON body shapes.
+- Added the baseline-checked, idempotent `009_upgrade_0_19.sql` administrative upgrade and IR10-to-IR11 safe/reviewed evolution support.
+- Added live sequential replay, conflicting reuse, principal scoping, concurrent retry, private linkage, failed execution, and explicit rollback conformance coverage.
+
 ## 0.18.0
 
 - Added first-class stable-ID `policy` declarations with typed parameters, pure composition, and closed named `allow` authority branches.

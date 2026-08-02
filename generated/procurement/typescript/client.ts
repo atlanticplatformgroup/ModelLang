@@ -30,14 +30,35 @@ function moneyAmount(
 }
 
 
+const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+function executionMetadata(options: ExecutionOptions, required: boolean, ruleId: string): {
+  idempotencyKey: string;
+  correlationId: string;
+  causationId: string;
+} {
+  const key = options.idempotencyKey ?? "";
+  if (required && !key) throw new ValidationError("An idempotency key is required", "ML_IDEMPOTENCY_REQUIRED", ruleId);
+  if (!required && key) throw new ValidationError("This action does not support idempotency keys", "ML_IDEMPOTENCY_UNSUPPORTED", ruleId);
+  const correlation = options.correlationId ?? (required ? key : "");
+  const causation = options.causationId ?? "";
+  if ((key && !commandMetadataPattern.test(key))
+    || (correlation && !commandMetadataPattern.test(correlation))
+    || (causation && !commandMetadataPattern.test(causation))) {
+    throw new ValidationError("Command metadata is invalid", "ML_VALIDATION", ruleId);
+  }
+  return { idempotencyKey: key, correlationId: correlation, causationId: causation };
+}
+
+
 export class ProcurementClient {
   constructor(private readonly adapter: QueryAdapter) {}
 
   async openRequest(input: OpenRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
     try {
+      const metadata = executionMetadata(options, true, "idempotency:action:act_1e35db0451b1461e941af6283d86dca2");
       const result = await this.adapter.query<{ value: PurchaseRequest }>(
-        "WITH expected AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true)) SELECT \"model_procurement\".\"open_request\"($1) AS value FROM expected",
-        [moneyAmount(input.amount, "USD", 20, 2, "money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount"), options.expectedRevision ?? ""],
+        "WITH execution_context AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true), pg_catalog.set_config('modellang.idempotency_key', $3, true), pg_catalog.set_config('modellang.correlation_id', $4, true), pg_catalog.set_config('modellang.causation_id', $5, true)) SELECT \"model_procurement\".\"open_request\"($1) AS value FROM execution_context",
+        [moneyAmount(input.amount, "USD", 20, 2, "money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount"), options.expectedRevision ?? "", metadata.idempotencyKey, metadata.correlationId, metadata.causationId],
       );
       return result.rows[0]!.value;
     } catch (error) {
@@ -47,9 +68,10 @@ export class ProcurementClient {
 
   async submitRequest(input: SubmitRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
     try {
+      const metadata = executionMetadata(options, false, "idempotency:action:act_ed2374e822704c51a2925338253d05d2");
       const result = await this.adapter.query<{ value: PurchaseRequest }>(
-        "WITH expected AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true)) SELECT \"model_procurement\".\"submit_request\"($1) AS value FROM expected",
-        [input.request, options.expectedRevision ?? ""],
+        "WITH execution_context AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true), pg_catalog.set_config('modellang.idempotency_key', $3, true), pg_catalog.set_config('modellang.correlation_id', $4, true), pg_catalog.set_config('modellang.causation_id', $5, true)) SELECT \"model_procurement\".\"submit_request\"($1) AS value FROM execution_context",
+        [input.request, options.expectedRevision ?? "", metadata.idempotencyKey, metadata.correlationId, metadata.causationId],
       );
       return result.rows[0]!.value;
     } catch (error) {
@@ -59,9 +81,10 @@ export class ProcurementClient {
 
   async approveRequest(input: ApproveRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {
     try {
+      const metadata = executionMetadata(options, false, "idempotency:action:act_d39dbb883b5f4019b9027b85add3de47");
       const result = await this.adapter.query<{ value: PurchaseRequest }>(
-        "WITH expected AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true)) SELECT \"model_procurement\".\"approve_request\"($1) AS value FROM expected",
-        [input.request, options.expectedRevision ?? ""],
+        "WITH execution_context AS MATERIALIZED (SELECT pg_catalog.set_config('modellang.expected_revision', $2, true), pg_catalog.set_config('modellang.idempotency_key', $3, true), pg_catalog.set_config('modellang.correlation_id', $4, true), pg_catalog.set_config('modellang.causation_id', $5, true)) SELECT \"model_procurement\".\"approve_request\"($1) AS value FROM execution_context",
+        [input.request, options.expectedRevision ?? "", metadata.idempotencyKey, metadata.correlationId, metadata.causationId],
       );
       return result.rows[0]!.value;
     } catch (error) {

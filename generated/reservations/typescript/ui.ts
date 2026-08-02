@@ -6,13 +6,13 @@ import { ReservationsHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 2,
-  "operationManifestVersion": 2,
+  "uiManifestVersion": 3,
+  "operationManifestVersion": 3,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.10.0",
-    "sourceHash": "sha256:16abeadf4f4eceba16f786d649dc64c49a7e4bfd8cd5f7fdc59e2795fd7bd215",
+    "version": "0.11.0",
+    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418",
     "label": "Reservations"
   },
   "authentication": {
@@ -199,10 +199,15 @@ export const ReservationsUiManifest = {
       "errors": [
         "identityBinding",
         "authorization",
+        "idempotency",
         "precondition",
         "invariant",
         "conflict"
-      ]
+      ],
+      "reliability": {
+        "idempotency": "required",
+        "scope": "authenticatedPrincipal"
+      }
     }
   ],
   "queries": [

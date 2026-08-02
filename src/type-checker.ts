@@ -174,7 +174,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, policies, actions, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 10,
+    irVersion: 11,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -648,6 +648,14 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     returnEntityId: entityId(returnEntity),
     authorization: { id: `authorize:${semanticId}`, name: "authorize", expression: authorization, sourceExpression: expressionText(action.authorize), span: irSpan(action.authorize.span, file) },
     preconditions,
+    ...(action.idempotency ? {
+      idempotency: {
+        mode: action.idempotency.mode,
+        scope: "authenticatedPrincipal" as const,
+        replay: "storedResult" as const,
+        fingerprint: "canonicalSha256" as const,
+      },
+    } : {}),
     effect: { kind: action.effect.kind, target: action.effect.target, entityId: entityId(effectEntity), assignments },
     lockPlan,
     span: irSpan(action.span, file),
@@ -1269,6 +1277,7 @@ function buildEnforcement(
     }
     entries.push({ id: `boundary:${action.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_actions.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: `boundary:${action.id}.applicability`, purpose: "Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution.", layer: "PostgreSQL stable function", artifact: "postgres/003_decisions.sql", objectName: `${schema}.${decisionFunctionName(action.id)}`, source: action.span });
+    if (action.idempotency) entries.push({ id: `idempotency:${action.id}`, purpose: "Serialize principal-scoped retries and replay the one committed result from a private transactional receipt.", layer: "PostgreSQL command receipt", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.command_receipt`, source: action.span });
     entries.push({ id: decisionRevisionRuleId(action.id), purpose: "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.", layer: "PostgreSQL action and applicability functions", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
@@ -1311,5 +1320,6 @@ function buildEnforcement(
   }
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });
+  entries.push({ id: "boundary:command_receipts", purpose: "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.", layer: "PostgreSQL receipt boundary", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.command_receipt` });
   return entries;
 }

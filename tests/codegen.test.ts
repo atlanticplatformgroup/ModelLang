@@ -38,13 +38,13 @@ describe("backends", () => {
       manifestVersion: number;
       authentication: { source: string; requestSupplied: boolean };
       entities: { name: string; idFieldId: string }[];
-      operations: { id: string; kind: string; name: string; input: { name: string }[]; caller: { requestSupplied: boolean } }[];
+      operations: { id: string; kind: string; name: string; input: { name: string }[]; caller: { requestSupplied: boolean }; reliability?: { idempotency: string } }[];
       workflows: { id: string; transitions: { id: string; actionId: string; target: object }[] }[];
     };
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(2);
+    expect(manifest.manifestVersion).toBe(3);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -56,6 +56,10 @@ describe("backends", () => {
       expect(operation.caller.requestSupplied).toBe(false);
       expect(operation.input.map((parameter) => parameter.name)).not.toContain("actor");
     }
+    expect(manifest.operations.find((operation) => operation.name === "openRequest")?.reliability)
+      .toMatchObject({ idempotency: "required" });
+    expect(manifest.operations.find((operation) => operation.name === "submitRequest")?.reliability)
+      .toMatchObject({ idempotency: "unsupported" });
     expect(manifest.workflows).toEqual([expect.objectContaining({
       id: "workflow:wfl_96a1115ba9bf42f2a206374822eeaa87",
       transitions: [
@@ -77,7 +81,8 @@ describe("backends", () => {
 
     const openapi = JSON.parse(output["openapi.json"]!) as {
       openapi: string;
-      paths: Record<string, { post: { summary: string; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } } } }>;
+      paths: Record<string, { post: { summary: string; parameters: { $ref: string }[]; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } } } }>;
+      components: { parameters: Record<string, { name: string; required: boolean }> };
     };
     expect(openapi.openapi).toBe("3.1.1");
     const openRoute = "/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
@@ -85,6 +90,14 @@ describe("backends", () => {
     const requestSchema = openapi.paths[openRoute]!.post.requestBody.content["application/json"].schema;
     expect(requestSchema.additionalProperties).toBe(false);
     expect(requestSchema.properties).not.toHaveProperty("actor");
+    expect(openapi.paths[openRoute]!.post.parameters).toEqual(expect.arrayContaining([
+      { $ref: "#/components/parameters/IdempotencyKey" },
+      { $ref: "#/components/parameters/CorrelationId" },
+      { $ref: "#/components/parameters/CausationId" },
+    ]));
+    expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: true });
+    expect(openapi.components.parameters.CorrelationId).toMatchObject({ name: "X-Correlation-ID", required: false });
+    expect(openapi.components.parameters.CausationId).toMatchObject({ name: "X-Causation-ID", required: false });
 
     const browser = `${output["typescript/browser.ts"]}\n${output["typescript/http-client.ts"]}`;
     expect(browser).not.toMatch(/QueryAdapter|SELECT |session_user|PostgreSQL|node:/);
@@ -106,7 +119,7 @@ describe("backends", () => {
     const capabilities = JSON.parse(output["capabilities.json"]!) as {
       view: { safeProjection: boolean; containsExpressions: boolean; containsCurrentState: boolean; grantsAuthority: boolean };
       authentication: { callerInput: boolean };
-      actions: { operationId: string; outcomes: string[]; explanation: { authorizationRuleId: string; preconditionRuleIds: string[] }; revision: { staleRequiresExpectedRevision: boolean; grantsAuthority: boolean } }[];
+      actions: { operationId: string; reliability: { idempotency: string }; outcomes: string[]; explanation: { authorizationRuleId: string; preconditionRuleIds: string[] }; revision: { staleRequiresExpectedRevision: boolean; grantsAuthority: boolean } }[];
     };
     const decisionSchema = JSON.parse(await readFile("schemas/decision-plan.schema.json", "utf8")) as object;
     const capabilitySchema = JSON.parse(await readFile("schemas/capability-manifest.schema.json", "utf8")) as object;
@@ -129,16 +142,20 @@ describe("backends", () => {
       view: { safeProjection: true, containsExpressions: false, containsCurrentState: false, grantsAuthority: false },
       authentication: { callerInput: false },
     });
-    expect(JSON.stringify(capabilities)).not.toMatch(/expression|currentValue|sqlFunction|lockPlan|policyId|authorityId|decisionEvidence/);
+    expect(JSON.stringify(capabilities)).not.toMatch(/expression|currentValue|sqlFunction|lockPlan|policyId|authorityId|decisionEvidence|idempotencyKey|requestHash|commandReceipt/);
     for (const capability of capabilities.actions) {
       expect(capability.outcomes).toEqual(["applicable", "denied", "notApplicable", "stale"]);
       expect(capability.revision).toEqual(expect.objectContaining({ staleRequiresExpectedRevision: true, grantsAuthority: false }));
     }
+    expect(capabilities.actions[0]!.reliability).toMatchObject({ idempotency: "required" });
     expect(output["typescript/capabilities.ts"]).toContain("Safe public capability contract");
     expect(output["typescript/http-server.ts"]).toContain("validateDecision");
     expect(output["postgres/003_actions.sql"]).toContain('"decision_evidence"');
     expect(output["postgres/003_actions.sql"]).toContain("policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688");
     expect(output["postgres/008_upgrade_0_18.sql"]).toContain("durable decision-evidence upgrade");
+    expect(output["postgres/009_upgrade_0_19.sql"]).toContain("reliable-command upgrade");
+    expect(output["postgres/003_actions.sql"]).toContain('"command_receipt"');
+    expect(output["postgres/003_actions.sql"]).toContain("pg_catalog.sha256");
   });
 
   it("emits engineering-only semantic closure and deterministic artifact provenance", async () => {
@@ -152,6 +169,7 @@ describe("backends", () => {
       policies: { id: string; usedBy: { operationId: string; usage: string }[]; coverage: { applicability: boolean; execution: boolean; durableEvidence: boolean } }[];
       actions: {
         name: string;
+        reliability: { idempotency: string; durableReceipt: boolean };
         authorization: { id: string; dependencies: { kind: string; id: string }[] };
         readSet: { entityIds: string[]; fieldIds: string[] };
         effect: { kind: string; assignments: { fieldId: string }[] };
@@ -163,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 2,
+      manifestVersion: 3,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 10 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 11 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -195,6 +213,8 @@ describe("backends", () => {
     ]);
     expect(approve.postconditions.invariantIds).toHaveLength(3);
     expect(approve.workflowTransitionIds).toEqual(["transition:trn_efd18c8576154ba8b138c97b551afae3"]);
+    expect(semantic.actions.find((action) => action.name === "openRequest")?.reliability)
+      .toMatchObject({ idempotency: "required", durableReceipt: true });
 
     const provenance = JSON.parse(output["provenance.json"]!) as {
       compilerVersion: string;
@@ -204,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 10 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 11 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -221,7 +241,7 @@ describe("backends", () => {
       authentication: { required: boolean; callerInput: boolean };
       enums: { name: string; label: string; options: { value: string; label: string }[] }[];
       entities: { name: string; idFieldId: string; fields: { name: string; generated?: string; snapshot: boolean; presentation: object }[] }[];
-      actions: { operationId: string; name: string; label: string; fields: { name: string; presentation: object }[] }[];
+      actions: { operationId: string; name: string; label: string; reliability: { idempotency: string }; fields: { name: string; presentation: object }[] }[];
       queries: { operationId: string; name: string; label: string; filters: object[]; maxItems: number }[];
       workflows: {
         workflowId: string;
@@ -234,8 +254,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 2,
-      operationManifestVersion: 2,
+      uiManifestVersion: 3,
+      operationManifestVersion: 3,
       authentication: { required: true, callerInput: false },
     });
 
@@ -243,6 +263,7 @@ describe("backends", () => {
     expect(open).toMatchObject({
       operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
       label: "Open request",
+      reliability: { idempotency: "required", scope: "authenticatedPrincipal" },
     });
     expect(open.fields).toEqual([expect.objectContaining({
       name: "amount",
@@ -473,7 +494,7 @@ describe("backends", () => {
     const output = generateAll(compileText(source, "exclusive.model"));
     expect(output["postgres/002_schema.sql"]).toContain('"amount" > 0');
     expect(output["postgres/002_schema.sql"]).toContain("ck_record_amount_min_exclusive");
-    expect(output["postgres/003_actions.sql"]).not.toMatch(/INSERT INTO[\s\S]*?"role_at_write"[\s\S]*?VALUES/);
+    expect(output["postgres/003_actions.sql"]).not.toMatch(/INSERT INTO "model_m"\."record" \([^)]*"role_at_write"/);
     expect(output["typescript/types.ts"]).toContain("Stored point-in-time snapshot");
   });
 
@@ -600,7 +621,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.11.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.12.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

@@ -6,6 +6,7 @@ import {
   generateEntityTableStatement,
   generateGatewayInfrastructureStatements,
   generateDecisionEvidenceInfrastructureStatements,
+  generateCommandReceiptInfrastructureStatements,
   generateGatewayRoleStatements,
   generatePostgres,
   generateWorkflowStatements,
@@ -362,7 +363,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10].includes(Number(previous.irVersion)) || current.irVersion !== 10) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10 baseline and canonical IR10 current input.");
+  if (![9, 10, 11].includes(Number(previous.irVersion)) || current.irVersion !== 11) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11 baseline and canonical IR11 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -504,6 +505,7 @@ export function planReviewedMigration(
     ...current.workflows.flatMap((workflow) => generateWorkflowStatements(current, workflow, true)),
     ...generateGatewayInfrastructureStatements(current),
     ...generateDecisionEvidenceInfrastructureStatements(current),
+    ...generateCommandReceiptInfrastructureStatements(current),
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),

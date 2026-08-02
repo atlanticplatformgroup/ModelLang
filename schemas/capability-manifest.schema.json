@@ -7,8 +7,8 @@
   "required": ["$schema", "capabilityManifestVersion", "operationManifestVersion", "model", "view", "authentication", "actions"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/capability-manifest.schema.json" },
-    "capabilityManifestVersion": { "const": 1 },
-    "operationManifestVersion": { "const": 2 },
+    "capabilityManifestVersion": { "const": 2 },
+    "operationManifestVersion": { "const": 3 },
     "model": {
       "type": "object",
       "additionalProperties": false,
@@ -43,7 +43,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["operationId", "inputParameterIds", "outcomes", "explanation", "revision"],
+        "required": ["operationId", "inputParameterIds", "outcomes", "explanation", "revision", "reliability"],
         "properties": {
           "operationId": { "type": "string", "pattern": "^action:" },
           "inputParameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:" } },
@@ -74,6 +74,16 @@
             "properties": {
               "kind": { "const": "opaque" },
               "staleRequiresExpectedRevision": { "const": true },
+              "grantsAuthority": { "const": false }
+            }
+          },
+          "reliability": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["idempotency", "scope", "grantsAuthority"],
+            "properties": {
+              "idempotency": { "enum": ["required", "unsupported"] },
+              "scope": { "const": "authenticatedPrincipal" },
               "grantsAuthority": { "const": false }
             }
           }

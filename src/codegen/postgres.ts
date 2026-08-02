@@ -14,6 +14,7 @@ export interface PostgresOutput {
   "006_upgrade_0_12.sql": string;
   "007_upgrade_0_17.sql": string;
   "008_upgrade_0_18.sql": string;
+  "009_upgrade_0_19.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -548,6 +549,62 @@ export function generateDecisionEvidenceInfrastructureStatements(ir: ModelIR): s
   ];
 }
 
+export function generateCommandReceiptInfrastructureStatements(ir: ModelIR): string[] {
+  const internal = ir.model.naming.internalSchema;
+  const audit = qname(internal, "action_audit");
+  const receipts = qname(internal, "command_receipt");
+  return [
+    `CREATE TABLE IF NOT EXISTS ${receipts} (`,
+    `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
+    `  ${quoteIdent("model_id")} text NOT NULL,`,
+    `  ${quoteIdent("model_version")} text NOT NULL,`,
+    `  ${quoteIdent("source_hash")} text NOT NULL,`,
+    `  ${quoteIdent("action_id")} text NOT NULL,`,
+    `  ${quoteIdent("principal_id")} uuid NOT NULL,`,
+    `  ${quoteIdent("idempotency_key")} text NOT NULL,`,
+    `  ${quoteIdent("request_hash")} text NOT NULL,`,
+    `  ${quoteIdent("correlation_id")} text NOT NULL,`,
+    `  ${quoteIdent("causation_id")} text,`,
+    `  ${quoteIdent("status")} text NOT NULL DEFAULT 'executing',`,
+    `  ${quoteIdent("response")} jsonb,`,
+    `  ${quoteIdent("target_id")} uuid,`,
+    `  ${quoteIdent("action_audit_id")} bigint UNIQUE REFERENCES ${audit} (${quoteIdent("id")}),`,
+    `  ${quoteIdent("created_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),`,
+    `  ${quoteIdent("completed_at")} timestamptz,`,
+    `  CONSTRAINT ${quoteIdent("uq_command_receipt_identity")} UNIQUE (${quoteIdent("principal_id")}, ${quoteIdent("action_id")}, ${quoteIdent("idempotency_key")}),`,
+    `  CONSTRAINT ${quoteIdent("ck_command_receipt_hashes")} CHECK (${quoteIdent("source_hash")} ~ '^sha256:[0-9a-f]{64}$' AND ${quoteIdent("request_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_command_receipt_ids")} CHECK (${quoteIdent("idempotency_key")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ${quoteIdent("correlation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND (${quoteIdent("causation_id")} IS NULL OR ${quoteIdent("causation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),`,
+    `  CONSTRAINT ${quoteIdent("ck_command_receipt_completion")} CHECK (`,
+    `    (${quoteIdent("status")} = 'executing' AND ${quoteIdent("response")} IS NULL AND ${quoteIdent("target_id")} IS NULL AND ${quoteIdent("action_audit_id")} IS NULL AND ${quoteIdent("completed_at")} IS NULL)`,
+    `    OR (${quoteIdent("status")} = 'executed' AND ${quoteIdent("response")} IS NOT NULL AND ${quoteIdent("target_id")} IS NOT NULL AND ${quoteIdent("action_audit_id")} IS NOT NULL AND ${quoteIdent("completed_at")} IS NOT NULL)`,
+    "  )",
+    ");",
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("correlation_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("causation_id")} text;`,
+    `ALTER TABLE ${audit} ADD COLUMN IF NOT EXISTS ${quoteIdent("command_receipt_id")} bigint;`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS ${quoteIdent("uq_action_audit_command_receipt")} ON ${audit} (${quoteIdent("command_receipt_id")}) WHERE ${quoteIdent("command_receipt_id")} IS NOT NULL;`,
+    "DO $modellang$",
+    "BEGIN",
+    "  IF NOT EXISTS (",
+    "    SELECT 1 FROM pg_catalog.pg_constraint",
+    `    WHERE conrelid = '${audit}'::regclass AND conname = 'fk_action_audit_command_receipt'`,
+    "  ) THEN",
+    `    ALTER TABLE ${audit} ADD CONSTRAINT ${quoteIdent("fk_action_audit_command_receipt")} FOREIGN KEY (${quoteIdent("command_receipt_id")}) REFERENCES ${receipts} (${quoteIdent("id")});`,
+    "  END IF;",
+    "  IF NOT EXISTS (",
+    "    SELECT 1 FROM pg_catalog.pg_constraint",
+    `    WHERE conrelid = '${audit}'::regclass AND conname = 'ck_action_audit_command_metadata'`,
+    "  ) THEN",
+    `    ALTER TABLE ${audit} ADD CONSTRAINT ${quoteIdent("ck_action_audit_command_metadata")} CHECK (`,
+    `      (${quoteIdent("correlation_id")} IS NULL AND ${quoteIdent("causation_id")} IS NULL AND ${quoteIdent("command_receipt_id")} IS NULL)`,
+    `      OR (${quoteIdent("correlation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND (${quoteIdent("causation_id")} IS NULL OR ${quoteIdent("causation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'))`,
+    "    );",
+    "  END IF;",
+    "END",
+    "$modellang$;",
+  ];
+}
+
 function generateSchema(ir: ModelIR): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
@@ -590,6 +647,7 @@ function generateSchema(ir: ModelIR): string {
     "",
     ...generateGatewayInfrastructureStatements(ir),
     ...generateDecisionEvidenceInfrastructureStatements(ir),
+    ...generateCommandReceiptInfrastructureStatements(ir),
     "",
     `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -630,6 +688,13 @@ function decisionFunctionSignature(ir: ModelIR, action: IRAction): string {
 function revisionInputSql(parameter: IRParameter, value: string): string {
   if (parameter.type.startsWith("set:enum:")) {
     return `pg_catalog.to_jsonb(ARRAY(SELECT member FROM pg_catalog.unnest(${value}) AS member ORDER BY member))`;
+  }
+  if (isMoneyType(parameter.type)) {
+    const profile = moneyProfileFromType(parameter.type)!;
+    return `pg_catalog.to_jsonb((${value})::numeric(${profile.precision}, ${profile.scale}))`;
+  }
+  if (parameter.type === "Decimal") {
+    return `pg_catalog.to_jsonb(pg_catalog.trim_scale(${value}))`;
   }
   return `pg_catalog.to_jsonb(${value})`;
 }
@@ -707,11 +772,29 @@ function decisionEvidenceSql(ir: ModelIR, action: IRAction, decision: ActionDeci
   const requirements = decision.preconditions.map((rule) =>
     `pg_catalog.jsonb_build_object('ruleId', '${rule.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array(${rule.policyIds.map((id) => `'${id.replaceAll("'", "''")}'`).join(", ")}))`);
   return `pg_catalog.jsonb_build_object(`
-    + `'version', 1, 'outcome', 'executed', `
+    + `'version', 2, 'outcome', 'executed', `
     + `'model', pg_catalog.jsonb_build_object('id', '${ir.model.id.replaceAll("'", "''")}', 'version', '${ir.model.version.replaceAll("'", "''")}', 'sourceHash', '${ir.model.sourceHash.replaceAll("'", "''")}'), `
     + `'actionId', '${action.id.replaceAll("'", "''")}', `
+    + `'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), `
     + `'authorization', pg_catalog.jsonb_build_object('ruleId', '${decision.authorization.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), `
     + `'requirements', pg_catalog.jsonb_build_array(${requirements.join(", ")}))`;
+}
+
+function commandRequestJsonSql(action: IRAction, callable: IRParameter[]): string {
+  const inputs = callable.flatMap((parameter) => [
+    `'${parameter.id.replaceAll("'", "''")}'`,
+    revisionInputSql(parameter, quoteIdent(parameter.naming.sqlParameter)),
+  ]);
+  return `pg_catalog.jsonb_build_object(`
+    + `'actionId', '${action.id.replaceAll("'", "''")}', `
+    + `'inputs', pg_catalog.jsonb_build_object(${inputs.join(", ")}), `
+    + `'expectedRevision', v_expected_revision, `
+    + `'correlationId', v_correlation_id, `
+    + `'causationId', v_causation_id)`;
+}
+
+function commandRequestHashSql(action: IRAction, callable: IRParameter[]): string {
+  return `'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((${commandRequestJsonSql(action, callable)})::text, 'UTF8')), 'hex')`;
 }
 
 function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionPlan): string {
@@ -731,6 +814,17 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     "  v_identity_subject text;",
     "  v_revision text;",
     "  v_expected_revision text;",
+    "  v_idempotency_key text;",
+    "  v_correlation_id text;",
+    "  v_causation_id text;",
+    "  v_request_hash text;",
+    "  v_receipt_source_hash text;",
+    "  v_receipt_request_hash text;",
+    "  v_receipt_status text;",
+    "  v_receipt_id bigint;",
+    "  v_action_audit_id bigint;",
+    "  v_receipt_response jsonb;",
+    "  v_response jsonb;",
     "  v_authority_policy_id text;",
     "  v_authority_id text;",
     `  v_result ${qname(schema, returnEntity.naming.sqlTable)}%ROWTYPE;`,
@@ -745,9 +839,68 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     "  INTO v_principal_id, v_identity_issuer, v_identity_subject",
     `  FROM ${qname(internal, "resolve_principal")}() AS identity;`,
     "",
+    `  v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');`,
+    `  v_idempotency_key := NULLIF(pg_catalog.current_setting('modellang.idempotency_key', true), '');`,
+    `  v_correlation_id := NULLIF(pg_catalog.current_setting('modellang.correlation_id', true), '');`,
+    `  v_causation_id := NULLIF(pg_catalog.current_setting('modellang.causation_id', true), '');`,
+    `  PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);`,
+    `  PERFORM pg_catalog.set_config('modellang.idempotency_key', '', true);`,
+    `  PERFORM pg_catalog.set_config('modellang.correlation_id', '', true);`,
+    `  PERFORM pg_catalog.set_config('modellang.causation_id', '', true);`,
+    "",
   ];
+  if (action.idempotency) {
+    body.push(
+      "  IF v_idempotency_key IS NULL THEN",
+      `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_IDEMPOTENCY_REQUIRED:idempotency:${action.id}';`,
+      "  END IF;",
+      "  v_correlation_id := COALESCE(v_correlation_id, v_idempotency_key);",
+      "",
+    );
+  } else {
+    body.push(
+      "  IF v_idempotency_key IS NOT NULL THEN",
+      `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_IDEMPOTENCY_UNSUPPORTED:idempotency:${action.id}';`,
+      "  END IF;",
+      "  v_correlation_id := COALESCE(v_correlation_id, pg_catalog.gen_random_uuid()::text);",
+      "",
+    );
+  }
+  body.push(
+    "  IF v_correlation_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'",
+    "     OR (v_causation_id IS NOT NULL AND v_causation_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')",
+    ...(action.idempotency ? ["     OR v_idempotency_key !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'"] : []),
+    "  THEN",
+    `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:idempotency:${action.id}';`,
+    "  END IF;",
+    "",
+  );
   for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
     body.push(...moneyParameterValidation(parameter));
+  }
+  if (action.idempotency) {
+    body.push(
+      `  v_request_hash := ${commandRequestHashSql(action, callable)};`,
+      `  INSERT INTO ${qname(internal, "command_receipt")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("action_id")}, ${quoteIdent("principal_id")}, ${quoteIdent("idempotency_key")}, ${quoteIdent("request_hash")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")})`,
+      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${action.id.replaceAll("'", "''")}', v_principal_id, v_idempotency_key, v_request_hash, v_correlation_id, v_causation_id)`,
+      `  ON CONFLICT (${quoteIdent("principal_id")}, ${quoteIdent("action_id")}, ${quoteIdent("idempotency_key")}) DO NOTHING`,
+      `  RETURNING ${quoteIdent("id")} INTO v_receipt_id;`,
+      "",
+      "  IF v_receipt_id IS NULL THEN",
+      `    SELECT ${quoteIdent("id")}, ${quoteIdent("source_hash")}, ${quoteIdent("request_hash")}, ${quoteIdent("status")}, ${quoteIdent("response")}`,
+      "    INTO v_receipt_id, v_receipt_source_hash, v_receipt_request_hash, v_receipt_status, v_receipt_response",
+      `    FROM ${qname(internal, "command_receipt")}`,
+      `    WHERE ${quoteIdent("principal_id")} = v_principal_id AND ${quoteIdent("action_id")} = '${action.id.replaceAll("'", "''")}' AND ${quoteIdent("idempotency_key")} = v_idempotency_key;`,
+      `    IF v_receipt_source_hash IS DISTINCT FROM '${ir.model.sourceHash.replaceAll("'", "''")}' OR v_receipt_request_hash IS DISTINCT FROM v_request_hash THEN`,
+      `      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_IDEMPOTENCY_CONFLICT:idempotency:${action.id}';`,
+      "    END IF;",
+      "    IF v_receipt_status IS DISTINCT FROM 'executed' OR v_receipt_response IS NULL THEN",
+      `      RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_IDEMPOTENCY_INCOMPLETE:idempotency:${action.id}';`,
+      "    END IF;",
+      "    RETURN v_receipt_response;",
+      "  END IF;",
+      "",
+    );
   }
   const lockGroups = new Map<string, typeof decision.entityLoads>();
   for (const load of decision.entityLoads) {
@@ -792,8 +945,6 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
   const context = { ir, action, recordNames };
   body.push(
     `  v_revision := ${revisionExpression(ir, action, decision, xminNames)};`,
-    `  v_expected_revision := NULLIF(pg_catalog.current_setting('modellang.expected_revision', true), '');`,
-    `  PERFORM pg_catalog.set_config('modellang.expected_revision', '', true);`,
     "",
     `  IF NOT ((${lowerExpression(decision.authorization.expression, context)}) IS TRUE) THEN`,
     `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${decision.authorization.id}';`,
@@ -852,11 +1003,22 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     );
   }
   body.push(
-    `  INSERT INTO ${qname(internal, "action_audit")} (${quoteIdent("action_id")}, ${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("identity_issuer")}, ${quoteIdent("identity_subject")}, ${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("authorization_rule_id")}, ${quoteIdent("decision_outcome")}, ${quoteIdent("policy_id")}, ${quoteIdent("authority_id")}, ${quoteIdent("decision_evidence")})`,
-    `  VALUES ('${action.id}', session_user, v_principal_id, v_result.${quoteIdent("id")}, v_identity_issuer, v_identity_subject, '${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${decision.authorization.id.replaceAll("'", "''")}', 'executed', v_authority_policy_id, v_authority_id, ${decisionEvidenceSql(ir, action, decision)});`,
+    `  v_response := ${rowJson(returnEntity, "v_result")};`,
+    `  INSERT INTO ${qname(internal, "action_audit")} (${quoteIdent("action_id")}, ${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("identity_issuer")}, ${quoteIdent("identity_subject")}, ${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("authorization_rule_id")}, ${quoteIdent("decision_outcome")}, ${quoteIdent("policy_id")}, ${quoteIdent("authority_id")}, ${quoteIdent("decision_evidence")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("command_receipt_id")})`,
+    `  VALUES ('${action.id}', session_user, v_principal_id, v_result.${quoteIdent("id")}, v_identity_issuer, v_identity_subject, '${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${decision.authorization.id.replaceAll("'", "''")}', 'executed', v_authority_policy_id, v_authority_id, ${decisionEvidenceSql(ir, action, decision)}, v_correlation_id, v_causation_id, v_receipt_id)`,
+    `  RETURNING ${quoteIdent("id")} INTO v_action_audit_id;`,
     "",
-    `  RETURN ${rowJson(returnEntity, "v_result")};`,
   );
+  if (action.idempotency) {
+    body.push(
+      `  UPDATE ${qname(internal, "command_receipt")}`,
+      `  SET ${quoteIdent("status")} = 'executed', ${quoteIdent("response")} = v_response, ${quoteIdent("target_id")} = v_result.${quoteIdent("id")},`,
+      `      ${quoteIdent("action_audit_id")} = v_action_audit_id, ${quoteIdent("completed_at")} = pg_catalog.transaction_timestamp()`,
+      `  WHERE ${quoteIdent("id")} = v_receipt_id;`,
+      "",
+    );
+  }
+  body.push("  RETURN v_response;");
   return `CREATE OR REPLACE FUNCTION ${qname(schema, action.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -1210,6 +1372,7 @@ $modellang_upgrade$;
 
 ${generateGatewayInfrastructureStatements(ir, false).join("\n")}
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
+${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 -- Existing guarded callables must resolve both direct and gateway identities.
@@ -1249,6 +1412,7 @@ END
 $modellang_upgrade$;
 ${generateSnapshotResolverStatements(ir).join("\n")}
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
+${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -1286,10 +1450,47 @@ BEGIN
 END
 $modellang_upgrade$;
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
+${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
 ${generateDecisions(ir, plan).trim()}
+${generateGrants(ir).trim()}
+COMMIT;
+`;
+}
+
+function generateReliableCommandUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.18 -> 0.19 reliable-command upgrade.
+-- Historical audit rows remain correlation- and receipt-unknown; new reliable commands write complete receipts.
+BEGIN;
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateActions(ir, plan).trim()}
 ${generateGrants(ir).trim()}
 COMMIT;
 `;
@@ -1307,5 +1508,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "006_upgrade_0_12.sql": generateGatewayUpgrade(ir, plan),
     "007_upgrade_0_17.sql": generateApplicabilityUpgrade(ir, plan),
     "008_upgrade_0_18.sql": generateDecisionEvidenceUpgrade(ir, plan),
+    "009_upgrade_0_19.sql": generateReliableCommandUpgrade(ir, plan),
   };
 }

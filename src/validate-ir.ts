@@ -20,3 +20,22 @@ export function validateIR(ir: ModelIR): void {
     throw new ModelError("E3002", `Canonical IR failed model-ir.schema.json validation: ${detail}`, internalSpan(), sourceFile);
   }
 }
+
+export function validateEvolutionIR(ir: ModelIR): void {
+  const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
+  const irVersion = Number(legacy.irVersion);
+  if (![9, 10, 11].includes(irVersion)) {
+    throw new ModelError(
+      "E3002",
+      `Evolution input must use released canonical IR9, IR10, or IR11; received '${String(legacy.irVersion)}'.`,
+      internalSpan(),
+      ir.model?.sourceFile,
+    );
+  }
+  const normalized = {
+    ...(ir as unknown as Record<string, unknown>),
+    irVersion: 11,
+    ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
+  } as unknown as ModelIR;
+  validateIR(normalized);
+}

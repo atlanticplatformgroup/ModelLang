@@ -1,0 +1,5 @@
+action_decl          = inherited_action_prefix, "{", "authorize", expression, ";",
+                       { require_decl }, [ idempotency_decl ], effect, "}" ;
+idempotency_decl     = "idempotency", "required", ";" ;
+
+All productions not replaced above are inherited from the ModelLang 0.18 grammar chain.

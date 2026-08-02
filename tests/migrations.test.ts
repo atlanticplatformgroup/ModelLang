@@ -4,7 +4,7 @@ import { compileText } from "../src/compiler.js";
 import { ModelError } from "../src/diagnostics.js";
 import { planMigration } from "../src/migrations.js";
 import { assignStableIds, type StableIdKind } from "../src/stable-ids.js";
-import { validateIR } from "../src/validate-ir.js";
+import { validateEvolutionIR, validateIR } from "../src/validate-ir.js";
 
 const entityUser = "ent_11111111111111111111111111111111";
 const entityPurchase = "ent_22222222222222222222222222222222";
@@ -237,7 +237,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "invariant", "exclusion", "action", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(10);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(11);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -330,19 +330,30 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
-  it("accepts a released IR9 artifact as the previous baseline for an IR10 migration", () => {
+  it("accepts released IR9 and IR10 artifacts as previous baselines for an IR11 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
-    const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
-    legacy.irVersion = 9;
-    delete legacy.policies;
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
+    for (const irVersion of [9, 10]) {
+      const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
+      legacy.irVersion = irVersion;
+      if (irVersion === 9) delete legacy.policies;
+      expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
+      const plan = planMigration(legacy as unknown as typeof previous, current);
+      expect(plan.previousVersion).toBe("1.0.0");
+      expect(plan.currentVersion).toBe("2.0.0");
+      expect(plan.operations).toContainEqual(expect.objectContaining({ kind: "addEntity" }));
+      expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
+      expect(plan.sql).toContain("command_receipt");
+    }
+  });
 
-    const plan = planMigration(legacy as unknown as typeof previous, current);
-
-    expect(plan.previousVersion).toBe("1.0.0");
-    expect(plan.currentVersion).toBe("2.0.0");
-    expect(plan.operations).toContainEqual(expect.objectContaining({ kind: "addEntity" }));
-    expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
+  it("refuses an existing action idempotency change on the automatic-safe path", () => {
+    const previous = compileText(renameModel({ version: "1" }), "previous.model");
+    const current = compileText(
+      renameModel({ version: "2" }).replace("  authorize true;", "  authorize true;\n  idempotency required;"),
+      "current.model",
+    );
+    expect(error(() => planMigration(previous, current)).code).toBe("E2807");
   });
 
   it("plans enum, entity, field, callable, and workflow additions as one guarded transaction", () => {

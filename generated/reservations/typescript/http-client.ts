@@ -20,7 +20,7 @@ export class ReservationsHttpClient {
     this.fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   }
 
-  private async call<Result>(path: string, input: unknown, expectedRevision?: string): Promise<Result> {
+  private async call<Result>(path: string, input: unknown, options: ExecutionOptions = {}): Promise<Result> {
     const token = await this.options.accessToken();
     if (!token) throw new AuthenticationError("HTTP authentication is required", "ML_AUTHENTICATION");
     const response = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -28,7 +28,10 @@ export class ReservationsHttpClient {
       headers: {
         ...this.options.headers,
         authorization: `Bearer ${token}`,
-        ...(expectedRevision ? { "if-match": `"${expectedRevision}"` } : {}),
+        ...(options.expectedRevision ? { "if-match": `"${options.expectedRevision}"` } : {}),
+        ...(options.idempotencyKey ? { "idempotency-key": options.idempotencyKey } : {}),
+        ...(options.correlationId ? { "x-correlation-id": options.correlationId } : {}),
+        ...(options.causationId ? { "x-causation-id": options.causationId } : {}),
         "content-type": "application/json",
         accept: "application/json, application/problem+json",
       },
@@ -42,7 +45,7 @@ export class ReservationsHttpClient {
   }
 
   async reserve(input: ReserveInput, options: ExecutionOptions = {}): Promise<Reservation> {
-    return this.call("/operations/actions/act_508ad810a19d4b79a5009871de5cd26b", input, options.expectedRevision);
+    return this.call("/operations/actions/act_508ad810a19d4b79a5009871de5cd26b", input, options);
   }
 
   async reservationsForResource(input: ReservationsForResourceInput): Promise<Reservation[]> {
@@ -50,6 +53,6 @@ export class ReservationsHttpClient {
   }
 
   async assessReserve(input: ReserveInput, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
-    return this.call("/operations/actions/act_508ad810a19d4b79a5009871de5cd26b/applicability", input, options.expectedRevision);
+    return this.call("/operations/actions/act_508ad810a19d4b79a5009871de5cd26b/applicability", input, { expectedRevision: options.expectedRevision });
   }
 }

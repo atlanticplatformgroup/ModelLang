@@ -10,15 +10,16 @@
 
 ## Implementation Status
 
-This repository edition distinguishes the architectural target from the released reference implementation. ModelLang 0.18 is a working implementation of a bounded transactional subset of the proposal. It is not yet a conforming implementation of the complete SML-Core profile in Appendix B and does not claim the SML-Agent or SML-Federation profiles.
+This repository edition distinguishes the architectural target from the released reference implementation. ModelLang 0.19 is a working implementation of a bounded transactional subset of the proposal. It is not yet a conforming implementation of the complete SML-Core profile in Appendix B and does not claim the SML-Agent or SML-Federation profiles.
 
-| Capability | ModelLang 0.18 status |
+| Capability | ModelLang 0.19 status |
 |---|---|
 | Textual domain source, typed IR, stable declaration identity, invariants, actions, authorization, preconditions, queries, and workflows | Implemented |
 | PostgreSQL enforcement, guarded automatic-safe and explicitly reviewed migrations, authenticated HTTP, typed clients and errors, framework-neutral UI metadata | Implemented for a bounded PostgreSQL-first profile |
 | Engineering semantic manifest with policies, coverage, rules, dependencies, read sets, locks, effects, postconditions, workflows, failures, and source spans | Implemented |
 | Deterministic artifact-provenance catalog and stable-ID-aware semantic change report | Implemented |
 | First-class reusable policy declarations and private transactional decision evidence | Implemented for closed Boolean policies and exact action authority |
+| Principal-scoped reliable commands with canonical fingerprints, committed-result replay, and private receipts | Implemented for PostgreSQL-local action effects |
 | Authored semantic presentation hints, events, and typed external operations | Partial or proposed |
 | Filtered public capability contract and authenticated, side-effect-free action applicability from one enforcement decision plan | Implemented for the bounded PostgreSQL-first profile |
 | General authorization-filtered resource views, full decision traces, delegated capabilities, and agent planning | Proposed; not implemented |
@@ -29,15 +30,15 @@ The implementation has several independent version axes:
 
 | Axis | Current value | Meaning |
 |---|---|---|
-| Compiler release | 0.18.0 | Toolchain and generated-artifact release |
-| Canonical IR | IR10 | Typed backend boundary with reusable policy identity and calls; IR9 remains an evolution baseline |
-| Example source models | Procurement 0.11.0; Reservations 0.10.0 | Domain-model evolution versions, independent of compiler release |
-| Operation manifest | v2 | Static transport-neutral public operation contract |
-| UI manifest | v2 | Static framework-neutral presentation contract |
+| Compiler release | 0.19.0 | Toolchain and generated-artifact release |
+| Canonical IR | IR11 | Typed backend boundary with reusable policy identity, reliable-command intent, and canonical fingerprint semantics; IR9 and IR10 remain evolution baselines |
+| Example source models | Procurement 0.12.0; Reservations 0.11.0 | Domain-model evolution versions, independent of compiler release |
+| Operation manifest | v3 | Static transport-neutral public operation and reliability contract |
+| UI manifest | v3 | Static framework-neutral presentation and reliability contract |
 | Enforcement decision plan | v2 | Internal policy- and expression-bearing plan shared by applicability and execution |
-| Public capability manifest | v1 | Filtered, expression-free action-applicability contract that grants no authority |
-| Engineering semantic manifest | v2 | Full static semantic closure plus policy use and coverage for trusted engineering consumers |
-| Semantic diff | v3 | Stable-ID policy-aware change analysis that names separate guarded migration authorities |
+| Public capability manifest | v2 | Filtered, expression-free action-applicability and static reliability contract that grants no authority |
+| Engineering semantic manifest | v3 | Full static semantic closure plus policy/reliability use and coverage for trusted engineering consumers |
+| Semantic diff | v4 | Stable-ID policy- and reliability-aware change analysis that names separate guarded migration authorities |
 | Reviewed migration plan and provenance | v1 | Independently versioned evolution-intent and build-assurance contracts |
 
 These distinctions are intentional. A compiler upgrade need not change a domain model, IR schema, HTTP contract, or UI schema.
@@ -46,7 +47,7 @@ These distinctions are intentional. A compiler upgrade need not change a domain 
 
 Software architecture commonly treats the database, service layer, API, user interface, policy engine, tests, documentation, and agent tools as separate concerns. Each artifact contains a partial restatement of the same domain. A purchase-approval threshold, for example, may appear in backend conditionals, user-interface visibility rules, policy middleware, test fixtures, workflow diagrams, and prose. Because none of these representations is necessarily authoritative, application meaning becomes fragmented and must be reconstructed from implementation details.
 
-This paper proposes the **semantic model layer**: a versioned, typed, executable representation of a bounded application domain that defines concepts, stable identity, relationships, valid states, permitted transitions, policies, queries, events, effects, and presentation intent. The layer is architectural rather than necessarily a runtime service. A complete implementation could translate it into database schemas and migrations, backend handlers, API contracts, frontend metadata, policy checks, agent tools, tests, and documentation. The status table above identifies the smaller subset implemented by ModelLang 0.18.
+This paper proposes the **semantic model layer**: a versioned, typed, executable representation of a bounded application domain that defines concepts, stable identity, relationships, valid states, permitted transitions, policies, queries, events, effects, and presentation intent. The layer is architectural rather than necessarily a runtime service. A complete implementation could translate it into database schemas and migrations, backend handlers, API contracts, frontend metadata, policy checks, agent tools, tests, and documentation. The status table above identifies the smaller subset implemented by ModelLang 0.19.
 
 The proposal belongs to the lineage of Domain-Driven Design, model-driven engineering, ontology engineering, schema-first interfaces, policy as code, and semantic layers. It does not claim that a new syntax is intrinsically better for AI agents than every possible combination of OpenAPI, policy definitions, and state-machine specifications. A sufficiently integrated bundle of those artifacts could provide equivalent semantics. The architectural claim is that applications benefit from a **referentially closed, identity-preserving semantic representation** from which those partial contracts are generated or into which they are compiled.
 
@@ -790,7 +791,7 @@ A task-scoped model is semantically closed when it provides:
 
 This definition makes the agent claim testable. The question is no longer whether an agent “understands the business” in a general sense. The question is whether a task packet contains the declarations and current facts necessary to determine legal next actions and expected results.
 
-ModelLang 0.18 implements a deliberately narrower precursor to this closure. A filtered public capability manifest names action inputs and safe stable rule IDs without publishing compiler expressions, policy identities, or current state. A separate authenticated applicability endpoint evaluates current authorization, reusable policies, and preconditions from the same generated decision plan used by transactional execution. Authorization failure is `denied`, precondition failure is `notApplicable`, and missing or invisible referenced entities share the denial projection. Optional opaque revisions can report `stale` only when a caller explicitly asks for a comparison. Every public result declares that it grants no authority. Execution reloads, locks, and re-evaluates the plan, then privately records exact stable policy authority with action audit in the mutation transaction. This is an application-facing preflight contract plus internal audit evidence, not an agent task packet, public trace, delegated capability, or SML-Agent implementation.
+ModelLang 0.19 implements a deliberately narrower precursor to this closure. A filtered public capability manifest names action inputs, static reliability requirements, and safe stable rule IDs without publishing compiler expressions, policy identities, command instances, or current state. A separate authenticated applicability endpoint evaluates current authorization, reusable policies, and preconditions from the same generated decision plan used by transactional execution. Authorization failure is `denied`, precondition failure is `notApplicable`, and missing or invisible referenced entities share the denial projection. Optional opaque revisions can report `stale` only when a caller explicitly asks for a comparison. Every public result declares that it grants no authority. New execution reloads, locks, and re-evaluates the plan, then privately records exact stable policy authority with action audit in the mutation transaction; explicitly reliable actions also complete a principal-scoped receipt and stored result in that transaction. This is an application-facing preflight contract plus internal audit and retry evidence, not an agent task packet, public trace, delegated capability, or SML-Agent implementation.
 
 ## 8.4 An agent-facing compiled manifest
 
@@ -945,7 +946,7 @@ These outcomes should be measured rather than argued away.
 
 # 9. Evidence Status and Evaluation Program
 
-This document is a research proposal and architecture design. It does not present pilot results, production telemetry, controlled experiments, or longitudinal adoption data. ModelLang 0.18 provides two executable reference applications, deterministic generated golden artifacts, live PostgreSQL integration coverage, and more than 170 automated conformance tests. This establishes engineering feasibility for the implemented subset; it does not establish that the architecture improves software delivery.
+This document is a research proposal and architecture design. It does not present pilot results, production telemetry, controlled experiments, or longitudinal adoption data. ModelLang 0.19 provides two executable reference applications, deterministic generated golden artifacts, live PostgreSQL integration coverage, and more than 180 automated conformance tests. This establishes engineering feasibility for the implemented subset; it does not establish that the architecture improves software delivery.
 
 ## 9.1 Evidence classes
 
@@ -953,7 +954,7 @@ This document is a research proposal and architecture design. It does not presen
 |---|---|---|
 | Application meaning is repeated across technical artifacts | Observable in conventional architectures; supported indirectly by the existence of separate schema, policy, workflow, and interface standards | A motivating observation, not a quantified universal law |
 | Narrow, domain-specific, incremental MDE can succeed while whole-system and top-down efforts often struggle | Supported by prior empirical MDE research [13][14][15] | A historical constraint on the proposal |
-| Stable IDs, typed IR, reusable policies, exact decision evidence, source-linked enforcement, filtered applicability, semantic manifests, semantic diffs, reviewed evolution plans, provenance, and one-way generation are technically implementable | Implemented in the ModelLang 0.18 reference compiler and exercised by its conformance suite | An engineering feasibility claim, not a productivity claim |
+| Stable IDs, typed IR, reliable commands, reusable policies, exact decision evidence, source-linked enforcement, filtered applicability, semantic manifests, semantic diffs, reviewed evolution plans, provenance, and one-way generation are technically implementable | Implemented in the ModelLang 0.19 reference compiler and exercised by its conformance suite | An engineering feasibility claim, not a productivity claim |
 | A semantic model reduces drift, change amplification, or policy defects | Not yet measured for ModelLang | A testable hypothesis |
 | A semantic manifest improves agent planning beyond integrated existing specifications | Not yet measured | A comparative research question |
 | The declarative core remains adequate under production pressure | Unknown | The central long-term risk |
@@ -1894,7 +1895,7 @@ The case suggests diagnostics that could be useful without pretending to prove p
 
 These should generally be warnings with suppression mechanisms, not universal errors. A compiler can identify suspicious structural patterns; domain experts must decide whether the pattern is intentional.
 
-## A.5 Status in the 0.18 reference implementation
+## A.5 Status in the 0.19 reference implementation
 
 Appendix A intentionally preserves the 0.5.0 source reviewed in Section 7. It is a historical fixture, not the current Procurement model.
 
@@ -1910,8 +1911,9 @@ Appendix A intentionally preserves the 0.5.0 source reviewed in Section 7. It is
 | Correction could not propagate to an application boundary | HTTP, browser client, UI metadata, workflow helpers, and typed transport errors are generated across 0.11–0.14 |
 | Current action applicability required frontend inference | Fixed in 0.17 with authenticated side-effect-free decisions, safe stable-ID explanations, explicit opaque revisions, and transactional re-evaluation |
 | Audit captured every approver role instead of the authority used | Fixed in 0.18 execution evidence: manager and finance branch IDs are recorded exactly; the complete role set remains contextual snapshot data rather than the decision basis |
+| Retried creates could duplicate effects | Fixed in 0.19 for explicitly marked actions with private principal-scoped receipts, canonical fingerprints, serialized replay, and transactional rollback |
 
-ModelLang 0.18 retains the engineering semantic manifest, reviewed evolution artifact, filtered public capability manifest, and runtime applicability decisions. It adds private transactional execution evidence without widening the public projection. The engineering manifest remains trusted static analysis, the reviewed plan remains migration intent, applicability remains current advisory evidence that grants no execution authority, and durable audit evidence is not a capability token.
+ModelLang 0.19 retains the reviewed evolution artifact, filtered public capability manifest, runtime applicability decisions, and private transactional execution evidence. It adds reliable commands without publishing command instances or receipts. The engineering manifest remains trusted static analysis, the reviewed plan remains migration intent, applicability remains current advisory evidence that grants no execution authority, and durable audit or command evidence is not a capability token.
 
 # Appendix B. Minimal Conformance Profile
 
@@ -2011,9 +2013,9 @@ The following practices would violate the intent of the profile:
 - Claiming cross-context consistency through direct writes into another context's storage.
 - Requiring a proprietary visual editor to inspect or version the authoritative semantics.
 
-## B.5 ModelLang 0.18 conformance declaration
+## B.5 ModelLang 0.19 conformance declaration
 
-ModelLang 0.18 does not claim complete conformance with SML-Core. It substantially implements model and declaration identity for its current language, typed references and values, valid-state semantics, reusable closed policies, exact action authority evidence, action semantics, explicit workflows, operation-level and row-level query visibility, typed IR, deterministic diagnostics, PostgreSQL-oriented traceability, semantic change analysis, reviewed evolution intent, authenticated applicability, and conformance tests.
+ModelLang 0.19 does not claim complete conformance with SML-Core. It substantially implements model and declaration identity for its current language, typed references and values, valid-state semantics, reusable closed policies, reliable PostgreSQL-local commands, exact action authority evidence, action semantics, explicit workflows, operation-level and row-level query visibility, typed IR, deterministic diagnostics, PostgreSQL-oriented traceability, semantic change analysis, reviewed evolution intent, authenticated applicability, and conformance tests.
 
 The following SML-Core requirements remain partial or absent:
 
@@ -2023,7 +2025,7 @@ The following SML-Core requirements remain partial or absent:
 - Semantic change analysis classifies known changes but deliberately reports `review` when logical implication cannot be proven.
 - Target capability profiles and an extension ledger are not implemented.
 
-The engineering semantic manifest is not an SML-Agent implementation. It is unfiltered, static, and non-executable. The separate 0.18 public capability manifest remains v1, filtered, and backed by authenticated side-effect-free applicability, but it covers only declared actions and safe action-rule IDs. Private execution evidence is not published as a trace. ModelLang does not yet provide general resource views, public full decision traces, delegated capabilities, freshness lifetimes, idempotency, recovery semantics, agent task packets, or adversarial agent tests. No SML-Federation capabilities are implemented.
+The engineering semantic manifest is not an SML-Agent implementation. It is unfiltered, static, and non-executable. The separate 0.19 public capability manifest v2 is filtered and backed by authenticated side-effect-free applicability, but it covers only declared actions, static reliability requirements, and safe action-rule IDs. Private execution evidence and command receipts are not published as traces. ModelLang does not yet provide general resource views, public full decision traces, delegated capabilities, freshness lifetimes, recovery workflows, external-effect deduplication, agent task packets, or adversarial agent tests. No SML-Federation capabilities are implemented.
 
 # Appendix C. Proposed Evaluation Protocol
 

@@ -24,6 +24,7 @@ export type SemanticChangeArea =
   | "queryVisibility"
   | "lifecycle"
   | "effect"
+  | "executionReliability"
   | "persistence";
 
 export interface SemanticChange {
@@ -39,9 +40,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 3;
+  diffVersion: 4;
   compilerVersion: string;
-  irVersion: 10;
+  irVersion: 11;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -299,6 +300,16 @@ function compareActions(changes: SemanticChange[], previous: IRAction[], current
       explanation: "Action authority changed; only literal allow/deny changes are directionally classified automatically.",
     });
     comparePreconditions(changes, pair.previous, pair.current);
+    if (!same(pair.previous.idempotency, pair.current.idempotency)) addChange(changes, {
+      kind: "idempotencyChanged",
+      area: "executionReliability",
+      classification: "breaking",
+      subject: subject("action", pair.current),
+      before: text(pair.previous.idempotency ?? null),
+      after: text(pair.current.idempotency ?? null),
+      persistenceRisk: true,
+      explanation: "The action's retry, receipt, or replay contract changed.",
+    });
     if (!same(pair.previous.effect, pair.current.effect)) addChange(changes, {
       kind: "effectChanged",
       area: "effect",
@@ -486,7 +497,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 3,
+    diffVersion: 4,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

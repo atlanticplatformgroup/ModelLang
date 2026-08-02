@@ -24,9 +24,9 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-diff.schema.json" },
-    "diffVersion": { "const": 3 },
+    "diffVersion": { "const": 4 },
     "compilerVersion": { "type": "string" },
-    "irVersion": { "const": 10 },
+    "irVersion": { "const": 11 },
     "previous": { "$ref": "#/$defs/model" },
     "current": { "$ref": "#/$defs/model" },
     "changes": {
@@ -41,7 +41,7 @@
           "area": {
             "enum": [
               "identity", "structure", "validation", "authorization", "queryVisibility",
-              "lifecycle", "effect", "persistence"
+              "lifecycle", "effect", "executionReliability", "persistence"
             ]
           },
           "classification": { "$ref": "#/$defs/classification" },

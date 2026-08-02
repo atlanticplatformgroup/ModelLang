@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 2;
+  manifestVersion: 3;
   model: {
     id: string;
     name: string;
@@ -65,6 +65,7 @@ export type ManifestErrorKind =
   | "transition"
   | "invariant"
   | "conflict"
+  | "idempotency"
   | "notFound"
   | "validation";
 
@@ -85,6 +86,12 @@ export type ManifestOperation =
   | (ManifestOperationBase & {
       kind: "action";
       output: { entityId: string; cardinality: "one" };
+      reliability: {
+        idempotency: "required" | "unsupported";
+        scope: "authenticatedPrincipal";
+        replay: "storedResult" | "none";
+        fingerprint: "canonicalSha256" | "none";
+      };
     })
   | (ManifestOperationBase & {
       kind: "query";
@@ -153,6 +160,7 @@ function caller(operation: IRAction | IRQuery, ir: ModelIR): ManifestOperationBa
 
 function actionErrors(ir: ModelIR, action: IRAction): ManifestErrorKind[] {
   const errors: ManifestErrorKind[] = ["identityBinding", "authorization"];
+  if (action.idempotency) errors.push("idempotency");
   if (action.preconditions.length > 0) errors.push("precondition");
   if (action.parameters.some((parameter) => action.callableParameters.includes(parameter.id) && isMoneyType(parameter.type))) {
     errors.push("validation");
@@ -211,7 +219,7 @@ function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
 export function generateOperationManifest(ir: ModelIR): OperationManifest {
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 2,
+    manifestVersion: 3,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -255,6 +263,17 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         input: callableInput(action),
         caller: caller(action, ir),
         output: { entityId: action.returnEntityId, cardinality: "one" },
+        reliability: action.idempotency ? {
+          idempotency: "required",
+          scope: "authenticatedPrincipal",
+          replay: "storedResult",
+          fingerprint: "canonicalSha256",
+        } : {
+          idempotency: "unsupported",
+          scope: "authenticatedPrincipal",
+          replay: "none",
+          fingerprint: "none",
+        },
         errors: actionErrors(ir, action),
       })),
       ...ir.queries.map((query): ManifestOperation => ({

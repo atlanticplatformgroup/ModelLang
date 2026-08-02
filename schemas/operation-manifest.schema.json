@@ -77,6 +77,7 @@
           "transition",
           "invariant",
           "conflict",
+          "idempotency",
           "notFound",
           "validation"
         ]
@@ -84,7 +85,7 @@
     },
     "action": {
       "type": "object",
-      "required": ["id", "name", "kind", "input", "caller", "output", "errors"],
+      "required": ["id", "name", "kind", "input", "caller", "output", "reliability", "errors"],
       "properties": {
         "id": { "type": "string", "pattern": "^action:" },
         "name": { "type": "string" },
@@ -99,6 +100,27 @@
             "cardinality": { "const": "one" }
           },
           "additionalProperties": false
+        },
+        "reliability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["idempotency", "scope", "replay", "fingerprint"],
+          "properties": {
+            "idempotency": { "enum": ["required", "unsupported"] },
+            "scope": { "const": "authenticatedPrincipal" },
+            "replay": { "enum": ["storedResult", "none"] },
+            "fingerprint": { "enum": ["canonicalSha256", "none"] }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "idempotency": { "const": "required" } }, "required": ["idempotency"] },
+              "then": { "properties": { "replay": { "const": "storedResult" }, "fingerprint": { "const": "canonicalSha256" } } }
+            },
+            {
+              "if": { "properties": { "idempotency": { "const": "unsupported" } }, "required": ["idempotency"] },
+              "then": { "properties": { "replay": { "const": "none" }, "fingerprint": { "const": "none" } } }
+            }
+          ]
         },
         "errors": { "$ref": "#/$defs/errors" }
       },
@@ -178,7 +200,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 2 },
+    "manifestVersion": { "const": 3 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

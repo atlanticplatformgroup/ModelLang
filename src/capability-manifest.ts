@@ -1,10 +1,15 @@
 import type { DecisionPlan } from "./decision-plan.js";
 import type { OperationManifest } from "./operation-manifest.js";
 
+function actionIdempotency(operations: OperationManifest, operationId: string): "required" | "unsupported" {
+  const operation = operations.operations.find((candidate) => candidate.id === operationId);
+  return operation?.kind === "action" ? operation.reliability.idempotency : "unsupported";
+}
+
 export interface CapabilityManifest {
   $schema: "https://modellang.dev/schemas/capability-manifest.schema.json";
-  capabilityManifestVersion: 1;
-  operationManifestVersion: 2;
+  capabilityManifestVersion: 2;
+  operationManifestVersion: 3;
   model: { id: string; name: string; version: string; sourceHash: string };
   view: {
     audience: "application";
@@ -29,6 +34,11 @@ export interface CapabilityManifest {
       staleRequiresExpectedRevision: true;
       grantsAuthority: false;
     };
+    reliability: {
+      idempotency: "required" | "unsupported";
+      scope: "authenticatedPrincipal";
+      grantsAuthority: false;
+    };
   }[];
 }
 
@@ -38,7 +48,7 @@ export function generateCapabilityManifest(
 ): CapabilityManifest {
   return {
     $schema: "https://modellang.dev/schemas/capability-manifest.schema.json",
-    capabilityManifestVersion: 1,
+    capabilityManifestVersion: 2,
     operationManifestVersion: operations.manifestVersion,
     model: { ...operations.model },
     view: {
@@ -62,6 +72,11 @@ export function generateCapabilityManifest(
       revision: {
         kind: "opaque",
         staleRequiresExpectedRevision: true,
+        grantsAuthority: false,
+      },
+      reliability: {
+        idempotency: actionIdempotency(operations, decision.operationId),
+        scope: "authenticatedPrincipal",
         grantsAuthority: false,
       },
     })),

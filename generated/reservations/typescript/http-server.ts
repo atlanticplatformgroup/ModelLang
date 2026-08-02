@@ -5,6 +5,7 @@ import {
   AuthenticationError,
   AuthorizationError,
   ConflictError,
+  IdempotencyConflictError,
   IdentityBindingError,
   InvariantError,
   ModelOperationError,
@@ -34,6 +35,8 @@ interface OperationDefinition {
   endpoint: "execution" | "applicability";
   input: readonly { name: string; type: RuntimeValueType }[];
   output: { entityId: string; cardinality: "one" | "many"; maxItems?: number };
+  action: boolean;
+  idempotency: "required" | "unsupported";
 }
 
 const operationDefinitions = [
@@ -70,7 +73,9 @@ const operationDefinitions = [
     "output": {
       "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "cardinality": "one"
-    }
+    },
+    "action": true,
+    "idempotency": "required"
   },
   {
     "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
@@ -90,7 +95,9 @@ const operationDefinitions = [
       "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "cardinality": "many",
       "maxItems": 100
-    }
+    },
+    "action": false,
+    "idempotency": "unsupported"
   },
   {
     "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
@@ -125,7 +132,9 @@ const operationDefinitions = [
     "output": {
       "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "cardinality": "one"
-    }
+    },
+    "action": true,
+    "idempotency": "unsupported"
   }
 ] as unknown as readonly OperationDefinition[];
 const enumValues = {} as Readonly<Record<string, readonly string[]>>;
@@ -361,6 +370,37 @@ function expectedRevision(request: Request): string | undefined {
   return match[1];
 }
 
+const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
+function executionOptions(
+  request: Request,
+  definition: OperationDefinition,
+  revision: string | undefined,
+): ExecutionOptions {
+  const idempotencyKey = request.headers.get("idempotency-key") ?? undefined;
+  const suppliedCorrelationId = request.headers.get("x-correlation-id") ?? undefined;
+  const causationId = request.headers.get("x-causation-id") ?? undefined;
+  if (definition.endpoint !== "execution" || !definition.action) {
+    if (idempotencyKey || suppliedCorrelationId || causationId) {
+      throw new ValidationError("Command metadata is not accepted by this endpoint", "ML_IDEMPOTENCY_UNSUPPORTED", `idempotency:${definition.id}`);
+    }
+    return { expectedRevision: revision };
+  }
+  if (definition.idempotency === "required" && !idempotencyKey) {
+    throw new ValidationError("An Idempotency-Key header is required", "ML_IDEMPOTENCY_REQUIRED", `idempotency:${definition.id}`);
+  }
+  if (definition.idempotency === "unsupported" && idempotencyKey) {
+    throw new ValidationError("This action does not support Idempotency-Key", "ML_IDEMPOTENCY_UNSUPPORTED", `idempotency:${definition.id}`);
+  }
+  const correlationId = suppliedCorrelationId
+    ?? (definition.idempotency === "required" ? idempotencyKey : globalThis.crypto.randomUUID());
+  if ((idempotencyKey && !commandMetadataPattern.test(idempotencyKey))
+    || (correlationId && !commandMetadataPattern.test(correlationId))
+    || (causationId && !commandMetadataPattern.test(causationId))) {
+    throw new ValidationError("Command metadata is invalid", "ML_VALIDATION", `idempotency:${definition.id}`);
+  }
+  return { expectedRevision: revision, idempotencyKey, correlationId, causationId };
+}
+
 function validateDecision(definition: OperationDefinition, value: unknown): ApplicabilityDecision {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`Applicability executor returned an invalid decision for '${definition.id}'`);
@@ -392,7 +432,7 @@ function validateDecision(definition: OperationDefinition, value: unknown): Appl
 }
 
 function normalizedRuleId(error: ModelOperationError): string | undefined {
-  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion):/.test(error.ruleId)
+  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency):/.test(error.ruleId)
     ? error.ruleId
     : undefined;
 }
@@ -420,6 +460,8 @@ function problem(error: unknown): { status: number; body: Record<string, unknown
     status = 409; kind = "transition"; title = "The workflow transition is not legal."; code = "ML_WORKFLOW";
   } else if (error instanceof StaleError) {
     status = 409; kind = "stale"; title = "The expected revision is stale."; code = "ML_STALE";
+  } else if (error instanceof IdempotencyConflictError) {
+    status = 409; kind = "idempotency-conflict"; title = "The idempotency key conflicts with an earlier command."; code = "ML_IDEMPOTENCY_CONFLICT";
   } else if (error instanceof ConflictError) {
     status = 409; kind = "conflict"; title = "The operation conflicts with current state."; code = "ML_CONFLICT";
   } else if (error instanceof NotFoundError) {
@@ -497,10 +539,11 @@ export function createReservationsHttpHandler(
       if (!executor) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
       const input = validateInput(definition, await readJson(request, maxBodyBytes));
       const revision = expectedRevision(request);
+      const command = executionOptions(request, definition, revision);
       if (definition.endpoint === "applicability") {
         const decision = validateDecision(
           definition,
-          await executor.assess(definition.id as ReservationsActionOperationId, input, { expectedRevision: revision }),
+          await executor.assess(definition.id as ReservationsActionOperationId, input, { expectedRevision: command.expectedRevision }),
         );
         return Response.json(decision, {
           status: 200,
@@ -510,9 +553,15 @@ export function createReservationsHttpHandler(
           },
         });
       }
-      const result = await executor.execute(definition.id, input, { expectedRevision: revision });
+      const result = await executor.execute(definition.id, input, command);
       validateOutput(definition, result);
-      return Response.json(result, { status: 200, headers: { "content-type": "application/json" } });
+      return Response.json(result, {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+          ...(definition.action && command.correlationId ? { "x-correlation-id": command.correlationId } : {}),
+        },
+      });
     } catch (error) {
       return problemResponse(error);
     }

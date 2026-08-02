@@ -1,4 +1,4 @@
-model Procurement version "0.11.0";
+model Procurement version "0.12.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -76,6 +76,7 @@ action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
     or Role.MANAGER in actor.roles
     or Role.FINANCE in actor.roles;
   require positive_amount: amount > USD 0;
+  idempotency required;
 
   create PurchaseRequest {
     requester = actor;

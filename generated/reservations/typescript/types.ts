@@ -10,7 +10,12 @@ export interface ApplicabilityDecision {
   readonly revision?: string;
   readonly explanation?: { readonly kind: ApplicabilityExplanationKind; readonly ruleId: string };
 }
-export interface ExecutionOptions { readonly expectedRevision?: string; }
+export interface ExecutionOptions {
+  readonly expectedRevision?: string;
+  readonly idempotencyKey?: string;
+  readonly correlationId?: string;
+  readonly causationId?: string;
+}
 export interface ApplicabilityOptions { readonly expectedRevision?: string; }
 
 export interface User {

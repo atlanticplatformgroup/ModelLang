@@ -39,8 +39,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 2;
-  profile: "sml-transactional-core/2";
+  manifestVersion: 3;
+  profile: "sml-transactional-core/3";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -49,7 +49,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 10;
+    irVersion: 11;
     generator: "semantic-manifest";
   };
   model: {
@@ -108,6 +108,13 @@ export interface SemanticAction {
     temporalExclusionIds: string[];
   };
   workflowTransitionIds: string[];
+  reliability: {
+    idempotency: "required" | "unsupported";
+    scope: "authenticatedPrincipal";
+    replay: "storedResult" | "none";
+    durableReceipt: boolean;
+    correlation: true;
+  };
   failureClasses: ManifestErrorKind[];
 }
 
@@ -281,6 +288,19 @@ function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction)
     workflowTransitionIds: ir.workflows.flatMap((workflow) => workflow.transitions)
       .filter((transition) => transition.actionId === action.id)
       .map((transition) => transition.id),
+    reliability: action.idempotency ? {
+      idempotency: "required",
+      scope: "authenticatedPrincipal",
+      replay: "storedResult",
+      durableReceipt: true,
+      correlation: true,
+    } : {
+      idempotency: "unsupported",
+      scope: "authenticatedPrincipal",
+      replay: "none",
+      durableReceipt: false,
+      correlation: true,
+    },
     failureClasses: operation.errors,
   };
 }
@@ -322,7 +342,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 2,
+    manifestVersion: 3,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

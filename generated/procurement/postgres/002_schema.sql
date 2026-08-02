@@ -1,4 +1,4 @@
--- source sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615
+-- source sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -250,6 +250,54 @@ BEGIN
   END IF;
 END
 $modellang$;
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."command_receipt" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "model_id" text NOT NULL,
+  "model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "action_id" text NOT NULL,
+  "principal_id" uuid NOT NULL,
+  "idempotency_key" text NOT NULL,
+  "request_hash" text NOT NULL,
+  "correlation_id" text NOT NULL,
+  "causation_id" text,
+  "status" text NOT NULL DEFAULT 'executing',
+  "response" jsonb,
+  "target_id" uuid,
+  "action_audit_id" bigint UNIQUE REFERENCES "model_procurement_internal"."action_audit" ("id"),
+  "created_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  "completed_at" timestamptz,
+  CONSTRAINT "uq_command_receipt_identity" UNIQUE ("principal_id", "action_id", "idempotency_key"),
+  CONSTRAINT "ck_command_receipt_hashes" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$' AND "request_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_command_receipt_ids" CHECK ("idempotency_key" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND "correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),
+  CONSTRAINT "ck_command_receipt_completion" CHECK (
+    ("status" = 'executing' AND "response" IS NULL AND "target_id" IS NULL AND "action_audit_id" IS NULL AND "completed_at" IS NULL)
+    OR ("status" = 'executed' AND "response" IS NOT NULL AND "target_id" IS NOT NULL AND "action_audit_id" IS NOT NULL AND "completed_at" IS NOT NULL)
+  )
+);
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "correlation_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "causation_id" text;
+ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "command_receipt_id" bigint;
+CREATE UNIQUE INDEX IF NOT EXISTS "uq_action_audit_command_receipt" ON "model_procurement_internal"."action_audit" ("command_receipt_id") WHERE "command_receipt_id" IS NOT NULL;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass AND conname = 'fk_action_audit_command_receipt'
+  ) THEN
+    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "fk_action_audit_command_receipt" FOREIGN KEY ("command_receipt_id") REFERENCES "model_procurement_internal"."command_receipt" ("id");
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_constraint
+    WHERE conrelid = '"model_procurement_internal"."action_audit"'::regclass AND conname = 'ck_action_audit_command_metadata'
+  ) THEN
+    ALTER TABLE "model_procurement_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_command_metadata" CHECK (
+      ("correlation_id" IS NULL AND "causation_id" IS NULL AND "command_receipt_id" IS NULL)
+      OR ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'))
+    );
+  END IF;
+END
+$modellang$;
 
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -266,6 +314,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.11.0', 'sha256:a32224b056c7d22afb6d9f612816c32c6294b9188a496a54e990f96e08c91615', 'installation');
+VALUES ('model:Procurement', '0.12.0', 'sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad', 'installation');
 RESET ROLE;
 

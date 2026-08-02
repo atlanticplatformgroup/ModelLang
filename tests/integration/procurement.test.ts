@@ -17,7 +17,8 @@ import {
   ProcurementUiManifest,
 } from "../../generated/procurement/typescript/ui.js";
 import {
-  AuthenticationError, AuthorizationError, IdentityBindingError, PreconditionError, StaleError, ValidationError,
+  AuthenticationError, AuthorizationError, IdempotencyConflictError, IdentityBindingError, PreconditionError,
+  StaleError, ValidationError,
 } from "../../generated/procurement/typescript/errors.js";
 import {
   databaseUrl, installDemoDatabase, loginUrl, poolFor,
@@ -36,6 +37,12 @@ let gateway: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
+}
+
+let commandSequence = 0;
+function commandOptions(label = "test"): { idempotencyKey: string } {
+  commandSequence += 1;
+  return { idempotencyKey: `${label}-${commandSequence}` };
 }
 
 async function withHttpServer(
@@ -102,7 +109,7 @@ afterAll(async () => {
 });
 
 async function submittedRequest(amount: string): Promise<string> {
-  const opened = await clients.employeeOne.openRequest({ amount: usd(amount) });
+  const opened = await clients.employeeOne.openRequest({ amount: usd(amount) }, commandOptions("submitted"));
   await clients.employeeOne.submitRequest({ request: opened.id });
   return opened.id;
 }
@@ -123,8 +130,8 @@ async function waitUntilLockWaiting(pids: number[], timeoutMs = 5_000): Promise<
 
 describe.sequential("PostgreSQL enforcement boundary", () => {
   it("allows the procurement workflow and rejects invalid actors and transitions", async () => {
-    await expect(clients.employeeOne.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
-    const opened = await clients.employeeOne.openRequest({ amount: usd("5000") });
+    await expect(clients.employeeOne.openRequest({ amount: usd("0") }, commandOptions())).rejects.toBeInstanceOf(PreconditionError);
+    const opened = await clients.employeeOne.openRequest({ amount: usd("5000") }, commandOptions());
     const low = opened.id;
     expect(opened).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000001",
@@ -173,7 +180,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.11.0",
+      model_version: "0.12.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -191,11 +198,121 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       },
     });
 
-    const managerRequest = await clients.manager.openRequest({ amount: usd("25") });
+    const managerRequest = await clients.manager.openRequest({ amount: usd("25") }, commandOptions());
     expect(managerRequest).toMatchObject({
       requester: "00000000-0000-4000-8000-000000000003",
     });
     expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest.id)).toBe(true);
+  });
+
+  it("replays reliable commands exactly once and keeps receipts private and linked", async () => {
+    const idempotencyKey = `replay-${randomUUID()}`;
+    const options = {
+      idempotencyKey,
+      correlationId: `correlation-${randomUUID()}`,
+      causationId: `causation-${randomUUID()}`,
+    };
+    const first = await clients.employeeOne.openRequest({ amount: usd("41") }, options);
+    const replay = await clients.employeeOne.openRequest({ amount: usd("41.00") }, options);
+    expect(replay).toEqual(first);
+
+    const receipt = await admin.query<{
+      status: string;
+      response: unknown;
+      target_id: string;
+      correlation_id: string;
+      causation_id: string;
+      action_audit_id: string;
+      audit_receipt_id: string;
+      evidence_receipt_id: string;
+    }>(`
+      SELECT receipt.status, receipt.response, receipt.target_id, receipt.correlation_id,
+             receipt.causation_id, receipt.action_audit_id::text,
+             audit.command_receipt_id::text AS audit_receipt_id,
+             audit.decision_evidence->'command'->>'receiptId' AS evidence_receipt_id
+      FROM model_procurement_internal.command_receipt AS receipt
+      JOIN model_procurement_internal.action_audit AS audit ON audit.id = receipt.action_audit_id
+      WHERE receipt.principal_id = '00000000-0000-4000-8000-000000000001'
+        AND receipt.action_id = 'action:act_1e35db0451b1461e941af6283d86dca2'
+        AND receipt.idempotency_key = $1
+    `, [idempotencyKey]);
+    expect(receipt.rows).toHaveLength(1);
+    expect(receipt.rows[0]).toMatchObject({
+      status: "executed",
+      response: first,
+      target_id: first.id,
+      correlation_id: options.correlationId,
+      causation_id: options.causationId,
+      audit_receipt_id: receipt.rows[0]!.evidence_receipt_id,
+    });
+    expect(receipt.rows[0]!.action_audit_id).toBeTruthy();
+  });
+
+  it("rejects changed retry inputs without disclosing the stored result", async () => {
+    const idempotencyKey = `conflict-${randomUUID()}`;
+    const correlationId = `correlation-${randomUUID()}`;
+    const first = await clients.employeeOne.openRequest(
+      { amount: usd("42") },
+      { idempotencyKey, correlationId },
+    );
+    const conflict = await clients.employeeOne.openRequest(
+      { amount: usd("43") },
+      { idempotencyKey, correlationId },
+    ).catch((caught: unknown) => caught);
+    expect(conflict).toBeInstanceOf(IdempotencyConflictError);
+    expect(conflict).toMatchObject({ code: "40001" });
+    expect(JSON.stringify(conflict)).not.toContain(first.id);
+
+    await admin.query(
+      `UPDATE model_procurement_internal.command_receipt
+       SET source_hash = $2
+       WHERE principal_id = '00000000-0000-4000-8000-000000000001' AND idempotency_key = $1`,
+      [idempotencyKey, `sha256:${"0".repeat(64)}`],
+    );
+    const sourceConflict = await clients.employeeOne.openRequest(
+      { amount: usd("42") },
+      { idempotencyKey, correlationId },
+    ).catch((caught: unknown) => caught);
+    expect(sourceConflict).toBeInstanceOf(IdempotencyConflictError);
+    expect(JSON.stringify(sourceConflict)).not.toContain(first.id);
+  });
+
+  it("scopes command identity by principal and serializes equivalent concurrent retries", async () => {
+    const sharedAcrossPrincipals = `principal-${randomUUID()}`;
+    const [employeeOne, employeeTwo] = await Promise.all([
+      clients.employeeOne.openRequest({ amount: usd("44") }, { idempotencyKey: sharedAcrossPrincipals }),
+      clients.employeeTwo.openRequest({ amount: usd("44") }, { idempotencyKey: sharedAcrossPrincipals }),
+    ]);
+    expect(employeeOne.id).not.toBe(employeeTwo.id);
+
+    const concurrentKey = `concurrent-${randomUUID()}`;
+    const concurrentOptions = { idempotencyKey: concurrentKey, correlationId: concurrentKey };
+    const results = await Promise.all([
+      clients.employeeOne.openRequest({ amount: usd("45") }, concurrentOptions),
+      clients.employeeOne.openRequest({ amount: usd("45.00") }, concurrentOptions),
+    ]);
+    expect(results[1]).toEqual(results[0]);
+    const counts = await admin.query<{ receipts: string; rows: string; audits: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.command_receipt
+         WHERE principal_id = '00000000-0000-4000-8000-000000000001' AND idempotency_key = $1) AS receipts,
+        (SELECT count(*)::text FROM model_procurement.purchase_request WHERE id = $2) AS rows,
+        (SELECT count(*)::text FROM model_procurement_internal.action_audit WHERE target_id = $2) AS audits
+    `, [concurrentKey, results[0]!.id]);
+    expect(counts.rows[0]).toEqual({ receipts: "1", rows: "1", audits: "1" });
+  });
+
+  it("rolls back a claimed receipt when reliable command execution fails", async () => {
+    const idempotencyKey = `failed-${randomUUID()}`;
+    await expect(clients.employeeOne.openRequest(
+      { amount: usd("-1") },
+      { idempotencyKey },
+    )).rejects.toBeInstanceOf(PreconditionError);
+    const receipt = await admin.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM model_procurement_internal.command_receipt WHERE idempotency_key = $1`,
+      [idempotencyKey],
+    );
+    expect(receipt.rows[0]!.count).toBe("0");
   });
 
   it("enforces workflow initial state and declared edges against direct SQL", async () => {
@@ -238,16 +355,19 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   it("rejects malformed, wrong-currency, and out-of-profile money at every public boundary", async () => {
     await expect(clients.employeeOne.openRequest({
       amount: { currency: "EUR", amount: "1.00" } as unknown as ReturnType<typeof usd>,
-    })).rejects.toMatchObject({
+    }, commandOptions())).rejects.toMatchObject({
       name: ValidationError.name,
       ruleId: "money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount",
     });
-    await expect(clients.employeeOne.openRequest({ amount: usd("1.001") })).rejects.toBeInstanceOf(ValidationError);
-    await expect(clients.employeeOne.openRequest({ amount: usd("1e3") })).rejects.toBeInstanceOf(ValidationError);
+    await expect(clients.employeeOne.openRequest({ amount: usd("1.001") }, commandOptions())).rejects.toBeInstanceOf(ValidationError);
+    await expect(clients.employeeOne.openRequest({ amount: usd("1e3") }, commandOptions())).rejects.toBeInstanceOf(ValidationError);
 
     await expect(pools[0]!.query(
-      `SELECT model_procurement.open_request($1::numeric)`,
-      ["1.001"],
+      `WITH execution_context AS MATERIALIZED (
+         SELECT pg_catalog.set_config('modellang.idempotency_key', $2, true)
+       )
+       SELECT model_procurement.open_request($1::numeric) FROM execution_context`,
+      ["1.001", `invalid-money-${randomUUID()}`],
     )).rejects.toMatchObject({
       code: "22023",
       message: expect.stringContaining("ML_VALIDATION:money-parameter:"),
@@ -263,11 +383,11 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("prevents self-approval for every approval tier", async () => {
-    const managerRequest = await clients.manager.openRequest({ amount: usd("5000") });
+    const managerRequest = await clients.manager.openRequest({ amount: usd("5000") }, commandOptions());
     await clients.manager.submitRequest({ request: managerRequest.id });
     await expect(clients.manager.approveRequest({ request: managerRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
 
-    const financeRequest = await clients.finance.openRequest({ amount: usd("25000") });
+    const financeRequest = await clients.finance.openRequest({ amount: usd("25000") }, commandOptions());
     await clients.finance.submitRequest({ request: financeRequest.id });
     await expect(clients.finance.approveRequest({ request: financeRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
   });
@@ -276,10 +396,10 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     try {
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['MANAGER']::text[] WHERE id = '00000000-0000-4000-8000-000000000003'");
       await admin.query("UPDATE model_procurement.user SET roles = ARRAY['FINANCE']::text[] WHERE id = '00000000-0000-4000-8000-000000000004'");
-      await expect(clients.manager.openRequest({ amount: usd("10") })).resolves.toMatchObject({
+      await expect(clients.manager.openRequest({ amount: usd("10") }, commandOptions())).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000003",
       });
-      await expect(clients.finance.openRequest({ amount: usd("10") })).resolves.toMatchObject({
+      await expect(clients.finance.openRequest({ amount: usd("10") }, commandOptions())).resolves.toMatchObject({
         requester: "00000000-0000-4000-8000-000000000004",
       });
     } finally {
@@ -289,8 +409,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("returns only the authenticated caller's requests through the generated read boundary", async () => {
-    const employeeOneId = (await clients.employeeOne.openRequest({ amount: usd("11") })).id;
-    const employeeTwoId = (await clients.employeeTwo.openRequest({ amount: usd("12") })).id;
+    const employeeOneId = (await clients.employeeOne.openRequest({ amount: usd("11") }, commandOptions())).id;
+    const employeeTwoId = (await clients.employeeTwo.openRequest({ amount: usd("12") }, commandOptions())).id;
 
     const employeeOneRows = await clients.employeeOne.myRequests({});
     const employeeTwoRows = await clients.employeeTwo.myRequests({});
@@ -304,7 +424,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("binds identity before authorization and exposes no actor function argument", async () => {
-    await expect(clients.unbound.openRequest({ amount: usd("10") })).rejects.toBeInstanceOf(IdentityBindingError);
+    await expect(clients.unbound.openRequest({ amount: usd("10") }, commandOptions())).rejects.toBeInstanceOf(IdentityBindingError);
     const functions = await admin.query<{ proname: string; pronargs: number; args: string }>(`
       SELECT p.proname, p.pronargs, pg_catalog.pg_get_function_arguments(p.oid) AS args
       FROM pg_catalog.pg_proc p
@@ -339,7 +459,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       },
     });
 
-    const own = await clients.manager.openRequest({ amount: usd("100") });
+    const own = await clients.manager.openRequest({ amount: usd("100") }, commandOptions());
     await clients.manager.submitRequest({ request: own.id });
     const invisible = await clients.manager.assessApproveRequest({ request: randomUUID() });
     const unauthorized = await clients.manager.assessApproveRequest({ request: own.id });
@@ -359,7 +479,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("uses explicit revisions only to report stale state and re-evaluates inside execution", async () => {
-    const opened = await clients.employeeOne.openRequest({ amount: usd("25") });
+    const opened = await clients.employeeOne.openRequest({ amount: usd("25") }, commandOptions());
     const decision = await clients.employeeOne.assessSubmitRequest({ request: opened.id });
     expect(decision).toMatchObject({ status: "applicable", applicable: true, authority: "none" });
     expect(decision.revision).toMatch(/^rev:1:[0-9a-f]{32}$/);
@@ -445,13 +565,35 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
+  it("reapplies the transactional 0.19 reliable-command upgrade without changing model data or history", async () => {
+    const before = await admin.query<{ requests: string; receipts: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.command_receipt) AS receipts,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/009_upgrade_0_19.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; receipts: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.command_receipt) AS receipts,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
   it("rolls back durable decision evidence with the action transaction", async () => {
     const connection = new Client({ connectionString: loginUrl("ml_manager") });
     await connection.connect();
     let target = "";
+    const rollbackOptions = commandOptions("rollback");
     try {
       await connection.query("BEGIN");
-      const result = await new ProcurementClient(connection).openRequest({ amount: usd("19") });
+      const result = await new ProcurementClient(connection).openRequest({ amount: usd("19") }, rollbackOptions);
       target = result.id;
       const inside = await connection.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit WHERE target_id = $1`,
@@ -459,12 +601,13 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       ).catch(() => ({ rows: [{ count: "private" }] }));
       expect(inside.rows[0]!.count).toBe("private");
       await connection.query("ROLLBACK");
-      const persisted = await admin.query<{ rows: string; evidence: string }>(`
+      const persisted = await admin.query<{ rows: string; evidence: string; receipts: string }>(`
         SELECT
           (SELECT count(*)::text FROM model_procurement.purchase_request WHERE id = $1) AS rows,
-          (SELECT count(*)::text FROM model_procurement_internal.action_audit WHERE target_id = $1) AS evidence
-      `, [target]);
-      expect(persisted.rows[0]).toEqual({ rows: "0", evidence: "0" });
+          (SELECT count(*)::text FROM model_procurement_internal.action_audit WHERE target_id = $1) AS evidence,
+          (SELECT count(*)::text FROM model_procurement_internal.command_receipt WHERE idempotency_key = $2) AS receipts
+      `, [target, rollbackOptions.idempotencyKey]);
+      expect(persisted.rows[0]).toEqual({ rows: "0", evidence: "0", receipts: "0" });
     } finally {
       await connection.query("ROLLBACK").catch(() => undefined);
       await connection.end();
@@ -550,7 +693,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       [randomUUID()],
     )).rejects.toMatchObject({ code: "23514", constraint: "ck_purchase_request_approver_differs_from_requester" });
 
-    const id = (await clients.employeeOne.openRequest({ amount: usd("3") })).id;
+    const id = (await clients.employeeOne.openRequest({ amount: usd("3") }, commandOptions())).id;
     const audit = await admin.query<{
       database_principal: string;
       principal_id: string;
@@ -703,8 +846,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const openDescriptor = ProcurementUiManifest.actions.find((action) => action.name === "openRequest")!;
       const requestsDescriptor = ProcurementUiManifest.queries.find((query) => query.name === "myRequests")!;
 
-      await expect(employee.openRequest({ amount: usd("0") })).rejects.toBeInstanceOf(PreconditionError);
-      const low = await employeeUi.execute(openDescriptor.operationId, { amount: usd("5000") });
+      await expect(employee.openRequest({ amount: usd("0") }, commandOptions())).rejects.toBeInstanceOf(PreconditionError);
+      const low = await employeeUi.execute(openDescriptor.operationId, { amount: usd("5000") }, commandOptions());
       expect(low.requester).toBe("00000000-0000-4000-8000-000000000001");
       const workflow = ProcurementUiManifest.workflows[0]!;
       const submit = employeeWorkflow.available(workflow.workflowId, low.status)[0]!;
@@ -725,7 +868,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         approvedBy: "00000000-0000-4000-8000-000000000003",
       });
 
-      const high = await employee.openRequest({ amount: usd("25000") });
+      const high = await employee.openRequest({ amount: usd("25000") }, commandOptions());
       const highSubmit = employeeWorkflow.available(workflow.workflowId, high.status)[0]!;
       const highSubmitted = await employeeWorkflow.executeTransition(highSubmit.transitionId, high.id, {});
       const highApprove = managerWorkflow.available(workflow.workflowId, highSubmitted.status)[0]!;
@@ -775,11 +918,19 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
 
     await expect(employee.execute("action:act_1e35db0451b1461e941af6283d86dca2", {
       amount: usd("0"),
-    })).rejects.toBeInstanceOf(PreconditionError);
+    }, commandOptions("gateway-precondition"))).rejects.toBeInstanceOf(PreconditionError);
 
     const [employeeRequest, managerRequest] = await Promise.all([
-      employee.execute("action:act_1e35db0451b1461e941af6283d86dca2", { amount: usd("101") }),
-      manager.execute("action:act_1e35db0451b1461e941af6283d86dca2", { amount: usd("102") }),
+      employee.execute(
+        "action:act_1e35db0451b1461e941af6283d86dca2",
+        { amount: usd("101") },
+        commandOptions("gateway-employee"),
+      ),
+      manager.execute(
+        "action:act_1e35db0451b1461e941af6283d86dca2",
+        { amount: usd("102") },
+        commandOptions("gateway-manager"),
+      ),
     ]) as [{ id: string; requester: string }, { id: string; requester: string }];
     expect(employeeRequest.requester).toBe("00000000-0000-4000-8000-000000000001");
     expect(managerRequest.requester).toBe("00000000-0000-4000-8000-000000000003");
@@ -832,7 +983,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await connection.query("BEGIN");
       await connection.query("SET LOCAL modellang.gateway_issuer = 'https://auth.example.test'");
       await connection.query("SET LOCAL modellang.gateway_subject = 'finance'");
-      const request = await new ProcurementClient(connection).openRequest({ amount: usd("103") });
+      const request = await new ProcurementClient(connection).openRequest({ amount: usd("103") }, commandOptions("gateway"));
       expect(request.requester).toBe("00000000-0000-4000-8000-000000000001");
       await connection.query("COMMIT");
       await expect(connection.query(
