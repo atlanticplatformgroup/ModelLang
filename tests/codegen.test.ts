@@ -630,7 +630,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.26.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.27.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -687,6 +687,15 @@ describe("backends", () => {
     expect(output["typescript/index.ts"]).toContain('export * from "./publication-recovery.js"');
     expect(output["postgres/015_upgrade_0_25.sql"]).toContain("bounded event-publication failure upgrade");
     expect(output["postgres/016_upgrade_0_26.sql"]).toContain("audited event-publication recovery upgrade");
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_observer NOLOGIN");
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."failure_observation_audit"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."observe_terminal_publications"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."observe_terminal_consumers"');
+    expect(output["postgres/004_grants.sql"]).toContain('"observe_terminal_publications"(timestamptz, timestamptz, uuid, integer) TO modellang_failure_observer');
+    expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalPublications");
+    expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalConsumers");
+    expect(output["typescript/index.ts"]).toContain('export * from "./failure-observer.js"');
+    expect(output["postgres/017_upgrade_0_27.sql"]).toContain("private terminal-failure observation upgrade");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {
       expect(output[publicArtifact]).not.toContain("publication_failure_count");
       expect(output[publicArtifact]).not.toContain("lastPublicationErrorCode");
@@ -695,6 +704,8 @@ describe("backends", () => {
       expect(output[publicArtifact]).not.toContain("publicationRecoveryAudit");
       expect(output[publicArtifact]).not.toContain("reasonCode");
       expect(output[publicArtifact]).not.toContain("ML_BROKER_UNAVAILABLE");
+      expect(output[publicArtifact]).not.toContain("failureObservation");
+      expect(output[publicArtifact]).not.toContain("eventInstanceId");
     }
     expect(output["model.mmd"]).toContain("emits atomically");
   });

@@ -21,6 +21,11 @@ import {
 } from "../../generated/procurement/typescript/dispatcher.js";
 import { recoverProcurementEventPublication } from "../../generated/procurement/typescript/publication-recovery.js";
 import {
+  observeProcurementTerminalConsumers,
+  observeProcurementTerminalPublications,
+  type ConsumerFailureCursor,
+} from "../../generated/procurement/typescript/failure-observer.js";
+import {
   createProcurementUiExecutor,
   createProcurementUiWorkflowExecutor,
   ProcurementUiManifest,
@@ -46,6 +51,7 @@ let gateway: Pool;
 let consumer: Pool;
 let recovery: Pool;
 let publicationRecovery: Pool;
+let failureObserver: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -109,7 +115,8 @@ beforeAll(async () => {
   consumer = poolFor("ml_consumer");
   recovery = poolFor("ml_recovery");
   publicationRecovery = poolFor("ml_publication_recovery");
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery, publicationRecovery);
+  failureObserver = poolFor("ml_failure_observer");
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery, publicationRecovery, failureObserver);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -210,7 +217,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.26.0",
+      model_version: "0.27.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -486,6 +493,135 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     }
   });
 
+  it("observes terminal failures through a separate bounded and audited private projection", async () => {
+    const created = await clients.employeeOne.openRequest({ amount: usd("43") }, commandOptions("failure-observer"));
+    const dispatcher = new Client({ connectionString: loginUrl("ml_dispatcher") });
+    await dispatcher.connect();
+    let publicationInstanceId = "";
+    const terminalConsumer = async (eventId: string): Promise<void> => {
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        await consumer.query(
+          "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4)",
+          ["consumer:con_10d694c9a0a274dc79c6168e47d25968", eventId, attempt, "ML_HANDLER_UNAVAILABLE"],
+        );
+      }
+    };
+    try {
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        const claimed = await claimProcurementEvents(dispatcher, 1000, 60);
+        const target = claimed.find((event) => event.targetId === created.id)!;
+        expect(target).toBeTruthy();
+        publicationInstanceId = target.id;
+        for (const event of claimed) {
+          if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
+        }
+        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
+      }
+
+      const firstConsumerId = randomUUID();
+      const secondConsumerId = randomUUID();
+      await terminalConsumer(firstConsumerId);
+      await terminalConsumer(secondConsumerId);
+
+      const auditBefore = await admin.query<{ count: string }>(
+        "SELECT count(*)::text AS count FROM model_procurement_internal.failure_observation_audit",
+      );
+      const firstPage = await observeProcurementTerminalConsumers(failureObserver, { limit: 1 });
+      expect(firstPage.items).toHaveLength(1);
+      expect(firstPage.nextCursor).not.toBeNull();
+
+      const afterSnapshotId = randomUUID();
+      await terminalConsumer(afterSnapshotId);
+      const observedConsumerIds = firstPage.items.map((item) => item.eventInstanceId);
+      let cursor: ConsumerFailureCursor | null = firstPage.nextCursor;
+      while (cursor) {
+        const page = await observeProcurementTerminalConsumers(failureObserver, { cursor, limit: 1 });
+        observedConsumerIds.push(...page.items.map((item) => item.eventInstanceId));
+        cursor = page.nextCursor;
+      }
+      expect(new Set(observedConsumerIds).size).toBe(observedConsumerIds.length);
+      expect(observedConsumerIds).toContain(firstConsumerId);
+      expect(observedConsumerIds).toContain(secondConsumerId);
+      expect(observedConsumerIds).not.toContain(afterSnapshotId);
+
+      const consumerPage = await observeProcurementTerminalConsumers(failureObserver, { limit: 100 });
+      const consumerItem = consumerPage.items.find((item) => item.eventInstanceId === afterSnapshotId)!;
+      expect(consumerItem).toBeTruthy();
+      expect(Object.keys(consumerItem).sort()).toEqual([
+        "consumerId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
+        "recoveryEligible", "recoveryGeneration", "terminalAt", "totalFailureCount",
+      ].sort());
+      expect(consumerItem).toMatchObject({
+        kind: "consumer",
+        consumerId: "consumer:con_10d694c9a0a274dc79c6168e47d25968",
+        failureCount: 3,
+        totalFailureCount: 3,
+        maxAttempts: 3,
+        lastErrorCode: "ML_HANDLER_UNAVAILABLE",
+        recoveryGeneration: 0,
+        recoveryEligible: true,
+      });
+
+      const publicationPage = await observeProcurementTerminalPublications(failureObserver, { limit: 100 });
+      const publicationItem = publicationPage.items.find((item) => item.eventInstanceId === publicationInstanceId)!;
+      expect(publicationItem).toBeTruthy();
+      expect(Object.keys(publicationItem).sort()).toEqual([
+        "eventId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
+        "recoveryEligible", "recoveryGeneration", "terminalAt", "totalFailureCount",
+      ].sort());
+      expect(publicationItem).toMatchObject({
+        kind: "publication",
+        failureCount: 5,
+        totalFailureCount: 5,
+        maxAttempts: 5,
+        lastErrorCode: "ML_BROKER_UNAVAILABLE",
+        recoveryGeneration: 0,
+        recoveryEligible: true,
+      });
+
+      await expect(failureObserver.query("SELECT * FROM model_procurement_internal.consumer_failure"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(recoverProcurementEventPublication(failureObserver, publicationInstanceId, "FORGED"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(claimProcurementEvents(failureObserver, 1, 60))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(observeProcurementTerminalConsumers(recovery, { limit: 1 }))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(observeProcurementTerminalPublications(publicationRecovery, { limit: 1 }))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(observeProcurementTerminalConsumers(admin, { limit: 1 }))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(observeProcurementTerminalConsumers(failureObserver, { limit: 0 }))
+        .rejects.toMatchObject({ code: "22023" });
+      await expect(failureObserver.query(
+        "SELECT model_procurement_internal.observe_terminal_consumers($1, NULL, NULL, NULL, 1)",
+        [new Date().toISOString()],
+      )).rejects.toMatchObject({ code: "22023" });
+
+      const observerConnection = await failureObserver.connect();
+      try {
+        await observerConnection.query("BEGIN");
+        await observeProcurementTerminalPublications(observerConnection, { limit: 1 });
+        await observerConnection.query("ROLLBACK");
+      } finally {
+        observerConnection.release();
+      }
+      const audits = await admin.query<{
+        count: string; principals: string[]; kinds: string[]; invalid_counts: string;
+      }>(`SELECT count(*)::text AS count,
+          pg_catalog.array_agg(DISTINCT database_principal::text) AS principals,
+          pg_catalog.array_agg(DISTINCT failure_kind ORDER BY failure_kind) AS kinds,
+          count(*) FILTER (WHERE requested_limit NOT BETWEEN 1 AND 100 OR returned_count > requested_limit)::text AS invalid_counts
+        FROM model_procurement_internal.failure_observation_audit`);
+      expect(Number(audits.rows[0]!.count)).toBeGreaterThan(Number(auditBefore.rows[0]!.count));
+      expect(audits.rows[0]!.principals).toEqual(["ml_failure_observer"]);
+      expect(audits.rows[0]!.kinds).toEqual(["consumer", "publication"]);
+      expect(audits.rows[0]!.invalid_counts).toBe("0");
+    } finally {
+      await dispatcher.end();
+    }
+  });
+
   it("allows exactly one competing lease transition to commit", async () => {
     const created = await clients.employeeOne.openRequest({ amount: usd("44") }, commandOptions("publication-race"));
     const first = new Client({ connectionString: loginUrl("ml_dispatcher") });
@@ -551,7 +687,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.26.0', $1,
+        VALUES ('model:Procurement', '0.27.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1364,6 +1500,29 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT coalesce(sum(publication_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS failures,
         (SELECT coalesce(sum(publication_total_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS total_failures,
         (SELECT count(*)::text FROM model_procurement_internal.publication_recovery_audit) AS recoveries,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the 0.27 failure-observation upgrade without changing failure state or fabricating audit", async () => {
+    const before = await admin.query<{ events: string; consumer_failures: string; observations: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/017_upgrade_0_27.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<typeof before.rows[number]>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);

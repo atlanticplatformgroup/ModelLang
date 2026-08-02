@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.26.0",
-    "sourceHash": "sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a",
+    "version": "0.27.0",
+    "sourceHash": "sha256:84969af54e131f4e9751a5798913868b43f2b70f3345402a4ad03a9b5d781c90",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -38,6 +38,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_publication_recovery NOLOGIN"
+    },
+    {
+      "id": "boundary:failure_observer_role",
+      "purpose": "Confine bounded terminal-failure inspection to a separate non-login role with execute-only access and no recovery authority.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_failure_observer NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",

@@ -8,6 +8,7 @@ export * from "./workflows.js";
 export * from "./events.js";
 export * from "./dispatcher.js";
 export * from "./publication-recovery.js";
+export * from "./failure-observer.js";
 export * from "./consumers.js";
 export * from "./ui.js";
 export * from "./capabilities.js";

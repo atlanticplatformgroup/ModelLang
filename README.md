@@ -1,4 +1,4 @@
-# ModelLang 0.26 reference compiler
+# ModelLang 0.27 reference compiler
 
 ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, reusable closed policies, reliable commands, typed domain events and consumers, one canonical enforcement decision plan, filtered public applicability, private transactional decision evidence, engineering policy coverage, a workflow-aware operation and UI boundary, deterministic provenance, guarded evolution, generated clients, and PostgreSQL enforcement.
 
@@ -61,7 +61,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.26 advances to IR18 because event publication recovery eligibility cannot be retained faithfully by IR17. IR18 preserves IR17 publication-failure semantics and adds explicit `none` or `manual` recovery to bounded event policy. Released IR9 through IR17 remain accepted evolution baselines when current source compiles to IR18. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.27 retains IR18 and its explicit `none` or `manual` recovery policy while adding a private generated operational projection rather than new language syntax. Released IR9 through IR17 remain accepted evolution baselines when current source compiles to IR18. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v4 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, action reliability and emitted-event IDs, and stable workflow bindings. It contains no runtime events, leases, keys, receipts, request hashes, HTTP paths, SQL names, database roles, or connection details. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
@@ -90,10 +90,11 @@ The PostgreSQL backend emits:
 - private principal-scoped command receipts with canonical SHA-256 request fingerprints, stored results, and audit/correlation links;
 - a private transactional event outbox plus bounded lease/ack/release/failure functions, durable policy-derived publication disposition, and separately authorized audited recovery;
 - private transactional inbox, consumer audit, stored-result replay, atomic downstream outbox insertion, policy-derived durable failure dispositions, and immutable recovery audit for isolated consumer and recovery roles;
+- bounded cursor-based terminal publication and consumer failure observation through a separate execute-only role with immutable private inspection audit;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
-- idempotent administrative upgrades through the 0.26 private-publication-recovery boundary.
+- idempotent administrative upgrades through the 0.27 private-failure-observation boundary.
 
 The generated TypeScript clients expose only declared actions, queries, and action applicability. They have no generic table or mutation API. Caller identity is not an input field.
 
@@ -105,6 +106,7 @@ The generated TypeScript clients expose only declared actions, queries, and acti
 - `typescript/events.ts` exports typed event-envelope variants keyed by stable event identity and post-effect entity payload.
 - `typescript/dispatcher.ts` is a server-only typed adapter for private outbox claim, acknowledgement, release, and lease-bound failure recording.
 - `typescript/publication-recovery.ts` is a server-only typed adapter for isolated audited terminal-outbox reopening.
+- `typescript/failure-observer.ts` is a server-only typed adapter for bounded private terminal-failure inspection; it has no recovery or dispatch operation.
 - `typescript/consumers.ts` is a server-only, broker-neutral adapter for invoking declared consumers through the execute-only database boundary and recording bounded private failure codes.
 
 Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
@@ -170,6 +172,20 @@ const recovery = await recoverProcurementEventPublication(
 ```
 
 Recovery resets the current failure cycle, preserves monotonic total failures, increments a generation, and writes exact private operator audit atomically. It does not claim or publish the event. A separately authorized dispatcher must later claim it through the ordinary lease path; ModelLang never looks up, reconstructs, or moves a broker message.
+
+Terminal publication and consumer failures can be discovered only through a client bound to the separate `modellang_failure_observer` role:
+
+```ts
+import {
+  observeProcurementTerminalConsumers,
+  observeProcurementTerminalPublications,
+} from "./generated/procurement/typescript/failure-observer.js";
+
+const publications = await observeProcurementTerminalPublications(observerDatabase, { limit: 50 });
+const consumers = await observeProcurementTerminalConsumers(observerDatabase, { limit: 50 });
+```
+
+The private projection is keyset paginated under a database-generated terminal-time cutoff and contains only stable contract identity, private event identity, bounded failure state, generation, and static recovery eligibility. Every successful page is privately audited. It excludes payloads, principals, correlations, decisions, receipts, fingerprints, stored responses, leases, and broker details. Observation grants neither recovery nor dispatch authority.
 
 ## Event-consumer boundary
 
@@ -464,6 +480,15 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The baseline-checked artifact installs copied recovery eligibility, monotonic total failures, recovery generations, immutable private audit, an isolated execute-only recovery role, and current producers/grants. Existing rows remain ineligible, including existing terminal rows. The upgrade is transactional and idempotent and fabricates no recovery, operator, audit, claim, publication, lease, or broker operation.
 
+Existing installations can add the private 0.27 terminal-failure observation boundary without changing failure state:
+
+```bash
+psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f generated/procurement/postgres/017_upgrade_0_27.sql
+```
+
+The baseline-checked artifact installs the isolated observer role, immutable private observation audit, bounded keyset functions, indexes, typed server adapter, and least-privilege grants. It is transactional and idempotent and fabricates no observation, recovery, failure, claim, publication, consumer execution, or broker history.
+
 The safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. Policy and branch renames preserve stable identity, while changed policy signatures, branches, action authority, idempotency requirements, existing-event publication policies, or existing-consumer failure policies require reviewed evolution. Unsupported transformations still fail closed rather than becoming compiler guesses.
 
 ## Explicit language semantics
@@ -588,4 +613,4 @@ The full suite validates reliable-command replay and conflicts, bounded event-pu
 - Engineering semantic manifest v10 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, general recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.25 language is in [spec/0.25/LANGUAGE.md](./spec/0.25/LANGUAGE.md), with its [private publication-failure contract](./spec/0.25/PUBLICATION_FAILURES.md), [conformance requirements](./spec/0.25/CONFORMANCE.md), and [unstable boundaries](./spec/0.25/UNSTABLE.md). Earlier consumer-recovery, failure-disposition, event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.25 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.
+The normative 0.27 language is in [spec/0.27/LANGUAGE.md](./spec/0.27/LANGUAGE.md), with its [private failure-observation contract](./spec/0.27/FAILURE_OBSERVATION.md), [conformance requirements](./spec/0.27/CONFORMANCE.md), and [unstable boundaries](./spec/0.27/UNSTABLE.md). Earlier publication/consumer recovery, failure-disposition, event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.27 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.

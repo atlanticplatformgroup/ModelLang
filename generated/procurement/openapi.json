@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.26.0",
-    "description": "Generated from ModelLang operation manifest v4 (sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a)."
+    "version": "0.27.0",
+    "description": "Generated from ModelLang operation manifest v4 (sha256:84969af54e131f4e9751a5798913868b43f2b70f3345402a4ad03a9b5d781c90)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {

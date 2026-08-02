@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a`
+Source hash: `sha256:84969af54e131f4e9751a5798913868b43f2b70f3345402a4ad03a9b5d781c90`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -8,6 +8,7 @@ Source hash: `sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef
 | `boundary:consumer_role` | Confine event consumption to a dedicated non-login role with execute-only handler access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_consumer NOLOGIN` | compiler-derived |
 | `boundary:recovery_role` | Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_recovery NOLOGIN` | compiler-derived |
 | `boundary:publication_recovery_role` | Confine opted-in terminal publication recovery to a separate non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_publication_recovery NOLOGIN` | compiler-derived |
+| `boundary:failure_observer_role` | Confine bounded terminal-failure inspection to a separate non-login role with execute-only access and no recovery authority. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_failure_observer NOLOGIN` | compiler-derived |
 | `boundary:dispatcher_role` | Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
 | `boundary:gateway_role` | Confine shared-credential identity activation to a dedicated non-login gateway role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_gateway NOLOGIN` | compiler-derived |

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.27.0
+
+- Added a separate non-login `modellang_failure_observer` role with execute-only access to bounded terminal publication and consumer failure inspection; observation grants no recovery, dispatch, consumer, application, query, or table authority.
+- Added deterministic keyset pagination under a database-generated terminal-time cutoff, with validated private cursors and a hard page bound of 100.
+- Added minimal server-only observation projections containing stable contract identity, private event identity, bounded failure state, terminal time, recovery generation, and static recovery eligibility while excluding payloads, principals, correlations, decisions, receipts, fingerprints, stored responses, leases, and broker details.
+- Added immutable private inspection audit recording authenticated operator, kind, cutoff, continuation position, requested and returned counts, and page continuation in the observation transaction.
+- Added generated typed `failure-observer.ts` adapters while keeping operation manifest v4, capability manifest v3, UI manifest v4, event manifest v5, semantic manifest v10, semantic diff v11, HTTP, MCP, and agent-facing contracts unchanged.
+- Added baseline-checked idempotent `017_upgrade_0_27.sql`; existing failure, recovery, outbox, inbox, domain, decision, and receipt state remains unchanged and no observation history is fabricated.
+- Retained canonical IR18 because the release adds a private generator boundary rather than new model semantics, and updated both example models and golden fixtures to 0.27.0.
+
 ## 0.26.0
 
 - Added optional `recovery manual` on bounded local event declarations and preserved `none` or `manual` publication recovery in canonical IR18.

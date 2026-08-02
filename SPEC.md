@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.26](./spec/0.26/LANGUAGE.md). It retains the complete 0.25 boundary and adds opt-in isolated audited manual recovery for terminal event-publication failures without publishing or controlling broker state.
+The current normative specification is [ModelLang 0.27](./spec/0.27/LANGUAGE.md). It retains the complete 0.26 language and adds separately authorized, bounded, minimally projected, privately audited observation of current terminal publication and consumer failures without granting recovery or dispatch authority.
+
+- [Private terminal-failure observation semantics](./spec/0.27/FAILURE_OBSERVATION.md)
+- [0.27 unchanged grammar statement](./spec/0.27/GRAMMAR.ebnf)
+- [0.27 conformance requirements](./spec/0.27/CONFORMANCE.md)
+- [0.27 unstable observation boundaries](./spec/0.27/UNSTABLE.md)
 
 - [Private audited publication-recovery semantics](./spec/0.26/PUBLICATION_RECOVERY.md)
 - [0.26 grammar additions](./spec/0.26/GRAMMAR.ebnf)

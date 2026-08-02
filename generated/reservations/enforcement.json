@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.26.0",
-    "sourceHash": "sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce",
+    "version": "0.27.0",
+    "sourceHash": "sha256:01df88c2afa54a4edbd145a5024ad6cff5c583b2dd1901a95ea7a0ac1582bf6d",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -38,6 +38,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_publication_recovery NOLOGIN"
+    },
+    {
+      "id": "boundary:failure_observer_role",
+      "purpose": "Confine bounded terminal-failure inspection to a separate non-login role with execute-only access and no recovery authority.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_failure_observer NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
