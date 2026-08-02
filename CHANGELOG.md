@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.29.0
+
+- Added a separate non-login `modellang_failure_claimant` role with execute-only publication and consumer terminal-failure claim functions and no observation, acknowledgement, recovery, dispatch, consumer, application, query, or table authority.
+- Added immutable first-writer claim records keyed by private terminal-cycle identity: outbox UUID plus trusted recovery generation for publication, and stable consumer ID plus source-event UUID plus trusted recovery generation for consumers.
+- Derived generation, current disposition, stable contract identity, and claimant database principal from locked private state while accepting only private event identity.
+- Serialized concurrent claims to one committed row and return closed `alreadyClaimed` outcomes without exposing the stored claimant or occurrence time.
+- Serialized claiming and recovery through the same failure-state locks; claim-first history remains immutable, recovery-first claiming fails, and each later terminal generation begins unclaimed.
+- Extended only the private observer projection with current-generation `claimed` Boolean and added the server-only typed `failure-claim.ts` adapter; operation manifest v4, capability manifest v3, UI manifest v4, event manifest v5, semantic manifest v10, semantic diff v11, HTTP, MCP, and agent-facing contracts remain unchanged.
+- Added baseline-checked idempotent `019_upgrade_0_29.sql`; all existing failure, recovery, acknowledgement, observation, outbox, inbox, domain, decision, receipt, and broker state is preserved and no claim history is fabricated.
+- Retained canonical IR18 because the release adds a private generated operational boundary, advanced the generator profile to `/13`, and updated both example models and deterministic golden fixtures to 0.29.0.
+
 ## 0.28.0
 
 - Added a separate non-login `modellang_failure_acknowledger` role with execute-only publication and consumer acknowledgement functions and no observation, recovery, dispatch, consumer, application, query, or table authority.

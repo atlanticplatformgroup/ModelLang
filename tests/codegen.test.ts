@@ -630,7 +630,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.28.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.29.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -710,6 +710,21 @@ describe("backends", () => {
     expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("database_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-acknowledgement.js"');
     expect(output["postgres/018_upgrade_0_28.sql"]).toContain("private terminal-failure acknowledgement upgrade");
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_claimant NOLOGIN");
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_claim"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_claim"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."claim_terminal_publication_failure"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."claim_terminal_consumer_failure"');
+    expect(output["postgres/002_schema.sql"]).toContain("'claimed', claimed");
+    expect(output["postgres/004_grants.sql"]).toContain('"claim_terminal_publication_failure"(uuid) TO modellang_failure_claimant');
+    expect(output["postgres/004_grants.sql"]).toContain('"claim_terminal_consumer_failure"(text, text) TO modellang_failure_claimant');
+    expect(output["typescript/failure-claim.ts"]).toContain("claimProcurementTerminalPublication");
+    expect(output["typescript/failure-claim.ts"]).toContain("claimProcurementTerminalConsumer");
+    expect(output["typescript/failure-claim.ts"]).not.toContain("claimant_principal");
+    expect(output["typescript/index.ts"]).toContain('export * from "./failure-claim.js"');
+    expect(output["postgres/019_upgrade_0_29.sql"]).toContain("private terminal-failure claim upgrade");
+    expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("publication_failure_claim");
+    expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("'claimed', claimed");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {
       expect(output[publicArtifact]).not.toContain("publication_failure_count");
       expect(output[publicArtifact]).not.toContain("lastPublicationErrorCode");
@@ -724,6 +739,10 @@ describe("backends", () => {
       expect(output[publicArtifact]).not.toContain("failure_acknowledgement");
       expect(output[publicArtifact]).not.toContain("failureAcknowledgement");
       expect(output[publicArtifact]).not.toContain("acknowledgementAudit");
+      expect(output[publicArtifact]).not.toContain("failureClaim");
+      expect(output[publicArtifact]).not.toContain("failure_claim");
+      expect(output[publicArtifact]).not.toContain("claimantPrincipal");
+      expect(output[publicArtifact]).not.toContain("claimed");
       expect(output[publicArtifact]).not.toContain("databasePrincipal");
       expect(output[publicArtifact]).not.toContain("decisionEvidence");
       expect(output[publicArtifact]).not.toContain("storedResponse");
@@ -738,6 +757,9 @@ describe("backends", () => {
       expect(output[publicOrAgentArtifact]).not.toContain("reasonCode");
       expect(output[publicOrAgentArtifact]).not.toContain("databasePrincipal");
       expect(output[publicOrAgentArtifact]).not.toContain("acknowledgementAudit");
+      expect(output[publicOrAgentArtifact]).not.toContain("failureClaim");
+      expect(output[publicOrAgentArtifact]).not.toContain("claimantPrincipal");
+      expect(output[publicOrAgentArtifact]).not.toContain("claimed");
       expect(output[publicOrAgentArtifact]).not.toContain("decisionEvidence");
       expect(output[publicOrAgentArtifact]).not.toContain("storedResponse");
       expect(output[publicOrAgentArtifact]).not.toContain("privateCursor");

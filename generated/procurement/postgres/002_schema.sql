@@ -1,4 +1,4 @@
--- source sha256:b84dcde53f682175f8bdf448d921c82f9e25ddcafea82bdbc36914c54bf92033
+-- source sha256:e9411f2d3e9841bb910da155f1557ca18b62050c589622c506afda63cc4f3381
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -844,6 +844,91 @@ BEGIN
   RETURN pg_catalog.jsonb_build_object('status', 'acknowledged', 'acknowledged', TRUE, 'recoveryGeneration', v_recovery_generation);
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."acknowledge_terminal_consumer_failure"(text, text, text) FROM PUBLIC;
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_claim" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "event_outbox_id" uuid NOT NULL REFERENCES "model_procurement_internal"."event_outbox" ("id"),
+  "event_id" text NOT NULL,
+  "recovery_generation" integer NOT NULL,
+  "claimant_principal" name NOT NULL,
+  "claimed_at" timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT "uq_publication_failure_claim_cycle" UNIQUE ("event_outbox_id", "recovery_generation"),
+  CONSTRAINT "ck_publication_failure_claim" CHECK ("recovery_generation" >= 0)
+);
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_claim" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "consumer_id" text NOT NULL,
+  "source_event_id" text NOT NULL,
+  "recovery_generation" integer NOT NULL,
+  "claimant_principal" name NOT NULL,
+  "claimed_at" timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT "uq_consumer_failure_claim_cycle" UNIQUE ("consumer_id", "source_event_id", "recovery_generation"),
+  CONSTRAINT "fk_consumer_failure_claim" FOREIGN KEY ("consumer_id", "source_event_id") REFERENCES "model_procurement_internal"."consumer_failure" ("consumer_id", "source_event_id"),
+  CONSTRAINT "ck_consumer_failure_claim" CHECK ("recovery_generation" >= 0)
+);
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."claim_terminal_publication_failure"(p_event_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_stable_event_id text;
+  v_disposition text;
+  v_recovery_generation integer;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS claimant_role ON claimant_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE claimant_role.rolname = 'modellang_failure_claimant' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_FAILURE_CLAIMANT_REQUIRED';
+  END IF;
+  IF p_event_id IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_PUBLICATION_FAILURE_CLAIM';
+  END IF;
+  SELECT "event_id", "publication_disposition", "publication_recovery_generation"
+  INTO v_stable_event_id, v_disposition, v_recovery_generation
+  FROM "model_procurement_internal"."event_outbox" WHERE "id" = p_event_id FOR UPDATE;
+  IF NOT FOUND OR v_disposition <> 'deadLetter' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_PUBLICATION_FAILURE_CLAIM_STATE';
+  END IF;
+  IF EXISTS (SELECT 1 FROM "model_procurement_internal"."publication_failure_claim" WHERE "event_outbox_id" = p_event_id AND "recovery_generation" = v_recovery_generation) THEN
+    RETURN pg_catalog.jsonb_build_object('status', 'alreadyClaimed', 'claimed', TRUE, 'recoveryGeneration', v_recovery_generation);
+  END IF;
+  INSERT INTO "model_procurement_internal"."publication_failure_claim" ("event_outbox_id", "event_id", "recovery_generation", "claimant_principal")
+  VALUES (p_event_id, v_stable_event_id, v_recovery_generation, session_user);
+  RETURN pg_catalog.jsonb_build_object('status', 'claimed', 'claimed', TRUE, 'recoveryGeneration', v_recovery_generation);
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."claim_terminal_publication_failure"(uuid) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."claim_terminal_consumer_failure"(p_consumer_id text, p_event_id text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_disposition text;
+  v_recovery_generation integer;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS claimant_role ON claimant_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE claimant_role.rolname = 'modellang_failure_claimant' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_FAILURE_CLAIMANT_REQUIRED';
+  END IF;
+  IF p_consumer_id IS NULL OR p_consumer_id NOT IN ('consumer:con_10d694c9a0a274dc79c6168e47d25968') OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_CONSUMER_FAILURE_CLAIM';
+  END IF;
+  p_event_id := p_event_id::uuid::text;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_consumer_id || ':' || p_event_id, 0));
+  SELECT "disposition", "recovery_generation" INTO v_disposition, v_recovery_generation
+  FROM "model_procurement_internal"."consumer_failure" WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id FOR UPDATE;
+  IF NOT FOUND OR v_disposition <> 'deadLetter' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_CONSUMER_FAILURE_CLAIM_STATE';
+  END IF;
+  IF EXISTS (SELECT 1 FROM "model_procurement_internal"."consumer_failure_claim" WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id AND "recovery_generation" = v_recovery_generation) THEN
+    RETURN pg_catalog.jsonb_build_object('status', 'alreadyClaimed', 'claimed', TRUE, 'recoveryGeneration', v_recovery_generation);
+  END IF;
+  INSERT INTO "model_procurement_internal"."consumer_failure_claim" ("consumer_id", "source_event_id", "recovery_generation", "claimant_principal")
+  VALUES (p_consumer_id, p_event_id, v_recovery_generation, session_user);
+  RETURN pg_catalog.jsonb_build_object('status', 'claimed', 'claimed', TRUE, 'recoveryGeneration', v_recovery_generation);
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."claim_terminal_consumer_failure"(text, text) FROM PUBLIC;
 CREATE TABLE IF NOT EXISTS "model_procurement_internal"."failure_observation_audit" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "database_principal" name NOT NULL,
@@ -889,7 +974,7 @@ BEGIN
       row_value."event_id" AS event_id, row_value."publication_failure_count" AS failure_count,
       row_value."publication_total_failure_count" AS total_failure_count, row_value."publication_max_attempts" AS max_attempts,
       row_value."last_publication_error_code" AS last_error_code, row_value."publication_recovery_generation" AS recovery_generation,
-      row_value."publication_recovery_mode" = 'manual' AS recovery_eligible, EXISTS (SELECT 1 FROM "model_procurement_internal"."publication_failure_acknowledgement" AS acknowledgement WHERE acknowledgement."event_outbox_id" = row_value."id" AND acknowledgement."recovery_generation" = row_value."publication_recovery_generation") AS acknowledged
+      row_value."publication_recovery_mode" = 'manual' AS recovery_eligible, EXISTS (SELECT 1 FROM "model_procurement_internal"."publication_failure_acknowledgement" AS acknowledgement WHERE acknowledgement."event_outbox_id" = row_value."id" AND acknowledgement."recovery_generation" = row_value."publication_recovery_generation") AS acknowledged, EXISTS (SELECT 1 FROM "model_procurement_internal"."publication_failure_claim" AS failure_claim WHERE failure_claim."event_outbox_id" = row_value."id" AND failure_claim."recovery_generation" = row_value."publication_recovery_generation") AS claimed
     FROM "model_procurement_internal"."event_outbox" AS row_value
     WHERE row_value."publication_disposition" = 'deadLetter' AND row_value."publication_terminal_at" <= v_snapshot_at
       AND (p_after_terminal_at IS NULL OR (row_value."publication_terminal_at", row_value."id") > (p_after_terminal_at, p_after_event_id))
@@ -902,7 +987,7 @@ BEGIN
       'kind', 'publication', 'eventInstanceId', event_instance_id, 'eventId', event_id,
       'failureCount', failure_count, 'totalFailureCount', total_failure_count, 'maxAttempts', max_attempts,
       'lastErrorCode', last_error_code, 'terminalAt', terminal_at, 'recoveryGeneration', recovery_generation,
-      'recoveryEligible', recovery_eligible, 'acknowledged', acknowledged) ORDER BY terminal_at, event_instance_id) FROM page_rows), '[]'::jsonb),
+      'recoveryEligible', recovery_eligible, 'acknowledged', acknowledged, 'claimed', claimed) ORDER BY terminal_at, event_instance_id) FROM page_rows), '[]'::jsonb),
     'nextCursor', CASE WHEN stats.candidate_count > p_limit THEN (SELECT pg_catalog.jsonb_build_object(
       'snapshotAt', v_snapshot_at, 'afterTerminalAt', terminal_at, 'afterEventInstanceId', event_instance_id)
       FROM page_rows ORDER BY terminal_at DESC, event_instance_id DESC LIMIT 1) ELSE NULL END)
@@ -940,7 +1025,7 @@ BEGIN
       row_value."source_event_id"::uuid AS event_instance_id, row_value."failure_count" AS failure_count,
       row_value."total_failure_count" AS total_failure_count, row_value."max_attempts" AS max_attempts,
       row_value."last_error_code" AS last_error_code, row_value."recovery_generation" AS recovery_generation,
-      row_value."consumer_id" IN ('consumer:con_10d694c9a0a274dc79c6168e47d25968') AS recovery_eligible, EXISTS (SELECT 1 FROM "model_procurement_internal"."consumer_failure_acknowledgement" AS acknowledgement WHERE acknowledgement."consumer_id" = row_value."consumer_id" AND acknowledgement."source_event_id" = row_value."source_event_id" AND acknowledgement."recovery_generation" = row_value."recovery_generation") AS acknowledged
+      row_value."consumer_id" IN ('consumer:con_10d694c9a0a274dc79c6168e47d25968') AS recovery_eligible, EXISTS (SELECT 1 FROM "model_procurement_internal"."consumer_failure_acknowledgement" AS acknowledgement WHERE acknowledgement."consumer_id" = row_value."consumer_id" AND acknowledgement."source_event_id" = row_value."source_event_id" AND acknowledgement."recovery_generation" = row_value."recovery_generation") AS acknowledged, EXISTS (SELECT 1 FROM "model_procurement_internal"."consumer_failure_claim" AS failure_claim WHERE failure_claim."consumer_id" = row_value."consumer_id" AND failure_claim."source_event_id" = row_value."source_event_id" AND failure_claim."recovery_generation" = row_value."recovery_generation") AS claimed
     FROM "model_procurement_internal"."consumer_failure" AS row_value
     WHERE row_value."disposition" = 'deadLetter' AND row_value."terminal_at" <= v_snapshot_at
       AND (p_after_terminal_at IS NULL OR (row_value."terminal_at", row_value."consumer_id", row_value."source_event_id"::uuid) > (p_after_terminal_at, p_after_consumer_id, p_after_event_id))
@@ -953,7 +1038,7 @@ BEGIN
       'kind', 'consumer', 'consumerId', consumer_id, 'eventInstanceId', event_instance_id,
       'failureCount', failure_count, 'totalFailureCount', total_failure_count, 'maxAttempts', max_attempts,
       'lastErrorCode', last_error_code, 'terminalAt', terminal_at, 'recoveryGeneration', recovery_generation,
-      'recoveryEligible', recovery_eligible, 'acknowledged', acknowledged) ORDER BY terminal_at, consumer_id, event_instance_id) FROM page_rows), '[]'::jsonb),
+      'recoveryEligible', recovery_eligible, 'acknowledged', acknowledged, 'claimed', claimed) ORDER BY terminal_at, consumer_id, event_instance_id) FROM page_rows), '[]'::jsonb),
     'nextCursor', CASE WHEN stats.candidate_count > p_limit THEN (SELECT pg_catalog.jsonb_build_object(
       'snapshotAt', v_snapshot_at, 'afterTerminalAt', terminal_at, 'afterConsumerId', consumer_id, 'afterEventInstanceId', event_instance_id)
       FROM page_rows ORDER BY terminal_at DESC, consumer_id DESC, event_instance_id DESC LIMIT 1) ELSE NULL END)
@@ -979,6 +1064,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.28.0', 'sha256:b84dcde53f682175f8bdf448d921c82f9e25ddcafea82bdbc36914c54bf92033', 'installation');
+VALUES ('model:Procurement', '0.29.0', 'sha256:e9411f2d3e9841bb910da155f1557ca18b62050c589622c506afda63cc4f3381', 'installation');
 RESET ROLE;
 

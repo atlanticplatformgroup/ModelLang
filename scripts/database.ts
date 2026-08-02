@@ -7,7 +7,7 @@ export const demoPassword = process.env.MODELLANG_DEMO_PASSWORD ?? "modellang-de
 
 export const demoRoles = [
   "ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound",
-  "ml_reserver_one", "ml_reserver_two", "ml_gateway", "ml_dispatcher", "ml_consumer", "ml_recovery", "ml_publication_recovery", "ml_failure_observer", "ml_failure_acknowledger",
+  "ml_reserver_one", "ml_reserver_two", "ml_gateway", "ml_dispatcher", "ml_consumer", "ml_recovery", "ml_publication_recovery", "ml_failure_observer", "ml_failure_acknowledger", "ml_failure_claimant",
 ] as const;
 
 export function loginUrl(role: typeof demoRoles[number]): string {
@@ -68,6 +68,7 @@ $provision$;`);
       await client.query(`REVOKE modellang_publication_recovery FROM "${role}"`);
       await client.query(`REVOKE modellang_failure_observer FROM "${role}"`);
       await client.query(`REVOKE modellang_failure_acknowledger FROM "${role}"`);
+      await client.query(`REVOKE modellang_failure_claimant FROM "${role}"`);
       if (role === "ml_gateway") {
         await client.query(`REVOKE modellang_app FROM "${role}"`);
         await client.query(`GRANT modellang_gateway TO "${role}"`);
@@ -89,6 +90,9 @@ $provision$;`);
       } else if (role === "ml_failure_acknowledger") {
         await client.query(`REVOKE modellang_app FROM "${role}"`);
         await client.query(`GRANT modellang_failure_acknowledger TO "${role}"`);
+      } else if (role === "ml_failure_claimant") {
+        await client.query(`REVOKE modellang_app FROM "${role}"`);
+        await client.query(`GRANT modellang_failure_claimant TO "${role}"`);
       } else {
         await client.query(`GRANT modellang_app TO "${role}"`);
       }

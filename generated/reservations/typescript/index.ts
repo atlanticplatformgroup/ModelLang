@@ -10,6 +10,7 @@ export * from "./dispatcher.js";
 export * from "./publication-recovery.js";
 export * from "./failure-observer.js";
 export * from "./failure-acknowledgement.js";
+export * from "./failure-claim.js";
 export * from "./consumers.js";
 export * from "./ui.js";
 export * from "./capabilities.js";

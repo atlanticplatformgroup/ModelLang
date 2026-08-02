@@ -15,6 +15,7 @@ export type TerminalPublicationFailure = {
   readonly recoveryGeneration: number;
   readonly recoveryEligible: boolean;
   readonly acknowledged: boolean;
+  readonly claimed: boolean;
 };
 
 export type TerminalConsumerFailure = {
@@ -29,6 +30,7 @@ export type TerminalConsumerFailure = {
   readonly recoveryGeneration: number;
   readonly recoveryEligible: boolean;
   readonly acknowledged: boolean;
+  readonly claimed: boolean;
 };
 
 export type PublicationFailureCursor = {

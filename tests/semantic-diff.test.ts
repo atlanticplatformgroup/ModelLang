@@ -92,7 +92,7 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
       diffVersion: 11,
-      compilerVersion: "0.28.0",
+      compilerVersion: "0.29.0",
       irVersion: 18,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });

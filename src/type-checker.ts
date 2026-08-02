@@ -1466,6 +1466,12 @@ function buildEnforcement(
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_failure_acknowledger NOLOGIN",
   }, {
+    id: "boundary:failure_claimant_role",
+    purpose: "Confine first-writer terminal-cycle self-claiming to a separate non-login role with execute-only access and no observation, acknowledgement, or recovery authority.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_failure_claimant NOLOGIN",
+  }, {
     id: "boundary:dispatcher_role",
     purpose: "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
     layer: "PostgreSQL role",
