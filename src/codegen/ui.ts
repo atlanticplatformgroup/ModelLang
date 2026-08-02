@@ -7,10 +7,19 @@ export interface UiOutput {
   "typescript/ui.ts": string;
 }
 
-function resultType(manifest: OperationManifest, entityId: string, many: boolean): string {
-  const entity = manifest.entities.find((candidate) => candidate.id === entityId);
-  if (!entity) throw new Error(`E6202 Missing UI result entity '${entityId}'.`);
-  return many ? `${entity.name}[]` : entity.name;
+function resultType(manifest: OperationManifest, operation: OperationManifest["operations"][number]): string {
+  if (operation.kind === "action") {
+    const entity = manifest.entities.find((candidate) => candidate.id === operation.output.entityId);
+    if (!entity) throw new Error(`E6202 Missing UI result entity '${operation.output.entityId}'.`);
+    return entity.name;
+  }
+  const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
+  if (!projection) throw new Error(`E6206 Missing UI result projection '${operation.output.projectionId}'.`);
+  return `${projection.name}[]`;
+}
+
+function resultImportType(manifest: OperationManifest, operation: OperationManifest["operations"][number]): string {
+  return resultType(manifest, operation).replace(/\[\]$/, "");
 }
 
 export function generateUi(manifest: OperationManifest, uiManifest: UiManifest): UiOutput {
@@ -20,7 +29,7 @@ export function generateUi(manifest: OperationManifest, uiManifest: UiManifest):
     return enumeration.name;
   });
   const imports = [...new Set([
-    ...manifest.operations.map((operation) => resultType(manifest, operation.output.entityId, false)),
+    ...manifest.operations.map((operation) => resultImportType(manifest, operation)),
     ...manifest.operations.map(operationInputName),
     ...workflowEnums,
     "ApplicabilityDecision",
@@ -33,7 +42,7 @@ export function generateUi(manifest: OperationManifest, uiManifest: UiManifest):
     `  ${JSON.stringify(operation.id)}: ${operationInputName(operation)};`,
   ).join("\n");
   const resultMap = manifest.operations.map((operation) =>
-    `  ${JSON.stringify(operation.id)}: ${resultType(manifest, operation.output.entityId, operation.kind === "query")};`,
+    `  ${JSON.stringify(operation.id)}: ${resultType(manifest, operation)};`,
   ).join("\n");
   const dispatch = manifest.operations.map((operation) =>
     `        case ${JSON.stringify(operation.id)}:\n          return await client.${operation.name}(input as unknown as ${operationInputName(operation)}${operation.kind === "action" ? ", options" : ""}) as ${manifest.model.name}UiResultByOperationId[Id];`,
@@ -60,7 +69,7 @@ export function generateUi(manifest: OperationManifest, uiManifest: UiManifest):
   }).join("\n");
   const transitionResultMap = transitions.map((transition) => {
     const action = manifest.operations.find((candidate) => candidate.id === transition.actionId && candidate.kind === "action")!;
-    return `  ${JSON.stringify(transition.id)}: ${resultType(manifest, action.output.entityId, false)};`;
+    return `  ${JSON.stringify(transition.id)}: ${resultType(manifest, action)};`;
   }).join("\n");
   const transitionDispatch = transitions.map((transition) => {
     const action = manifest.operations.find((candidate) => candidate.id === transition.actionId && candidate.kind === "action")!;

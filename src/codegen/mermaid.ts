@@ -41,9 +41,13 @@ export function generateMermaid(ir: ModelIR): string {
     }
   }
   for (const query of ir.queries) {
+    const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId)!;
+    lines.push(`  ${safe(projection.id)}["Projection: ${projection.name}"]`);
     lines.push(`  ${safe(query.id)}["Query: ${query.name}"]`);
     lines.push(`  principal -->|authenticated caller| ${safe(query.id)}`);
-    lines.push(`  ${safe(query.id)} -->|reads| ${safe(query.sourceEntityId)}`);
+    lines.push(`  ${safe(query.id)} -->|reads source rows| ${safe(query.sourceEntityId)}`);
+    lines.push(`  ${safe(query.id)} -->|discloses selected fields| ${safe(projection.id)}`);
+    lines.push(`  ${safe(projection.id)} -->|shape from| ${safe(projection.sourceEntityId)}`);
     lines.push(`  ${safe(query.authorization.id)}["Authorize"] -->|guards| ${safe(query.id)}`);
     lines.push(`  ${safe(query.rowPolicy.id)}["Where"] -->|filters rows| ${safe(query.id)}`);
   }

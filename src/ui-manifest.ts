@@ -64,8 +64,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 4;
-  operationManifestVersion: 4;
+  uiManifestVersion: 5;
+  operationManifestVersion: 5;
   model: {
     id: string;
     name: string;
@@ -99,6 +99,20 @@ export interface UiManifest {
       snapshot: boolean;
     }[];
   }[];
+  projections: {
+    id: string;
+    name: string;
+    label: string;
+    sourceEntityId: string;
+    fields: {
+      projectionFieldId: string;
+      sourceFieldId: string;
+      name: string;
+      label: string;
+      presentation: UiPresentation;
+      nullable: boolean;
+    }[];
+  }[];
   actions: {
     operationId: string;
     name: string;
@@ -117,7 +131,7 @@ export interface UiManifest {
     name: string;
     label: string;
     filters: UiInputField[];
-    resultEntityId: string;
+    resultProjectionId: string;
     maxItems: number;
     errors: ManifestErrorKind[];
   }[];
@@ -167,12 +181,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 4) {
-    throw new Error(`E6201 UI generation requires operation manifest version 4, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 5) {
+    throw new Error(`E6201 UI generation requires operation manifest version 5, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 4,
+    uiManifestVersion: 5,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -208,6 +222,20 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         snapshot: field.snapshot,
       })),
     })),
+    projections: manifest.projections.map((projection) => ({
+      id: projection.id,
+      name: projection.name,
+      label: uiLabel(projection.name),
+      sourceEntityId: projection.sourceEntityId,
+      fields: projection.fields.map((field) => ({
+        projectionFieldId: field.id,
+        sourceFieldId: field.sourceFieldId,
+        name: field.name,
+        label: uiLabel(field.name),
+        presentation: uiPresentation(field.type),
+        nullable: field.nullable,
+      })),
+    })),
     actions: manifest.operations
       .filter((operation) => operation.kind === "action")
       .map((operation) => ({
@@ -230,7 +258,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         name: operation.name,
         label: uiLabel(operation.name),
         filters: inputFields(operation),
-        resultEntityId: operation.output.entityId,
+        resultProjectionId: operation.output.projectionId,
         maxItems: operation.output.maxItems,
         errors: operation.errors,
       })),

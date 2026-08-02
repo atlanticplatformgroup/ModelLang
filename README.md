@@ -1,4 +1,4 @@
-# ModelLang 0.29 reference compiler
+# ModelLang 0.30 reference compiler
 
 ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, reusable closed policies, reliable commands, typed domain events and consumers, one canonical enforcement decision plan, filtered public applicability, private transactional decision evidence, engineering policy coverage, a workflow-aware operation and UI boundary, deterministic provenance, guarded evolution, generated clients, and PostgreSQL enforcement.
 
@@ -61,19 +61,19 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.29 retains IR18 and its explicit `none` or `manual` recovery policy while adding a private generated terminal-failure self-claim boundary rather than new language syntax. Released IR9 through IR17 remain accepted evolution baselines when current source compiles to IR18. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.30 advances to IR19 with named, closed read projections. Released IR9 through IR18 remain accepted evolution baselines; their historical query result is retained as `legacyEntity` for change analysis without inventing projection identity. Both committed subtrees are golden fixtures and migration baselines.
 
-`operations.json` is manifest v4 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, action reliability and emitted-event IDs, and stable workflow bindings. It contains no runtime events, leases, keys, receipts, request hashes, HTTP paths, SQL names, database roles, or connection details. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
+`operations.json` is manifest v5 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, only query-reachable projection descriptors, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, action reliability and emitted-event IDs, and stable workflow bindings. Query outputs reference projection IDs rather than source entities. It contains no runtime events, leases, keys, receipts, request hashes, HTTP paths, SQL names, database roles, or connection details. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
 `events.json` is event manifest v5. It is the static typed event contract: stable event ID and name, payload entity ID, local or imported source contract, emitting action and consumer IDs, bounded or unbounded publication failure policy with static recovery eligibility, envelope v2, and the private-outbox/at-least-once delivery profile. It contains no queued payloads, principals, correlations, lease tokens, attempts, errors, dispositions, recovery audit, operator identity, outcomes, inbox state, or broker configuration.
 
 `decisions.json` is enforcement decision plan v2. In addition to normalized action rules, loads, locks, absence projection, and revision components, it carries stable policies, exact-one branch semantics, composition, and per-rule policy use. It is internal and expression-bearing. Both generated applicability functions and mutation functions consume this plan, so execution cannot drift from preflight logic.
 
-`capabilities.json` is public capability manifest v3, a filtered projection derived from the operation manifest and decision plan. It exposes action/input and emitted-event IDs, static reliability requirements, fixed applicability outcomes, safe explanation rule IDs, and opaque-revision behavior. It contains no command or event instances, keys, correlations, receipts, expressions, current state, SQL details, or authority grant.
+`capabilities.json` is public capability manifest v4, a filtered projection derived from the operation manifest and decision plan. It exposes action/input and emitted-event IDs, static reliability requirements, fixed applicability outcomes, safe explanation rule IDs, and opaque-revision behavior. It contains no command or event instances, keys, correlations, receipts, expressions, current state, SQL details, or authority grant.
 
-`semantic.json` is engineering semantic manifest v10. It includes stable event publication failure and recovery policies plus consumers, accepted source contracts, delivery identity, bounded or unbounded consumer failure policy, recovery eligibility, rules, read/lock sets, local effects, and ordered downstream event IDs in the existing action, policy, reliability, workflow, failure, and source-span closure.
+`semantic.json` is engineering semantic manifest v11. It includes every projection, separates query source read sets from disclosed fields, and retains stable event publication failure and recovery policies plus consumers, accepted source contracts, delivery identity, bounded or unbounded consumer failure policy, recovery eligibility, rules, lock sets, local effects, and ordered downstream event IDs.
 
-`ui.json` is UI manifest v4 derived exclusively from operation manifest v4. It adds static emitted-event IDs to the existing action, query, entity, enum, workflow, presentation, error, and reliability metadata.
+`ui.json` is UI manifest v5 derived exclusively from operation manifest v5. Query descriptors use `resultProjectionId`, and projection columns are the selected closed output shape. Entity descriptors remain available for action results and reference inputs but grant no read capability.
 
 `provenance.json` records compiler version, generator profile, model and IR identity, and the role and SHA-256 content hash of every other generated artifact. It omits wall-clock timestamps and its own recursive hash, so identical compilation inputs remain byte-for-byte deterministic.
 
@@ -93,7 +93,7 @@ The PostgreSQL backend emits:
 - bounded cursor-based terminal publication and consumer failure observation through a separate execute-only role with immutable private inspection audit;
 - immutable per-generation terminal-failure acknowledgement through a separate execute-only role, serialized with recovery and reflected only as a Boolean in private observation;
 - immutable first-writer terminal-failure self-claiming through another execute-only role, serialized with recovery and reflected only as a Boolean in private observation;
-- `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
+- `SECURITY DEFINER` query functions with fail-closed filters and bounded, directly allowlisted projection JSON-array results;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
 - idempotent administrative upgrades through the 0.29 private-failure-claim boundary.
@@ -113,7 +113,28 @@ The generated TypeScript clients expose only declared actions, queries, and acti
 - `typescript/failure-claim.ts` is a server-only typed adapter for immutable first-writer self-claiming of one current terminal recovery generation; it exposes no claimant identity.
 - `typescript/consumers.ts` is a server-only, broker-neutral adapter for invoking declared consumers through the execute-only database boundary and recording bounded private failure codes.
 
-Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
+Query methods return typed projection arrays. Predicates and ordering may read source fields that are absent from the result, but generated PostgreSQL, OpenAPI, HTTP validation, TypeScript, and UI contracts disclose only selected keys. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
+
+Named projections are closed allowlists:
+
+```modellang
+projection RequestSummary @stableId("prj_70d694c9a0a274dc79c6168e47d25968") from PurchaseRequest {
+  id @stableId("pfd_71d694c9a0a274dc79c6168e47d25968");
+  amount @stableId("pfd_73d694c9a0a274dc79c6168e47d25968");
+  status @stableId("pfd_74d694c9a0a274dc79c6168e47d25968");
+}
+
+query myRequests @stableId("qry_4406b045404a48449282db804f6167a8")(
+  caller actor: User
+) returns RequestSummary from PurchaseRequest as request {
+  authorize true;
+  where request.requester == actor;
+  orderBy request.id asc;
+  limit 100;
+}
+```
+
+The hidden `requester` field enforces row visibility but is never serialized. Optional selected fields remain required JSON keys whose stored null value is encoded as JSON `null`.
 
 Generated values are equally absent from create assignments and public inputs. For example:
 
@@ -679,8 +700,8 @@ The full suite validates reliable-command replay and conflicts, bounded event-pu
 - The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, transport retry scheduling, package publication, deployment, and observability to the host.
 - Reliable commands intentionally omit automatic retry scheduling, receipt expiry/deletion, multi-action sagas, asynchronous recovery, external side-effect deduplication, cross-model keys, and signed/public receipts. Retention is deployment-governed.
 - Event delivery intentionally omits network publication, broker-specific polling and acknowledgement, retry timing/backoff schedules, destinations or message movement, publication recovery/redrive, replay-message selection/retrieval, third-party assignment, release, reassignment, delegation, claim leases, workload balancing, approval workflows, notifications, alerts, dashboards, batch operations, bulk or automatic consumer recovery, authored separation of duties, retention, arbitrary payload transformations, imported-event emission, cyclic chains, cross-context translation, partition assignment, global ordering, sagas, and exactly-once network delivery. ModelLang supplies private lease-bound publication disposition, durable consumer failure accounting, opt-in single-event audited reopening, bounded observation, single-cycle acknowledgement, and immutable first-writer self-claiming only.
-- UI manifest v4 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, pagination controls, optimistic concurrency, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
-- Engineering semantic manifest v10 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, general recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
+- UI manifest v5 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, pagination controls, optimistic concurrency, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
+- Engineering semantic manifest v11 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, general recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.29 language is in [spec/0.29/LANGUAGE.md](./spec/0.29/LANGUAGE.md), with its [private failure-claim contract](./spec/0.29/FAILURE_CLAIM.md), [conformance requirements](./spec/0.29/CONFORMANCE.md), and [unstable boundaries](./spec/0.29/UNSTABLE.md). Earlier acknowledgement, observation, publication/consumer recovery, failure-disposition, event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.29 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.
+The normative 0.30 language is in [spec/0.30/LANGUAGE.md](./spec/0.30/LANGUAGE.md), with its [named read-projection contract](./spec/0.30/READ_PROJECTIONS.md), [conformance requirements](./spec/0.30/CONFORMANCE.md), and [unstable boundaries](./spec/0.30/UNSTABLE.md). Earlier claim, acknowledgement, observation, publication/consumer recovery, failure-disposition, event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.30 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.

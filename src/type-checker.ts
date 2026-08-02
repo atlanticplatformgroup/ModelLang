@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRProjection, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
-  ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
+  ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, ProjectionDecl, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
 
@@ -27,6 +27,7 @@ interface Scope {
 interface Symbols {
   enums: Map<string, Extract<Declaration, { kind: "enum" }>>;
   entities: Map<string, EntityDecl>;
+  projections: Map<string, ProjectionDecl>;
   events: Map<string, EventDecl>;
   policies: Map<string, PolicyDecl>;
   actions: Map<string, ActionDecl>;
@@ -79,6 +80,14 @@ function entityId(entity: EntityDecl): string {
 function fieldId(entity: EntityDecl, field: FieldDecl): string {
   const stableId = field.annotations.find((annotation) => annotation.name === "stableId")?.value;
   return `field:${String(stableId ?? `${entity.name}.${field.name}`)}`;
+}
+
+function projectionId(projection: ProjectionDecl): string {
+  return `projection:${String(projection.stableId?.value ?? projection.name)}`;
+}
+
+function projectionFieldId(projection: ProjectionDecl, field: ProjectionDecl["fields"][number]): string {
+  return `projectionField:${String(field.stableId?.value ?? `${projection.name}.${field.name}`)}`;
 }
 
 function enumId(enumeration: Extract<Declaration, { kind: "enum" }>): string {
@@ -179,6 +188,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     naming: { sqlCheckPrefix: `ck_enum_${snakeCase(declaration.name)}`, typescriptName: declaration.name },
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
+  const projections: IRProjection[] = [...symbols.projections.values()].map((projection) => lowerProjection(projection, symbols, file));
   const events: IREvent[] = [...symbols.events.values()].map((event) => {
     const payload = symbols.entities.get(event.payloadType.name);
     if (!payload || event.payloadType.collection || event.payloadType.moneyCurrency) {
@@ -219,7 +229,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 18,
+    irVersion: 19,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -231,6 +241,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     principal: { entityId: entityId(symbols.entities.get(principalName)!), bindingMechanism: "session_user" },
     enums,
     entities,
+    projections,
     events,
     policies,
     actions,
@@ -244,6 +255,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
 function collectSymbols(program: Program, file: string): Symbols {
   const enums = new Map<string, Extract<Declaration, { kind: "enum" }>>();
   const entities = new Map<string, EntityDecl>();
+  const projections = new Map<string, ProjectionDecl>();
   const events = new Map<string, EventDecl>();
   const policies = new Map<string, PolicyDecl>();
   const actions = new Map<string, ActionDecl>();
@@ -257,6 +269,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     top.set(declaration.name, declaration);
     if (declaration.kind === "enum") enums.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
+    if (declaration.kind === "projection") projections.set(declaration.name, declaration);
     if (declaration.kind === "event") events.set(declaration.name, declaration);
     if (declaration.kind === "policy") policies.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
@@ -287,10 +300,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, events, policies, actions, consumers, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
+  return { enums, entities, projections, events, policies, actions, consumers, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "con" | "qry" | "inv" | "exc" | "wfl" | "trn";
+type StableDeclarationKind = "ent" | "fld" | "prj" | "pfd" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "con" | "qry" | "inv" | "exc" | "wfl" | "trn";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -332,6 +345,12 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
   }
   for (const query of symbols.queries.values()) {
     if (query.stableId) validateStableId(query.stableId, "qry", stableIds, file);
+  }
+  for (const projection of symbols.projections.values()) {
+    if (projection.stableId) validateStableId(projection.stableId, "prj", stableIds, file);
+    for (const field of projection.fields) {
+      if (field.stableId) validateStableId(field.stableId, "pfd", stableIds, file);
+    }
   }
   for (const workflow of symbols.workflows.values()) {
     if (workflow.stableId) validateStableId(workflow.stableId, "wfl", stableIds, file);
@@ -438,6 +457,8 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
     const subject: Record<StableDeclarationKind, string> = {
       ent: "entity",
       fld: "field",
+      prj: "projection",
+      pfd: "projection field",
       enm: "enum",
       emv: "enum member",
       evt: "event",
@@ -928,6 +949,51 @@ function validateConsumerEventGraph(consumers: IRConsumer[], symbols: Symbols, f
   for (const event of symbols.events.values()) visit(eventId(event), [event.name]);
 }
 
+function lowerProjection(projection: ProjectionDecl, symbols: Symbols, file: string): IRProjection {
+  const sourceEntity = symbols.entities.get(projection.sourceType.name);
+  if (projection.sourceType.collection || projection.sourceType.moneyCurrency || !sourceEntity) {
+    throw new ModelError("E2621", `Projection source '${projection.sourceType.name}' must be an entity.`, projection.sourceType.span, file);
+  }
+  if (projection.fields.length === 0) {
+    throw new ModelError("E2622", `Projection '${projection.name}' must select at least one field.`, projection.span, file);
+  }
+  const sourceFields = symbols.fields.get(sourceEntity.name)!;
+  const seen = new Map<string, Span>();
+  const fields = projection.fields.map((selected) => {
+    const previous = seen.get(selected.name);
+    if (previous) {
+      throw new ModelError("E2623", `Duplicate projection field '${projection.name}.${selected.name}'.`, selected.span, file, {
+        message: "First selected here.",
+        span: previous,
+      });
+    }
+    seen.set(selected.name, selected.span);
+    const sourceField = sourceFields.get(selected.name);
+    if (!sourceField) {
+      throw new ModelError("E2624", `Unknown projection source field '${sourceEntity.name}.${selected.name}'.`, selected.nameSpan, file);
+    }
+    if (sourceField.type.collection) {
+      throw new ModelError("E2625", `Projection field '${sourceEntity.name}.${sourceField.name}' cannot select a collection-valued field.`, selected.span, file);
+    }
+    return {
+      id: projectionFieldId(projection, selected),
+      name: selected.name,
+      identity: identity(selected.stableId),
+      sourceFieldId: fieldId(sourceEntity, sourceField),
+      span: irSpan(selected.span, file),
+    };
+  });
+  return {
+    id: projectionId(projection),
+    name: projection.name,
+    identity: identity(projection.stableId),
+    sourceEntityId: entityId(sourceEntity),
+    fields,
+    span: irSpan(projection.span, file),
+    naming: { typescriptName: projection.name },
+  };
+}
+
 function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, file: string): IRQuery {
   const semanticId = queryId(query);
   const seen = new Map<string, Span>();
@@ -956,6 +1022,19 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   const sourceEntity = symbols.entities.get(query.sourceType.name);
   if (!sourceEntity) {
     throw new ModelError("E2601", `Query source '${query.sourceType.name}' must be an entity.`, query.sourceType.span, file);
+  }
+  const projection = symbols.projections.get(query.returnType.name);
+  if (query.returnType.collection || query.returnType.moneyCurrency || !projection) {
+    throw new ModelError("E2620", `Query return type '${query.returnType.name}' must be a projection.`, query.returnType.span, file);
+  }
+  const projectionSource = symbols.entities.get(projection.sourceType.name);
+  if (!projectionSource || entityId(projectionSource) !== entityId(sourceEntity)) {
+    throw new ModelError(
+      "E2626",
+      `Query '${query.name}' source '${sourceEntity.name}' must match projection '${projection.name}' source '${projection.sourceType.name}'.`,
+      query.returnType.span,
+      file,
+    );
   }
   const parameterMap = new Map(parameters.map((parameter) => [parameter.name, parameter]));
   const caller = parameters.find((parameter) => parameter.caller)!;
@@ -1004,6 +1083,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     callerParameterId: caller.id,
     callableParameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => parameter.id),
     sourceEntityId: entityId(sourceEntity),
+    returnProjectionId: projectionId(projection),
     rowAlias: query.rowAlias.name,
     authorization: {
       id: `authorize:${semanticId}`,
@@ -1667,6 +1747,7 @@ function buildEnforcement(
     entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `read:${query.id}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `disclose:${query.id}`, purpose: `Disclose only ${query.returnProjectionId} through the generated query boundary.`, layer: "PostgreSQL projection encoder", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
   }
   for (const workflow of workflows) {
     entries.push({

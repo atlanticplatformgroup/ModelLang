@@ -41,7 +41,7 @@ BEGIN
     '[]'::jsonb
   ) INTO v_result
   FROM (
-    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'resource', v_row."resource_id", 'reservedBy', v_row."reserved_by_id", 'startsAt', v_row."starts_at", 'endsAt', v_row."ends_at", 'indexed', v_row."indexed") AS "item",
+    SELECT jsonb_build_object('id', v_row."id", 'resource', v_row."resource_id", 'startsAt', v_row."starts_at", 'endsAt', v_row."ends_at") AS "item",
            v_row."starts_at" AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_reservations"."reservation" AS v_row

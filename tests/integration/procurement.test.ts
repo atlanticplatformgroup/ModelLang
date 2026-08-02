@@ -271,7 +271,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.29.0",
+      model_version: "0.30.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -1125,7 +1125,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.29.0', $1,
+        VALUES ('model:Procurement', '0.30.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1608,8 +1608,10 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const employeeTwoRows = await clients.employeeTwo.myRequests({});
     expect(employeeOneRows.some((request) => request.id === employeeOneId)).toBe(true);
     expect(employeeTwoRows.some((request) => request.id === employeeTwoId)).toBe(true);
-    expect(employeeOneRows.every((request) => request.requester === "00000000-0000-4000-8000-000000000001")).toBe(true);
-    expect(employeeTwoRows.every((request) => request.requester === "00000000-0000-4000-8000-000000000002")).toBe(true);
+    expect(employeeOneRows.every((request) => !Object.hasOwn(request, "requester"))).toBe(true);
+    expect(employeeTwoRows.every((request) => !Object.hasOwn(request, "requester"))).toBe(true);
+    expect(employeeOneRows.every((request) => Object.hasOwn(request, "approvedBy"))).toBe(true);
+    expect(employeeOneRows.find((request) => request.id === employeeOneId)?.approvedBy).toBeNull();
     expect(employeeOneRows.some((request) => request.id === employeeTwoId)).toBe(false);
     expect(employeeTwoRows.some((request) => request.id === employeeOneId)).toBe(false);
     await expect(clients.unbound.myRequests({})).rejects.toBeInstanceOf(IdentityBindingError);

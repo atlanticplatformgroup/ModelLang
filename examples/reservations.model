@@ -1,4 +1,4 @@
-model Reservations version "0.29.0";
+model Reservations version "0.30.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -59,10 +59,17 @@ consumer indexReservation @stableId("con_20d694c9a0a274dc79c6168e47d25968") on R
   emit ReservationIndexed;
 }
 
+projection ReservationSummary @stableId("prj_80d694c9a0a274dc79c6168e47d25968") from Reservation {
+  id @stableId("pfd_81d694c9a0a274dc79c6168e47d25968");
+  resource @stableId("pfd_82d694c9a0a274dc79c6168e47d25968");
+  startsAt @stableId("pfd_83d694c9a0a274dc79c6168e47d25968");
+  endsAt @stableId("pfd_84d694c9a0a274dc79c6168e47d25968");
+}
+
 query reservationsForResource @stableId("qry_94d8a56f4c2640fab58a4c2190c35c69")(
   caller actor: User,
   resource: Resource
-) from Reservation as reservation {
+) returns ReservationSummary from Reservation as reservation {
   authorize true;
   where reservation.resource == resource;
   orderBy reservation.startsAt asc;

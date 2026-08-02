@@ -98,12 +98,12 @@
   "type": "object",
   "required": [
     "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
-    "model", "principal", "policies", "events", "actions", "consumers", "queries"
+    "model", "principal", "projections", "policies", "events", "actions", "consumers", "queries"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 10 },
-    "profile": { "const": "sml-transactional-core/10" },
+    "manifestVersion": { "const": 11 },
+    "profile": { "const": "sml-transactional-core/11" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 18 },
+          "irVersion": { "const": 19 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -146,6 +146,35 @@
         "requestSupplied": { "const": false }
       },
       "additionalProperties": false
+    },
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "source", "sourceEntityId", "fields"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^projection:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "sourceEntityId": { "type": "string", "pattern": "^entity:" },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "sourceFieldId", "source"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^projectionField:" },
+                "name": { "type": "string" },
+                "sourceFieldId": { "type": "string", "pattern": "^field:" },
+                "source": { "$ref": "#/$defs/span" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "policies": {
       "type": "array",
@@ -383,7 +412,7 @@
         "type": "object",
         "required": [
           "id", "name", "source", "caller", "input", "output", "authorization",
-          "rowPolicy", "readSet", "orderBy", "failureClasses"
+          "rowPolicy", "readSet", "disclosureSet", "orderBy", "failureClasses"
         ],
         "properties": {
           "id": { "type": "string", "pattern": "^query:" },
@@ -393,9 +422,9 @@
           "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
           "output": {
             "type": "object",
-            "required": ["entityId", "cardinality", "maxItems"],
+            "required": ["projectionId", "cardinality", "maxItems"],
             "properties": {
-              "entityId": { "type": "string", "pattern": "^entity:" },
+              "projectionId": { "type": "string", "pattern": "^projection:" },
               "cardinality": { "const": "many" },
               "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
             },
@@ -404,6 +433,16 @@
           "authorization": { "$ref": "#/$defs/rule" },
           "rowPolicy": { "$ref": "#/$defs/rule" },
           "readSet": { "$ref": "#/$defs/readSet" },
+          "disclosureSet": {
+            "type": "object",
+            "required": ["projectionId", "projectionFieldIds", "sourceFieldIds"],
+            "properties": {
+              "projectionId": { "type": "string", "pattern": "^projection:" },
+              "projectionFieldIds": { "type": "array", "items": { "type": "string", "pattern": "^projectionField:" } },
+              "sourceFieldIds": { "type": "array", "items": { "type": "string", "pattern": "^field:" } }
+            },
+            "additionalProperties": false
+          },
           "orderBy": {
             "type": "object",
             "required": ["fieldId", "direction", "identityTieBreaker"],

@@ -12,6 +12,13 @@ const schemaUrl = schemaCandidates.find((candidate) => existsSync(fileURLToPath(
 if (!schemaUrl) throw new Error("E4008 Cannot locate schemas/model-ir.schema.json");
 const schema = JSON.parse(readFileSync(schemaUrl, "utf8")) as object;
 const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+const evolutionSchema = JSON.parse(JSON.stringify(schema)) as {
+  required: string[];
+  $defs: { query: { required: string[] } };
+};
+evolutionSchema.required = evolutionSchema.required.filter((name) => name !== "projections");
+evolutionSchema.$defs.query.required = evolutionSchema.$defs.query.required.filter((name) => name !== "returnProjectionId");
+const validateEvolution = new Ajv2020({ allErrors: true, strict: true }).compile(evolutionSchema);
 
 export function validateIR(ir: ModelIR): void {
   const sourceFile = ir.model.sourceFile;
@@ -24,17 +31,21 @@ export function validateIR(ir: ModelIR): void {
 export function validateEvolutionIR(ir: ModelIR): void {
   const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
   const irVersion = Number(legacy.irVersion);
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(irVersion)) {
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(irVersion)) {
     throw new ModelError(
       "E3002",
-      `Evolution input must use released canonical IR9 through IR18; received '${String(legacy.irVersion)}'.`,
+      `Evolution input must use released canonical IR9 through IR19; received '${String(legacy.irVersion)}'.`,
       internalSpan(),
       ir.model?.sourceFile,
     );
   }
+  if (irVersion === 19) {
+    validateIR(ir);
+    return;
+  }
   const normalized = {
     ...(ir as unknown as Record<string, unknown>),
-    irVersion: 18,
+    irVersion: 19,
     ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
     ...(irVersion < 12 && (legacy as { events?: unknown }).events === undefined ? { events: [] } : {}),
     ...(irVersion < 13 ? { consumers: [] } : {}),
@@ -64,5 +75,8 @@ export function validateEvolutionIR(ir: ModelIR): void {
       };
     }),
   } as unknown as ModelIR;
-  validateIR(normalized);
+  if (!validateEvolution(normalized as unknown)) {
+    const detail = validateEvolution.errors?.map((error: ErrorObject) => `${error.instancePath || "/"} ${error.message}`).join("; ") ?? "unknown schema failure";
+    throw new ModelError("E3002", `Evolution IR failed released schema normalization: ${detail}`, internalSpan(), ir.model?.sourceFile);
+  }
 }

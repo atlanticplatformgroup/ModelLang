@@ -2,7 +2,7 @@ import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
   ActionDecl, Annotation, Assignment, ConsumerDecl, Declaration, Effect, EntityDecl, EventDecl, ExclusionDecl,
-  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
+  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, ProjectionDecl, QueryDecl, RequireDecl, TypeRef,
   PolicyDecl, WorkflowDecl,
 } from "./syntax-ast.js";
 
@@ -56,13 +56,14 @@ class Parser {
     while (!this.at("eof")) {
       if (this.atWord("enum")) declarations.push(this.parseEnum());
       else if (this.atWord("entity")) declarations.push(this.parseEntity());
+      else if (this.atWord("projection")) declarations.push(this.parseProjection());
       else if (this.atWord("event")) declarations.push(this.parseEvent());
       else if (this.atWord("policy")) declarations.push(this.parsePolicy());
       else if (this.atWord("action")) declarations.push(this.parseAction());
       else if (this.atWord("consumer")) declarations.push(this.parseConsumer());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
       else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
-      else this.fail("E1103", "Expected enum, entity, event, policy, action, consumer, query, or workflow declaration.");
+      else this.fail("E1103", "Expected enum, entity, projection, event, policy, action, consumer, query, or workflow declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -108,6 +109,31 @@ class Parser {
     }
     const end = this.expect("}");
     return { kind: "entity", name: name.text, nameSpan: name.span, stableId, members, span: this.span(start, end) };
+  }
+
+  private parseProjection(): ProjectionDecl {
+    const start = this.expectWord("projection");
+    const name = this.identifier("Expected projection name.");
+    const stableId = this.at("@") ? this.parseStableId("projection declaration") : undefined;
+    this.expectWord("from");
+    const sourceType = this.parseTypeRef();
+    this.expect("{");
+    const fields: ProjectionDecl["fields"] = [];
+    while (!this.at("}")) {
+      const field = this.identifier("Expected projection field name.");
+      const fieldStableId = this.at("@") ? this.parseStableId("projection field") : undefined;
+      const end = this.expect(";");
+      fields.push({
+        kind: "projectionField",
+        name: field.text,
+        nameSpan: field.span,
+        stableId: fieldStableId,
+        span: this.span(field, end),
+      });
+    }
+    if (fields.length === 0) this.fail("E1150", "A projection must select at least one field.");
+    const end = this.expect("}");
+    return { kind: "projection", name: name.text, nameSpan: name.span, stableId, sourceType, fields, span: this.span(start, end) };
   }
 
   private parseEvent(): EventDecl {
@@ -442,6 +468,8 @@ class Parser {
       } while (!this.at(")"));
     }
     this.expect(")");
+    this.expectWord("returns");
+    const returnType = this.parseTypeRef();
     this.expectWord("from");
     const sourceType = this.parseTypeRef();
     this.expectWord("as");
@@ -468,6 +496,7 @@ class Parser {
       nameSpan: name.span,
       stableId,
       parameters,
+      returnType,
       sourceType,
       rowAlias: { name: alias.text, span: alias.span },
       authorize,

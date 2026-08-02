@@ -1,11 +1,12 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { moneyProfile } from "./money.js";
-import type { ActionDecl, ConsumerDecl, Declaration, EntityDecl, Program, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
+import type { ActionDecl, ConsumerDecl, Declaration, EntityDecl, Program, ProjectionDecl, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
   program: Program;
   declarations: ReadonlyMap<string, Declaration>;
   entities: ReadonlyMap<string, EntityDecl>;
+  projections: ReadonlyMap<string, ProjectionDecl>;
   actions: ReadonlyMap<string, ActionDecl>;
   consumers: ReadonlyMap<string, ConsumerDecl>;
   queries: ReadonlyMap<string, QueryDecl>;
@@ -28,6 +29,7 @@ function validateType(type: { name: string; moneyCurrency?: string; span: Span }
 export function resolveProgram(program: Program, file: string): ResolvedProgram {
   const declarations = new Map<string, Declaration>();
   const entities = new Map<string, EntityDecl>();
+  const projections = new Map<string, ProjectionDecl>();
   const actions = new Map<string, ActionDecl>();
   const consumers = new Map<string, ConsumerDecl>();
   const queries = new Map<string, QueryDecl>();
@@ -42,6 +44,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     }
     declarations.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
+    if (declaration.kind === "projection") projections.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
     if (declaration.kind === "consumer") consumers.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
@@ -85,7 +88,15 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
       if (!entities.has(declaration.sourceType.name)) {
         throw new ModelError("E2601", `Query source '${declaration.sourceType.name}' must be an entity.`, declaration.sourceType.span, file);
       }
+      if (declaration.returnType.collection || declaration.returnType.moneyCurrency || !projections.has(declaration.returnType.name)) {
+        throw new ModelError("E2620", `Query return type '${declaration.returnType.name}' must be a projection.`, declaration.returnType.span, file);
+      }
+    }
+    if (declaration.kind === "projection") {
+      if (declaration.sourceType.collection || declaration.sourceType.moneyCurrency || !entities.has(declaration.sourceType.name)) {
+        throw new ModelError("E2621", `Projection source '${declaration.sourceType.name}' must be an entity.`, declaration.sourceType.span, file);
+      }
     }
   }
-  return { program, declarations, entities, actions, consumers, queries, workflows, typeNames };
+  return { program, declarations, entities, projections, actions, consumers, queries, workflows, typeNames };
 }

@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.29](./spec/0.29/LANGUAGE.md). It retains the complete 0.28 language and adds separately authorized, immutable first-writer self-claiming of one current terminal publication or consumer recovery generation without changing failure, acknowledgement, recovery, delivery, broker, or domain state.
+The current normative specification is [ModelLang 0.30](./spec/0.30/LANGUAGE.md). It retains the complete 0.29 language and adds stable named read projections as mandatory closed query result shapes without moving authorization or row policy out of the query.
+
+- [Named read-projection semantics](./spec/0.30/READ_PROJECTIONS.md)
+- [0.30 grammar additions](./spec/0.30/GRAMMAR.ebnf)
+- [0.30 conformance requirements](./spec/0.30/CONFORMANCE.md)
+- [0.30 unstable projection boundaries](./spec/0.30/UNSTABLE.md)
 
 - [Private terminal-failure self-claim semantics](./spec/0.29/FAILURE_CLAIM.md)
 - [0.29 unchanged grammar statement](./spec/0.29/GRAMMAR.ebnf)

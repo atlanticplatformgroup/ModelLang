@@ -18,7 +18,7 @@
             "strategy": { "const": "explicitStableId" },
             "stableId": {
               "type": "string",
-              "pattern": "^(ent|fld|enm|emv|evt|pol|pbr|act|con|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
+              "pattern": "^(ent|fld|prj|pfd|enm|emv|evt|pol|pbr|act|con|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
             }
           },
           "additionalProperties": false
@@ -148,6 +148,32 @@
         "temporalExclusions": { "type": "array", "items": { "$ref": "#/$defs/exclusion" } }
       }
     },
+    "projectionField": {
+      "type": "object",
+      "required": ["id", "name", "identity", "sourceFieldId", "span"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^projectionField:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "sourceFieldId": { "type": "string", "pattern": "^field:" },
+        "span": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "projection": {
+      "type": "object",
+      "required": ["id", "name", "identity", "sourceEntityId", "fields", "span", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^projection:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "sourceEntityId": { "type": "string", "pattern": "^entity:" },
+        "fields": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/projectionField" } },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "action": {
       "type": "object",
       "required": ["id", "name", "identity", "emittedEventIds"],
@@ -246,11 +272,13 @@
     },
     "query": {
       "type": "object",
-      "required": ["id", "name", "identity"],
+      "required": ["id", "name", "identity", "sourceEntityId", "returnProjectionId"],
       "properties": {
         "id": { "type": "string", "pattern": "^query:" },
         "name": { "type": "string" },
-        "identity": { "$ref": "#/$defs/identity" }
+        "identity": { "$ref": "#/$defs/identity" },
+        "sourceEntityId": { "type": "string", "pattern": "^entity:" },
+        "returnProjectionId": { "type": "string", "pattern": "^projection:" }
       }
     },
     "workflowTransition": {
@@ -284,9 +312,9 @@
     }
   },
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "projections", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 18 },
+    "irVersion": { "const": 19 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -319,6 +347,7 @@
     },
     "enums": { "type": "array", "items": { "$ref": "#/$defs/enum" } },
     "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" } },
+    "projections": { "type": "array", "items": { "$ref": "#/$defs/projection" } },
     "events": {
       "type": "array",
       "items": {

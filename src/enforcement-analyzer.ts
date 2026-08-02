@@ -73,6 +73,11 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   requireEntry(ir, `order:${query.id}`, query.span);
   requireEntry(ir, `limit:${query.id}`, query.span);
   requireEntry(ir, `read:${query.id}`, query.span);
+  requireEntry(ir, `disclose:${query.id}`, query.span);
+  const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId);
+  if (!projection || projection.sourceEntityId !== query.sourceEntityId) {
+    fail(ir, `Query '${query.name}' has an invalid disclosure projection.`, query.span);
+  }
 }
 
 function checkWorkflow(ir: ModelIR, workflow: IRWorkflow): void {

@@ -1,6 +1,6 @@
 import { ModelError, internalSpan } from "./diagnostics.js";
 import type {
-  IRAction, IRConsumer, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRQuery,
+  IRAction, IRConsumer, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRProjection, IRQuery,
   IRPolicy, IRTemporalExclusion, IRWorkflow, IRWorkflowTransition, ModelIR,
 } from "./ir.js";
 import {
@@ -109,6 +109,10 @@ export function requireExplicitIds(ir: ModelIR): void {
     for (const branch of policy.branches) requireExplicit(ir, branch, `branch in policy '${policy.name}'`, "policyBranch");
   }
   for (const query of ir.queries) requireExplicit(ir, query, "query", "query");
+  for (const projection of (ir as ModelIR & { projections?: IRProjection[] }).projections ?? []) {
+    requireExplicit(ir, projection, "projection", "projection");
+    for (const field of projection.fields) requireExplicit(ir, field, `field in projection '${projection.name}'`, "projectionField");
+  }
   for (const workflow of ir.workflows) {
     requireExplicit(ir, workflow, "workflow", "workflow");
     for (const transition of workflow.transitions) {
@@ -194,6 +198,16 @@ function policyBranchStructure(branch: IRPolicy["branches"][number]): unknown {
 function queryStructure(query: IRQuery): unknown {
   const { name: _name, identity: _identity, ...structure } = query;
   return structure;
+}
+
+function projectionStructure(projection: IRProjection): unknown {
+  const { name: _name, identity: _identity, fields, span: _span, naming: _naming, ...structure } = projection;
+  return {
+    ...structure,
+    fields: fields
+      .map(({ name, identity: _fieldIdentity, span: _fieldSpan, ...field }) => ({ ...field, name }))
+      .sort((left, right) => left.id.localeCompare(right.id)),
+  };
 }
 
 function workflowStructure(workflow: IRWorkflow): unknown {
@@ -373,8 +387,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(Number(previous.irVersion)) || current.irVersion !== 18) {
-    fail(current, "E2803", "Migration planning requires a released canonical IR9 through IR18 baseline and canonical IR18 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(Number(previous.irVersion)) || current.irVersion !== 19) {
+    fail(current, "E2803", "Migration planning requires a released canonical IR9 through IR19 baseline and canonical IR19 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -615,6 +629,21 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
         to: currentAction.naming.sqlFunction,
         parameterTypes: callableSqlTypes(previousAction),
       });
+    }
+  }
+
+  const previousProjections = (previous as ModelIR & { projections?: IRProjection[] }).projections ?? [];
+  const projectionDiff = additiveDiff(previousProjections, current.projections, "Projection", current);
+  const previousProjectionsById = byId(previousProjections);
+  const reachableProjectionIds = new Set([
+    ...previous.queries.map((query) => query.returnProjectionId).filter(Boolean),
+    ...current.queries.map((query) => query.returnProjectionId),
+  ]);
+  for (const projection of projectionDiff.existing) {
+    const oldProjection = previousProjectionsById.get(projection.id)!;
+    if (reachableProjectionIds.has(projection.id)
+      && !same(projectionStructure(oldProjection), projectionStructure(projection))) {
+      fail(current, "E2807", `Reachable projection contract changed for '${projection.name}'; reviewed migration is required.`);
     }
   }
 

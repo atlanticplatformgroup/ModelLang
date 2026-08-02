@@ -92,7 +92,10 @@ action comment @stableId("act_cccccccccccccccccccccccccccccccc")(
   authorize true;
   create Comment { id = id; ticket = ticket; body = body; }
 }
-query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) from Ticket as ticket {
+projection TicketSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from Ticket {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns TicketSummary from Ticket as ticket {
   authorize true;
   where ticket.status == Status.SUBMITTED;
   orderBy ticket.id asc;
@@ -115,7 +118,7 @@ policy MayCreate(actor: User) { allow authenticated: actor == actor; }
 action make(caller actor: User) -> Record { authorize MayCreate(actor); create Record { } }`;
     const assigned = assignStableIds(source, "policy-ids.model", (kind) => {
       const prefix: Record<StableIdKind, string> = {
-        entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
+        entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
         action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
       };
       return `${prefix[kind]}_${kind === "policy" ? "a" : kind === "policyBranch" ? "b" : "c".repeat(1)}${"0".repeat(31)}`;
@@ -182,7 +185,7 @@ workflow TaskLifecycle for Task.state {
   transition submit: State.DRAFT -> State.SUBMITTED by submit;
 }`;
     const prefix: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
+      entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -221,7 +224,8 @@ consumer closeAfterCreate on BookingCreated(payload booking: Booking) -> Booking
   authorize true;
   update booking { state = State.CLOSED; }
 }
-query bookings(caller actor: User) from Booking as booking {
+projection BookingSummary from Booking { id; }
+query bookings(caller actor: User) returns BookingSummary from Booking as booking {
   authorize true;
   where true;
   orderBy booking.id asc;
@@ -230,7 +234,7 @@ query bookings(caller actor: User) from Booking as booking {
     const seen: StableIdKind[] = [];
     const counters = new Map<StableIdKind, number>();
     const prefixes: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
+      entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -241,9 +245,9 @@ query bookings(caller actor: User) from Booking as booking {
       return `${prefixes[kind]}_${next.toString(16).padStart(32, "0")}`;
     });
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
-      "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "consumer", "query",
+      "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(18);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(19);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -264,7 +268,9 @@ query bookings(caller actor: User) from Booking as booking {
     ["invariant", `entity User { id: UUID @id; invariant valid @stableId("bad"): id == id; }`],
     ["exclusion", `entity User { id: UUID @id; } entity Resource { id: UUID @id; } entity Slot { id: UUID @id; resource: Resource; starts: DateTime; ends: DateTime; exclusion no_overlap @stableId("bad"): noOverlap(resource, starts, ends); }`],
     ["action", `entity User { id: UUID @id; } action make @stableId("bad")(caller actor: User, id: UUID) -> User { authorize true; create User { id = id; } }`],
-    ["query", `entity User { id: UUID @id; } query users @stableId("bad")(caller actor: User) from User as user { authorize true; where true; orderBy user.id asc; limit 10; }`],
+    ["projection", `entity User { id: UUID @id; } projection UserSummary @stableId("bad") from User { id; }`],
+    ["projection field", `entity User { id: UUID @id; } projection UserSummary from User { id @stableId("bad"); }`],
+    ["query", `entity User { id: UUID @id; } projection UserSummary from User { id; } query users @stableId("bad")(caller actor: User) returns UserSummary from User as user { authorize true; where true; orderBy user.id asc; limit 10; }`],
     ["workflow", `enum State { DRAFT } entity User { id: UUID @id; state: State = State.DRAFT; } workflow Lifecycle @stableId("bad") for User.state { initial State.DRAFT; }`],
     ["transition", `enum State { DRAFT, DONE } entity User { id: UUID @id; state: State = State.DRAFT; } workflow Lifecycle for User.state { initial State.DRAFT; transition finish @stableId("bad"): State.DRAFT -> State.DONE by establish; }`],
   ])("rejects an invalid %s stable ID", (_name, declaration) => {
@@ -290,7 +296,10 @@ action change @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: Us
   authorize actor.state == State.OPEN;
   create User { id = id; state = State.CLOSED; }
 }
-query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) from User as user {
+projection UserSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from User {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns UserSummary from User as user {
   authorize true;
   where user.state == State.OPEN;
   orderBy user.id asc;
@@ -337,6 +346,24 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
+  it("normalizes an IR18 entity result without inventing projection identity and rejects automatic narrowing", () => {
+    const current = compileText(readFileSync("examples/procurement.model", "utf8"), "examples/procurement.model");
+    const legacy = structuredClone(current) as unknown as Record<string, unknown> & {
+      irVersion: number;
+      model: { version: string; sourceHash: string };
+      queries: { returnProjectionId?: string }[];
+    };
+    legacy.irVersion = 18;
+    legacy.model.version = "0.29.0";
+    legacy.model.sourceHash = `sha256:${"0".repeat(64)}`;
+    delete legacy.projections;
+    delete legacy.queries[0]!.returnProjectionId;
+    expect(() => validateEvolutionIR(legacy as unknown as typeof current)).not.toThrow();
+    const migrationError = error(() => planMigration(legacy as unknown as typeof current, current));
+    expect(migrationError.code).toBe("E2807");
+    expect(migrationError.message).toContain("Query semantics changed");
+  });
+
   it("normalizes IR15 recovery omission and rejects a real recovery-policy change", () => {
     const source = (version: string, recovery: boolean) => `model RecoveryEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -396,7 +423,7 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR17 artifacts as previous baselines for an IR18 migration", () => {
+  it("accepts released IR9 through IR18 artifacts as previous baselines for an IR19 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
     for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16, 17]) {
@@ -589,7 +616,7 @@ action make @stableId("act_11111111111111111111111111111111")(caller actor: User
     );
     const targetError = error(() => planMigration(previous, renamedTarget));
     expect(targetError.code).toBe("E2807");
-    expect(targetError.message).toContain("only transition additions are safe in 0.10");
+    expect(targetError.message).toContain("Reachable projection contract changed");
   });
 
   it("matches by ID and emits deterministic entity and field renames", () => {
@@ -682,9 +709,12 @@ action ${names.actionName} @stableId("act_11111111111111111111111111111111")(
   authorize true;
   create ${names.entityName} { id = id; resource = resource; ${names.startField} = startsAt; endsAt = endsAt; }
 }
+projection ResultSummary @stableId("prj_11111111111111111111111111111111") from ${names.entityName} {
+  id @stableId("pfd_11111111111111111111111111111111");
+}
 query ${names.queryName} @stableId("qry_11111111111111111111111111111111")(
   caller actor: User, resource: Resource
-) from ${names.entityName} as row {
+) returns ResultSummary from ${names.entityName} as row {
   authorize true;
   where row.resource == resource;
   orderBy row.${names.startField} asc;

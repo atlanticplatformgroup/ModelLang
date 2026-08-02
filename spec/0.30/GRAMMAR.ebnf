@@ -1,0 +1,25 @@
+(* ModelLang 0.30 extends the complete ModelLang 0.29 grammar. *)
+
+declaration = prior_declaration | projection_declaration ;
+
+projection_declaration =
+  "projection", identifier, [ stable_id ], "from", identifier,
+  "{", projection_field, { projection_field }, "}" ;
+
+projection_field = identifier, [ stable_id ], ";" ;
+
+query_declaration =
+  "query", identifier, [ stable_id ], "(", [ parameter_list ], ")",
+  "returns", identifier,
+  "from", identifier, "as", identifier,
+  "{",
+    "authorize", expression, ";",
+    "where", expression, ";",
+    "orderBy", path, ( "asc" | "desc" ), ";",
+    "limit", integer, ";",
+  "}" ;
+
+stable_id = "@stableId", "(", string, ")" ;
+
+(* A projection stable ID uses prj_<32 lowercase hex digits>. *)
+(* A projection-field stable ID uses pfd_<32 lowercase hex digits>. *)

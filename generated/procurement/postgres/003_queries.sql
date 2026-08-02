@@ -32,7 +32,7 @@ BEGIN
     '[]'::jsonb
   ) INTO v_result
   FROM (
-    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'requester', v_row."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_row."amount"::numeric(20, 2))::text), 'status', v_row."status", 'approvedBy', v_row."approved_by_id", 'approvedByRoles', v_row."approved_by_roles", 'approvalObserved', v_row."approval_observed") AS "item",
+    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_row."amount"::numeric(20, 2))::text), 'status', v_row."status", 'approvedBy', v_row."approved_by_id") AS "item",
            v_row."id" AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_procurement"."purchase_request" AS v_row

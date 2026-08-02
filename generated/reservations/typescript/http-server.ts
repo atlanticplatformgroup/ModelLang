@@ -34,7 +34,9 @@ interface OperationDefinition {
   route: string;
   endpoint: "execution" | "applicability";
   input: readonly { name: string; type: RuntimeValueType }[];
-  output: { entityId: string; cardinality: "one" | "many"; maxItems?: number };
+  output:
+    | { entityId: string; cardinality: "one" }
+    | { projectionId: string; cardinality: "many"; maxItems: number };
   action: boolean;
   idempotency: "required" | "unsupported";
 }
@@ -92,7 +94,7 @@ const operationDefinitions = [
       }
     ],
     "output": {
-      "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
       "cardinality": "many",
       "maxItems": 100
     },
@@ -237,6 +239,45 @@ const entityDefinitions = {
   string,
   readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
 >>;
+const projectionDefinitions = {
+  "projection:prj_80d694c9a0a274dc79c6168e47d25968": [
+    {
+      "name": "id",
+      "type": {
+        "kind": "scalar",
+        "name": "UUID"
+      },
+      "nullable": false
+    },
+    {
+      "name": "resource",
+      "type": {
+        "kind": "entity",
+        "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+      },
+      "nullable": false
+    },
+    {
+      "name": "startsAt",
+      "type": {
+        "kind": "scalar",
+        "name": "DateTime"
+      },
+      "nullable": false
+    },
+    {
+      "name": "endsAt",
+      "type": {
+        "kind": "scalar",
+        "name": "DateTime"
+      },
+      "nullable": false
+    }
+  ]
+} as Readonly<Record<
+  string,
+  readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
+>>;
 const safeExplanations = {
   "action:act_508ad810a19d4b79a5009871de5cd26b": {
     "authorization": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
@@ -361,12 +402,27 @@ function validEntity(value: unknown, entityId: string): boolean {
     && (entity[field.name] === null ? field.nullable : validValue(entity[field.name], field.type)));
 }
 
+function validProjection(value: unknown, projectionId: string): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fields = projectionDefinitions[projectionId];
+  if (!fields) return false;
+  const projection = value as Record<string, unknown>;
+  const allowed = new Set(fields.map((field) => field.name));
+  if (Object.keys(projection).some((name) => !allowed.has(name))) return false;
+  return fields.every((field) => Object.hasOwn(projection, field.name)
+    && (projection[field.name] === null ? field.nullable : validValue(projection[field.name], field.type)));
+}
+
 function validateOutput(definition: OperationDefinition, value: unknown): void {
-  const valid = definition.output.cardinality === "one"
-    ? validEntity(value, definition.output.entityId)
-    : Array.isArray(value)
-      && value.length <= (definition.output.maxItems ?? 0)
-      && value.every((entity) => validEntity(entity, definition.output.entityId));
+  let valid: boolean;
+  if (definition.output.cardinality === "one") {
+    valid = validEntity(value, definition.output.entityId);
+  } else {
+    const output = definition.output;
+    valid = Array.isArray(value)
+      && value.length <= output.maxItems
+      && value.every((projection) => validProjection(projection, output.projectionId));
+  }
   if (!valid) throw new Error(`Operation executor returned an invalid result for '${definition.id}'`);
 }
 

@@ -128,16 +128,33 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
     enumeration.name,
     { type: "string", enum: enumeration.members.map((member) => member.value) },
   ]));
+  const projectionSchemas = Object.fromEntries(manifest.projections.map((projection) => [
+    projection.name,
+    {
+      type: "object",
+      additionalProperties: false,
+      required: projection.fields.map((field) => field.name),
+      properties: Object.fromEntries(projection.fields.map((field) => [
+        field.name,
+        field.nullable ? nullable(valueSchema(manifest, field.type)) : valueSchema(manifest, field.type),
+      ])),
+    },
+  ]));
   const executionPaths = manifest.operations.map((operation) => {
-    const outputEntity = manifest.entities.find((entity) => entity.id === operation.output.entityId);
-    if (!outputEntity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
-    const outputSchema = operation.output.cardinality === "one"
-      ? { $ref: `#/components/schemas/${outputEntity.name}` }
-      : {
-          type: "array",
-          maxItems: operation.output.maxItems,
-          items: { $ref: `#/components/schemas/${outputEntity.name}` },
-        };
+    let outputSchema: JsonSchema;
+    if (operation.kind === "action") {
+      const outputEntity = manifest.entities.find((entity) => entity.id === operation.output.entityId);
+      if (!outputEntity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
+      outputSchema = { $ref: `#/components/schemas/${outputEntity.name}` };
+    } else {
+      const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
+      if (!projection) throw new Error(`E6104 Missing output projection '${operation.output.projectionId}'.`);
+      outputSchema = {
+        type: "array",
+        maxItems: operation.output.maxItems,
+        items: { $ref: `#/components/schemas/${projection.name}` },
+      };
+    }
     return [
       operationRoute(operation),
       {
@@ -269,6 +286,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       schemas: {
         ...enumSchemas,
         ...entitySchemas,
+        ...projectionSchemas,
         ModelProblem: {
           type: "object",
           additionalProperties: false,
@@ -339,6 +357,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
 function typeImports(manifest: OperationManifest): string[] {
   return [
     ...manifest.entities.map((entity) => entity.name),
+    ...manifest.projections.map((projection) => projection.name),
     ...manifest.operations.map(operationInputName),
     "ApplicabilityDecision",
     "ApplicabilityOptions",
@@ -347,9 +366,14 @@ function typeImports(manifest: OperationManifest): string[] {
 }
 
 function returnType(manifest: OperationManifest, operation: ManifestOperation): string {
-  const entity = manifest.entities.find((candidate) => candidate.id === operation.output.entityId);
-  if (!entity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
-  return operation.output.cardinality === "one" ? entity.name : `${entity.name}[]`;
+  if (operation.kind === "action") {
+    const entity = manifest.entities.find((candidate) => candidate.id === operation.output.entityId);
+    if (!entity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
+    return entity.name;
+  }
+  const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
+  if (!projection) throw new Error(`E6104 Missing output projection '${operation.output.projectionId}'.`);
+  return `${projection.name}[]`;
 }
 
 function generateHttpClient(manifest: OperationManifest): string {
@@ -448,6 +472,14 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
       nullable: field.nullable,
     })),
   ]));
+  const projectionDefinitions = Object.fromEntries(manifest.projections.map((projection) => [
+    projection.id,
+    projection.fields.map((field) => ({
+      name: field.name,
+      type: field.type,
+      nullable: field.nullable,
+    })),
+  ]));
   const operationIds = manifest.operations.map((operation) => JSON.stringify(operation.id)).join(" | ");
   const actionIds = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => JSON.stringify(operation.id)).join(" | ");
   const inputImports = manifest.operations.map(operationInputName);
@@ -498,7 +530,9 @@ interface OperationDefinition {
   route: string;
   endpoint: "execution" | "applicability";
   input: readonly { name: string; type: RuntimeValueType }[];
-  output: { entityId: string; cardinality: "one" | "many"; maxItems?: number };
+  output:
+    | { entityId: string; cardinality: "one" }
+    | { projectionId: string; cardinality: "many"; maxItems: number };
   action: boolean;
   idempotency: "required" | "unsupported";
 }
@@ -506,6 +540,10 @@ interface OperationDefinition {
 const operationDefinitions = ${JSON.stringify(definitions, null, 2)} as unknown as readonly OperationDefinition[];
 const enumValues = ${JSON.stringify(enumValues, null, 2)} as Readonly<Record<string, readonly string[]>>;
 const entityDefinitions = ${JSON.stringify(entityDefinitions, null, 2)} as Readonly<Record<
+  string,
+  readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
+>>;
+const projectionDefinitions = ${JSON.stringify(projectionDefinitions, null, 2)} as Readonly<Record<
   string,
   readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
 >>;
@@ -624,12 +662,27 @@ function validEntity(value: unknown, entityId: string): boolean {
     && (entity[field.name] === null ? field.nullable : validValue(entity[field.name], field.type)));
 }
 
+function validProjection(value: unknown, projectionId: string): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const fields = projectionDefinitions[projectionId];
+  if (!fields) return false;
+  const projection = value as Record<string, unknown>;
+  const allowed = new Set(fields.map((field) => field.name));
+  if (Object.keys(projection).some((name) => !allowed.has(name))) return false;
+  return fields.every((field) => Object.hasOwn(projection, field.name)
+    && (projection[field.name] === null ? field.nullable : validValue(projection[field.name], field.type)));
+}
+
 function validateOutput(definition: OperationDefinition, value: unknown): void {
-  const valid = definition.output.cardinality === "one"
-    ? validEntity(value, definition.output.entityId)
-    : Array.isArray(value)
-      && value.length <= (definition.output.maxItems ?? 0)
-      && value.every((entity) => validEntity(entity, definition.output.entityId));
+  let valid: boolean;
+  if (definition.output.cardinality === "one") {
+    valid = validEntity(value, definition.output.entityId);
+  } else {
+    const output = definition.output;
+    valid = Array.isArray(value)
+      && value.length <= output.maxItems
+      && value.every((projection) => validProjection(projection, output.projectionId));
+  }
   if (!valid) throw new Error(\`Operation executor returned an invalid result for '\${definition.id}'\`);
 }
 

@@ -92,6 +92,15 @@ function generateTypes(ir: ModelIR): string {
     }
     lines.push("}", "");
   }
+  for (const projection of ir.projections) {
+    const entity = ir.entities.find((candidate) => candidate.id === projection.sourceEntityId)!;
+    lines.push(`export interface ${projection.naming.typescriptName} {`);
+    for (const selected of projection.fields) {
+      const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId)!;
+      lines.push(`  ${selected.name}: ${tsType(ir, field)};`);
+    }
+    lines.push("}", "");
+  }
   for (const action of ir.actions) {
     lines.push(`export interface ${operationInputName(action)} {`);
     for (const id of action.callableParameters) {
@@ -244,16 +253,16 @@ function applicabilityMethod(ir: ModelIR, action: IRAction, plan: DecisionPlan):
 }
 
 function queryMethod(ir: ModelIR, query: IRQuery): string {
-  const sourceEntity = ir.entities.find((entity) => entity.id === query.sourceEntityId)!;
+  const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId)!;
   const args = query.callableParameters.map((id, index) => {
     const parameter = query.parameters.find((candidate) => candidate.id === id)!;
     return { parameter, placeholder: `$${index + 1}` };
   });
   const schema = ir.model.naming.sqlSchema.replaceAll('"', '""');
   const fn = query.naming.sqlFunction.replaceAll('"', '""');
-  return `  async ${query.name}(input: ${operationInputName(query)}): Promise<${sourceEntity.name}[]> {
+  return `  async ${query.name}(input: ${operationInputName(query)}): Promise<${projection.naming.typescriptName}[]> {
     try {
-      const result = await this.adapter.query<{ value: ${sourceEntity.name}[] }>(
+      const result = await this.adapter.query<{ value: ${projection.naming.typescriptName}[] }>(
         'SELECT "${schema}"."${fn}"(${args.map((arg) => arg.placeholder).join(", ")}) AS value',
         [${args.map((arg) => clientParameterValue(arg.parameter)).join(", ")}],
       );
@@ -267,6 +276,7 @@ function queryMethod(ir: ModelIR, query: IRQuery): string {
 function generateClient(ir: ModelIR, plan: DecisionPlan): string {
   const imports = [...new Set([
     ...ir.entities.map((entity) => entity.name),
+    ...ir.projections.map((projection) => projection.naming.typescriptName),
     ...ir.actions.map(operationInputName),
     ...ir.queries.map(operationInputName),
     "ApplicabilityDecision",

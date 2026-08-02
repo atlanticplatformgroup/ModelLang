@@ -4,6 +4,7 @@ import type {
   IREntity,
   IREnum,
   IRPolicy,
+  IRProjection,
   IRQuery,
   IRWorkflow,
   ModelIR,
@@ -43,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 11;
+  diffVersion: 12;
   compilerVersion: string;
-  irVersion: 18;
+  irVersion: 19;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -420,8 +421,8 @@ function compareActions(changes: SemanticChange[], previous: IRAction[], current
   }
 }
 
-function compareQueries(changes: SemanticChange[], previous: IRQuery[], current: IRQuery[]): void {
-  for (const pair of pairById(changes, "query", previous, current, "structure", "additive", "breaking", false)) {
+function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentIR: ModelIR): void {
+  for (const pair of pairById(changes, "query", previousIR.queries, currentIR.queries, "structure", "additive", "breaking", false)) {
     compareNamed(changes, "query", pair.previous, pair.current);
     if (!same(operationShape(pair.previous), operationShape(pair.current))
       || pair.previous.sourceEntityId !== pair.current.sourceEntityId) addChange(changes, {
@@ -429,11 +430,36 @@ function compareQueries(changes: SemanticChange[], previous: IRQuery[], current:
       area: "structure",
       classification: "breaking",
       subject: subject("query", pair.current),
-      before: text({ input: operationShape(pair.previous), output: pair.previous.sourceEntityId }),
-      after: text({ input: operationShape(pair.current), output: pair.current.sourceEntityId }),
+      before: text({ input: operationShape(pair.previous), source: pair.previous.sourceEntityId }),
+      after: text({ input: operationShape(pair.current), source: pair.current.sourceEntityId }),
       persistenceRisk: false,
-      explanation: "The callable query input or result entity changed.",
+      explanation: "The callable query input or row source changed.",
     });
+    const previousOutput = pair.previous.returnProjectionId ?? `legacyEntity:${pair.previous.sourceEntityId}`;
+    if (previousOutput !== pair.current.returnProjectionId) addChange(changes, {
+      kind: "queryOutputChanged",
+      area: "queryVisibility",
+      classification: "breaking",
+      subject: subject("query", pair.current),
+      before: previousOutput,
+      after: pair.current.returnProjectionId,
+      persistenceRisk: false,
+      explanation: "The query's disclosed result contract changed.",
+    });
+    if (previousOutput !== pair.current.returnProjectionId) {
+      const previousProjection = (previousIR as ModelIR & { projections?: IRProjection[] }).projections
+        ?.find((candidate) => candidate.id === pair.previous.returnProjectionId);
+      const currentProjection = currentIR.projections.find((candidate) => candidate.id === pair.current.returnProjectionId);
+      const previousFields = previousProjection?.fields.map((field) => field.sourceFieldId)
+        ?? previousIR.entities.find((entity) => entity.id === pair.previous.sourceEntityId)?.fields.map((field) => field.id)
+        ?? [];
+      const currentFields = currentProjection?.fields.map((field) => field.sourceFieldId) ?? [];
+      addChange(changes, {
+        kind: "queryDisclosureChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("query", pair.current), before: text(previousFields), after: text(currentFields),
+        persistenceRisk: false, explanation: "The exact set of fields disclosed by the query changed.",
+      });
+    }
     if (!same(pair.previous.authorization.expression, pair.current.authorization.expression)) addChange(changes, {
       kind: "authorizationChanged",
       area: "authorization",
@@ -468,6 +494,41 @@ function compareQueries(changes: SemanticChange[], previous: IRQuery[], current:
       persistenceRisk: false,
       explanation: "Query ordering or maximum result cardinality changed.",
     });
+  }
+}
+
+function compareProjections(changes: SemanticChange[], previousIR: ModelIR, currentIR: ModelIR): void {
+  const previous = (previousIR as ModelIR & { projections?: IRProjection[] }).projections ?? [];
+  for (const pair of pairById(changes, "projection", previous, currentIR.projections, "queryVisibility", "additive", "breaking", false)) {
+    compareNamed(changes, "projection", pair.previous, pair.current);
+    if (pair.previous.sourceEntityId !== pair.current.sourceEntityId) addChange(changes, {
+      kind: "projectionSourceChanged", area: "queryVisibility", classification: "breaking",
+      subject: subject("projection", pair.current), before: pair.previous.sourceEntityId, after: pair.current.sourceEntityId,
+      persistenceRisk: false, explanation: "Changing a projection's source entity changes its disclosure contract.",
+    });
+    for (const fieldPair of pairById(changes, "projectionField", pair.previous.fields, pair.current.fields, "queryVisibility", "breaking", "breaking", false)) {
+      if (fieldPair.previous.name !== fieldPair.current.name) addChange(changes, {
+        kind: "projectionFieldOutputNameChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("projectionField", fieldPair.current), before: fieldPair.previous.name, after: fieldPair.current.name,
+        persistenceRisk: false, explanation: "A projection field rename changes the closed JSON object key.",
+      });
+      if (fieldPair.previous.sourceFieldId !== fieldPair.current.sourceFieldId) addChange(changes, {
+        kind: "projectionFieldSourceChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("projectionField", fieldPair.current), before: fieldPair.previous.sourceFieldId, after: fieldPair.current.sourceFieldId,
+        persistenceRisk: false, explanation: "A stable projection member now discloses a different source field.",
+      });
+      const fieldContract = (ir: ModelIR, fieldId: string) => {
+        const field = ir.entities.flatMap((entity) => entity.fields).find((candidate) => candidate.id === fieldId);
+        return field ? { type: field.type, nullable: field.optional } : null;
+      };
+      const before = fieldContract(previousIR, fieldPair.previous.sourceFieldId);
+      const after = fieldContract(currentIR, fieldPair.current.sourceFieldId);
+      if (!same(before, after)) addChange(changes, {
+        kind: "projectionFieldContractChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("projectionField", fieldPair.current), before: text(before), after: text(after),
+        persistenceRisk: false, explanation: "The disclosed field type or nullability changed.",
+      });
+    }
   }
 }
 
@@ -580,11 +641,12 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
     compareInvariants(changes, pair.previous, pair.current);
     compareExclusions(changes, pair.previous, pair.current);
   }
+  compareProjections(changes, previous, current);
   comparePolicies(changes, (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [], current.policies);
   compareEvents(changes, (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [], current.events);
   compareActions(changes, previous.actions, current.actions);
   compareConsumers(changes, (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [], current.consumers);
-  compareQueries(changes, previous.queries, current.queries);
+  compareQueries(changes, previous, current);
   compareWorkflows(changes, previous.workflows, current.workflows);
   const summary: SemanticDiff["summary"] = {
     additive: 0,
@@ -596,7 +658,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 11,
+    diffVersion: 12,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

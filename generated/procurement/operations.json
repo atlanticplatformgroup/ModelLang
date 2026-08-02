@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 4,
+  "manifestVersion": 5,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.29.0",
-    "sourceHash": "sha256:e9411f2d3e9841bb910da155f1557ca18b62050c589622c506afda63cc4f3381"
+    "version": "0.30.0",
+    "sourceHash": "sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2"
   },
   "authentication": {
     "required": true,
@@ -198,6 +198,67 @@
       ]
     }
   ],
+  "projections": [
+    {
+      "id": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
+      "name": "RequestSummary",
+      "sourceEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+      "fields": [
+        {
+          "id": "projectionField:pfd_71d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "sourceFieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_72d694c9a0a274dc79c6168e47d25968",
+          "name": "createdAt",
+          "sourceFieldId": "field:fld_b425073719d6446b9859fe6ca97b0ffe",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968",
+          "name": "amount",
+          "sourceFieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+          "type": {
+            "kind": "money",
+            "currency": "USD",
+            "precision": 20,
+            "scale": 2
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_74d694c9a0a274dc79c6168e47d25968",
+          "name": "status",
+          "sourceFieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+          "type": {
+            "kind": "enum",
+            "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_75d694c9a0a274dc79c6168e47d25968",
+          "name": "approvedBy",
+          "sourceFieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
+          },
+          "nullable": true
+        }
+      ]
+    }
+  ],
   "operations": [
     {
       "id": "action:act_1e35db0451b1461e941af6283d86dca2",
@@ -337,7 +398,7 @@
         "requestSupplied": false
       },
       "output": {
-        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "projectionId": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
         "cardinality": "many",
         "maxItems": 100
       },

@@ -99,6 +99,24 @@ export interface IREntity {
   naming: { sqlTable: string; typescriptName: string };
 }
 
+export interface IRProjectionField {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  sourceFieldId: string;
+  span: IRSpan;
+}
+
+export interface IRProjection {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  sourceEntityId: string;
+  fields: IRProjectionField[];
+  span: IRSpan;
+  naming: { typescriptName: string };
+}
+
 export interface IRParameter {
   id: string;
   name: string;
@@ -223,6 +241,7 @@ export interface IRQuery {
   callerParameterId: string;
   callableParameters: string[];
   sourceEntityId: string;
+  returnProjectionId: string;
   rowAlias: string;
   authorization: IRRule;
   rowPolicy: IRRule;
@@ -274,7 +293,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 18;
+  irVersion: 19;
   model: {
     id: string;
     name: string;
@@ -286,6 +305,7 @@ export interface ModelIR {
   principal: { entityId: string; bindingMechanism: "session_user" };
   enums: IREnum[];
   entities: IREntity[];
+  projections: IRProjection[];
   events: IREvent[];
   policies: IRPolicy[];
   actions: IRAction[];

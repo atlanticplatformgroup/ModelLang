@@ -10,6 +10,7 @@ import type {
 } from "./ir.js";
 import type {
   ManifestErrorKind,
+  ManifestOperation,
   ManifestParameter,
   OperationManifest,
   OperationValueType,
@@ -41,8 +42,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 10;
-  profile: "sml-transactional-core/10";
+  manifestVersion: 11;
+  profile: "sml-transactional-core/11";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -51,7 +52,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 18;
+    irVersion: 19;
     generator: "semantic-manifest";
   };
   model: {
@@ -66,6 +67,7 @@ export interface SemanticManifest {
     binding: "authenticatedContext";
     requestSupplied: false;
   };
+  projections: SemanticProjection[];
   policies: SemanticPolicy[];
   events: SemanticEvent[];
   actions: SemanticAction[];
@@ -135,16 +137,25 @@ export interface SemanticAction {
   failureClasses: ManifestErrorKind[];
 }
 
+export interface SemanticProjection {
+  id: string;
+  name: string;
+  source: IRSpan;
+  sourceEntityId: string;
+  fields: { id: string; name: string; sourceFieldId: string; source: IRSpan }[];
+}
+
 export interface SemanticQuery {
   id: string;
   name: string;
   source: IRSpan;
   caller: { parameterId: string; entityId: string; source: "authenticatedContext" };
   input: ManifestParameter[];
-  output: { entityId: string; cardinality: "many"; maxItems: number };
+  output: { projectionId: string; cardinality: "many"; maxItems: number };
   authorization: SemanticRule;
   rowPolicy: SemanticRule;
   readSet: SemanticReadSet;
+  disclosureSet: { projectionId: string; projectionFieldIds: string[]; sourceFieldIds: string[] };
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
   failureClasses: ManifestErrorKind[];
 }
@@ -225,7 +236,7 @@ function semanticRule(rule: IRRule): SemanticRule {
 function operationInput(
   manifest: OperationManifest,
   id: string,
-): { input: ManifestParameter[]; output: { entityId: string; cardinality: "one" | "many"; maxItems?: number }; errors: ManifestErrorKind[] } {
+): { input: ManifestParameter[]; output: ManifestOperation["output"]; errors: ManifestErrorKind[] } {
   const operation = manifest.operations.find((candidate) => candidate.id === id);
   if (!operation) throw new Error(`E6301 Missing operation manifest entry '${id}'.`);
   return { input: operation.input, output: operation.output, errors: operation.errors };
@@ -350,16 +361,30 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
   if (operation.output.cardinality !== "many" || operation.output.maxItems === undefined) {
     throw new Error(`E6304 Query '${query.id}' has a non-collection output.`);
   }
+  const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId);
+  if (!projection) throw new Error(`E6305 Query '${query.id}' references unknown projection '${query.returnProjectionId}'.`);
+  const sourceReads = readSet(ir, [query.authorization, query.rowPolicy]);
+  sourceReads.entityIds = [...new Set([...sourceReads.entityIds, query.sourceEntityId])].sort();
+  sourceReads.fieldIds = [...new Set([
+    ...sourceReads.fieldIds,
+    query.orderBy.fieldId,
+    ...projection.fields.map((field) => field.sourceFieldId),
+  ])].sort();
   return {
     id: query.id,
     name: query.name,
     source: query.span,
     caller: caller(query, ir),
     input: operation.input,
-    output: { entityId: operation.output.entityId, cardinality: "many", maxItems: operation.output.maxItems },
+    output: { projectionId: operation.output.projectionId, cardinality: "many", maxItems: operation.output.maxItems },
     authorization: semanticRule(query.authorization),
     rowPolicy: semanticRule(query.rowPolicy),
-    readSet: readSet(ir, [query.authorization, query.rowPolicy]),
+    readSet: sourceReads,
+    disclosureSet: {
+      projectionId: projection.id,
+      projectionFieldIds: projection.fields.map((field) => field.id),
+      sourceFieldIds: projection.fields.map((field) => field.sourceFieldId),
+    },
     orderBy: query.orderBy,
     failureClasses: operation.errors,
   };
@@ -410,7 +435,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 10,
+    manifestVersion: 11,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -435,6 +460,18 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
       binding: "authenticatedContext",
       requestSupplied: false,
     },
+    projections: ir.projections.map((projection) => ({
+      id: projection.id,
+      name: projection.name,
+      source: projection.span,
+      sourceEntityId: projection.sourceEntityId,
+      fields: projection.fields.map((field) => ({
+        id: field.id,
+        name: field.name,
+        sourceFieldId: field.sourceFieldId,
+        source: field.span,
+      })),
+    })),
     policies: ir.policies.map((policy) => ({
       id: policy.id,
       name: policy.name,

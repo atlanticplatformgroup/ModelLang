@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 10,
-  "profile": "sml-transactional-core/10",
+  "manifestVersion": 11,
+  "profile": "sml-transactional-core/11",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.29.0",
-    "irVersion": 18,
+    "compilerVersion": "0.30.0",
+    "irVersion": 19,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.29.0",
-    "sourceHash": "sha256:d9a86d5833c534acd18355e3bde514f2f7b23aad3d87323fb5faf19af69696f3",
+    "version": "0.30.0",
+    "sourceHash": "sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -25,6 +25,70 @@
     "binding": "authenticatedContext",
     "requestSupplied": false
   },
+  "projections": [
+    {
+      "id": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationSummary",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 62,
+        "column": 1,
+        "endLine": 67,
+        "endColumn": 2
+      },
+      "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "fields": [
+        {
+          "id": "projectionField:pfd_81d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "sourceFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
+          "source": {
+            "file": "examples/reservations.model",
+            "line": 63,
+            "column": 3,
+            "endLine": 63,
+            "endColumn": 56
+          }
+        },
+        {
+          "id": "projectionField:pfd_82d694c9a0a274dc79c6168e47d25968",
+          "name": "resource",
+          "sourceFieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "source": {
+            "file": "examples/reservations.model",
+            "line": 64,
+            "column": 3,
+            "endLine": 64,
+            "endColumn": 62
+          }
+        },
+        {
+          "id": "projectionField:pfd_83d694c9a0a274dc79c6168e47d25968",
+          "name": "startsAt",
+          "sourceFieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "source": {
+            "file": "examples/reservations.model",
+            "line": 65,
+            "column": 3,
+            "endLine": 65,
+            "endColumn": 62
+          }
+        },
+        {
+          "id": "projectionField:pfd_84d694c9a0a274dc79c6168e47d25968",
+          "name": "endsAt",
+          "sourceFieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+          "source": {
+            "file": "examples/reservations.model",
+            "line": 66,
+            "column": 3,
+            "endLine": 66,
+            "endColumn": 60
+          }
+        }
+      ]
+    }
+  ],
   "policies": [],
   "events": [
     {
@@ -440,9 +504,9 @@
       "name": "reservationsForResource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 62,
+        "line": 69,
         "column": 1,
-        "endLine": 70,
+        "endLine": 77,
         "endColumn": 2
       },
       "caller": {
@@ -461,7 +525,7 @@
         }
       ],
       "output": {
-        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
         "cardinality": "many",
         "maxItems": 100
       },
@@ -477,9 +541,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/reservations.model",
-          "line": 66,
+          "line": 73,
           "column": 13,
-          "endLine": 66,
+          "endLine": 73,
           "endColumn": 17
         },
         "dependencies": []
@@ -514,9 +578,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "source": {
           "file": "examples/reservations.model",
-          "line": 67,
+          "line": 74,
           "column": 9,
-          "endLine": 67,
+          "endLine": 74,
           "endColumn": 41
         },
         "dependencies": [
@@ -536,7 +600,25 @@
           "entity:ent_ba2d028e915841d1ab90adfa40d38404"
         ],
         "fieldIds": [
-          "field:fld_8df4f409794e4c66acdbb162b6063d57"
+          "field:fld_066660fbd78d479084a9db613ee746ae",
+          "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "field:fld_fd818707952f4b388baea4c3132bce63"
+        ]
+      },
+      "disclosureSet": {
+        "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
+        "projectionFieldIds": [
+          "projectionField:pfd_81d694c9a0a274dc79c6168e47d25968",
+          "projectionField:pfd_82d694c9a0a274dc79c6168e47d25968",
+          "projectionField:pfd_83d694c9a0a274dc79c6168e47d25968",
+          "projectionField:pfd_84d694c9a0a274dc79c6168e47d25968"
+        ],
+        "sourceFieldIds": [
+          "field:fld_066660fbd78d479084a9db613ee746ae",
+          "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "field:fld_fd818707952f4b388baea4c3132bce63"
         ]
       },
       "orderBy": {

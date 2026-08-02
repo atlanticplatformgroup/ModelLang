@@ -5,6 +5,17 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.30.0
+
+- Added stable named `projection ... from Entity` declarations with independent `prj_` and `pfd_` identity and mandatory `query ... returns Projection from Entity` result contracts.
+- Made projections closed direct-field allowlists: query predicates and ordering can read hidden source fields, while PostgreSQL constructs only selected JSON keys and preserves scalar, enum, exact-money, UUID/reference, DateTime, generated-value, snapshot, and nullable encodings.
+- Advanced canonical IR to IR19 with all projections, projection-member source-field identity, and query `returnProjectionId`; projection order remains non-semantic and projections carry no authority or row policy.
+- Advanced operation manifest to v5, capability manifest to v4, UI manifest to v5, engineering semantic manifest/profile to v11, semantic diff to v12, and generator profile to `postgresql-http-ui-read-projections/14`. Decision plan v2, event manifest v5, event envelope v2, provenance format v1, HTTP routes, and private runtime profile 29 remain unchanged.
+- Derived closed OpenAPI projection schemas, exact HTTP output validation, typed projection-array database/HTTP/browser/UI clients, UI result columns, engineering disclosure sets, enforcement evidence, and Mermaid disclosure edges from the shared operation/IR contract.
+- Added evolution comparison by projection and projection-field stable identity. Reachable member/source/type/nullability changes and query output changes are breaking; member reordering is ignored and stable projection renames remain identity-preserving.
+- Normalized released IR9–IR18 query results internally as historical `legacyEntity` output without fabricating projection identity. Automatic-safe migration rejects narrowing to an explicit projection; reviewed migration requires stable acknowledgement.
+- Updated Procurement with `RequestSummary`, Reservations with `ReservationSummary`, both example versions, deterministic golden artifacts, normative 0.30 specification, whitepaper status, and live PostgreSQL coverage for hidden fields and nullable selected keys.
+
 ## 0.29.0
 
 - Added a separate non-login `modellang_failure_claimant` role with execute-only publication and consumer terminal-failure claim functions and no observation, acknowledgement, recovery, dispatch, consumer, application, query, or table authority.

@@ -4,6 +4,8 @@ import { parse } from "./parser.js";
 export type StableIdKind =
   | "entity"
   | "field"
+  | "projection"
+  | "projectionField"
   | "enum"
   | "enumMember"
   | "event"
@@ -26,6 +28,8 @@ function generatedId(kind: StableIdKind): string {
   const prefix: Record<StableIdKind, string> = {
     entity: "ent",
     field: "fld",
+    projection: "prj",
+    projectionField: "pfd",
     enum: "enm",
     enumMember: "emv",
     event: "evt",
@@ -79,6 +83,15 @@ export function assignStableIds(
             text: ` @stableId("${createId(member.kind)}")`,
           });
         }
+      }
+    }
+    if (declaration.kind === "projection") {
+      for (const field of declaration.fields) {
+        if (field.stableId) continue;
+        edits.push({
+          offset: field.nameSpan.end.offset,
+          text: ` @stableId("${createId("projectionField")}")`,
+        });
       }
     }
     if (declaration.kind === "workflow") {

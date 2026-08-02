@@ -24,8 +24,11 @@ flowchart LR
   event_evt_40d694c9a0a274dc79c6168e47d25968 -->|consumed through inbox| consumer_con_20d694c9a0a274dc79c6168e47d25968
   consumer_con_20d694c9a0a274dc79c6168e47d25968 -->|update| entity_ent_ba2d028e915841d1ab90adfa40d38404
   consumer_con_20d694c9a0a274dc79c6168e47d25968 -->|emits atomically| event_evt_60d694c9a0a274dc79c6168e47d25968
+  projection_prj_80d694c9a0a274dc79c6168e47d25968["Projection: ReservationSummary"]
   query_qry_94d8a56f4c2640fab58a4c2190c35c69["Query: reservationsForResource"]
   principal -->|authenticated caller| query_qry_94d8a56f4c2640fab58a4c2190c35c69
-  query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|reads| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|reads source rows| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|discloses selected fields| projection_prj_80d694c9a0a274dc79c6168e47d25968
+  projection_prj_80d694c9a0a274dc79c6168e47d25968 -->|shape from| entity_ent_ba2d028e915841d1ab90adfa40d38404
   authorize_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Authorize"] -->|guards| query_qry_94d8a56f4c2640fab58a4c2190c35c69
   where_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Where"] -->|filters rows| query_qry_94d8a56f4c2640fab58a4c2190c35c69

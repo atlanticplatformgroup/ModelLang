@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.29.0",
-    "sourceHash": "sha256:e9411f2d3e9841bb910da155f1557ca18b62050c589622c506afda63cc4f3381",
+    "version": "0.30.0",
+    "sourceHash": "sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1111,9 +1111,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 151,
+        "line": 159,
         "column": 3,
-        "endLine": 151,
+        "endLine": 159,
         "endColumn": 21
       }
     },
@@ -1132,9 +1132,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 153,
+        "line": 161,
         "column": 13,
-        "endLine": 153,
+        "endLine": 161,
         "endColumn": 17
       }
     },
@@ -1146,9 +1146,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 154,
+        "line": 162,
         "column": 9,
-        "endLine": 154,
+        "endLine": 162,
         "endColumn": 35
       }
     },
@@ -1160,9 +1160,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 158,
         "column": 1,
-        "endLine": 157,
+        "endLine": 165,
         "endColumn": 2
       }
     },
@@ -1174,9 +1174,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 158,
         "column": 1,
-        "endLine": 157,
+        "endLine": 165,
         "endColumn": 2
       }
     },
@@ -1188,9 +1188,23 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 158,
         "column": 1,
-        "endLine": 157,
+        "endLine": 165,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "disclose:query:qry_4406b045404a48449282db804f6167a8",
+      "purpose": "Disclose only projection:prj_70d694c9a0a274dc79c6168e47d25968 through the generated query boundary.",
+      "layer": "PostgreSQL projection encoder",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 158,
+        "column": 1,
+        "endLine": 165,
         "endColumn": 2
       }
     },

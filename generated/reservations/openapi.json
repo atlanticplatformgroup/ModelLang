@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.29.0",
-    "description": "Generated from ModelLang operation manifest v4 (sha256:d9a86d5833c534acd18355e3bde514f2f7b23aad3d87323fb5faf19af69696f3)."
+    "version": "0.30.0",
+    "description": "Generated from ModelLang operation manifest v5 (sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -219,7 +219,7 @@
                   "type": "array",
                   "maxItems": 100,
                   "items": {
-                    "$ref": "#/components/schemas/Reservation"
+                    "$ref": "#/components/schemas/ReservationSummary"
                   }
                 }
               }
@@ -553,6 +553,34 @@
           },
           "indexed": {
             "type": "boolean"
+          }
+        }
+      },
+      "ReservationSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "resource",
+          "startsAt",
+          "endsAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resource": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

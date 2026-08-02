@@ -1630,13 +1630,29 @@ function decisionJson(
 function rowJson(entity: IREntity, record: string): string {
   const values = entity.fields.flatMap((field) => {
     const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
-    let value = `${column}${field.type === "Decimal" ? "::text" : ""}`;
-    if (isMoneyType(field.type)) {
-      const profile = moneyProfileFromType(field.type)!;
-      const encoded = `jsonb_build_object('currency', '${profile.currency}', 'amount', (${column}::numeric(${profile.precision}, ${profile.scale}))::text)`;
-      value = field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${encoded} END` : encoded;
-    }
-    return [`'${field.name.replaceAll("'", "''")}'`, value];
+    return [`'${field.name.replaceAll("'", "''")}'`, fieldJson(field, column)];
+  });
+  return `jsonb_build_object(${values.join(", ")})`;
+}
+
+function fieldJson(field: IRField, column: string): string {
+  if (isMoneyType(field.type)) {
+    const profile = moneyProfileFromType(field.type)!;
+    const encoded = `jsonb_build_object('currency', '${profile.currency}', 'amount', (${column}::numeric(${profile.precision}, ${profile.scale}))::text)`;
+    return field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${encoded} END` : encoded;
+  }
+  return `${column}${field.type === "Decimal" ? "::text" : ""}`;
+}
+
+function projectionJson(ir: ModelIR, projectionId: string, record: string): string {
+  const projection = ir.projections.find((candidate) => candidate.id === projectionId);
+  if (!projection) throw new Error(`E5008 Missing query projection '${projectionId}'.`);
+  const entity = entityById(ir, projection.sourceEntityId);
+  const values = projection.fields.flatMap((selected) => {
+    const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId);
+    if (!field) throw new Error(`E5009 Missing projection source field '${selected.sourceFieldId}'.`);
+    const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
+    return [`'${selected.name.replaceAll("'", "''")}'`, fieldJson(field, column)];
   });
   return `jsonb_build_object(${values.join(", ")})`;
 }
@@ -2089,7 +2105,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "    '[]'::jsonb",
     "  ) INTO v_result",
     "  FROM (",
-    `    SELECT ${rowJson(sourceEntity, "v_row")} AS ${quoteIdent("item")},`,
+    `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
     `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
     `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
     `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,

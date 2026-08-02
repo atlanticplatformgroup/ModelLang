@@ -15,7 +15,7 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | EventDecl | PolicyDecl | ActionDecl | ConsumerDecl | QueryDecl | WorkflowDecl;
+export type Declaration = EnumDecl | EntityDecl | ProjectionDecl | EventDecl | PolicyDecl | ActionDecl | ConsumerDecl | QueryDecl | WorkflowDecl;
 
 export interface EventDecl {
   kind: "event";
@@ -91,6 +91,24 @@ export interface EntityDecl {
   nameSpan: Span;
   stableId?: Annotation;
   members: (FieldDecl | InvariantDecl | ExclusionDecl)[];
+  span: Span;
+}
+
+export interface ProjectionFieldDecl {
+  kind: "projectionField";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  span: Span;
+}
+
+export interface ProjectionDecl {
+  kind: "projection";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  sourceType: TypeRef;
+  fields: ProjectionFieldDecl[];
   span: Span;
 }
 
@@ -178,6 +196,7 @@ export interface QueryDecl {
   nameSpan: Span;
   stableId?: Annotation;
   parameters: ParameterDecl[];
+  returnType: TypeRef;
   sourceType: TypeRef;
   rowAlias: { name: string; span: Span };
   authorize: Expression;

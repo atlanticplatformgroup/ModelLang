@@ -13,6 +13,9 @@ const ids = {
   value: "fld_44444444444444444444444444444444",
   note: "fld_55555555555555555555555555555555",
   create: "act_11111111111111111111111111111111",
+  projection: "prj_11111111111111111111111111111111",
+  projectionId: "pfd_11111111111111111111111111111111",
+  projectionValue: "pfd_22222222222222222222222222222222",
   query: "qry_11111111111111111111111111111111",
 };
 
@@ -27,6 +30,10 @@ entity Record @stableId("${ids.record}") {
   value: String @stableId("${ids.value}");
   ${options.note ? `note: String? @stableId("${ids.note}");` : ""}
 }
+projection RecordSummary @stableId("${ids.projection}") from Record {
+  id @stableId("${ids.projectionId}");
+  value @stableId("${ids.projectionValue}");
+}
 action ${options.actionName ?? "createRecord"} @stableId("${ids.create}")(
   caller actor: User,
   id: UUID,
@@ -38,7 +45,7 @@ action ${options.actionName ?? "createRecord"} @stableId("${ids.create}")(
 }
 query records @stableId("${ids.query}")(
   caller actor: User
-) from Record as row {
+) returns RecordSummary from Record as row {
   authorize true;
   where ${options.where ?? "row.owner == actor"};
   orderBy row.id asc;
@@ -47,6 +54,45 @@ query records @stableId("${ids.query}")(
 }
 
 describe("semantic change analysis", () => {
+  it("classifies projection member and legacy entity-output changes as breaking disclosure changes", () => {
+    const source = (version: string, includeValue: boolean) => `model ProjectionEvolution version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  owner: User @stableId("fld_cccccccccccccccccccccccccccccccc");
+  value: String @stableId("fld_dddddddddddddddddddddddddddddddd");
+}
+projection RecordView @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from Record {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ${includeValue ? `value @stableId("pfd_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");` : ""}
+}
+query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns RecordView from Record as row {
+  authorize true; where row.owner == actor; orderBy row.id asc; limit 10;
+}`;
+    const previous = compileText(source("1", false));
+    const current = compileText(source("2", true));
+    expect(semanticDiff(previous, current).changes).toContainEqual(expect.objectContaining({
+      kind: "declarationAdded",
+      classification: "breaking",
+      subject: expect.objectContaining({ kind: "projectionField" }),
+    }));
+
+    const legacy = structuredClone(previous) as unknown as Record<string, unknown> & {
+      irVersion: number;
+      queries: { returnProjectionId?: string }[];
+    };
+    legacy.irVersion = 18;
+    delete legacy.projections;
+    delete legacy.queries[0]!.returnProjectionId;
+    const report = semanticDiff(legacy as unknown as typeof previous, compileText(source("2", false)));
+    expect(report.changes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: "queryOutputChanged", classification: "breaking", before: expect.stringMatching(/^legacyEntity:/) }),
+      expect.objectContaining({ kind: "queryDisclosureChanged", classification: "breaking" }),
+    ]));
+  });
+
   it("tracks policy identity-preserving renames and reviewed authority changes", () => {
     const source = (version: string, policyName: string, branchName: string, predicate: string) => `model PolicyDiff version "${version}";
 enum Role @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -91,9 +137,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 11,
-      compilerVersion: "0.29.0",
-      irVersion: 18,
+      diffVersion: 12,
+      compilerVersion: "0.30.0",
+      irVersion: 19,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

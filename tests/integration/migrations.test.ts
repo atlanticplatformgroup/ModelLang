@@ -35,7 +35,10 @@ action ${actionName} @stableId("${makeAction}")(caller actor: User, id: UUID) ->
   authorize true;
   create ${entityName} { id = id; ${fieldName} = actor; }
 }
-query ${queryName} @stableId("${ordersQuery}")(caller actor: User) from ${entityName} as row {
+projection OrderSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from ${entityName} {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query ${queryName} @stableId("${ordersQuery}")(caller actor: User) returns OrderSummary from ${entityName} as row {
   authorize true;
   where row.${fieldName} == actor;
   orderBy row.id asc;
@@ -79,7 +82,10 @@ action comment @stableId("act_cccccccccccccccccccccccccccccccc")(
   authorize true;
   create Comment { id = id; ticket = ticket; body = body; }
 }
-query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) from Ticket as ticket {
+projection TicketSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from Ticket {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query submitted @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns TicketSummary from Ticket as ticket {
   authorize true;
   where ticket.status == Status.SUBMITTED;
   orderBy ticket.id asc;
@@ -165,8 +171,8 @@ describe("ModelLang 0.6 PostgreSQL rename migration", () => {
       "SELECT model_rename_integration.my_orders() AS value",
     );
     expect(listed.rows.map((row) => row.value).flat()).toEqual([
-      { id: purchaseId, requestor: userId },
-      { id: createdId, requestor: userId },
+      { id: purchaseId },
+      { id: createdId },
     ]);
     await expect(admin.query("SELECT model_rename_integration.make($1)", [createdId])).rejects.toMatchObject({ code: "42883" });
     await expect(admin.query("SELECT model_rename_integration.my_purchases()")).rejects.toMatchObject({ code: "42883" });
@@ -248,7 +254,7 @@ describe("ModelLang 0.10 PostgreSQL safe evolution", () => {
     const listed = await admin.query<{ value: { id: string; status: string }[] }>(
       "SELECT model_evolution_integration.submitted() AS value",
     );
-    expect(listed.rows[0]!.value).toEqual([expect.objectContaining({ id: ticketId, status: "SUBMITTED" })]);
+    expect(listed.rows[0]!.value).toEqual([{ id: ticketId }]);
 
     const history = await admin.query<{ version: string; source_hash: string }>(
       `SELECT version, source_hash

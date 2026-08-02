@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 4;
+  manifestVersion: 5;
   model: {
     id: string;
     name: string;
@@ -42,6 +42,18 @@ export interface OperationManifest {
       generated?: "uuid" | "now";
       immutable: boolean;
       snapshot: boolean;
+    }[];
+  }[];
+  projections: {
+    id: string;
+    name: string;
+    sourceEntityId: string;
+    fields: {
+      id: string;
+      name: string;
+      sourceFieldId: string;
+      type: OperationValueType;
+      nullable: boolean;
     }[];
   }[];
   operations: ManifestOperation[];
@@ -96,7 +108,7 @@ export type ManifestOperation =
     })
   | (ManifestOperationBase & {
       kind: "query";
-      output: { entityId: string; cardinality: "many"; maxItems: number };
+      output: { projectionId: string; cardinality: "many"; maxItems: number };
     });
 
 export interface ManifestWorkflowTarget {
@@ -218,9 +230,10 @@ function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
 }
 
 export function generateOperationManifest(ir: ModelIR): OperationManifest {
+  const reachableProjectionIds = new Set(ir.queries.map((query) => query.returnProjectionId));
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 4,
+    manifestVersion: 5,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -256,6 +269,28 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         snapshot: field.storage === "snapshot",
       })),
     })),
+    projections: ir.projections
+      .filter((projection) => reachableProjectionIds.has(projection.id))
+      .map((projection) => {
+        const entity = ir.entities.find((candidate) => candidate.id === projection.sourceEntityId);
+        if (!entity) throw new Error(`E6006 Missing projection source entity '${projection.sourceEntityId}'.`);
+        return {
+          id: projection.id,
+          name: projection.name,
+          sourceEntityId: projection.sourceEntityId,
+          fields: projection.fields.map((selected) => {
+            const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId);
+            if (!field) throw new Error(`E6007 Missing projection source field '${selected.sourceFieldId}'.`);
+            return {
+              id: selected.id,
+              name: selected.name,
+              sourceFieldId: selected.sourceFieldId,
+              type: operationValueType(field.type),
+              nullable: field.optional,
+            };
+          }),
+        };
+      }),
     operations: [
       ...ir.actions.map((action): ManifestOperation => ({
         id: action.id,
@@ -284,7 +319,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         kind: "query",
         input: callableInput(query),
         caller: caller(query, ir),
-        output: { entityId: query.sourceEntityId, cardinality: "many", maxItems: query.limit },
+        output: { projectionId: query.returnProjectionId, cardinality: "many", maxItems: query.limit },
         errors: queryErrors(query),
       })),
     ],

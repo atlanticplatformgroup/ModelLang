@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 4,
+  "manifestVersion": 5,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.29.0",
-    "sourceHash": "sha256:d9a86d5833c534acd18355e3bde514f2f7b23aad3d87323fb5faf19af69696f3"
+    "version": "0.30.0",
+    "sourceHash": "sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578"
   },
   "authentication": {
     "required": true,
@@ -160,6 +160,55 @@
       ]
     }
   ],
+  "projections": [
+    {
+      "id": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationSummary",
+      "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "fields": [
+        {
+          "id": "projectionField:pfd_81d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "sourceFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_82d694c9a0a274dc79c6168e47d25968",
+          "name": "resource",
+          "sourceFieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_83d694c9a0a274dc79c6168e47d25968",
+          "name": "startsAt",
+          "sourceFieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_84d694c9a0a274dc79c6168e47d25968",
+          "name": "endsAt",
+          "sourceFieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          },
+          "nullable": false
+        }
+      ]
+    }
+  ],
   "operations": [
     {
       "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
@@ -240,7 +289,7 @@
         "requestSupplied": false
       },
       "output": {
-        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
         "cardinality": "many",
         "maxItems": 100
       },

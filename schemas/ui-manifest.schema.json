@@ -157,14 +157,15 @@
     "authentication",
     "enums",
     "entities",
+    "projections",
     "actions",
     "queries",
     "workflows"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 4 },
-    "operationManifestVersion": { "const": 4 },
+    "uiManifestVersion": { "const": 5 },
+    "operationManifestVersion": { "const": 5 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -245,6 +246,37 @@
         "additionalProperties": false
       }
     },
+    "projections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "label", "sourceEntityId", "fields"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^projection:" },
+          "name": { "type": "string" },
+          "label": { "type": "string" },
+          "sourceEntityId": { "type": "string", "pattern": "^entity:" },
+          "fields": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["projectionFieldId", "sourceFieldId", "name", "label", "presentation", "nullable"],
+              "properties": {
+                "projectionFieldId": { "type": "string", "pattern": "^projectionField:" },
+                "sourceFieldId": { "type": "string", "pattern": "^field:" },
+                "name": { "type": "string" },
+                "label": { "type": "string" },
+                "presentation": { "$ref": "#/$defs/presentation" },
+                "nullable": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "actions": {
       "type": "array",
       "items": {
@@ -275,13 +307,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["operationId", "name", "label", "filters", "resultEntityId", "maxItems", "errors"],
+        "required": ["operationId", "name", "label", "filters", "resultProjectionId", "maxItems", "errors"],
         "properties": {
           "operationId": { "type": "string", "pattern": "^query:" },
           "name": { "type": "string" },
           "label": { "type": "string" },
           "filters": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
-          "resultEntityId": { "type": "string", "pattern": "^entity:" },
+          "resultProjectionId": { "type": "string", "pattern": "^projection:" },
           "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
           "errors": { "$ref": "#/$defs/errors" }
         },
