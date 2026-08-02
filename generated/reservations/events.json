@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/event-manifest.schema.json",
-  "eventManifestVersion": 4,
+  "eventManifestVersion": 5,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.25.0",
-    "sourceHash": "sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a"
+    "version": "0.26.0",
+    "sourceHash": "sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce"
   },
   "delivery": {
     "semantics": "atLeastOnce",
@@ -24,7 +24,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_508ad810a19d4b79a5009871de5cd26b"
@@ -40,7 +41,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [],
       "emittedByConsumerIds": [

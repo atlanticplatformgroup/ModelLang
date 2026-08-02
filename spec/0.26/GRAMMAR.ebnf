@@ -1,0 +1,8 @@
+program                   = modelDeclaration, { declaration } ;
+eventDeclaration          = "event", identifier, [ stableId ], "payload", type,
+                            [ importedEventSource ], [ publicationRetryPolicy ],
+                            [ publicationRecoveryPolicy ], ";" ;
+publicationRetryPolicy    = "retry", "maxAttempts", integer ;
+publicationRecoveryPolicy = "recovery", "manual" ;
+
+(* Productions not replaced above are inherited from ModelLang 0.25. *)

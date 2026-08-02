@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 9,
-  "profile": "sml-transactional-core/9",
+  "manifestVersion": 10,
+  "profile": "sml-transactional-core/10",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.25.0",
-    "irVersion": 17,
+    "compilerVersion": "0.26.0",
+    "irVersion": 18,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.25.0",
-    "sourceHash": "sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478",
+    "version": "0.26.0",
+    "sourceHash": "sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a",
     "sourceFile": "examples/procurement.model"
   },
   "principal": {
@@ -250,7 +250,7 @@
         "line": 58,
         "column": 1,
         "endLine": 58,
-        "endColumn": 115
+        "endColumn": 131
       },
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "contractSource": {
@@ -258,7 +258,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_1e35db0451b1461e941af6283d86dca2"
@@ -277,7 +278,7 @@
         "line": 59,
         "column": 1,
         "endLine": 59,
-        "endColumn": 118
+        "endColumn": 134
       },
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "contractSource": {
@@ -285,7 +286,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_ed2374e822704c51a2925338253d05d2"
@@ -304,7 +306,7 @@
         "line": 60,
         "column": 1,
         "endLine": 60,
-        "endColumn": 117
+        "endColumn": 133
       },
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "contractSource": {
@@ -312,7 +314,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_d39dbb883b5f4019b9027b85add3de47"
@@ -331,7 +334,7 @@
         "line": 61,
         "column": 1,
         "endLine": 61,
-        "endColumn": 118
+        "endColumn": 134
       },
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "contractSource": {
@@ -339,7 +342,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [],
       "emittedByConsumerIds": [

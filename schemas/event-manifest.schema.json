@@ -6,7 +6,7 @@
   "required": ["$schema", "eventManifestVersion", "model", "delivery", "events"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/event-manifest.schema.json" },
-    "eventManifestVersion": { "const": 4 },
+    "eventManifestVersion": { "const": 5 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -70,10 +70,11 @@
               },
               {
                 "type": "object",
-                "required": ["mode", "maxAttempts"],
+                "required": ["mode", "maxAttempts", "recovery"],
                 "properties": {
                   "mode": { "const": "deadLetterAfterMaxAttempts" },
-                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 }
+                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                  "recovery": { "enum": ["none", "manual"] }
                 },
                 "additionalProperties": false
               }

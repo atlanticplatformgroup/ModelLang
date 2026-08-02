@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 10,
-      compilerVersion: "0.25.0",
-      irVersion: 17,
+      diffVersion: 11,
+      compilerVersion: "0.26.0",
+      irVersion: 18,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -159,6 +159,14 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
       area: "eventDelivery",
       classification: "review",
       persistenceRisk: true,
+    }));
+    const bounded = compileText(source("2", "retry maxAttempts 5"));
+    const recoverable = compileText(source("3", "retry maxAttempts 5 recovery manual"));
+    expect(semanticDiff(bounded, recoverable).changes).toContainEqual(expect.objectContaining({
+      kind: "eventPublicationFailurePolicyChanged",
+      before: expect.stringContaining('"recovery":"none"'),
+      after: expect.stringContaining('"recovery":"manual"'),
+      classification: "review",
     }));
   });
 

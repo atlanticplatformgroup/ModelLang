@@ -190,6 +190,12 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     if (event.retry && (!Number.isInteger(event.retry.maxAttempts) || event.retry.maxAttempts < 1 || event.retry.maxAttempts > 1000)) {
       throw new ModelError("E3402", "Event publication retry maxAttempts must be an integer from 1 through 1000.", event.retry.span, file);
     }
+    if (event.recovery && event.importedFrom) {
+      throw new ModelError("E3504", `Imported event '${event.name}' cannot declare local publication recovery policy.`, event.recovery.span, file);
+    }
+    if (event.recovery && !event.retry) {
+      throw new ModelError("E3503", "Manual event publication recovery requires a bounded retry maxAttempts policy.", event.recovery.span, file);
+    }
     return {
       id: eventId(event),
       name: event.name,
@@ -199,7 +205,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
         ? { kind: "imported" as const, ...event.importedFrom }
         : { kind: "local" as const },
       publicationFailurePolicy: event.retry
-        ? { mode: "deadLetterAfterMaxAttempts" as const, maxAttempts: event.retry.maxAttempts }
+        ? { mode: "deadLetterAfterMaxAttempts" as const, maxAttempts: event.retry.maxAttempts, recovery: event.recovery?.mode ?? "none" as const }
         : { mode: "unboundedRetry" as const },
       span: irSpan(event.span, file),
       naming: { typescriptName: event.name },
@@ -213,7 +219,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 17,
+    irVersion: 18,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1442,6 +1448,12 @@ function buildEnforcement(
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_recovery NOLOGIN",
   }, {
+    id: "boundary:publication_recovery_role",
+    purpose: "Confine opted-in terminal publication recovery to a separate non-login role with execute-only access.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_publication_recovery NOLOGIN",
+  }, {
     id: "boundary:dispatcher_role",
     purpose: "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
     layer: "PostgreSQL role",
@@ -1550,7 +1562,7 @@ function buildEnforcement(
   for (const event of events.filter((candidate) => candidate.source.kind === "local")) entries.push({
     id: `publication-failure-policy:${event.id}`,
     purpose: event.publicationFailurePolicy.mode === "deadLetterAfterMaxAttempts"
-      ? `Record lease-bound publication failures durably and stop claiming after ${event.publicationFailurePolicy.maxAttempts} failures.`
+      ? `Record lease-bound publication failures durably, stop claiming after ${event.publicationFailurePolicy.maxAttempts} failures, and ${event.publicationFailurePolicy.recovery === "manual" ? "permit isolated audited manual recovery" : "deny generated recovery"}.`
       : "Record lease-bound publication failures durably while preserving unbounded retry.",
     layer: "PostgreSQL event outbox publication state",
     artifact: "postgres/002_schema.sql",

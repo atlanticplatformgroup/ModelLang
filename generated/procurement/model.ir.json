@@ -1,10 +1,10 @@
 {
-  "irVersion": 17,
+  "irVersion": 18,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.25.0",
-    "sourceHash": "sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478",
+    "version": "0.26.0",
+    "sourceHash": "sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -921,14 +921,15 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "span": {
         "file": "examples/procurement.model",
         "line": 58,
         "column": 1,
         "endLine": 58,
-        "endColumn": 115
+        "endColumn": 131
       },
       "naming": {
         "typescriptName": "RequestOpened"
@@ -947,14 +948,15 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "span": {
         "file": "examples/procurement.model",
         "line": 59,
         "column": 1,
         "endLine": 59,
-        "endColumn": 118
+        "endColumn": 134
       },
       "naming": {
         "typescriptName": "RequestSubmitted"
@@ -973,14 +975,15 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "span": {
         "file": "examples/procurement.model",
         "line": 60,
         "column": 1,
         "endLine": 60,
-        "endColumn": 117
+        "endColumn": 133
       },
       "naming": {
         "typescriptName": "RequestApproved"
@@ -999,14 +1002,15 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "span": {
         "file": "examples/procurement.model",
         "line": 61,
         "column": 1,
         "endLine": 61,
-        "endColumn": 118
+        "endColumn": 134
       },
       "naming": {
         "typescriptName": "ApprovalObserved"
@@ -2215,6 +2219,13 @@
       "objectName": "modellang_recovery NOLOGIN"
     },
     {
+      "id": "boundary:publication_recovery_role",
+      "purpose": "Confine opted-in terminal publication recovery to a separate non-login role with execute-only access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_publication_recovery NOLOGIN"
+    },
+    {
       "id": "boundary:dispatcher_role",
       "purpose": "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
       "layer": "PostgreSQL role",
@@ -2755,7 +2766,7 @@
     },
     {
       "id": "publication-failure-policy:event:evt_10d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.event_outbox",
@@ -2764,12 +2775,12 @@
         "line": 58,
         "column": 1,
         "endLine": 58,
-        "endColumn": 115
+        "endColumn": 131
       }
     },
     {
       "id": "publication-failure-policy:event:evt_20d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.event_outbox",
@@ -2778,12 +2789,12 @@
         "line": 59,
         "column": 1,
         "endLine": 59,
-        "endColumn": 118
+        "endColumn": 134
       }
     },
     {
       "id": "publication-failure-policy:event:evt_30d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.event_outbox",
@@ -2792,12 +2803,12 @@
         "line": 60,
         "column": 1,
         "endLine": 60,
-        "endColumn": 117
+        "endColumn": 133
       }
     },
     {
       "id": "publication-failure-policy:event:evt_50d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.event_outbox",
@@ -2806,7 +2817,7 @@
         "line": 61,
         "column": 1,
         "endLine": 61,
-        "endColumn": 118
+        "endColumn": 134
       }
     },
     {

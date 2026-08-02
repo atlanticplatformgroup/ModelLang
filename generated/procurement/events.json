@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/event-manifest.schema.json",
-  "eventManifestVersion": 4,
+  "eventManifestVersion": 5,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.25.0",
-    "sourceHash": "sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478"
+    "version": "0.26.0",
+    "sourceHash": "sha256:3079db660c2fde702d89e403c7d97e7e54c07e21725579a1e7e199e56ef90c0a"
   },
   "delivery": {
     "semantics": "atLeastOnce",
@@ -24,7 +24,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_1e35db0451b1461e941af6283d86dca2"
@@ -40,7 +41,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_ed2374e822704c51a2925338253d05d2"
@@ -56,7 +58,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [
         "action:act_d39dbb883b5f4019b9027b85add3de47"
@@ -72,7 +75,8 @@
       },
       "publicationFailurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 5
+        "maxAttempts": 5,
+        "recovery": "manual"
       },
       "emittedByActionIds": [],
       "emittedByConsumerIds": [

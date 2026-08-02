@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.26.0
+
+- Added optional `recovery manual` on bounded local event declarations and preserved `none` or `manual` publication recovery in canonical IR18.
+- Copied recovery eligibility into each committed outbox instance so later source changes cannot retroactively enable existing or terminal rows.
+- Added isolated `modellang_publication_recovery` execute-only authority with atomic `deadLetter` to `pending` reopening, current-cycle reset, monotonic total failures, recovery generations, and no dispatcher or table authority.
+- Added immutable private publication-recovery audit containing outbox and stable-event identity, prior cycle and total counts, prior bounded error, generation, bounded reason, authenticated database principal, and occurrence time.
+- Added a generated server-only typed publication-recovery adapter while keeping runtime state, counts, errors, dispositions, generations, reasons, operators, audit, and outcomes out of public and agent-facing contracts.
+- Kept claim, publication, acknowledgement, retry timing, message lookup/reconstruction/movement, destinations, and broker redrive host-owned; recovery only restores ordinary dispatcher eligibility.
+- Advanced event manifest to v5, engineering semantic manifest to v10, semantic diff to v11, and generator profile to `/10`; existing-event recovery-policy changes require reviewed acknowledgement.
+- Added IR9–IR17 evolution normalization and baseline-checked idempotent `016_upgrade_0_26.sql`; existing rows remain ineligible and no recovery, audit, operator, claim, publication, lease, or broker history is fabricated.
+- Updated Procurement and Reservations with opted-in publication recovery plus compiler, schema, privacy, authority, cycle, total-count, audit, rollback, migration, and live PostgreSQL coverage.
+
 ## 0.25.0
 
 - Added optional `retry maxAttempts N` on local event declarations and preserved bounded or unbounded publication failure policy in canonical IR17.

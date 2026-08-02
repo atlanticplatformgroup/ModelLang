@@ -23,6 +23,18 @@ $modellang$;
 ALTER ROLE modellang_recovery NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
 REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer FROM modellang_recovery;
 REVOKE modellang_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;
+
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_publication_recovery') THEN
+    CREATE ROLE modellang_publication_recovery NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+  END IF;
+END
+$modellang$;
+
+ALTER ROLE modellang_publication_recovery NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery FROM modellang_publication_recovery;
+REVOKE modellang_publication_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
 SET LOCAL ROLE modellang_owner;
 DO $modellang_upgrade$
 DECLARE
@@ -36,9 +48,9 @@ BEGIN
   ORDER BY "id" DESC LIMIT 1;
   IF NOT FOUND
      OR v_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_version IS DISTINCT FROM '0.25.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a' THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a';
+     OR v_version IS DISTINCT FROM '0.26.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce';
   END IF;
 END
 $modellang_upgrade$;
@@ -290,10 +302,14 @@ CREATE TABLE IF NOT EXISTS "model_reservations_internal"."event_outbox" (
   "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
   "delivery_attempts" integer NOT NULL DEFAULT 0,
   "publication_failure_count" integer NOT NULL DEFAULT 0,
+  "publication_total_failure_count" integer NOT NULL DEFAULT 0,
   "publication_max_attempts" integer,
+  "publication_recovery_mode" text NOT NULL DEFAULT 'none',
+  "publication_recovery_generation" integer NOT NULL DEFAULT 0,
   "publication_disposition" text NOT NULL DEFAULT 'pending',
   "last_publication_error_code" text,
   "publication_terminal_at" timestamptz,
+  "last_publication_recovered_at" timestamptz,
   "lease_token" uuid,
   "leased_until" timestamptz,
   "published_at" timestamptz,
@@ -302,20 +318,25 @@ CREATE TABLE IF NOT EXISTS "model_reservations_internal"."event_outbox" (
   CONSTRAINT "ck_event_outbox_producer" CHECK (("action_id" IS NOT NULL AND "action_id" ~ '^action:.+$' AND "consumer_id" IS NULL AND "action_audit_id" IS NOT NULL AND "consumer_audit_id" IS NULL AND "principal_id" IS NOT NULL) OR ("action_id" IS NULL AND "consumer_id" IS NOT NULL AND "consumer_id" ~ '^consumer:.+$' AND "action_audit_id" IS NULL AND "consumer_audit_id" IS NOT NULL AND "principal_id" IS NULL AND "command_receipt_id" IS NULL)),
   CONSTRAINT "ck_event_outbox_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
   CONSTRAINT "ck_event_outbox_metadata" CHECK ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),
-  CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND (("lease_token" IS NULL) = ("leased_until" IS NULL))),
+  CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND "publication_total_failure_count" >= "publication_failure_count" AND "publication_recovery_generation" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND ("publication_recovery_mode" = 'none' OR ("publication_recovery_mode" = 'manual' AND "publication_max_attempts" IS NOT NULL)) AND (("lease_token" IS NULL) = ("leased_until" IS NULL))),
   CONSTRAINT "ck_event_outbox_publication_error" CHECK ("last_publication_error_code" IS NULL OR "last_publication_error_code" ~ '^ML_[A-Z_]+$'),
   CONSTRAINT "ck_event_outbox_publication_disposition" CHECK (("publication_disposition" = 'pending' AND "published_at" IS NULL AND "publication_terminal_at" IS NULL) OR ("publication_disposition" = 'published' AND "published_at" IS NOT NULL AND "publication_terminal_at" IS NULL AND "lease_token" IS NULL) OR ("publication_disposition" = 'deadLetter' AND "published_at" IS NULL AND "publication_terminal_at" IS NOT NULL AND "lease_token" IS NULL AND "publication_max_attempts" IS NOT NULL AND "publication_failure_count" >= "publication_max_attempts"))
 );
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "consumer_id" text;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "consumer_audit_id" bigint;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_failure_count" integer NOT NULL DEFAULT 0;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_total_failure_count" integer NOT NULL DEFAULT 0;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_max_attempts" integer;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_recovery_mode" text NOT NULL DEFAULT 'none';
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_recovery_generation" integer NOT NULL DEFAULT 0;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_disposition" text NOT NULL DEFAULT 'pending';
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "last_publication_error_code" text;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_terminal_at" timestamptz;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "last_publication_recovered_at" timestamptz;
+UPDATE "model_reservations_internal"."event_outbox" SET "publication_total_failure_count" = "publication_failure_count" WHERE "publication_total_failure_count" < "publication_failure_count";
 UPDATE "model_reservations_internal"."event_outbox" SET "publication_disposition" = 'published' WHERE "published_at" IS NOT NULL AND "publication_disposition" = 'pending';
 ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_delivery";
-ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND (("lease_token" IS NULL) = ("leased_until" IS NULL)));
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND "publication_total_failure_count" >= "publication_failure_count" AND "publication_recovery_generation" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND ("publication_recovery_mode" = 'none' OR ("publication_recovery_mode" = 'manual' AND "publication_max_attempts" IS NOT NULL)) AND (("lease_token" IS NULL) = ("leased_until" IS NULL)));
 ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_publication_error";
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_publication_error" CHECK ("last_publication_error_code" IS NULL OR "last_publication_error_code" ~ '^ML_[A-Z_]+$');
 ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_publication_disposition";
@@ -336,6 +357,21 @@ BEGIN
   END IF;
 END
 $modellang$;
+CREATE TABLE IF NOT EXISTS "model_reservations_internal"."publication_recovery_audit" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "event_outbox_id" uuid NOT NULL REFERENCES "model_reservations_internal"."event_outbox" ("id"),
+  "event_id" text NOT NULL,
+  "recovery_generation" integer NOT NULL,
+  "prior_failure_count" integer NOT NULL,
+  "total_failure_count" integer NOT NULL,
+  "prior_error_code" text NOT NULL,
+  "reason_code" text NOT NULL,
+  "database_principal" name NOT NULL,
+  "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  CONSTRAINT "uq_publication_recovery_generation" UNIQUE ("event_outbox_id", "recovery_generation"),
+  CONSTRAINT "ck_publication_recovery_counts" CHECK ("recovery_generation" >= 1 AND "prior_failure_count" >= 1 AND "total_failure_count" >= "prior_failure_count"),
+  CONSTRAINT "ck_publication_recovery_codes" CHECK ("prior_error_code" ~ '^ML_[A-Z_]+$' AND "reason_code" ~ '^[A-Z][A-Z0-9_]{0,63}$')
+);
 CREATE INDEX IF NOT EXISTS "ix_event_outbox_delivery_v3" ON "model_reservations_internal"."event_outbox" ("occurred_at", "action_audit_id", "consumer_audit_id", "ordinal", "id") WHERE "publication_disposition" = 'pending';
 CREATE OR REPLACE FUNCTION "model_reservations_internal"."claim_events"(p_limit integer, p_lease_seconds integer)
 RETURNS SETOF jsonb
@@ -427,7 +463,7 @@ BEGIN
   IF p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' OR pg_catalog.length(p_error_code) > 64 THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:event_outbox';
   END IF;
-  UPDATE "model_reservations_internal"."event_outbox" SET "publication_failure_count" = "publication_failure_count" + 1,
+  UPDATE "model_reservations_internal"."event_outbox" SET "publication_failure_count" = "publication_failure_count" + 1, "publication_total_failure_count" = "publication_total_failure_count" + 1,
     "last_publication_error_code" = p_error_code, "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz),
     "publication_disposition" = CASE WHEN "publication_max_attempts" IS NOT NULL AND "publication_failure_count" + 1 >= "publication_max_attempts" THEN 'deadLetter' ELSE 'pending' END,
     "publication_terminal_at" = CASE WHEN "publication_max_attempts" IS NOT NULL AND "publication_failure_count" + 1 >= "publication_max_attempts" THEN pg_catalog.clock_timestamp() ELSE (NULL::timestamptz) END
@@ -437,6 +473,44 @@ BEGIN
   RETURN pg_catalog.jsonb_build_object('status', CASE WHEN v_disposition = 'deadLetter' THEN 'deadLetter' ELSE 'retry' END, 'recorded', TRUE, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."fail_event"(uuid, uuid, text) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_reservations_internal"."recover_event_publication"(p_event_id uuid, p_reason_code text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_stable_event_id text;
+  v_failure_count integer;
+  v_total_failure_count integer;
+  v_error_code text;
+  v_disposition text;
+  v_recovery_mode text;
+  v_recovery_generation integer;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS recovery_role ON recovery_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE recovery_role.rolname = 'modellang_publication_recovery' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_PUBLICATION_RECOVERY_REQUIRED';
+  END IF;
+  IF p_event_id IS NULL OR p_reason_code IS NULL OR p_reason_code !~ '^[A-Z][A-Z0-9_]{0,63}$' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_PUBLICATION_RECOVERY';
+  END IF;
+  SELECT "event_id", "publication_failure_count", "publication_total_failure_count", "last_publication_error_code", "publication_disposition", "publication_recovery_mode", "publication_recovery_generation"
+  INTO v_stable_event_id, v_failure_count, v_total_failure_count, v_error_code, v_disposition, v_recovery_mode, v_recovery_generation
+  FROM "model_reservations_internal"."event_outbox" WHERE "id" = p_event_id FOR UPDATE;
+  IF NOT FOUND OR v_disposition <> 'deadLetter' OR v_recovery_mode <> 'manual' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_PUBLICATION_RECOVERY_STATE';
+  END IF;
+  v_recovery_generation := v_recovery_generation + 1;
+  UPDATE "model_reservations_internal"."event_outbox" SET "publication_failure_count" = 0, "publication_disposition" = 'pending',
+    "publication_recovery_generation" = v_recovery_generation, "publication_terminal_at" = (NULL::timestamptz),
+    "last_publication_recovered_at" = pg_catalog.clock_timestamp(), "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
+  WHERE "id" = p_event_id;
+  INSERT INTO "model_reservations_internal"."publication_recovery_audit" ("event_outbox_id", "event_id", "recovery_generation", "prior_failure_count", "total_failure_count", "prior_error_code", "reason_code", "database_principal")
+  VALUES (p_event_id, v_stable_event_id, v_recovery_generation, v_failure_count, v_total_failure_count, v_error_code, p_reason_code, session_user);
+  RETURN pg_catalog.jsonb_build_object('status', 'recovered', 'recoveryGeneration', v_recovery_generation, 'priorFailureCount', v_failure_count, 'totalFailureCount', v_total_failure_count);
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_reservations_internal"."recover_event_publication"(uuid, text) FROM PUBLIC;
 RESET ROLE;
 
 -- Generated private transactional event consumers. Broker transport remains host-owned.
@@ -520,8 +594,8 @@ BEGIN
   IF p_envelope->>'eventId' IS DISTINCT FROM 'event:evt_40d694c9a0a274dc79c6168e47d25968'
      OR p_envelope->>'eventName' IS DISTINCT FROM 'ReservationCreated'
      OR v_source_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_source_model_version IS DISTINCT FROM '0.25.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a'
+     OR v_source_model_version IS DISTINCT FROM '0.26.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce'
      OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)
               OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)
      OR (p_envelope->>'ordinal')::integer < 0
@@ -600,8 +674,8 @@ BEGIN
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at", 'indexed', v_result."indexed");
   INSERT INTO "model_reservations_internal"."consumer_audit" ("consumer_id", "source_event_id", "source_event_type", "source_model_id", "source_model_version", "source_hash", "target_id", "authorization_rule_id", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id")
   VALUES ('consumer:con_20d694c9a0a274dc79c6168e47d25968', v_source_event_id, 'event:evt_40d694c9a0a274dc79c6168e47d25968', v_source_model_id, v_source_model_version, v_source_hash, v_result."id", 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'consumed', 'consumerId', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', 'sourceEventId', v_source_event_id, 'sourceContract', pg_catalog.jsonb_build_object('eventId', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:consumer:con_20d694c9a0a274dc79c6168e47d25968.valid_interval', 'outcome', 'passed')), 'emittedEventIds', pg_catalog.to_jsonb(ARRAY['event:evt_60d694c9a0a274dc79c6168e47d25968']::text[]), 'failurePolicy', pg_catalog.jsonb_build_object('mode', 'deadLetterAfterMaxAttempts', 'maxAttempts', 3, 'recovery', 'manual')), v_correlation_id, v_causation_id) RETURNING "id" INTO v_consumer_audit_id;
-  INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts")
-  VALUES ('model:Reservations', '0.25.0', 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5);
+  INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
+  VALUES ('model:Reservations', '0.26.0', 'sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5, 'manual');
 
   UPDATE "model_reservations_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = 3, "terminal_at" = (NULL::timestamptz), "resolved_at" = pg_catalog.clock_timestamp()
   WHERE "consumer_id" = 'consumer:con_20d694c9a0a274dc79c6168e47d25968' AND "source_event_id" = v_source_event_id::text;
@@ -614,17 +688,18 @@ REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"
 
 RESET ROLE;
 -- Generated least-privilege application boundary.
-REVOKE CREATE ON SCHEMA "model_reservations" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
-REVOKE ALL ON SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
+REVOKE CREATE ON SCHEMA "model_reservations" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
+REVOKE ALL ON SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
 GRANT USAGE ON SCHEMA "model_reservations" TO modellang_app;
 GRANT USAGE ON SCHEMA "model_reservations_internal" TO modellang_gateway;
 GRANT USAGE ON SCHEMA "model_reservations_internal" TO modellang_dispatcher;
 GRANT USAGE ON SCHEMA "model_reservations_internal" TO modellang_consumer;
 GRANT USAGE ON SCHEMA "model_reservations_internal" TO modellang_recovery;
+GRANT USAGE ON SCHEMA "model_reservations_internal" TO modellang_publication_recovery;
 
-REVOKE ALL ON TABLE "model_reservations"."user" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery;
-REVOKE ALL ON TABLE "model_reservations"."resource" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery;
-REVOKE ALL ON TABLE "model_reservations"."reservation" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery;
+REVOKE ALL ON TABLE "model_reservations"."user" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
+REVOKE ALL ON TABLE "model_reservations"."resource" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
+REVOKE ALL ON TABLE "model_reservations"."reservation" FROM PUBLIC, modellang_app, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
 
 REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) TO modellang_app;
@@ -632,10 +707,10 @@ REVOKE ALL ON FUNCTION "model_reservations"."decide_act_508ad810a19d4b79a5009871
 GRANT EXECUTE ON FUNCTION "model_reservations"."decide_act_508ad810a19d4b79a5009871de5cd26b"(uuid, timestamptz, timestamptz, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) TO modellang_app;
-REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_recovery;
+REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_recovery, modellang_publication_recovery;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) TO modellang_consumer;
-REVOKE ALL ON ALL TABLES IN SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
+REVOKE ALL ON ALL TABLES IN SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."bind_gateway_identity"(text, text) TO modellang_gateway;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."claim_events"(integer, integer) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."ack_event"(uuid, uuid) TO modellang_dispatcher;
@@ -644,6 +719,7 @@ GRANT EXECUTE ON FUNCTION "model_reservations_internal"."fail_event"(uuid, uuid,
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consumer_failure_state"(text, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."record_consumer_failure"(text, text, integer, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."recover_consumer_failure"(text, text, text) TO modellang_recovery;
+GRANT EXECUTE ON FUNCTION "model_reservations_internal"."recover_event_publication"(uuid, text) TO modellang_publication_recovery;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) TO modellang_consumer;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE modellang_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
@@ -656,6 +732,8 @@ REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher F
 REVOKE modellang_consumer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher;
 REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer FROM modellang_recovery;
 REVOKE modellang_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;
+REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery FROM modellang_publication_recovery;
+REVOKE modellang_publication_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
 REVOKE modellang_gateway FROM modellang_app;
 GRANT modellang_app TO modellang_gateway;
 COMMIT;

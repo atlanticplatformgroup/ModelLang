@@ -24,9 +24,9 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-diff.schema.json" },
-    "diffVersion": { "const": 10 },
+    "diffVersion": { "const": 11 },
     "compilerVersion": { "type": "string" },
-    "irVersion": { "const": 17 },
+    "irVersion": { "const": 18 },
     "previous": { "$ref": "#/$defs/model" },
     "current": { "$ref": "#/$defs/model" },
     "changes": {

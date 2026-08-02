@@ -1,11 +1,11 @@
-# ModelLang 0.25 reference compiler
+# ModelLang 0.26 reference compiler
 
 ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, reusable closed policies, reliable commands, typed domain events and consumers, one canonical enforcement decision plan, filtered public applicability, private transactional decision evidence, engineering policy coverage, a workflow-aware operation and UI boundary, deterministic provenance, guarded evolution, generated clients, and PostgreSQL enforcement.
 
 Two canonical applications drive the language:
 
-- Procurement proves authenticated callers, principal-scoped exactly-once command replay, atomic request lifecycle events with bounded publication failure disposition, duplicate-safe `RequestApproved` consumption, bounded durable consumer failure disposition, isolated audited recovery, and chained `ApprovalObserved` emission, reusable manager/finance authority, exact executed decision evidence, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
-- Reservations proves reliable creation with bounded-publication `ReservationCreated` events, duplicate-safe bounded-retry local indexing, opt-in terminal recovery, and chained `ReservationIndexed` emission, parameterized reads, temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
+- Procurement proves authenticated callers, principal-scoped exactly-once command replay, atomic request lifecycle events with bounded publication failure disposition and isolated audited reopening, duplicate-safe `RequestApproved` consumption, bounded durable consumer failure disposition, isolated audited consumer recovery, and chained `ApprovalObserved` emission, reusable manager/finance authority, exact executed decision evidence, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
+- Reservations proves reliable creation with bounded-publication `ReservationCreated` events, opt-in audited publication and consumer terminal recovery, duplicate-safe bounded-retry local indexing, and chained `ReservationIndexed` emission, parameterized reads, temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
 
 ## Quick start
 
@@ -61,17 +61,17 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.25 advances to IR17 because event publication failure policy cannot be retained faithfully by IR16. IR17 preserves IR16 consumer recovery semantics and adds explicit per-event publication failure policy. Released IR9 through IR16 remain accepted evolution baselines when current source compiles to IR17. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.26 advances to IR18 because event publication recovery eligibility cannot be retained faithfully by IR17. IR18 preserves IR17 publication-failure semantics and adds explicit `none` or `manual` recovery to bounded event policy. Released IR9 through IR17 remain accepted evolution baselines when current source compiles to IR18. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v4 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, action reliability and emitted-event IDs, and stable workflow bindings. It contains no runtime events, leases, keys, receipts, request hashes, HTTP paths, SQL names, database roles, or connection details. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
-`events.json` is event manifest v4. It is the static typed event contract: stable event ID and name, payload entity ID, local or imported source contract, emitting action and consumer IDs, bounded or unbounded publication failure policy, envelope v2, and the private-outbox/at-least-once delivery profile. It contains no queued payloads, principals, correlations, lease tokens, attempts, errors, dispositions, inbox state, or broker configuration.
+`events.json` is event manifest v5. It is the static typed event contract: stable event ID and name, payload entity ID, local or imported source contract, emitting action and consumer IDs, bounded or unbounded publication failure policy with static recovery eligibility, envelope v2, and the private-outbox/at-least-once delivery profile. It contains no queued payloads, principals, correlations, lease tokens, attempts, errors, dispositions, recovery audit, operator identity, outcomes, inbox state, or broker configuration.
 
 `decisions.json` is enforcement decision plan v2. In addition to normalized action rules, loads, locks, absence projection, and revision components, it carries stable policies, exact-one branch semantics, composition, and per-rule policy use. It is internal and expression-bearing. Both generated applicability functions and mutation functions consume this plan, so execution cannot drift from preflight logic.
 
 `capabilities.json` is public capability manifest v3, a filtered projection derived from the operation manifest and decision plan. It exposes action/input and emitted-event IDs, static reliability requirements, fixed applicability outcomes, safe explanation rule IDs, and opaque-revision behavior. It contains no command or event instances, keys, correlations, receipts, expressions, current state, SQL details, or authority grant.
 
-`semantic.json` is engineering semantic manifest v9. It includes stable event publication policies plus consumers, accepted source contracts, delivery identity, bounded or unbounded consumer failure policy, recovery eligibility, rules, read/lock sets, local effects, and ordered downstream event IDs in the existing action, policy, reliability, workflow, failure, and source-span closure.
+`semantic.json` is engineering semantic manifest v10. It includes stable event publication failure and recovery policies plus consumers, accepted source contracts, delivery identity, bounded or unbounded consumer failure policy, recovery eligibility, rules, read/lock sets, local effects, and ordered downstream event IDs in the existing action, policy, reliability, workflow, failure, and source-span closure.
 
 `ui.json` is UI manifest v4 derived exclusively from operation manifest v4. It adds static emitted-event IDs to the existing action, query, entity, enum, workflow, presentation, error, and reliability metadata.
 
@@ -88,12 +88,12 @@ The PostgreSQL backend emits:
 - pure authenticated `SECURITY DEFINER` action-applicability functions generated from the same decision plan;
 - private exact-authority evidence written transactionally with successful action audit;
 - private principal-scoped command receipts with canonical SHA-256 request fingerprints, stored results, and audit/correlation links;
-- a private transactional event outbox plus bounded lease/ack/release/failure functions and durable policy-derived publication disposition for an isolated dispatcher role;
+- a private transactional event outbox plus bounded lease/ack/release/failure functions, durable policy-derived publication disposition, and separately authorized audited recovery;
 - private transactional inbox, consumer audit, stored-result replay, atomic downstream outbox insertion, policy-derived durable failure dispositions, and immutable recovery audit for isolated consumer and recovery roles;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
-- idempotent administrative upgrades through the 0.25 private-publication-failure boundary.
+- idempotent administrative upgrades through the 0.26 private-publication-recovery boundary.
 
 The generated TypeScript clients expose only declared actions, queries, and action applicability. They have no generic table or mutation API. Caller identity is not an input field.
 
@@ -104,6 +104,7 @@ The generated TypeScript clients expose only declared actions, queries, and acti
 - `typescript/client.ts` remains the server-side PostgreSQL client. It never forwards caller identity as a SQL argument; the database resolves it through the authenticated session boundary.
 - `typescript/events.ts` exports typed event-envelope variants keyed by stable event identity and post-effect entity payload.
 - `typescript/dispatcher.ts` is a server-only typed adapter for private outbox claim, acknowledgement, release, and lease-bound failure recording.
+- `typescript/publication-recovery.ts` is a server-only typed adapter for isolated audited terminal-outbox reopening.
 - `typescript/consumers.ts` is a server-only, broker-neutral adapter for invoking declared consumers through the execute-only database boundary and recording bounded private failure codes.
 
 Query methods return typed entity arrays. Generated workflow metadata exposes lifecycle edges without creating a generic mutation surface. Authentication, PostgreSQL exclusion, and workflow failures cross HTTP as typed `AuthenticationError`, `ConflictError`, and `TransitionError` values.
@@ -125,7 +126,7 @@ Local events can opt into bounded lease-bound publication failure:
 
 ```modellang
 event RequestApproved @stableId("evt_30d694c9a0a274dc79c6168e47d25968")
-  payload PurchaseRequest retry maxAttempts 5;
+  payload PurchaseRequest retry maxAttempts 5 recovery manual;
 ```
 
 The host claims private typed envelopes through a connection that can assume only `modellang_dispatcher`, publishes them through its chosen broker, then acknowledges, releases, or records a bounded stable failure code:
@@ -154,7 +155,21 @@ for (const event of await claimProcurementEvents(dispatcherDatabase, 100, 60)) {
 }
 ```
 
-Only an explicit failure recorded under the current unexpired lease increments the durable count. Release, lease expiry, and dispatcher crashes do not fabricate a failure. At the declared maximum the outbox row becomes private `deadLetter` state and is excluded from later claims. ModelLang does not publish or move a broker message and 0.25 defines no publication-recovery operation.
+Only an explicit failure recorded under the current unexpired lease increments the durable count. Release, lease expiry, and dispatcher crashes do not fabricate a failure. At the declared maximum the outbox row becomes private `deadLetter` state and is excluded from later claims.
+
+An opted-in terminal publication can be reopened only through a separate client bound to `modellang_publication_recovery`:
+
+```ts
+import { recoverProcurementEventPublication } from "./generated/procurement/typescript/publication-recovery.js";
+
+const recovery = await recoverProcurementEventPublication(
+  publicationRecoveryDatabase,
+  outboxEventId,
+  "OPERATOR_REVIEWED",
+);
+```
+
+Recovery resets the current failure cycle, preserves monotonic total failures, increments a generation, and writes exact private operator audit atomically. It does not claim or publish the event. A separately authorized dispatcher must later claim it through the ordinary lease path; ModelLang never looks up, reconstructs, or moves a broker message.
 
 ## Event-consumer boundary
 
@@ -440,6 +455,15 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The baseline-checked artifact adds private copied publication policy, recorded-failure count, terminal disposition, and lease-bound failure recording, then redeploys producers and grants. Existing outbox rows retain unbounded retry. The upgrade is transactional and idempotent and invents no failure, dead letter, publication, lease, or broker operation.
 
+Existing installations can add the private 0.26 audited publication-recovery boundary without reopening terminal rows:
+
+```bash
+psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f generated/procurement/postgres/016_upgrade_0_26.sql
+```
+
+The baseline-checked artifact installs copied recovery eligibility, monotonic total failures, recovery generations, immutable private audit, an isolated execute-only recovery role, and current producers/grants. Existing rows remain ineligible, including existing terminal rows. The upgrade is transactional and idempotent and fabricates no recovery, operator, audit, claim, publication, lease, or broker operation.
+
 The safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. Policy and branch renames preserve stable identity, while changed policy signatures, branches, action authority, idempotency requirements, existing-event publication policies, or existing-consumer failure policies require reviewed evolution. Unsupported transformations still fail closed rather than becoming compiler guesses.
 
 ## Explicit language semantics
@@ -452,10 +476,10 @@ The safe planner continues to refuse removals, existing semantic changes, requir
 - A reliable command claims its private receipt in the mutation transaction. Its SHA-256 fingerprint covers stable action ID, canonical typed callable inputs keyed by stable parameter ID, expected revision, correlation ID, and causation ID; model source hash is checked separately.
 - A committed equivalent retry returns the stored result without re-authorizing or rechecking mutable state because it performs no new effect. A failed or rolled-back first attempt leaves no receipt, effect, or audit record. Changed input or source fails with `ML_IDEMPOTENCY_CONFLICT` and discloses no result.
 - Correlation and causation IDs are execution metadata, never action inputs or capabilities. For reliable commands correlation defaults to the key; other actions receive a boundary-generated UUID (inside PostgreSQL for direct execution and at HTTP for response echoing). Receipts, fingerprints, and stored results remain owner-private.
-- `event Name @stableId("evt_...") payload Entity retry maxAttempts N;` declares a durable typed event with optional bounded publication failure; omission preserves unbounded publication retry. An action lists `emit Name;` after its effect, and the compiler requires the payload entity to match the returned post-effect entity.
+- `event Name @stableId("evt_...") payload Entity retry maxAttempts N recovery manual;` declares a durable typed event with optional bounded publication failure and manual terminal recovery; omissions preserve unbounded retry or disable recovery. An action lists `emit Name;` after its effect, and the compiler requires the payload entity to match the returned post-effect entity.
 - Event rows commit in the same transaction as mutation, invariants, audit, evidence, and receipt completion. Rollback removes all of them; reliable-command replay returns before event insertion.
 - Delivery is explicitly at least once: the private dispatcher leases bounded batches with `FOR UPDATE SKIP LOCKED`, the host publishes externally, and an unexpired lease token gates acknowledgement or failure recording. A crash between publish and acknowledgement can redeliver the same stable event ID, so consumers deduplicate by ID.
-- Publication failure recording atomically increments only an explicit lease-bound failure and returns `retry` or policy-derived `deadLetter`; release and lease expiry do not count. Terminal rows are excluded from claims. Retry timing, broker routing/movement, and publication recovery remain host-owned.
+- Publication failure recording atomically increments only an explicit lease-bound failure and returns `retry` or policy-derived `deadLetter`; release and lease expiry do not count. Terminal rows are excluded from claims. Opted-in recovery under a separate execute-only role restores claim eligibility, resets only the current cycle, preserves total failures, increments generation, and appends immutable private audit. Retry timing and all broker routing, lookup, reconstruction, movement, and publication remain host-owned.
 - A `consumer ... on Event(payload value: Entity)` declaration binds one stable consumer identity to one exact local or imported event-source contract. Its payload is an immutable event snapshot, not authenticated caller identity or execution authority.
 - Consumer invocation is execute-only through `modellang_consumer`. The closed envelope and complete typed payload are validated before the handler loads and locks local state, re-evaluates authorization and named requirements, applies one create/update effect, and records private evidence.
 - The private inbox identity is stable consumer ID plus event instance ID. Its SHA-256 fingerprint covers the stable closed envelope except `deliveryAttempt`; equivalent concurrent duplicates serialize and replay one committed stored result, while changed content fails with `ML_EVENT_CONFLICT` without result disclosure.
@@ -561,7 +585,7 @@ The full suite validates reliable-command replay and conflicts, bounded event-pu
 - Reliable commands intentionally omit automatic retry scheduling, receipt expiry/deletion, multi-action sagas, asynchronous recovery, external side-effect deduplication, cross-model keys, and signed/public receipts. Retention is deployment-governed.
 - Event delivery intentionally omits network publication, broker-specific polling and acknowledgement, retry timing/backoff schedules, destinations or message movement, publication recovery/redrive, replay-message selection/retrieval, bulk or automatic consumer recovery, operator approval workflows, authored separation of duties, retention, arbitrary payload transformations, imported-event emission, cyclic chains, cross-context translation, partition assignment, global ordering, sagas, and exactly-once network delivery. ModelLang supplies private lease-bound publication disposition plus durable consumer failure accounting and opt-in single-event audited consumer reopening only.
 - UI manifest v4 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, pagination controls, optimistic concurrency, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
-- Engineering semantic manifest v9 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, general recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
+- Engineering semantic manifest v10 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, general recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
 The normative 0.25 language is in [spec/0.25/LANGUAGE.md](./spec/0.25/LANGUAGE.md), with its [private publication-failure contract](./spec/0.25/PUBLICATION_FAILURES.md), [conformance requirements](./spec/0.25/CONFORMANCE.md), and [unstable boundaries](./spec/0.25/UNSTABLE.md). Earlier consumer-recovery, failure-disposition, event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.25 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.

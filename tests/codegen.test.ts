@@ -181,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 9,
+      manifestVersion: 10,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 17 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 18 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -224,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 17 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 18 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -630,7 +630,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.25.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.26.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -654,15 +654,18 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(contract), JSON.stringify(validate.errors)).toBe(true);
     expect(contract).toMatchObject({
-      eventManifestVersion: 4,
+      eventManifestVersion: 5,
       delivery: { semantics: "atLeastOnce", storage: "privateTransactionalOutbox", acknowledgement: "leaseToken" },
     });
     expect(contract.events).toHaveLength(4);
-    expect(contract.events[0].publicationFailurePolicy).toEqual({ mode: "deadLetterAfterMaxAttempts", maxAttempts: 5 });
+    expect(contract.events[0].publicationFailurePolicy).toEqual({ mode: "deadLetterAfterMaxAttempts", maxAttempts: 5, recovery: "manual" });
     expect(output["postgres/001_roles.sql"]).toContain("modellang_dispatcher NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_outbox"');
     expect(output["postgres/002_schema.sql"]).toContain("FOR UPDATE SKIP LOCKED LIMIT p_limit");
     expect(output["postgres/002_schema.sql"]).toContain('"publication_failure_count" integer NOT NULL DEFAULT 0');
+    expect(output["postgres/002_schema.sql"]).toContain('"publication_total_failure_count" integer NOT NULL DEFAULT 0');
+    expect(output["postgres/002_schema.sql"]).toContain('"publication_recovery_mode" text NOT NULL DEFAULT \'none\'');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_recovery_audit"');
     expect(output["postgres/002_schema.sql"]).toContain('"publication_disposition" text NOT NULL DEFAULT \'pending\'');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."fail_event"');
     expect(output["postgres/002_schema.sql"]).toContain('WHERE row_value."publication_disposition" = \'pending\'');
@@ -670,19 +673,27 @@ describe("backends", () => {
     expect(output["postgres/003_actions.sql"]).toContain('INSERT INTO "model_procurement_internal"."event_outbox"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."claim_events"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."fail_event"');
+    expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."recover_event_publication"(uuid, text) TO modellang_publication_recovery');
     expect(output["postgres/010_upgrade_0_20.sql"]).toContain("transactional domain-event upgrade");
     expect(output["typescript/events.ts"]).toContain("export type RequestOpenedEvent");
     expect(output["typescript/dispatcher.ts"]).toContain("claimProcurementEvents");
     expect(output["typescript/dispatcher.ts"]).toContain("acknowledgeProcurementEvent");
     expect(output["typescript/dispatcher.ts"]).toContain("failProcurementEvent");
     expect(output["typescript/dispatcher.ts"]).toContain('status: "retry" | "deadLetter"');
+    expect(output["typescript/publication-recovery.ts"]).toContain("recoverProcurementEventPublication");
+    expect(output["typescript/publication-recovery.ts"]).toContain('status: "recovered"');
     expect(output["typescript/index.ts"]).toContain('export * from "./events.js"');
     expect(output["typescript/index.ts"]).toContain('export * from "./dispatcher.js"');
+    expect(output["typescript/index.ts"]).toContain('export * from "./publication-recovery.js"');
     expect(output["postgres/015_upgrade_0_25.sql"]).toContain("bounded event-publication failure upgrade");
+    expect(output["postgres/016_upgrade_0_26.sql"]).toContain("audited event-publication recovery upgrade");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {
       expect(output[publicArtifact]).not.toContain("publication_failure_count");
       expect(output[publicArtifact]).not.toContain("lastPublicationErrorCode");
       expect(output[publicArtifact]).not.toContain("publicationDisposition");
+      expect(output[publicArtifact]).not.toContain("publicationTotalFailureCount");
+      expect(output[publicArtifact]).not.toContain("publicationRecoveryAudit");
+      expect(output[publicArtifact]).not.toContain("reasonCode");
       expect(output[publicArtifact]).not.toContain("ML_BROKER_UNAVAILABLE");
     }
     expect(output["model.mmd"]).toContain("emits atomically");

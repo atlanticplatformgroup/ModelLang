@@ -243,7 +243,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(17);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(18);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -396,10 +396,10 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR16 artifacts as previous baselines for an IR17 migration", () => {
+  it("accepts released IR9 through IR17 artifacts as previous baselines for an IR18 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16]) {
+    for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16, 17]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
       if (irVersion === 9) delete legacy.policies;
@@ -422,6 +422,11 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
       if (irVersion < 17 && legacy.events) {
         for (const event of legacy.events as Record<string, unknown>[]) delete event.publicationFailurePolicy;
       }
+      if (irVersion === 17 && legacy.events) {
+        for (const event of legacy.events as { publicationFailurePolicy?: Record<string, unknown> }[]) {
+          if (event.publicationFailurePolicy?.mode === "deadLetterAfterMaxAttempts") delete event.publicationFailurePolicy.recovery;
+        }
+      }
       expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
       const plan = planMigration(legacy as unknown as typeof previous, current);
       expect(plan.previousVersion).toBe("1.0.0");
@@ -432,23 +437,31 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     }
   });
 
-  it("normalizes IR16 event publication policy omission and rejects a real policy change", () => {
-    const source = (version: string, retry: boolean) => `model PublicationEvolution version "${version}";
+  it("normalizes IR16 policy omission and IR17 recovery omission while rejecting real policy changes", () => {
+    const source = (version: string, policy: string) => `model PublicationEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") { id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); }
 entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") { id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"); }
-event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record ${retry ? "retry maxAttempts 5" : ""};
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record ${policy};
 action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Record {
   authorize true;
   create Record { id = id; }
   emit RecordCreated;
 }`;
-    const previous = compileText(source("1", false));
+    const previous = compileText(source("1", ""));
     const ir16 = structuredClone(previous) as unknown as { irVersion: number; events: Record<string, unknown>[] };
     ir16.irVersion = 16;
     delete ir16.events[0]!.publicationFailurePolicy;
     expect(() => validateEvolutionIR(ir16 as unknown as typeof previous)).not.toThrow();
-    expect(planMigration(ir16 as unknown as typeof previous, compileText(source("2", false))).operations).toEqual([]);
-    expect(error(() => planMigration(previous, compileText(source("2", true)))).code).toBe("E2807");
+    expect(planMigration(ir16 as unknown as typeof previous, compileText(source("2", ""))).operations).toEqual([]);
+    expect(error(() => planMigration(previous, compileText(source("2", "retry maxAttempts 5")))).code).toBe("E2807");
+
+    const bounded = compileText(source("1", "retry maxAttempts 5"));
+    const ir17 = structuredClone(bounded) as unknown as { irVersion: number; events: { publicationFailurePolicy: { recovery?: string } }[] };
+    ir17.irVersion = 17;
+    delete ir17.events[0]!.publicationFailurePolicy.recovery;
+    expect(() => validateEvolutionIR(ir17 as unknown as typeof bounded)).not.toThrow();
+    expect(planMigration(ir17 as unknown as typeof bounded, compileText(source("2", "retry maxAttempts 5"))).operations).toEqual([]);
+    expect(error(() => planMigration(bounded, compileText(source("2", "retry maxAttempts 5 recovery manual")))).code).toBe("E2807");
   });
 
   it("refuses an existing action idempotency change on the automatic-safe path", () => {

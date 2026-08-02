@@ -286,7 +286,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 17 },
+    "irVersion": { "const": 18 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -360,10 +360,11 @@
               },
               {
                 "type": "object",
-                "required": ["mode", "maxAttempts"],
+                "required": ["mode", "maxAttempts", "recovery"],
                 "properties": {
                   "mode": { "const": "deadLetterAfterMaxAttempts" },
-                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 }
+                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                  "recovery": { "enum": ["none", "manual"] }
                 },
                 "additionalProperties": false
               }

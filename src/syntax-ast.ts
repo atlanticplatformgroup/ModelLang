@@ -29,6 +29,7 @@ export interface EventDecl {
     sourceHash: string;
   };
   retry?: { maxAttempts: number; span: Span };
+  recovery?: { mode: "manual"; span: Span };
   span: Span;
 }
 

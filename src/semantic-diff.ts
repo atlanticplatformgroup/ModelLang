@@ -43,9 +43,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 10;
+  diffVersion: 11;
   compilerVersion: string;
-  irVersion: 17;
+  irVersion: 18;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -75,6 +75,11 @@ function normalizedConsumerFailurePolicy(policy: IRConsumer["failurePolicy"] | u
   return { ...policy, recovery: policy.recovery ?? "none" };
 }
 
+function normalizedEventPublicationFailurePolicy(policy: ModelIR["events"][number]["publicationFailurePolicy"] | undefined): ModelIR["events"][number]["publicationFailurePolicy"] {
+  if (!policy || policy.mode === "unboundedRetry") return { mode: "unboundedRetry" };
+  return { ...policy, recovery: policy.recovery ?? "none" };
+}
+
 function subject(kind: string, value: { id: string; name: string }): SemanticChange["subject"] {
   return { kind, id: value.id, name: value.name };
 }
@@ -96,11 +101,12 @@ function compareEvents(changes: SemanticChange[], previous: ModelIR["events"], c
       subject: subject("event", pair.current), before: text(pair.previous.source ?? { kind: "local" }), after: text(pair.current.source),
       persistenceRisk: true, explanation: "Changing an event source model, version, or hash changes the accepted durable contract.",
     });
-    const previousPolicy = pair.previous.publicationFailurePolicy ?? { mode: "unboundedRetry" };
-    if (!same(previousPolicy, pair.current.publicationFailurePolicy)) addChange(changes, {
+    const previousPolicy = normalizedEventPublicationFailurePolicy(pair.previous.publicationFailurePolicy);
+    const currentPolicy = normalizedEventPublicationFailurePolicy(pair.current.publicationFailurePolicy);
+    if (!same(previousPolicy, currentPolicy)) addChange(changes, {
       kind: "eventPublicationFailurePolicyChanged", area: "eventDelivery", classification: "review",
-      subject: subject("event", pair.current), before: text(previousPolicy), after: text(pair.current.publicationFailurePolicy),
-      persistenceRisk: true, explanation: "The event's durable publication retry or terminal disposition policy changed.",
+      subject: subject("event", pair.current), before: text(previousPolicy), after: text(currentPolicy),
+      persistenceRisk: true, explanation: "The event's durable publication retry, terminal disposition, or recovery policy changed.",
     });
   }
 }
@@ -590,7 +596,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 10,
+    diffVersion: 11,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

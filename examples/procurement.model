@@ -1,4 +1,4 @@
-model Procurement version "0.25.0";
+model Procurement version "0.26.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -55,10 +55,10 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
     or approvedBy != requester;
 }
 
-event RequestOpened @stableId("evt_10d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5;
-event RequestSubmitted @stableId("evt_20d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5;
-event RequestApproved @stableId("evt_30d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5;
-event ApprovalObserved @stableId("evt_50d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5;
+event RequestOpened @stableId("evt_10d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5 recovery manual;
+event RequestSubmitted @stableId("evt_20d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5 recovery manual;
+event RequestApproved @stableId("evt_30d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5 recovery manual;
+event ApprovalObserved @stableId("evt_50d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest retry maxAttempts 5 recovery manual;
 
 // Policy branches are closed, stable authorities. Exactly one must match.
 policy ApprovalAuthority @stableId("pol_a3a80ffeec774402be92cddaafd0f069")(

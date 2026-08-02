@@ -19,6 +19,7 @@ import {
   failProcurementEvent,
   releaseProcurementEvent,
 } from "../../generated/procurement/typescript/dispatcher.js";
+import { recoverProcurementEventPublication } from "../../generated/procurement/typescript/publication-recovery.js";
 import {
   createProcurementUiExecutor,
   createProcurementUiWorkflowExecutor,
@@ -44,6 +45,7 @@ let admin: Pool;
 let gateway: Pool;
 let consumer: Pool;
 let recovery: Pool;
+let publicationRecovery: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -106,7 +108,8 @@ beforeAll(async () => {
   gateway = new Pool({ connectionString: loginUrl("ml_gateway"), max: 1 });
   consumer = poolFor("ml_consumer");
   recovery = poolFor("ml_recovery");
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery);
+  publicationRecovery = poolFor("ml_publication_recovery");
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery, publicationRecovery);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -207,7 +210,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.25.0",
+      model_version: "0.26.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -387,6 +390,102 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     }
   });
 
+  it("recovers terminal publication failures under isolated audited authority", async () => {
+    const created = await clients.employeeOne.openRequest({ amount: usd("45") }, commandOptions("publication-recovery"));
+    const dispatcher = new Client({ connectionString: loginUrl("ml_dispatcher") });
+    await dispatcher.connect();
+    const claimTarget = async () => {
+      const claimed = await claimProcurementEvents(dispatcher, 1000, 60);
+      const target = claimed.find((event) => event.targetId === created.id)!;
+      expect(target).toBeTruthy();
+      for (const event of claimed) {
+        if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
+      }
+      return target;
+    };
+    try {
+      let targetId = "";
+      for (let count = 1; count <= 5; count += 1) {
+        const target = await claimTarget();
+        targetId = target.id;
+        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
+      }
+
+      await expect(recoverProcurementEventPublication(dispatcher, targetId, "OPERATOR_REVIEWED"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(recoverProcurementEventPublication(recovery, targetId, "WRONG_RECOVERY_ROLE"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(admin.query("SELECT model_procurement_internal.recover_event_publication($1, $2)", [targetId, "OWNER_ATTEMPT"]))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(publicationRecovery.query("SELECT * FROM model_procurement_internal.event_outbox"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(claimProcurementEvents(publicationRecovery, 1, 60))
+        .rejects.toMatchObject({ code: "42501" });
+
+      await expect(recoverProcurementEventPublication(publicationRecovery, targetId, "OPERATOR_REVIEWED")).resolves.toEqual({
+        status: "recovered",
+        recoveryGeneration: 1,
+        priorFailureCount: 5,
+        totalFailureCount: 5,
+      });
+      const firstRecovery = await admin.query<{
+        publication_failure_count: number;
+        publication_total_failure_count: number;
+        publication_disposition: string;
+        publication_recovery_generation: number;
+      }>(`SELECT publication_failure_count, publication_total_failure_count, publication_disposition, publication_recovery_generation
+          FROM model_procurement_internal.event_outbox WHERE id = $1`, [targetId]);
+      expect(firstRecovery.rows[0]).toEqual({
+        publication_failure_count: 0,
+        publication_total_failure_count: 5,
+        publication_disposition: "pending",
+        publication_recovery_generation: 1,
+      });
+      const firstAudit = await admin.query<{ reason_code: string; database_principal: string; prior_error_code: string }>(
+        `SELECT reason_code, database_principal::text, prior_error_code
+         FROM model_procurement_internal.publication_recovery_audit WHERE event_outbox_id = $1`,
+        [targetId],
+      );
+      expect(firstAudit.rows).toEqual([{
+        reason_code: "OPERATOR_REVIEWED",
+        database_principal: "ml_publication_recovery",
+        prior_error_code: "ML_BROKER_UNAVAILABLE",
+      }]);
+
+      for (let count = 1; count <= 5; count += 1) {
+        const target = await claimTarget();
+        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_REJECTED");
+      }
+      const recoveryConnection = await publicationRecovery.connect();
+      try {
+        await recoveryConnection.query("BEGIN");
+        await recoverProcurementEventPublication(recoveryConnection, targetId, "ROLLBACK_TEST");
+        await recoveryConnection.query("ROLLBACK");
+      } finally {
+        recoveryConnection.release();
+      }
+      const rolledBack = await admin.query<{ disposition: string; audits: string }>(`
+        SELECT
+          (SELECT publication_disposition FROM model_procurement_internal.event_outbox WHERE id = $1) AS disposition,
+          (SELECT count(*)::text FROM model_procurement_internal.publication_recovery_audit WHERE event_outbox_id = $1) AS audits
+      `, [targetId]);
+      expect(rolledBack.rows[0]).toEqual({ disposition: "deadLetter", audits: "1" });
+
+      await expect(recoverProcurementEventPublication(publicationRecovery, targetId, "SECOND_REVIEW")).resolves.toEqual({
+        status: "recovered",
+        recoveryGeneration: 2,
+        priorFailureCount: 5,
+        totalFailureCount: 10,
+      });
+      const republished = await claimTarget();
+      await acknowledgeProcurementEvent(dispatcher, republished.id, republished.leaseToken);
+      await expect(recoverProcurementEventPublication(publicationRecovery, targetId, "TOO_LATE"))
+        .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_PUBLICATION_RECOVERY_STATE") });
+    } finally {
+      await dispatcher.end();
+    }
+  });
+
   it("allows exactly one competing lease transition to commit", async () => {
     const created = await clients.employeeOne.openRequest({ amount: usd("44") }, commandOptions("publication-race"));
     const first = new Client({ connectionString: loginUrl("ml_dispatcher") });
@@ -452,7 +551,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.25.0', $1,
+        VALUES ('model:Procurement', '0.26.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1240,6 +1339,31 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT coalesce(sum(publication_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS failures,
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox WHERE publication_disposition = 'deadLetter') AS terminal,
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox WHERE publication_disposition = 'published') AS published,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the transactional 0.26 publication-recovery upgrade without fabricating recovery state", async () => {
+    const before = await admin.query<{ events: string; failures: string; total_failures: string; recoveries: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT coalesce(sum(publication_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS failures,
+        (SELECT coalesce(sum(publication_total_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS total_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.publication_recovery_audit) AS recoveries,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/016_upgrade_0_26.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<typeof before.rows[number]>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT coalesce(sum(publication_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS failures,
+        (SELECT coalesce(sum(publication_total_failure_count), 0)::text FROM model_procurement_internal.event_outbox) AS total_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.publication_recovery_audit) AS recoveries,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);

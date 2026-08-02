@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.25.0",
-    "sourceHash": "sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a",
+    "version": "0.26.0",
+    "sourceHash": "sha256:9024c4aadd045333aac9a62e38859d3b0aca0fd083300aa66235d243883d8dce",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -31,6 +31,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_recovery NOLOGIN"
+    },
+    {
+      "id": "boundary:publication_recovery_role",
+      "purpose": "Confine opted-in terminal publication recovery to a separate non-login role with execute-only access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_publication_recovery NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
@@ -503,7 +510,7 @@
     },
     {
       "id": "publication-failure-policy:event:evt_40d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.event_outbox",
@@ -512,12 +519,12 @@
         "line": 26,
         "column": 1,
         "endLine": 26,
-        "endColumn": 116
+        "endColumn": 132
       }
     },
     {
       "id": "publication-failure-policy:event:evt_60d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "purpose": "Record lease-bound publication failures durably, stop claiming after 5 failures, and permit isolated audited manual recovery.",
       "layer": "PostgreSQL event outbox publication state",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.event_outbox",
@@ -526,7 +533,7 @@
         "line": 27,
         "column": 1,
         "endLine": 27,
-        "endColumn": 116
+        "endColumn": 132
       }
     },
     {

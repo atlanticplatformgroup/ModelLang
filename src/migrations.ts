@@ -373,8 +373,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17].includes(Number(previous.irVersion)) || current.irVersion !== 17) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12/IR13/IR14/IR15/IR16/IR17 baseline and canonical IR17 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18].includes(Number(previous.irVersion)) || current.irVersion !== 18) {
+    fail(current, "E2803", "Migration planning requires a released canonical IR9 through IR18 baseline and canonical IR18 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -572,7 +572,9 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   const previousEventsById = byId(previousEvents);
   for (const currentEvent of eventDiff.existing) {
     const previousEvent = previousEventsById.get(currentEvent.id)!;
-    const previousPublicationPolicy = previousEvent.publicationFailurePolicy ?? { mode: "unboundedRetry" };
+    const previousPublicationPolicy = previousEvent.publicationFailurePolicy?.mode === "deadLetterAfterMaxAttempts"
+      ? { ...previousEvent.publicationFailurePolicy, recovery: previousEvent.publicationFailurePolicy.recovery ?? "none" }
+      : { mode: "unboundedRetry" };
     if (previousEvent.payloadEntityId !== currentEvent.payloadEntityId
       || !same(previousEvent.source ?? { kind: "local" }, currentEvent.source)
       || !same(previousPublicationPolicy, currentEvent.publicationFailurePolicy)) {

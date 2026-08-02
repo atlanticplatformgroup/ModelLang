@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.25](./spec/0.25/LANGUAGE.md). It retains the complete 0.24 boundary and adds opt-in bounded, lease-bound event-publication failure disposition without publishing or controlling broker state.
+The current normative specification is [ModelLang 0.26](./spec/0.26/LANGUAGE.md). It retains the complete 0.25 boundary and adds opt-in isolated audited manual recovery for terminal event-publication failures without publishing or controlling broker state.
+
+- [Private audited publication-recovery semantics](./spec/0.26/PUBLICATION_RECOVERY.md)
+- [0.26 grammar additions](./spec/0.26/GRAMMAR.ebnf)
+- [0.26 conformance requirements](./spec/0.26/CONFORMANCE.md)
+- [0.26 unstable publication-recovery boundaries](./spec/0.26/UNSTABLE.md)
 
 - [Private bounded publication-failure semantics](./spec/0.25/PUBLICATION_FAILURES.md)
 - [0.25 grammar additions](./spec/0.25/GRAMMAR.ebnf)

@@ -1,17 +1,6 @@
--- Idempotent ModelLang 0.24 -> 0.25 private bounded event-publication failure upgrade.
--- Existing outbox rows retain unbounded retry and no failure or terminal history is fabricated.
+-- Idempotent ModelLang 0.25 -> 0.26 private audited event-publication recovery upgrade.
+-- Existing terminal rows remain terminal and ineligible; counts are preserved and no recovery audit is fabricated.
 BEGIN;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_dispatcher') THEN
-    CREATE ROLE modellang_dispatcher NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-  END IF;
-END
-$modellang$;
-
-ALTER ROLE modellang_dispatcher NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-REVOKE modellang_owner, modellang_app, modellang_gateway FROM modellang_dispatcher;
-REVOKE modellang_dispatcher FROM modellang_owner, modellang_app, modellang_gateway;
 DO $modellang$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_publication_recovery') THEN

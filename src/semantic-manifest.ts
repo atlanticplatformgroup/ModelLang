@@ -41,8 +41,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 9;
-  profile: "sml-transactional-core/9";
+  manifestVersion: 10;
+  profile: "sml-transactional-core/10";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -51,7 +51,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 17;
+    irVersion: 18;
     generator: "semantic-manifest";
   };
   model: {
@@ -410,7 +410,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 9,
+    manifestVersion: 10,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
