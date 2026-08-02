@@ -58,7 +58,7 @@ async function main(): Promise<void> {
     if (!(conflict instanceof ConflictError)) throw new Error("Overlapping reservation unexpectedly succeeded");
     line(6, "Attempt overlapping reservation from 10:30 to 11:30", "REJECTED as designed");
     const visible = await first.reservationsForResource({ resource });
-    if (visible.length !== 2 || visible.some((reservation) => reservation.resource !== resource)) {
+    if (visible.length !== 2 || visible.some((reservation) => reservation.resource.id !== resource)) {
       throw new Error("Resource-scoped query returned an unexpected result");
     }
     line(7, "Read Conference Room A through declared resource query", "PASS");

@@ -45,6 +45,40 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
 }
 
 describe("generated HTTP boundary", () => {
+  it("recursively validates closed nested query projections", async () => {
+    const queryRoute = "https://example.test/operations/queries/qry_4406b045404a48449282db804f6167a8";
+    const validResult = [{
+      id: "00000000-0000-4000-8000-000000000010",
+      createdAt: "2026-07-30T12:00:00Z",
+      amount: { currency: "USD", amount: "10.00" },
+      status: "APPROVED",
+      approvedBy: {
+        id: "00000000-0000-4000-8000-000000000003",
+        name: "Manager",
+      },
+    }];
+    const queryRequest = () => new Request(queryRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: "{}",
+    });
+    const validHandler = createProcurementHttpHandler(async () => ({
+      execute: async () => validResult,
+      assess,
+    }));
+    const valid = await validHandler(queryRequest());
+    expect(valid.status).toBe(200);
+    expect(await valid.json()).toEqual(validResult);
+
+    const invalidHandler = createProcurementHttpHandler(async () => ({
+      execute: async () => [{ ...validResult[0], approvedBy: "00000000-0000-4000-8000-000000000003" }],
+      assess,
+    }));
+    const invalid = await invalidHandler(queryRequest());
+    expect(invalid.status).toBe(500);
+    expect(JSON.stringify(await invalid.json())).not.toContain("00000000-0000-4000-8000-000000000003");
+  });
+
   it("authenticates context and passes only validated callable input to the stable operation ID", async () => {
     const execute = vi.fn(async () => purchaseRequest);
     const executor: ProcurementOperationExecutor = { execute, assess };

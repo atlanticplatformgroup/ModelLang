@@ -117,8 +117,8 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     const secondRows = await firstClient.reservationsForResource({ resource: otherResource });
     expect(firstRows.some((reservation) => reservation.id === firstId)).toBe(true);
     expect(secondRows.some((reservation) => reservation.id === secondId)).toBe(true);
-    expect(firstRows.every((reservation) => reservation.resource === resource)).toBe(true);
-    expect(secondRows.every((reservation) => reservation.resource === otherResource)).toBe(true);
+    expect(firstRows.every((reservation) => reservation.resource.id === resource && reservation.resource.name === "Conference Room A")).toBe(true);
+    expect(secondRows.every((reservation) => reservation.resource.id === otherResource && reservation.resource.name === "Conference Room B")).toBe(true);
     expect(firstRows.some((reservation) => reservation.id === secondId)).toBe(false);
     await expect(firstClient.reservationsForResource({
       resource: "20000000-0000-4000-8000-000000000099",

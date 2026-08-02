@@ -1644,15 +1644,27 @@ function fieldJson(field: IRField, column: string): string {
   return `${column}${field.type === "Decimal" ? "::text" : ""}`;
 }
 
-function projectionJson(ir: ModelIR, projectionId: string, record: string): string {
+function projectionJson(ir: ModelIR, projectionId: string, record: string, path: number[] = []): string {
   const projection = ir.projections.find((candidate) => candidate.id === projectionId);
   if (!projection) throw new Error(`E5008 Missing query projection '${projectionId}'.`);
   const entity = entityById(ir, projection.sourceEntityId);
-  const values = projection.fields.flatMap((selected) => {
+  const values = projection.fields.flatMap((selected, index) => {
     const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId);
     if (!field) throw new Error(`E5009 Missing projection source field '${selected.sourceFieldId}'.`);
     const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
-    return [`'${selected.name.replaceAll("'", "''")}'`, fieldJson(field, column)];
+    if (!selected.nestedProjectionId) {
+      return [`'${selected.name.replaceAll("'", "''")}'`, fieldJson(field, column)];
+    }
+    const nestedProjection = ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId);
+    if (!nestedProjection) throw new Error(`E5010 Missing nested projection '${selected.nestedProjectionId}'.`);
+    const nestedEntity = entityById(ir, nestedProjection.sourceEntityId);
+    const nestedId = nestedEntity.fields.find((candidate) => candidate.id === nestedEntity.idFieldId);
+    if (!nestedId) throw new Error(`E5011 Missing identity field for nested projection '${nestedProjection.id}'.`);
+    const nestedPath = [...path, index];
+    const alias = `v_projection_${nestedPath.join("_")}`;
+    const lookup = `(SELECT ${projectionJson(ir, nestedProjection.id, quoteIdent(alias), nestedPath)} FROM ${qname(ir.model.naming.sqlSchema, nestedEntity.naming.sqlTable)} AS ${quoteIdent(alias)} WHERE ${quoteIdent(alias)}.${quoteIdent(nestedId.naming.sqlColumn)} = ${column})`;
+    const value = field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${lookup} END` : lookup;
+    return [`'${selected.name.replaceAll("'", "''")}'`, value];
   });
   return `jsonb_build_object(${values.join(", ")})`;
 }

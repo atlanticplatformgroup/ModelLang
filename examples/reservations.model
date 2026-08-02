@@ -1,4 +1,4 @@
-model Reservations version "0.30.0";
+model Reservations version "0.31.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -59,9 +59,14 @@ consumer indexReservation @stableId("con_20d694c9a0a274dc79c6168e47d25968") on R
   emit ReservationIndexed;
 }
 
+projection ResourceSummary @stableId("prj_85d694c9a0a274dc79c6168e47d25968") from Resource {
+  id @stableId("pfd_86d694c9a0a274dc79c6168e47d25968");
+  name @stableId("pfd_87d694c9a0a274dc79c6168e47d25968");
+}
+
 projection ReservationSummary @stableId("prj_80d694c9a0a274dc79c6168e47d25968") from Reservation {
   id @stableId("pfd_81d694c9a0a274dc79c6168e47d25968");
-  resource @stableId("pfd_82d694c9a0a274dc79c6168e47d25968");
+  resource: ResourceSummary @stableId("pfd_82d694c9a0a274dc79c6168e47d25968");
   startsAt @stableId("pfd_83d694c9a0a274dc79c6168e47d25968");
   endsAt @stableId("pfd_84d694c9a0a274dc79c6168e47d25968");
 }

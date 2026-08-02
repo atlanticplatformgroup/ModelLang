@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 5;
+  manifestVersion: 6;
   model: {
     id: string;
     name: string;
@@ -54,6 +54,7 @@ export interface OperationManifest {
       sourceFieldId: string;
       type: OperationValueType;
       nullable: boolean;
+      nestedProjectionId?: string;
     }[];
   }[];
   operations: ManifestOperation[];
@@ -230,10 +231,20 @@ function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
 }
 
 export function generateOperationManifest(ir: ModelIR): OperationManifest {
-  const reachableProjectionIds = new Set(ir.queries.map((query) => query.returnProjectionId));
+  const reachableProjectionIds = new Set<string>();
+  const visitProjection = (projectionId: string): void => {
+    if (reachableProjectionIds.has(projectionId)) return;
+    const projection = ir.projections.find((candidate) => candidate.id === projectionId);
+    if (!projection) throw new Error(`E6006 Missing projection '${projectionId}'.`);
+    reachableProjectionIds.add(projectionId);
+    for (const field of projection.fields) {
+      if (field.nestedProjectionId) visitProjection(field.nestedProjectionId);
+    }
+  };
+  for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 5,
+    manifestVersion: 6,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -287,6 +298,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
               sourceFieldId: selected.sourceFieldId,
               type: operationValueType(field.type),
               nullable: field.optional,
+              ...(selected.nestedProjectionId ? { nestedProjectionId: selected.nestedProjectionId } : {}),
             };
           }),
         };

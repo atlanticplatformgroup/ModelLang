@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.30](./spec/0.30/LANGUAGE.md). It retains the complete 0.29 language and adds stable named read projections as mandatory closed query result shapes without moving authorization or row policy out of the query.
+The current normative specification is [ModelLang 0.31](./spec/0.31/LANGUAGE.md). It retains the complete 0.30 language and adds bounded, acyclic to-one traversal between named projections without adding runtime-selected joins or moving authorization and row policy out of the root query.
+
+- [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
+- [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)
+- [0.31 conformance requirements](./spec/0.31/CONFORMANCE.md)
+- [0.31 unstable traversal boundaries](./spec/0.31/UNSTABLE.md)
 
 - [Named read-projection semantics](./spec/0.30/READ_PROJECTIONS.md)
 - [0.30 grammar additions](./spec/0.30/GRAMMAR.ebnf)

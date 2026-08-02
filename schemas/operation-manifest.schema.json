@@ -202,7 +202,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 5 },
+    "manifestVersion": { "const": 6 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -300,6 +300,7 @@
                 "id": { "type": "string", "pattern": "^projectionField:" },
                 "name": { "type": "string" },
                 "sourceFieldId": { "type": "string", "pattern": "^field:" },
+                "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
                 "type": { "$ref": "#/$defs/valueType" },
                 "nullable": { "type": "boolean" }
               },

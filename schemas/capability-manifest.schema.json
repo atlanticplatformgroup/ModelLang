@@ -7,8 +7,8 @@
   "required": ["$schema", "capabilityManifestVersion", "operationManifestVersion", "model", "view", "authentication", "actions"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/capability-manifest.schema.json" },
-    "capabilityManifestVersion": { "const": 4 },
-    "operationManifestVersion": { "const": 5 },
+    "capabilityManifestVersion": { "const": 5 },
+    "operationManifestVersion": { "const": 6 },
     "model": {
       "type": "object",
       "additionalProperties": false,

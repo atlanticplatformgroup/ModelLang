@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 12;
+  diffVersion: 13;
   compilerVersion: string;
-  irVersion: 19;
+  irVersion: 20;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -517,6 +517,14 @@ function compareProjections(changes: SemanticChange[], previousIR: ModelIR, curr
         subject: subject("projectionField", fieldPair.current), before: fieldPair.previous.sourceFieldId, after: fieldPair.current.sourceFieldId,
         persistenceRisk: false, explanation: "A stable projection member now discloses a different source field.",
       });
+      if (fieldPair.previous.nestedProjectionId !== fieldPair.current.nestedProjectionId) addChange(changes, {
+        kind: "projectionFieldTraversalChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("projectionField", fieldPair.current),
+        before: fieldPair.previous.nestedProjectionId ?? "directField",
+        after: fieldPair.current.nestedProjectionId ?? "directField",
+        persistenceRisk: false,
+        explanation: "Changing a projection member between a direct value and a nested projection changes its closed disclosure contract.",
+      });
       const fieldContract = (ir: ModelIR, fieldId: string) => {
         const field = ir.entities.flatMap((entity) => entity.fields).find((candidate) => candidate.id === fieldId);
         return field ? { type: field.type, nullable: field.optional } : null;
@@ -658,7 +666,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 12,
+    diffVersion: 13,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

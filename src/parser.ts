@@ -121,12 +121,18 @@ class Parser {
     const fields: ProjectionDecl["fields"] = [];
     while (!this.at("}")) {
       const field = this.identifier("Expected projection field name.");
+      let nestedProjectionType: TypeRef | undefined;
+      if (this.at(":")) {
+        this.take();
+        nestedProjectionType = this.parseTypeRef();
+      }
       const fieldStableId = this.at("@") ? this.parseStableId("projection field") : undefined;
       const end = this.expect(";");
       fields.push({
         kind: "projectionField",
         name: field.text,
         nameSpan: field.span,
+        nestedProjectionType,
         stableId: fieldStableId,
         span: this.span(field, end),
       });

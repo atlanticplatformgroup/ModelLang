@@ -1,0 +1,7 @@
+(* ModelLang 0.31 extends the complete ModelLang 0.30 grammar. *)
+
+projection_field =
+  identifier, [ ":", identifier ], [ stable_id ], ";" ;
+
+(* The identifier after ':' names a projection whose source is the entity *)
+(* referenced by the selected source field. Dependencies must be acyclic. *)

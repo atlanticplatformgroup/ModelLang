@@ -104,6 +104,7 @@ export interface IRProjectionField {
   name: string;
   identity: IRIdentity;
   sourceFieldId: string;
+  nestedProjectionId?: string;
   span: IRSpan;
 }
 
@@ -293,7 +294,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 19;
+  irVersion: 20;
   model: {
     id: string;
     name: string;

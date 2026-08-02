@@ -98,6 +98,7 @@ export interface ProjectionFieldDecl {
   kind: "projectionField";
   name: string;
   nameSpan: Span;
+  nestedProjectionType?: TypeRef;
   stableId?: Annotation;
   span: Span;
 }

@@ -1,12 +1,12 @@
 {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 5,
-  "operationManifestVersion": 5,
+  "uiManifestVersion": 6,
+  "operationManifestVersion": 6,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.30.0",
-    "sourceHash": "sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578",
+    "version": "0.31.0",
+    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8",
     "label": "Reservations"
   },
   "authentication": {
@@ -167,6 +167,34 @@
   ],
   "projections": [
     {
+      "id": "projection:prj_85d694c9a0a274dc79c6168e47d25968",
+      "name": "ResourceSummary",
+      "label": "Resource summary",
+      "sourceEntityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+      "fields": [
+        {
+          "projectionFieldId": "projectionField:pfd_86d694c9a0a274dc79c6168e47d25968",
+          "sourceFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
+          "name": "id",
+          "label": "Id",
+          "presentation": {
+            "kind": "uuid"
+          },
+          "nullable": false
+        },
+        {
+          "projectionFieldId": "projectionField:pfd_87d694c9a0a274dc79c6168e47d25968",
+          "sourceFieldId": "field:fld_41fd1b66c84441519c8ff1e4db72d145",
+          "name": "name",
+          "label": "Name",
+          "presentation": {
+            "kind": "text"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    {
       "id": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
       "name": "ReservationSummary",
       "label": "Reservation summary",
@@ -191,7 +219,8 @@
             "kind": "entityReference",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
           },
-          "nullable": false
+          "nullable": false,
+          "nestedProjectionId": "projection:prj_85d694c9a0a274dc79c6168e47d25968"
         },
         {
           "projectionFieldId": "projectionField:pfd_83d694c9a0a274dc79c6168e47d25968",

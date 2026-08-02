@@ -387,8 +387,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].includes(Number(previous.irVersion)) || current.irVersion !== 19) {
-    fail(current, "E2803", "Migration planning requires a released canonical IR9 through IR19 baseline and canonical IR19 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(Number(previous.irVersion)) || current.irVersion !== 20) {
+    fail(current, "E2803", "Migration planning requires a released canonical IR9 through IR20 baseline and canonical IR20 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -635,10 +635,16 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   const previousProjections = (previous as ModelIR & { projections?: IRProjection[] }).projections ?? [];
   const projectionDiff = additiveDiff(previousProjections, current.projections, "Projection", current);
   const previousProjectionsById = byId(previousProjections);
-  const reachableProjectionIds = new Set([
-    ...previous.queries.map((query) => query.returnProjectionId).filter(Boolean),
-    ...current.queries.map((query) => query.returnProjectionId),
-  ]);
+  const reachableProjectionIds = new Set<string>();
+  const addProjectionClosure = (projections: IRProjection[], projectionId: string | undefined): void => {
+    if (!projectionId || reachableProjectionIds.has(projectionId)) return;
+    const projection = projections.find((candidate) => candidate.id === projectionId);
+    if (!projection) return;
+    reachableProjectionIds.add(projectionId);
+    for (const field of projection.fields) addProjectionClosure(projections, field.nestedProjectionId);
+  };
+  for (const query of previous.queries) addProjectionClosure(previousProjections, query.returnProjectionId);
+  for (const query of current.queries) addProjectionClosure(current.projections, query.returnProjectionId);
   for (const projection of projectionDiff.existing) {
     const oldProjection = previousProjectionsById.get(projection.id)!;
     if (reachableProjectionIds.has(projection.id)

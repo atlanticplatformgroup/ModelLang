@@ -240,6 +240,12 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       approvedBy: "00000000-0000-4000-8000-000000000003",
       approvedByRoles: ["EMPLOYEE", "MANAGER"],
     });
+    const disclosedLow = (await clients.employeeOne.myRequests({})).find((request) => request.id === low)!;
+    expect(disclosedLow.approvedBy).toEqual({
+      id: "00000000-0000-4000-8000-000000000003",
+      name: "Manager",
+    });
+    expect(Object.hasOwn(disclosedLow.approvedBy!, "roles")).toBe(false);
 
     const high = await submittedRequest("25000");
     await expect(clients.manager.approveRequest({ request: high })).rejects.toBeInstanceOf(AuthorizationError);
@@ -271,7 +277,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.30.0",
+      model_version: "0.31.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -1125,7 +1131,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.30.0', $1,
+        VALUES ('model:Procurement', '0.31.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });

@@ -164,8 +164,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 5 },
-    "operationManifestVersion": { "const": 5 },
+    "uiManifestVersion": { "const": 6 },
+    "operationManifestVersion": { "const": 6 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -265,6 +265,7 @@
               "properties": {
                 "projectionFieldId": { "type": "string", "pattern": "^projectionField:" },
                 "sourceFieldId": { "type": "string", "pattern": "^field:" },
+                "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
                 "name": { "type": "string" },
                 "label": { "type": "string" },
                 "presentation": { "$ref": "#/$defs/presentation" },

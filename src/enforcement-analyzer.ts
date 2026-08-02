@@ -78,6 +78,26 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   if (!projection || projection.sourceEntityId !== query.sourceEntityId) {
     fail(ir, `Query '${query.name}' has an invalid disclosure projection.`, query.span);
   }
+  const visited = new Set<string>();
+  const checkProjection = (projectionId: string): void => {
+    if (visited.has(projectionId)) return;
+    visited.add(projectionId);
+    const current = ir.projections.find((candidate) => candidate.id === projectionId);
+    if (!current) fail(ir, `Query '${query.name}' has an unknown nested disclosure projection '${projectionId}'.`, query.span);
+    const entity = ir.entities.find((candidate) => candidate.id === current.sourceEntityId);
+    if (!entity) fail(ir, `Projection '${current.name}' has an unknown source entity.`, current.span);
+    for (const selected of current.fields) {
+      const sourceField = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId);
+      if (!sourceField) fail(ir, `Projection '${current.name}' has an unknown source field.`, selected.span);
+      if (!selected.nestedProjectionId) continue;
+      const nested = ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId);
+      if (!nested || sourceField.type !== nested.sourceEntityId) {
+        fail(ir, `Projection '${current.name}' has an invalid nested disclosure projection.`, selected.span);
+      }
+      checkProjection(nested.id);
+    }
+  };
+  checkProjection(projection.id);
 }
 
 function checkWorkflow(ir: ModelIR, workflow: IRWorkflow): void {

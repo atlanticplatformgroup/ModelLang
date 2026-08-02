@@ -1,10 +1,10 @@
 {
-  "irVersion": 19,
+  "irVersion": 20,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.30.0",
-    "sourceHash": "sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2",
+    "version": "0.31.0",
+    "sourceHash": "sha256:f23975e253a19d8f04efe1fe94e253d24c0ca560b1fc4fc7eec184ab5abaca55",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -909,6 +909,59 @@
   ],
   "projections": [
     {
+      "id": "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+      "name": "UserSummary",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "prj_76d694c9a0a274dc79c6168e47d25968"
+      },
+      "sourceEntityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+      "fields": [
+        {
+          "id": "projectionField:pfd_77d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pfd_77d694c9a0a274dc79c6168e47d25968"
+          },
+          "sourceFieldId": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 151,
+            "column": 3,
+            "endLine": 151,
+            "endColumn": 56
+          }
+        },
+        {
+          "id": "projectionField:pfd_78d694c9a0a274dc79c6168e47d25968",
+          "name": "name",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pfd_78d694c9a0a274dc79c6168e47d25968"
+          },
+          "sourceFieldId": "field:fld_a261560f630d4e818f8f099868078535",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 152,
+            "column": 3,
+            "endLine": 152,
+            "endColumn": 58
+          }
+        }
+      ],
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 150,
+        "column": 1,
+        "endLine": 153,
+        "endColumn": 2
+      },
+      "naming": {
+        "typescriptName": "UserSummary"
+      }
+    },
+    {
       "id": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
       "name": "RequestSummary",
       "identity": {
@@ -927,9 +980,9 @@
           "sourceFieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
           "span": {
             "file": "examples/procurement.model",
-            "line": 151,
+            "line": 156,
             "column": 3,
-            "endLine": 151,
+            "endLine": 156,
             "endColumn": 56
           }
         },
@@ -943,9 +996,9 @@
           "sourceFieldId": "field:fld_b425073719d6446b9859fe6ca97b0ffe",
           "span": {
             "file": "examples/procurement.model",
-            "line": 152,
+            "line": 157,
             "column": 3,
-            "endLine": 152,
+            "endLine": 157,
             "endColumn": 63
           }
         },
@@ -959,9 +1012,9 @@
           "sourceFieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
           "span": {
             "file": "examples/procurement.model",
-            "line": 153,
+            "line": 158,
             "column": 3,
-            "endLine": 153,
+            "endLine": 158,
             "endColumn": 60
           }
         },
@@ -975,9 +1028,9 @@
           "sourceFieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
           "span": {
             "file": "examples/procurement.model",
-            "line": 154,
+            "line": 159,
             "column": 3,
-            "endLine": 154,
+            "endLine": 159,
             "endColumn": 60
           }
         },
@@ -989,20 +1042,21 @@
             "stableId": "pfd_75d694c9a0a274dc79c6168e47d25968"
           },
           "sourceFieldId": "field:fld_5da56f04460f4deba9ccda4f552c2b97",
+          "nestedProjectionId": "projection:prj_76d694c9a0a274dc79c6168e47d25968",
           "span": {
             "file": "examples/procurement.model",
-            "line": 155,
+            "line": 160,
             "column": 3,
-            "endLine": 155,
-            "endColumn": 64
+            "endLine": 160,
+            "endColumn": 77
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 155,
         "column": 1,
-        "endLine": 156,
+        "endLine": 161,
         "endColumn": 2
       },
       "naming": {
@@ -2146,9 +2200,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 159,
+            "line": 164,
             "column": 3,
-            "endLine": 159,
+            "endLine": 164,
             "endColumn": 21
           },
           "naming": {
@@ -2174,9 +2228,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 161,
+          "line": 166,
           "column": 13,
-          "endLine": 161,
+          "endLine": 166,
           "endColumn": 17
         }
       },
@@ -2210,9 +2264,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 162,
+          "line": 167,
           "column": 9,
-          "endLine": 162,
+          "endLine": 167,
           "endColumn": 35
         }
       },
@@ -2224,9 +2278,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 158,
+        "line": 163,
         "column": 1,
-        "endLine": 165,
+        "endLine": 170,
         "endColumn": 2
       },
       "naming": {
@@ -3401,9 +3455,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 159,
+        "line": 164,
         "column": 3,
-        "endLine": 159,
+        "endLine": 164,
         "endColumn": 21
       }
     },
@@ -3422,9 +3476,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 161,
+        "line": 166,
         "column": 13,
-        "endLine": 161,
+        "endLine": 166,
         "endColumn": 17
       }
     },
@@ -3436,9 +3490,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 162,
+        "line": 167,
         "column": 9,
-        "endLine": 162,
+        "endLine": 167,
         "endColumn": 35
       }
     },
@@ -3450,9 +3504,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 158,
+        "line": 163,
         "column": 1,
-        "endLine": 165,
+        "endLine": 170,
         "endColumn": 2
       }
     },
@@ -3464,37 +3518,37 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 158,
+        "line": 163,
         "column": 1,
-        "endLine": 165,
+        "endLine": 170,
         "endColumn": 2
       }
     },
     {
       "id": "read:query:qry_4406b045404a48449282db804f6167a8",
-      "purpose": "Read entity:ent_9bc680209327484c8e98f5f740bcc702 through the generated query boundary.",
+      "purpose": "Read entity:ent_9bc680209327484c8e98f5f740bcc702 root rows and authored to-one related entities entity:ent_66c16684f17e4b4ca79eb7d916cbf725 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 158,
+        "line": 163,
         "column": 1,
-        "endLine": 165,
+        "endLine": 170,
         "endColumn": 2
       }
     },
     {
       "id": "disclose:query:qry_4406b045404a48449282db804f6167a8",
-      "purpose": "Disclose only projection:prj_70d694c9a0a274dc79c6168e47d25968 through the generated query boundary.",
+      "purpose": "Disclose only projection closure projection:prj_70d694c9a0a274dc79c6168e47d25968 -> projection:prj_76d694c9a0a274dc79c6168e47d25968 through the generated query boundary.",
       "layer": "PostgreSQL projection encoder",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 158,
+        "line": 163,
         "column": 1,
-        "endLine": 165,
+        "endLine": 170,
         "endColumn": 2
       }
     },

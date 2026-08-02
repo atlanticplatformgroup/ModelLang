@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 5,
+  "manifestVersion": 6,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.30.0",
-    "sourceHash": "sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578"
+    "version": "0.31.0",
+    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8"
   },
   "authentication": {
     "required": true,
@@ -162,6 +162,33 @@
   ],
   "projections": [
     {
+      "id": "projection:prj_85d694c9a0a274dc79c6168e47d25968",
+      "name": "ResourceSummary",
+      "sourceEntityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+      "fields": [
+        {
+          "id": "projectionField:pfd_86d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "sourceFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_87d694c9a0a274dc79c6168e47d25968",
+          "name": "name",
+          "sourceFieldId": "field:fld_41fd1b66c84441519c8ff1e4db72d145",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    {
       "id": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
       "name": "ReservationSummary",
       "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
@@ -184,7 +211,8 @@
             "kind": "entity",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
           },
-          "nullable": false
+          "nullable": false,
+          "nestedProjectionId": "projection:prj_85d694c9a0a274dc79c6168e47d25968"
         },
         {
           "id": "projectionField:pfd_83d694c9a0a274dc79c6168e47d25968",

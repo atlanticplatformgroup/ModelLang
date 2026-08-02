@@ -30,5 +30,8 @@ flowchart LR
   query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|reads source rows| entity_ent_ba2d028e915841d1ab90adfa40d38404
   query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|discloses selected fields| projection_prj_80d694c9a0a274dc79c6168e47d25968
   projection_prj_80d694c9a0a274dc79c6168e47d25968 -->|shape from| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  projection_prj_85d694c9a0a274dc79c6168e47d25968["Projection: ResourceSummary"]
+  projection_prj_80d694c9a0a274dc79c6168e47d25968 -->|resource: nested to-one| projection_prj_85d694c9a0a274dc79c6168e47d25968
+  projection_prj_85d694c9a0a274dc79c6168e47d25968 -->|shape from| entity_ent_7cb2307972954d83a6f344764faaae39
   authorize_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Authorize"] -->|guards| query_qry_94d8a56f4c2640fab58a4c2190c35c69
   where_query_qry_94d8a56f4c2640fab58a4c2190c35c69["Where"] -->|filters rows| query_qry_94d8a56f4c2640fab58a4c2190c35c69

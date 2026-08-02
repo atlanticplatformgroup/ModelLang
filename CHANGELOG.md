@@ -5,6 +5,17 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.31.0
+
+- Added explicit `referenceField: NestedProjection` members for bounded to-one relationship traversal while preserving direct entity-reference UUID encoding when no nested projection is named.
+- Required nested projection targets to match the referenced entity and rejected unknown targets, scalar or collection traversal, mismatches, and cyclic projection dependencies.
+- Advanced canonical IR to IR20 with optional projection-member `nestedProjectionId`; the finite acyclic authored dependency graph is the complete traversal bound.
+- Generated correlated foreign-key PostgreSQL lookups that construct only the nested allowlisted JSON keys, with exact required-object versus optional-object-or-null behavior.
+- Advanced operation manifest to v6, capability manifest to v5, UI manifest to v6, engineering semantic manifest/profile to v12, semantic diff to v13, and generator profile to `postgresql-http-ui-to-one-traversal/15` while retaining the locked decision, event, provenance, route, and private-runtime versions.
+- Published only transitive query-reachable projection dependencies and generated recursive closed OpenAPI schemas, TypeScript interfaces, HTTP result validation, UI dependency metadata, semantic read/disclosure closure, and Mermaid traversal edges.
+- Classified direct-to-nested and nested-target changes as breaking, and made automatic-safe migration treat transitively reachable nested projections as public query contracts. IR9–IR19 remain accepted evolution baselines without fabricated traversal.
+- Updated Procurement with nullable `approvedBy: UserSummary`, Reservations with required `resource: ResourceSummary`, deterministic golden artifacts, normative 0.31 documentation, and live PostgreSQL/HTTP tests for nested disclosure and null behavior.
+
 ## 0.30.0
 
 - Added stable named `projection ... from Entity` declarations with independent `prj_` and `pfd_` identity and mandatory `query ... returns Projection from Entity` result contracts.

@@ -38,25 +38,34 @@ describe("backends", () => {
       manifestVersion: number;
       authentication: { source: string; requestSupplied: boolean };
       entities: { name: string; idFieldId: string }[];
-      projections: { id: string; name: string; fields: { name: string }[] }[];
+      projections: { id: string; name: string; fields: { name: string; nestedProjectionId?: string }[] }[];
       operations: { id: string; kind: string; name: string; input: { name: string }[]; caller: { requestSupplied: boolean }; output: { projectionId?: string }; reliability?: { idempotency: string } }[];
       workflows: { id: string; transitions: { id: string; actionId: string; target: object }[] }[];
     };
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(5);
+    expect(manifest.manifestVersion).toBe(6);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
     }));
     expect(manifest.entities.find((entity) => entity.name === "PurchaseRequest")?.idFieldId)
       .toBe("field:fld_af918d24406040619a77b244a81ca5d3");
-    expect(manifest.projections).toEqual([expect.objectContaining({
-      id: "projection:prj_70d694c9a0a274dc79c6168e47d25968",
-      name: "RequestSummary",
-      fields: expect.arrayContaining([expect.objectContaining({ name: "amount" })]),
-    })]);
+    expect(manifest.projections).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "projection:prj_76d694c9a0a274dc79c6168e47d25968", name: "UserSummary" }),
+      expect.objectContaining({
+        id: "projection:prj_70d694c9a0a274dc79c6168e47d25968",
+        name: "RequestSummary",
+        fields: expect.arrayContaining([
+          expect.objectContaining({ name: "amount" }),
+          expect.objectContaining({
+            name: "approvedBy",
+            nestedProjectionId: "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+          }),
+        ]),
+      }),
+    ]));
     expect(manifest.operations).toHaveLength(4);
     for (const operation of manifest.operations) {
       expect(operation.caller.requestSupplied).toBe(false);
@@ -90,7 +99,10 @@ describe("backends", () => {
     const openapi = JSON.parse(output["openapi.json"]!) as {
       openapi: string;
       paths: Record<string, { post: { summary: string; parameters: { $ref: string }[]; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } } } }>;
-      components: { parameters: Record<string, { name: string; required: boolean }> };
+      components: {
+        parameters: Record<string, { name: string; required: boolean }>;
+        schemas: Record<string, { properties?: Record<string, unknown> }>;
+      };
     };
     expect(openapi.openapi).toBe("3.1.1");
     const openRoute = "/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
@@ -106,6 +118,12 @@ describe("backends", () => {
     expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: true });
     expect(openapi.components.parameters.CorrelationId).toMatchObject({ name: "X-Correlation-ID", required: false });
     expect(openapi.components.parameters.CausationId).toMatchObject({ name: "X-Causation-ID", required: false });
+    expect(openapi.components.schemas.RequestSummary?.properties?.approvedBy).toEqual({
+      anyOf: [
+        { $ref: "#/components/schemas/UserSummary" },
+        { type: "null" },
+      ],
+    });
 
     const browser = `${output["typescript/browser.ts"]}\n${output["typescript/http-client.ts"]}`;
     expect(browser).not.toMatch(/QueryAdapter|SELECT |session_user|PostgreSQL|node:/);
@@ -184,15 +202,17 @@ describe("backends", () => {
         postconditions: { invariantIds: string[] };
         workflowTransitionIds: string[];
       }[];
+      projections: { id: string; fields: { name: string; nestedProjectionId?: string }[] }[];
+      queries: { disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
     };
     const semanticSchema = JSON.parse(await readFile("schemas/semantic-manifest.schema.json", "utf8")) as object;
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 11,
+      manifestVersion: 12,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 19 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 20 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -223,6 +243,15 @@ describe("backends", () => {
     expect(approve.workflowTransitionIds).toEqual(["transition:trn_efd18c8576154ba8b138c97b551afae3"]);
     expect(semantic.actions.find((action) => action.name === "openRequest")?.reliability)
       .toMatchObject({ idempotency: "required", durableReceipt: true });
+    expect(semantic.projections.find((projection) => projection.id === "projection:prj_70d694c9a0a274dc79c6168e47d25968")?.fields)
+      .toContainEqual(expect.objectContaining({
+        name: "approvedBy",
+        nestedProjectionId: "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+      }));
+    expect(semantic.queries[0]!.disclosureSet.projectionIds).toEqual([
+      "projection:prj_70d694c9a0a274dc79c6168e47d25968",
+      "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+    ]);
 
     const provenance = JSON.parse(output["provenance.json"]!) as {
       compilerVersion: string;
@@ -232,7 +261,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 19 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 20 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -249,6 +278,7 @@ describe("backends", () => {
       authentication: { required: boolean; callerInput: boolean };
       enums: { name: string; label: string; options: { value: string; label: string }[] }[];
       entities: { name: string; idFieldId: string; fields: { name: string; generated?: string; snapshot: boolean; presentation: object }[] }[];
+      projections: { name: string; fields: { name: string; nestedProjectionId?: string }[] }[];
       actions: { operationId: string; name: string; label: string; reliability: { idempotency: string }; fields: { name: string; presentation: object }[] }[];
       queries: { operationId: string; name: string; label: string; filters: object[]; maxItems: number }[];
       workflows: {
@@ -262,8 +292,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 5,
-      operationManifestVersion: 5,
+      uiManifestVersion: 6,
+      operationManifestVersion: 6,
       authentication: { required: true, callerInput: false },
     });
 
@@ -286,6 +316,11 @@ describe("backends", () => {
       filters: [],
       maxItems: 100,
     });
+    expect(manifest.projections.find((projection) => projection.name === "RequestSummary")?.fields)
+      .toContainEqual(expect.objectContaining({
+        name: "approvedBy",
+        nestedProjectionId: "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+      }));
     expect(manifest.enums.find((enumeration) => enumeration.name === "RequestStatus")).toMatchObject({
       label: "Request status",
       options: [
@@ -604,7 +639,11 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/types.ts"]).toContain("export interface MyRequestsInput");
     expect(output["typescript/types.ts"]).not.toMatch(/interface MyRequestsInput \{\n {2}actor:/);
     expect(output["typescript/types.ts"]).toContain("export interface RequestSummary");
+    expect(output["typescript/types.ts"]).toContain("export interface UserSummary");
+    expect(output["typescript/types.ts"]).toContain("approvedBy: UserSummary | null;");
     expect(output["typescript/client.ts"]).toContain("async myRequests(input: MyRequestsInput): Promise<RequestSummary[]>");
+    expect(sql).toContain('FROM "model_procurement"."user" AS "v_projection_4"');
+    expect(sql).toContain('WHERE "v_projection_4"."id" = v_row."approved_by_id"');
     expect(sql).not.toContain("'requester'");
     expect(sql).not.toContain("'approvedByRoles'");
   });
@@ -666,7 +705,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.30.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.31.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

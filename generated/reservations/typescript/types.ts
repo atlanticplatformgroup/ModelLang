@@ -40,9 +40,14 @@ export interface Reservation {
   indexed: boolean;
 }
 
+export interface ResourceSummary {
+  id: string;
+  name: string;
+}
+
 export interface ReservationSummary {
   id: string;
-  resource: string;
+  resource: ResourceSummary;
   startsAt: string;
   endsAt: string;
 }

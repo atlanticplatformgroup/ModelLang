@@ -48,6 +48,20 @@ export function generateMermaid(ir: ModelIR): string {
     lines.push(`  ${safe(query.id)} -->|reads source rows| ${safe(query.sourceEntityId)}`);
     lines.push(`  ${safe(query.id)} -->|discloses selected fields| ${safe(projection.id)}`);
     lines.push(`  ${safe(projection.id)} -->|shape from| ${safe(projection.sourceEntityId)}`);
+    const visited = new Set<string>();
+    const nestedEdges = (current: typeof projection): void => {
+      if (visited.has(current.id)) return;
+      visited.add(current.id);
+      for (const field of current.fields) {
+        if (!field.nestedProjectionId) continue;
+        const nested = ir.projections.find((candidate) => candidate.id === field.nestedProjectionId)!;
+        lines.push(`  ${safe(nested.id)}["Projection: ${nested.name}"]`);
+        lines.push(`  ${safe(current.id)} -->|${field.name}: nested to-one| ${safe(nested.id)}`);
+        lines.push(`  ${safe(nested.id)} -->|shape from| ${safe(nested.sourceEntityId)}`);
+        nestedEdges(nested);
+      }
+    };
+    nestedEdges(projection);
     lines.push(`  ${safe(query.authorization.id)}["Authorize"] -->|guards| ${safe(query.id)}`);
     lines.push(`  ${safe(query.rowPolicy.id)}["Where"] -->|filters rows| ${safe(query.id)}`);
   }

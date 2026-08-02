@@ -50,6 +50,9 @@ flowchart LR
   query_qry_4406b045404a48449282db804f6167a8 -->|reads source rows| entity_ent_9bc680209327484c8e98f5f740bcc702
   query_qry_4406b045404a48449282db804f6167a8 -->|discloses selected fields| projection_prj_70d694c9a0a274dc79c6168e47d25968
   projection_prj_70d694c9a0a274dc79c6168e47d25968 -->|shape from| entity_ent_9bc680209327484c8e98f5f740bcc702
+  projection_prj_76d694c9a0a274dc79c6168e47d25968["Projection: UserSummary"]
+  projection_prj_70d694c9a0a274dc79c6168e47d25968 -->|approvedBy: nested to-one| projection_prj_76d694c9a0a274dc79c6168e47d25968
+  projection_prj_76d694c9a0a274dc79c6168e47d25968 -->|shape from| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   authorize_query_qry_4406b045404a48449282db804f6167a8["Authorize"] -->|guards| query_qry_4406b045404a48449282db804f6167a8
   where_query_qry_4406b045404a48449282db804f6167a8["Where"] -->|filters rows| query_qry_4406b045404a48449282db804f6167a8
   state_enumMember_emv_5528c88aa0fb42c79a9a773de2d7d675["State: DRAFT (initial)"]

@@ -189,6 +189,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
   const projections: IRProjection[] = [...symbols.projections.values()].map((projection) => lowerProjection(projection, symbols, file));
+  validateProjectionGraph(symbols, file);
   const events: IREvent[] = [...symbols.events.values()].map((event) => {
     const payload = symbols.entities.get(event.payloadType.name);
     if (!payload || event.payloadType.collection || event.payloadType.moneyCurrency) {
@@ -227,9 +228,9 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   validateConsumerEventGraph(consumers, symbols, file);
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
-  const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
+  const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 19,
+    irVersion: 20,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -975,11 +976,40 @@ function lowerProjection(projection: ProjectionDecl, symbols: Symbols, file: str
     if (sourceField.type.collection) {
       throw new ModelError("E2625", `Projection field '${sourceEntity.name}.${sourceField.name}' cannot select a collection-valued field.`, selected.span, file);
     }
+    let nestedProjectionId: string | undefined;
+    if (selected.nestedProjectionType) {
+      const nestedType = selected.nestedProjectionType;
+      const nestedProjection = !nestedType.collection && !nestedType.moneyCurrency
+        ? symbols.projections.get(nestedType.name)
+        : undefined;
+      if (!nestedProjection) {
+        throw new ModelError("E2627", `Nested projection target '${nestedType.name}' must be a projection.`, nestedType.span, file);
+      }
+      const referencedEntity = !sourceField.type.collection && !sourceField.type.moneyCurrency
+        ? symbols.entities.get(sourceField.type.name)
+        : undefined;
+      if (!referencedEntity) {
+        throw new ModelError("E2628", `Projection field '${sourceEntity.name}.${sourceField.name}' must be an entity reference to use nested projection '${nestedProjection.name}'.`, selected.span, file);
+      }
+      const nestedSource = !nestedProjection.sourceType.collection && !nestedProjection.sourceType.moneyCurrency
+        ? symbols.entities.get(nestedProjection.sourceType.name)
+        : undefined;
+      if (!nestedSource || entityId(nestedSource) !== entityId(referencedEntity)) {
+        throw new ModelError(
+          "E2629",
+          `Nested projection '${nestedProjection.name}' source '${nestedProjection.sourceType.name}' must match referenced entity '${referencedEntity.name}'.`,
+          nestedType.span,
+          file,
+        );
+      }
+      nestedProjectionId = projectionId(nestedProjection);
+    }
     return {
       id: projectionFieldId(projection, selected),
       name: selected.name,
       identity: identity(selected.stableId),
       sourceFieldId: fieldId(sourceEntity, sourceField),
+      ...(nestedProjectionId ? { nestedProjectionId } : {}),
       span: irSpan(selected.span, file),
     };
   });
@@ -992,6 +1022,32 @@ function lowerProjection(projection: ProjectionDecl, symbols: Symbols, file: str
     span: irSpan(projection.span, file),
     naming: { typescriptName: projection.name },
   };
+}
+
+function validateProjectionGraph(symbols: Symbols, file: string): void {
+  const active = new Set<string>();
+  const complete = new Set<string>();
+
+  const visit = (projection: ProjectionDecl, path: string[]): void => {
+    if (complete.has(projection.name)) return;
+    active.add(projection.name);
+    for (const field of projection.fields) {
+      const nestedName = field.nestedProjectionType?.name;
+      if (!nestedName) continue;
+      const nested = symbols.projections.get(nestedName);
+      if (!nested) continue;
+      if (active.has(nested.name)) {
+        const start = path.indexOf(nested.name);
+        const cycle = [...path.slice(start), nested.name].join(" -> ");
+        throw new ModelError("E2630", `Projection traversal dependencies must be acyclic; detected ${cycle}.`, field.span, file);
+      }
+      visit(nested, [...path, nested.name]);
+    }
+    active.delete(projection.name);
+    complete.add(projection.name);
+  };
+
+  for (const projection of symbols.projections.values()) visit(projection, [projection.name]);
 }
 
 function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, file: string): IRQuery {
@@ -1500,6 +1556,7 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
 function buildEnforcement(
   enums: IREnum[],
   entities: IREntity[],
+  projections: IRProjection[],
   events: IREvent[],
   policies: IRPolicy[],
   actions: IRAction[],
@@ -1746,8 +1803,36 @@ function buildEnforcement(
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
     entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
-    entries.push({ id: `read:${query.id}`, purpose: `Read ${query.sourceEntityId} through the generated query boundary.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
-    entries.push({ id: `disclose:${query.id}`, purpose: `Disclose only ${query.returnProjectionId} through the generated query boundary.`, layer: "PostgreSQL projection encoder", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    const closure: IRProjection[] = [];
+    const visited = new Set<string>();
+    const visit = (projectionId: string): void => {
+      if (visited.has(projectionId)) return;
+      const projection = projections.find((candidate) => candidate.id === projectionId);
+      if (!projection) return;
+      visited.add(projectionId);
+      closure.push(projection);
+      for (const field of projection.fields) if (field.nestedProjectionId) visit(field.nestedProjectionId);
+    };
+    visit(query.returnProjectionId);
+    const relatedEntityIds = [...new Set(closure.slice(1).map((projection) => projection.sourceEntityId))];
+    entries.push({
+      id: `read:${query.id}`,
+      purpose: relatedEntityIds.length === 0
+        ? `Read ${query.sourceEntityId} through the generated query boundary.`
+        : `Read ${query.sourceEntityId} root rows and authored to-one related entities ${relatedEntityIds.join(", ")} through the generated query boundary.`,
+      layer: "PostgreSQL query function",
+      artifact: "postgres/003_queries.sql",
+      objectName: fn,
+      source: query.span,
+    });
+    entries.push({
+      id: `disclose:${query.id}`,
+      purpose: `Disclose only projection closure ${closure.map((projection) => projection.id).join(" -> ")} through the generated query boundary.`,
+      layer: "PostgreSQL projection encoder",
+      artifact: "postgres/003_queries.sql",
+      objectName: fn,
+      source: query.span,
+    });
   }
   for (const workflow of workflows) {
     entries.push({

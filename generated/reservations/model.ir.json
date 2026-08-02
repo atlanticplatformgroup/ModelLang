@@ -1,10 +1,10 @@
 {
-  "irVersion": 19,
+  "irVersion": 20,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.30.0",
-    "sourceHash": "sha256:e1c7708cf256d934e12c4fa3e2b4cda544ffdd62894799b3ddc39d32f68d7578",
+    "version": "0.31.0",
+    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -415,6 +415,59 @@
   ],
   "projections": [
     {
+      "id": "projection:prj_85d694c9a0a274dc79c6168e47d25968",
+      "name": "ResourceSummary",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "prj_85d694c9a0a274dc79c6168e47d25968"
+      },
+      "sourceEntityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+      "fields": [
+        {
+          "id": "projectionField:pfd_86d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pfd_86d694c9a0a274dc79c6168e47d25968"
+          },
+          "sourceFieldId": "field:fld_8a690418c88c4400b88b6efca8eaa752",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 63,
+            "column": 3,
+            "endLine": 63,
+            "endColumn": 56
+          }
+        },
+        {
+          "id": "projectionField:pfd_87d694c9a0a274dc79c6168e47d25968",
+          "name": "name",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "pfd_87d694c9a0a274dc79c6168e47d25968"
+          },
+          "sourceFieldId": "field:fld_41fd1b66c84441519c8ff1e4db72d145",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 64,
+            "column": 3,
+            "endLine": 64,
+            "endColumn": 58
+          }
+        }
+      ],
+      "span": {
+        "file": "examples/reservations.model",
+        "line": 62,
+        "column": 1,
+        "endLine": 65,
+        "endColumn": 2
+      },
+      "naming": {
+        "typescriptName": "ResourceSummary"
+      }
+    },
+    {
       "id": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
       "name": "ReservationSummary",
       "identity": {
@@ -433,9 +486,9 @@
           "sourceFieldId": "field:fld_066660fbd78d479084a9db613ee746ae",
           "span": {
             "file": "examples/reservations.model",
-            "line": 63,
+            "line": 68,
             "column": 3,
-            "endLine": 63,
+            "endLine": 68,
             "endColumn": 56
           }
         },
@@ -447,12 +500,13 @@
             "stableId": "pfd_82d694c9a0a274dc79c6168e47d25968"
           },
           "sourceFieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+          "nestedProjectionId": "projection:prj_85d694c9a0a274dc79c6168e47d25968",
           "span": {
             "file": "examples/reservations.model",
-            "line": 64,
+            "line": 69,
             "column": 3,
-            "endLine": 64,
-            "endColumn": 62
+            "endLine": 69,
+            "endColumn": 79
           }
         },
         {
@@ -465,9 +519,9 @@
           "sourceFieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
           "span": {
             "file": "examples/reservations.model",
-            "line": 65,
+            "line": 70,
             "column": 3,
-            "endLine": 65,
+            "endLine": 70,
             "endColumn": 62
           }
         },
@@ -481,18 +535,18 @@
           "sourceFieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
           "span": {
             "file": "examples/reservations.model",
-            "line": 66,
+            "line": 71,
             "column": 3,
-            "endLine": 66,
+            "endLine": 71,
             "endColumn": 60
           }
         }
       ],
       "span": {
         "file": "examples/reservations.model",
-        "line": 62,
+        "line": 67,
         "column": 1,
-        "endLine": 67,
+        "endLine": 72,
         "endColumn": 2
       },
       "naming": {
@@ -943,9 +997,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 70,
+            "line": 75,
             "column": 3,
-            "endLine": 70,
+            "endLine": 75,
             "endColumn": 21
           },
           "naming": {
@@ -960,9 +1014,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 71,
+            "line": 76,
             "column": 3,
-            "endLine": 71,
+            "endLine": 76,
             "endColumn": 21
           },
           "naming": {
@@ -990,9 +1044,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 73,
+          "line": 78,
           "column": 13,
-          "endLine": 73,
+          "endLine": 78,
           "endColumn": 17
         }
       },
@@ -1026,9 +1080,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "span": {
           "file": "examples/reservations.model",
-          "line": 74,
+          "line": 79,
           "column": 9,
-          "endLine": 74,
+          "endLine": 79,
           "endColumn": 41
         }
       },
@@ -1040,9 +1094,9 @@
       "limit": 100,
       "span": {
         "file": "examples/reservations.model",
-        "line": 69,
+        "line": 74,
         "column": 1,
-        "endLine": 77,
+        "endLine": 82,
         "endColumn": 2
       },
       "naming": {
@@ -1810,9 +1864,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 70,
+        "line": 75,
         "column": 3,
-        "endLine": 70,
+        "endLine": 75,
         "endColumn": 21
       }
     },
@@ -1831,9 +1885,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 73,
+        "line": 78,
         "column": 13,
-        "endLine": 73,
+        "endLine": 78,
         "endColumn": 17
       }
     },
@@ -1845,9 +1899,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 74,
+        "line": 79,
         "column": 9,
-        "endLine": 74,
+        "endLine": 79,
         "endColumn": 41
       }
     },
@@ -1859,9 +1913,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 69,
+        "line": 74,
         "column": 1,
-        "endLine": 77,
+        "endLine": 82,
         "endColumn": 2
       }
     },
@@ -1873,37 +1927,37 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 69,
+        "line": 74,
         "column": 1,
-        "endLine": 77,
+        "endLine": 82,
         "endColumn": 2
       }
     },
     {
       "id": "read:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "Read entity:ent_ba2d028e915841d1ab90adfa40d38404 through the generated query boundary.",
+      "purpose": "Read entity:ent_ba2d028e915841d1ab90adfa40d38404 root rows and authored to-one related entities entity:ent_7cb2307972954d83a6f344764faaae39 through the generated query boundary.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 69,
+        "line": 74,
         "column": 1,
-        "endLine": 77,
+        "endLine": 82,
         "endColumn": 2
       }
     },
     {
       "id": "disclose:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "Disclose only projection:prj_80d694c9a0a274dc79c6168e47d25968 through the generated query boundary.",
+      "purpose": "Disclose only projection closure projection:prj_80d694c9a0a274dc79c6168e47d25968 -> projection:prj_85d694c9a0a274dc79c6168e47d25968 through the generated query boundary.",
       "layer": "PostgreSQL projection encoder",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 69,
+        "line": 74,
         "column": 1,
-        "endLine": 77,
+        "endLine": 82,
         "endColumn": 2
       }
     },

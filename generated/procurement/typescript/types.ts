@@ -48,12 +48,17 @@ export interface PurchaseRequest {
   approvalObserved: boolean;
 }
 
+export interface UserSummary {
+  id: string;
+  name: string;
+}
+
 export interface RequestSummary {
   id: string;
   createdAt: string;
   amount: Money<"USD">;
   status: RequestStatus;
-  approvedBy: string | null;
+  approvedBy: UserSummary | null;
 }
 
 export interface OpenRequestInput {

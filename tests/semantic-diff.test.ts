@@ -93,6 +93,33 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: Us
     ]));
   });
 
+  it("classifies changing a stable member from a UUID to a nested projection as breaking", () => {
+    const source = (version: string, nested: boolean) => `model TraversalEvolution version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  owner: User @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+projection UserSummary @stableId("prj_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") from User {
+  id @stableId("pfd_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+}
+projection RecordSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from Record {
+  owner${nested ? ": UserSummary" : ""} @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns RecordSummary from Record as row {
+  authorize true; where row.owner == actor; orderBy row.id asc; limit 10;
+}`;
+    const report = semanticDiff(compileText(source("1", false)), compileText(source("2", true)));
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "projectionFieldTraversalChanged",
+      classification: "breaking",
+      before: "directField",
+      after: "projection:prj_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    }));
+  });
+
   it("tracks policy identity-preserving renames and reviewed authority changes", () => {
     const source = (version: string, policyName: string, branchName: string, predicate: string) => `model PolicyDiff version "${version}";
 enum Role @stableId("enm_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -137,9 +164,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 12,
-      compilerVersion: "0.30.0",
-      irVersion: 19,
+      diffVersion: 13,
+      compilerVersion: "0.31.0",
+      irVersion: 20,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

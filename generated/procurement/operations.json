@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 5,
+  "manifestVersion": 6,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.30.0",
-    "sourceHash": "sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2"
+    "version": "0.31.0",
+    "sourceHash": "sha256:f23975e253a19d8f04efe1fe94e253d24c0ca560b1fc4fc7eec184ab5abaca55"
   },
   "authentication": {
     "required": true,
@@ -200,6 +200,33 @@
   ],
   "projections": [
     {
+      "id": "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+      "name": "UserSummary",
+      "sourceEntityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+      "fields": [
+        {
+          "id": "projectionField:pfd_77d694c9a0a274dc79c6168e47d25968",
+          "name": "id",
+          "sourceFieldId": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
+          "type": {
+            "kind": "scalar",
+            "name": "UUID"
+          },
+          "nullable": false
+        },
+        {
+          "id": "projectionField:pfd_78d694c9a0a274dc79c6168e47d25968",
+          "name": "name",
+          "sourceFieldId": "field:fld_a261560f630d4e818f8f099868078535",
+          "type": {
+            "kind": "scalar",
+            "name": "String"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    {
       "id": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
       "name": "RequestSummary",
       "sourceEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
@@ -254,7 +281,8 @@
             "kind": "entity",
             "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
           },
-          "nullable": true
+          "nullable": true,
+          "nestedProjectionId": "projection:prj_76d694c9a0a274dc79c6168e47d25968"
         }
       ]
     }

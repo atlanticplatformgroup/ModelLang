@@ -240,6 +240,24 @@ const entityDefinitions = {
   readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
 >>;
 const projectionDefinitions = {
+  "projection:prj_85d694c9a0a274dc79c6168e47d25968": [
+    {
+      "name": "id",
+      "type": {
+        "kind": "scalar",
+        "name": "UUID"
+      },
+      "nullable": false
+    },
+    {
+      "name": "name",
+      "type": {
+        "kind": "scalar",
+        "name": "String"
+      },
+      "nullable": false
+    }
+  ],
   "projection:prj_80d694c9a0a274dc79c6168e47d25968": [
     {
       "name": "id",
@@ -255,7 +273,8 @@ const projectionDefinitions = {
         "kind": "entity",
         "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
       },
-      "nullable": false
+      "nullable": false,
+      "nestedProjectionId": "projection:prj_85d694c9a0a274dc79c6168e47d25968"
     },
     {
       "name": "startsAt",
@@ -276,7 +295,7 @@ const projectionDefinitions = {
   ]
 } as Readonly<Record<
   string,
-  readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
+  readonly { name: string; type: RuntimeValueType; nullable: boolean; nestedProjectionId?: string }[]
 >>;
 const safeExplanations = {
   "action:act_508ad810a19d4b79a5009871de5cd26b": {
@@ -410,7 +429,11 @@ function validProjection(value: unknown, projectionId: string): boolean {
   const allowed = new Set(fields.map((field) => field.name));
   if (Object.keys(projection).some((name) => !allowed.has(name))) return false;
   return fields.every((field) => Object.hasOwn(projection, field.name)
-    && (projection[field.name] === null ? field.nullable : validValue(projection[field.name], field.type)));
+    && (projection[field.name] === null
+      ? field.nullable
+      : field.nestedProjectionId
+        ? validProjection(projection[field.name], field.nestedProjectionId)
+        : validValue(projection[field.name], field.type)));
 }
 
 function validateOutput(definition: OperationDefinition, value: unknown): void {

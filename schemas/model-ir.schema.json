@@ -156,6 +156,7 @@
         "name": { "type": "string" },
         "identity": { "$ref": "#/$defs/identity" },
         "sourceFieldId": { "type": "string", "pattern": "^field:" },
+        "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
         "span": { "type": "object" }
       },
       "additionalProperties": false
@@ -314,7 +315,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "projections", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 19 },
+    "irVersion": { "const": 20 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

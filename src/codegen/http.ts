@@ -136,7 +136,13 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       required: projection.fields.map((field) => field.name),
       properties: Object.fromEntries(projection.fields.map((field) => [
         field.name,
-        field.nullable ? nullable(valueSchema(manifest, field.type)) : valueSchema(manifest, field.type),
+        field.nullable
+          ? nullable(field.nestedProjectionId
+            ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
+            : valueSchema(manifest, field.type))
+          : field.nestedProjectionId
+            ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
+            : valueSchema(manifest, field.type),
       ])),
     },
   ]));
@@ -478,6 +484,7 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
       name: field.name,
       type: field.type,
       nullable: field.nullable,
+      ...(field.nestedProjectionId ? { nestedProjectionId: field.nestedProjectionId } : {}),
     })),
   ]));
   const operationIds = manifest.operations.map((operation) => JSON.stringify(operation.id)).join(" | ");
@@ -545,7 +552,7 @@ const entityDefinitions = ${JSON.stringify(entityDefinitions, null, 2)} as Reado
 >>;
 const projectionDefinitions = ${JSON.stringify(projectionDefinitions, null, 2)} as Readonly<Record<
   string,
-  readonly { name: string; type: RuntimeValueType; nullable: boolean }[]
+  readonly { name: string; type: RuntimeValueType; nullable: boolean; nestedProjectionId?: string }[]
 >>;
 const safeExplanations = ${JSON.stringify(safeExplanations, null, 2)} as Readonly<Record<
   ${manifest.model.name}ActionOperationId,
@@ -670,7 +677,11 @@ function validProjection(value: unknown, projectionId: string): boolean {
   const allowed = new Set(fields.map((field) => field.name));
   if (Object.keys(projection).some((name) => !allowed.has(name))) return false;
   return fields.every((field) => Object.hasOwn(projection, field.name)
-    && (projection[field.name] === null ? field.nullable : validValue(projection[field.name], field.type)));
+    && (projection[field.name] === null
+      ? field.nullable
+      : field.nestedProjectionId
+        ? validProjection(projection[field.name], field.nestedProjectionId)
+        : validValue(projection[field.name], field.type)));
 }
 
 function validateOutput(definition: OperationDefinition, value: unknown): void {

@@ -64,8 +64,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 5;
-  operationManifestVersion: 5;
+  uiManifestVersion: 6;
+  operationManifestVersion: 6;
   model: {
     id: string;
     name: string;
@@ -94,6 +94,7 @@ export interface UiManifest {
       label: string;
       presentation: UiPresentation;
       nullable: boolean;
+      nestedProjectionId?: string;
       generated?: "uuid" | "now";
       immutable: boolean;
       snapshot: boolean;
@@ -181,12 +182,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 5) {
-    throw new Error(`E6201 UI generation requires operation manifest version 5, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 6) {
+    throw new Error(`E6201 UI generation requires operation manifest version 6, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 5,
+    uiManifestVersion: 6,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -234,6 +235,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         label: uiLabel(field.name),
         presentation: uiPresentation(field.type),
         nullable: field.nullable,
+        ...(field.nestedProjectionId ? { nestedProjectionId: field.nestedProjectionId } : {}),
       })),
     })),
     actions: manifest.operations

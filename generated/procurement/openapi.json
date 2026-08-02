@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.30.0",
-    "description": "Generated from ModelLang operation manifest v5 (sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2)."
+    "version": "0.31.0",
+    "description": "Generated from ModelLang operation manifest v6 (sha256:f23975e253a19d8f04efe1fe94e253d24c0ca560b1fc4fc7eec184ab5abaca55)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1156,6 +1156,23 @@
           }
         }
       },
+      "UserSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "RequestSummary": {
         "type": "object",
         "additionalProperties": false,
@@ -1199,8 +1216,7 @@
           "approvedBy": {
             "anyOf": [
               {
-                "type": "string",
-                "format": "uuid"
+                "$ref": "#/components/schemas/UserSummary"
               },
               {
                 "type": "null"

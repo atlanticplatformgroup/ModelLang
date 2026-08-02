@@ -3,6 +3,7 @@ import type {
   IRConsumer,
   IREvent,
   IRExpression,
+  IRProjection,
   IRQuery,
   IRRule,
   IRSpan,
@@ -42,8 +43,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 11;
-  profile: "sml-transactional-core/11";
+  manifestVersion: 12;
+  profile: "sml-transactional-core/12";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -52,7 +53,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 19;
+    irVersion: 20;
     generator: "semantic-manifest";
   };
   model: {
@@ -142,7 +143,7 @@ export interface SemanticProjection {
   name: string;
   source: IRSpan;
   sourceEntityId: string;
-  fields: { id: string; name: string; sourceFieldId: string; source: IRSpan }[];
+  fields: { id: string; name: string; sourceFieldId: string; nestedProjectionId?: string; source: IRSpan }[];
 }
 
 export interface SemanticQuery {
@@ -155,7 +156,7 @@ export interface SemanticQuery {
   authorization: SemanticRule;
   rowPolicy: SemanticRule;
   readSet: SemanticReadSet;
-  disclosureSet: { projectionId: string; projectionFieldIds: string[]; sourceFieldIds: string[] };
+  disclosureSet: { projectionId: string; projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] };
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
   failureClasses: ManifestErrorKind[];
 }
@@ -363,12 +364,31 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
   }
   const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId);
   if (!projection) throw new Error(`E6305 Query '${query.id}' references unknown projection '${query.returnProjectionId}'.`);
+  const projectionClosure: IRProjection[] = [];
+  const visited = new Set<string>();
+  const visit = (current: IRProjection): void => {
+    if (visited.has(current.id)) return;
+    visited.add(current.id);
+    projectionClosure.push(current);
+    for (const field of current.fields) {
+      if (!field.nestedProjectionId) continue;
+      const nested = ir.projections.find((candidate) => candidate.id === field.nestedProjectionId);
+      if (!nested) throw new Error(`E6306 Projection '${current.id}' references unknown nested projection '${field.nestedProjectionId}'.`);
+      visit(nested);
+    }
+  };
+  visit(projection);
+  const disclosedFields = projectionClosure.flatMap((candidate) => candidate.fields);
   const sourceReads = readSet(ir, [query.authorization, query.rowPolicy]);
-  sourceReads.entityIds = [...new Set([...sourceReads.entityIds, query.sourceEntityId])].sort();
+  sourceReads.entityIds = [...new Set([
+    ...sourceReads.entityIds,
+    query.sourceEntityId,
+    ...projectionClosure.map((candidate) => candidate.sourceEntityId),
+  ])].sort();
   sourceReads.fieldIds = [...new Set([
     ...sourceReads.fieldIds,
     query.orderBy.fieldId,
-    ...projection.fields.map((field) => field.sourceFieldId),
+    ...disclosedFields.map((field) => field.sourceFieldId),
   ])].sort();
   return {
     id: query.id,
@@ -382,8 +402,9 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
     readSet: sourceReads,
     disclosureSet: {
       projectionId: projection.id,
-      projectionFieldIds: projection.fields.map((field) => field.id),
-      sourceFieldIds: projection.fields.map((field) => field.sourceFieldId),
+      projectionIds: projectionClosure.map((candidate) => candidate.id),
+      projectionFieldIds: disclosedFields.map((field) => field.id),
+      sourceFieldIds: disclosedFields.map((field) => field.sourceFieldId),
     },
     orderBy: query.orderBy,
     failureClasses: operation.errors,
@@ -435,7 +456,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 11,
+    manifestVersion: 12,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -469,6 +490,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
         id: field.id,
         name: field.name,
         sourceFieldId: field.sourceFieldId,
+        ...(field.nestedProjectionId ? { nestedProjectionId: field.nestedProjectionId } : {}),
         source: field.span,
       })),
     })),

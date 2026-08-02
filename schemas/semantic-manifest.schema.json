@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 11 },
-    "profile": { "const": "sml-transactional-core/11" },
+    "manifestVersion": { "const": 12 },
+    "profile": { "const": "sml-transactional-core/12" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 19 },
+          "irVersion": { "const": 20 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -167,6 +167,7 @@
                 "id": { "type": "string", "pattern": "^projectionField:" },
                 "name": { "type": "string" },
                 "sourceFieldId": { "type": "string", "pattern": "^field:" },
+                "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
                 "source": { "$ref": "#/$defs/span" }
               },
               "additionalProperties": false
@@ -435,9 +436,10 @@
           "readSet": { "$ref": "#/$defs/readSet" },
           "disclosureSet": {
             "type": "object",
-            "required": ["projectionId", "projectionFieldIds", "sourceFieldIds"],
+            "required": ["projectionId", "projectionIds", "projectionFieldIds", "sourceFieldIds"],
             "properties": {
               "projectionId": { "type": "string", "pattern": "^projection:" },
+              "projectionIds": { "type": "array", "items": { "type": "string", "pattern": "^projection:" } },
               "projectionFieldIds": { "type": "array", "items": { "type": "string", "pattern": "^projectionField:" } },
               "sourceFieldIds": { "type": "array", "items": { "type": "string", "pattern": "^field:" } }
             },

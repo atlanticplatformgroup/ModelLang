@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 5,
-  "operationManifestVersion": 5,
+  "uiManifestVersion": 6,
+  "operationManifestVersion": 6,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.30.0",
-    "sourceHash": "sha256:d19a601ffdc9aa6d966a612082bed9e023c3287e0a1cb27115533ef9684190f2",
+    "version": "0.31.0",
+    "sourceHash": "sha256:f23975e253a19d8f04efe1fe94e253d24c0ca560b1fc4fc7eec184ab5abaca55",
     "label": "Procurement"
   },
   "authentication": {
@@ -216,6 +216,34 @@ export const ProcurementUiManifest = {
   ],
   "projections": [
     {
+      "id": "projection:prj_76d694c9a0a274dc79c6168e47d25968",
+      "name": "UserSummary",
+      "label": "User summary",
+      "sourceEntityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+      "fields": [
+        {
+          "projectionFieldId": "projectionField:pfd_77d694c9a0a274dc79c6168e47d25968",
+          "sourceFieldId": "field:fld_fe4c8fe8243b456eadeefb42b0bd7097",
+          "name": "id",
+          "label": "Id",
+          "presentation": {
+            "kind": "uuid"
+          },
+          "nullable": false
+        },
+        {
+          "projectionFieldId": "projectionField:pfd_78d694c9a0a274dc79c6168e47d25968",
+          "sourceFieldId": "field:fld_a261560f630d4e818f8f099868078535",
+          "name": "name",
+          "label": "Name",
+          "presentation": {
+            "kind": "text"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    {
       "id": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
       "name": "RequestSummary",
       "label": "Request summary",
@@ -274,7 +302,8 @@ export const ProcurementUiManifest = {
             "kind": "entityReference",
             "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
           },
-          "nullable": true
+          "nullable": true,
+          "nestedProjectionId": "projection:prj_76d694c9a0a274dc79c6168e47d25968"
         }
       ]
     }

@@ -97,7 +97,13 @@ function generateTypes(ir: ModelIR): string {
     lines.push(`export interface ${projection.naming.typescriptName} {`);
     for (const selected of projection.fields) {
       const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId)!;
-      lines.push(`  ${selected.name}: ${tsType(ir, field)};`);
+      const nestedProjection = selected.nestedProjectionId
+        ? ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId)
+        : undefined;
+      const type = nestedProjection
+        ? `${nestedProjection.naming.typescriptName}${field.optional ? " | null" : ""}`
+        : tsType(ir, field);
+      lines.push(`  ${selected.name}: ${type};`);
     }
     lines.push("}", "");
   }

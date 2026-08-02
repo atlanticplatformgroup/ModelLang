@@ -247,7 +247,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(19);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(20);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -346,6 +346,33 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
+  it("treats transitively reachable nested projections as public query contracts", () => {
+    const source = (version: string, includeName: boolean) => `model NestedProjectionMigration version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  name: String @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_cccccccccccccccccccccccccccccccc");
+  owner: User @stableId("fld_dddddddddddddddddddddddddddddddd");
+}
+projection UserSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from User {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+  ${includeName ? `name @stableId("pfd_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");` : ""}
+}
+projection RecordSummary @stableId("prj_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") from Record {
+  owner: UserSummary @stableId("pfd_cccccccccccccccccccccccccccccccc");
+}
+query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) returns RecordSummary from Record as row {
+  authorize true; where row.owner == actor; orderBy row.id asc; limit 10;
+}`;
+    const previous = compileText(source("1", false));
+    const current = compileText(source("2", true));
+    const migrationError = error(() => planMigration(previous, current));
+    expect(migrationError.code).toBe("E2807");
+    expect(migrationError.message).toContain("UserSummary");
+  });
+
   it("normalizes an IR18 entity result without inventing projection identity and rejects automatic narrowing", () => {
     const current = compileText(readFileSync("examples/procurement.model", "utf8"), "examples/procurement.model");
     const legacy = structuredClone(current) as unknown as Record<string, unknown> & {
@@ -423,12 +450,13 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR18 artifacts as previous baselines for an IR19 migration", () => {
+  it("accepts released IR9 through IR19 artifacts as previous baselines for an IR20 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16, 17]) {
+    for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
+      if (irVersion < 19) delete legacy.projections;
       if (irVersion === 9) delete legacy.policies;
       if (irVersion < 12) {
         delete legacy.events;
