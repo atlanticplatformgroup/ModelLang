@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.27](./spec/0.27/LANGUAGE.md). It retains the complete 0.26 language and adds separately authorized, bounded, minimally projected, privately audited observation of current terminal publication and consumer failures without granting recovery or dispatch authority.
+The current normative specification is [ModelLang 0.28](./spec/0.28/LANGUAGE.md). It retains the complete 0.27 language and adds separately authorized, immutable acknowledgement of one current terminal publication or consumer recovery generation without changing failure, recovery, delivery, broker, or domain state.
+
+- [Private terminal-failure acknowledgement semantics](./spec/0.28/FAILURE_ACKNOWLEDGEMENT.md)
+- [0.28 unchanged grammar statement](./spec/0.28/GRAMMAR.ebnf)
+- [0.28 conformance requirements](./spec/0.28/CONFORMANCE.md)
+- [0.28 unstable acknowledgement boundaries](./spec/0.28/UNSTABLE.md)
 
 - [Private terminal-failure observation semantics](./spec/0.27/FAILURE_OBSERVATION.md)
 - [0.27 unchanged grammar statement](./spec/0.27/GRAMMAR.ebnf)

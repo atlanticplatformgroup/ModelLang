@@ -630,7 +630,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.27.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.28.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -696,6 +696,20 @@ describe("backends", () => {
     expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalConsumers");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-observer.js"');
     expect(output["postgres/017_upgrade_0_27.sql"]).toContain("private terminal-failure observation upgrade");
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_acknowledger NOLOGIN");
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_acknowledgement"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_acknowledgement"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."acknowledge_terminal_publication_failure"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."acknowledge_terminal_consumer_failure"');
+    expect(output["postgres/002_schema.sql"]).toContain("'acknowledged', acknowledged");
+    expect(output["postgres/004_grants.sql"]).toContain('"acknowledge_terminal_publication_failure"(uuid, text) TO modellang_failure_acknowledger');
+    expect(output["postgres/004_grants.sql"]).toContain('"acknowledge_terminal_consumer_failure"(text, text, text) TO modellang_failure_acknowledger');
+    expect(output["typescript/failure-acknowledgement.ts"]).toContain("acknowledgeProcurementTerminalPublication");
+    expect(output["typescript/failure-acknowledgement.ts"]).toContain("acknowledgeProcurementTerminalConsumer");
+    expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("reason_code");
+    expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("database_principal");
+    expect(output["typescript/index.ts"]).toContain('export * from "./failure-acknowledgement.js"');
+    expect(output["postgres/018_upgrade_0_28.sql"]).toContain("private terminal-failure acknowledgement upgrade");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {
       expect(output[publicArtifact]).not.toContain("publication_failure_count");
       expect(output[publicArtifact]).not.toContain("lastPublicationErrorCode");
@@ -706,6 +720,27 @@ describe("backends", () => {
       expect(output[publicArtifact]).not.toContain("ML_BROKER_UNAVAILABLE");
       expect(output[publicArtifact]).not.toContain("failureObservation");
       expect(output[publicArtifact]).not.toContain("eventInstanceId");
+      expect(output[publicArtifact]).not.toContain("acknowledged");
+      expect(output[publicArtifact]).not.toContain("failure_acknowledgement");
+      expect(output[publicArtifact]).not.toContain("failureAcknowledgement");
+      expect(output[publicArtifact]).not.toContain("acknowledgementAudit");
+      expect(output[publicArtifact]).not.toContain("databasePrincipal");
+      expect(output[publicArtifact]).not.toContain("decisionEvidence");
+      expect(output[publicArtifact]).not.toContain("storedResponse");
+      expect(output[publicArtifact]).not.toContain("privateCursor");
+    }
+    for (const publicOrAgentArtifact of [
+      "typescript/browser.ts", "typescript/http-client.ts", "typescript/ui.ts", "typescript/capabilities.ts",
+    ]) {
+      expect(output[publicOrAgentArtifact]).not.toContain("failureAcknowledgement");
+      expect(output[publicOrAgentArtifact]).not.toContain("acknowledged");
+      expect(output[publicOrAgentArtifact]).not.toContain("eventInstanceId");
+      expect(output[publicOrAgentArtifact]).not.toContain("reasonCode");
+      expect(output[publicOrAgentArtifact]).not.toContain("databasePrincipal");
+      expect(output[publicOrAgentArtifact]).not.toContain("acknowledgementAudit");
+      expect(output[publicOrAgentArtifact]).not.toContain("decisionEvidence");
+      expect(output[publicOrAgentArtifact]).not.toContain("storedResponse");
+      expect(output[publicOrAgentArtifact]).not.toContain("privateCursor");
     }
     expect(output["model.mmd"]).toContain("emits atomically");
   });

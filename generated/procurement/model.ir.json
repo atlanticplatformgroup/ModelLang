@@ -3,8 +3,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.27.0",
-    "sourceHash": "sha256:84969af54e131f4e9751a5798913868b43f2b70f3345402a4ad03a9b5d781c90",
+    "version": "0.28.0",
+    "sourceHash": "sha256:b84dcde53f682175f8bdf448d921c82f9e25ddcafea82bdbc36914c54bf92033",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -2231,6 +2231,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_failure_observer NOLOGIN"
+    },
+    {
+      "id": "boundary:failure_acknowledger_role",
+      "purpose": "Confine audited terminal-cycle acknowledgement to a separate non-login role with execute-only access and no observation or recovery authority.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_failure_acknowledger NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",

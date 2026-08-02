@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.28.0
+
+- Added a separate non-login `modellang_failure_acknowledger` role with execute-only publication and consumer acknowledgement functions and no observation, recovery, dispatch, consumer, application, query, or table authority.
+- Added immutable acknowledgement audit keyed by private terminal-cycle identity: outbox UUID plus trusted recovery generation for publication, and stable consumer ID plus source-event UUID plus trusted recovery generation for consumers.
+- Derived generation, current disposition, stable contract identity, and database operator from locked private state while accepting only private event identity and a bounded stable reason code.
+- Serialized equivalent concurrent acknowledgements to one committed row and return closed `alreadyAcknowledged` outcomes without exposing stored reason or operator.
+- Serialized acknowledgement and recovery through the same failure-state locks; acknowledgement-first history remains immutable, recovery-first acknowledgement fails, and each later terminal generation begins unacknowledged.
+- Extended only the private observer projection with current-generation `acknowledged` Boolean and added the server-only typed `failure-acknowledgement.ts` adapter; operation manifest v4, capability manifest v3, UI manifest v4, event manifest v5, semantic manifest v10, semantic diff v11, HTTP, MCP, and agent-facing contracts remain unchanged.
+- Added baseline-checked idempotent `018_upgrade_0_28.sql`; all existing failure, recovery, observation, outbox, inbox, domain, decision, receipt, and broker state is preserved and no acknowledgement history is fabricated.
+- Retained canonical IR18 because the release adds a private generated operational boundary, advanced the generator profile to `/12`, and updated both example models and deterministic golden fixtures to 0.28.0.
+
 ## 0.27.0
 
 - Added a separate non-login `modellang_failure_observer` role with execute-only access to bounded terminal publication and consumer failure inspection; observation grants no recovery, dispatch, consumer, application, query, or table authority.

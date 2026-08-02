@@ -1,6 +1,6 @@
 # Reservations enforcement map
 
-Source hash: `sha256:01df88c2afa54a4edbd145a5024ad6cff5c583b2dd1901a95ea7a0ac1582bf6d`
+Source hash: `sha256:99408c84bad14d678a20ca6e68b2e6b8dbea87afdebbadd5001e76c5bb6ade5b`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -9,6 +9,7 @@ Source hash: `sha256:01df88c2afa54a4edbd145a5024ad6cff5c583b2dd1901a95ea7a0ac158
 | `boundary:recovery_role` | Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_recovery NOLOGIN` | compiler-derived |
 | `boundary:publication_recovery_role` | Confine opted-in terminal publication recovery to a separate non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_publication_recovery NOLOGIN` | compiler-derived |
 | `boundary:failure_observer_role` | Confine bounded terminal-failure inspection to a separate non-login role with execute-only access and no recovery authority. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_failure_observer NOLOGIN` | compiler-derived |
+| `boundary:failure_acknowledger_role` | Confine audited terminal-cycle acknowledgement to a separate non-login role with execute-only access and no observation or recovery authority. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_failure_acknowledger NOLOGIN` | compiler-derived |
 | `boundary:dispatcher_role` | Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
 | `boundary:gateway_role` | Confine shared-credential identity activation to a dedicated non-login gateway role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_gateway NOLOGIN` | compiler-derived |

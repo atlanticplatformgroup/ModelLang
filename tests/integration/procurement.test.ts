@@ -26,6 +26,10 @@ import {
   type ConsumerFailureCursor,
 } from "../../generated/procurement/typescript/failure-observer.js";
 import {
+  acknowledgeProcurementTerminalConsumer,
+  acknowledgeProcurementTerminalPublication,
+} from "../../generated/procurement/typescript/failure-acknowledgement.js";
+import {
   createProcurementUiExecutor,
   createProcurementUiWorkflowExecutor,
   ProcurementUiManifest,
@@ -52,6 +56,7 @@ let consumer: Pool;
 let recovery: Pool;
 let publicationRecovery: Pool;
 let failureObserver: Pool;
+let failureAcknowledger: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -116,7 +121,8 @@ beforeAll(async () => {
   recovery = poolFor("ml_recovery");
   publicationRecovery = poolFor("ml_publication_recovery");
   failureObserver = poolFor("ml_failure_observer");
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery, publicationRecovery, failureObserver);
+  failureAcknowledger = poolFor("ml_failure_acknowledger");
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery, publicationRecovery, failureObserver, failureAcknowledger);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -217,7 +223,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.27.0",
+      model_version: "0.28.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -548,7 +554,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const consumerItem = consumerPage.items.find((item) => item.eventInstanceId === afterSnapshotId)!;
       expect(consumerItem).toBeTruthy();
       expect(Object.keys(consumerItem).sort()).toEqual([
-        "consumerId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
+        "acknowledged", "consumerId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
         "recoveryEligible", "recoveryGeneration", "terminalAt", "totalFailureCount",
       ].sort());
       expect(consumerItem).toMatchObject({
@@ -560,13 +566,14 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         lastErrorCode: "ML_HANDLER_UNAVAILABLE",
         recoveryGeneration: 0,
         recoveryEligible: true,
+        acknowledged: false,
       });
 
       const publicationPage = await observeProcurementTerminalPublications(failureObserver, { limit: 100 });
       const publicationItem = publicationPage.items.find((item) => item.eventInstanceId === publicationInstanceId)!;
       expect(publicationItem).toBeTruthy();
       expect(Object.keys(publicationItem).sort()).toEqual([
-        "eventId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
+        "acknowledged", "eventId", "eventInstanceId", "failureCount", "kind", "lastErrorCode", "maxAttempts",
         "recoveryEligible", "recoveryGeneration", "terminalAt", "totalFailureCount",
       ].sort());
       expect(publicationItem).toMatchObject({
@@ -577,6 +584,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         lastErrorCode: "ML_BROKER_UNAVAILABLE",
         recoveryGeneration: 0,
         recoveryEligible: true,
+        acknowledged: false,
       });
 
       await expect(failureObserver.query("SELECT * FROM model_procurement_internal.consumer_failure"))
@@ -621,6 +629,221 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await dispatcher.end();
     }
   });
+
+  it("acknowledges one current terminal cycle through an isolated audited authority", async () => {
+    const consumerId = "consumer:con_10d694c9a0a274dc79c6168e47d25968";
+    const dispatcher = poolFor("ml_dispatcher");
+    const application = poolFor("ml_employee_one");
+    pools.push(dispatcher, application);
+    const terminalConsumer = async (eventId: string, firstAttempt = 1): Promise<void> => {
+      for (let attempt = firstAttempt; attempt < firstAttempt + 3; attempt += 1) {
+        await consumer.query(
+          "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4)",
+          [consumerId, eventId, attempt, "ML_HANDLER_UNAVAILABLE"],
+        );
+      }
+    };
+    const terminalPublication = async (targetId: string): Promise<string> => {
+      let eventInstanceId = "";
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        const claimed = await claimProcurementEvents(dispatcher, 1000, 60);
+        const target = claimed.find((event) => event.targetId === targetId)!;
+        expect(target).toBeTruthy();
+        eventInstanceId = target.id;
+        for (const event of claimed) {
+          if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
+        }
+        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
+      }
+      return eventInstanceId;
+    };
+
+    const consumerEventId = randomUUID();
+    await terminalConsumer(consumerEventId);
+    const consumerBefore = await admin.query<{
+      failure_count: number; total_failure_count: number; disposition: string; recovery_generation: number;
+    }>(`SELECT failure_count, total_failure_count, disposition, recovery_generation
+        FROM model_procurement_internal.consumer_failure
+        WHERE consumer_id = $1 AND source_event_id = $2`, [consumerId, consumerEventId]);
+
+    const rollbackConnection = await failureAcknowledger.connect();
+    try {
+      await rollbackConnection.query("BEGIN");
+      await expect(acknowledgeProcurementTerminalConsumer(
+        rollbackConnection, consumerId, consumerEventId, "ROLLBACK_TEST",
+      )).resolves.toMatchObject({ status: "acknowledged", recoveryGeneration: 0 });
+      await rollbackConnection.query("ROLLBACK");
+    } finally {
+      rollbackConnection.release();
+    }
+    const rolledBackAcknowledgement = await admin.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM model_procurement_internal.consumer_failure_acknowledgement
+       WHERE consumer_id = $1 AND source_event_id = $2`,
+      [consumerId, consumerEventId],
+    );
+    expect(rolledBackAcknowledgement.rows[0]!.count).toBe("0");
+
+    const concurrentConsumer = await Promise.all([
+      acknowledgeProcurementTerminalConsumer(failureAcknowledger, consumerId, consumerEventId, "OPERATOR_REVIEWED"),
+      acknowledgeProcurementTerminalConsumer(failureAcknowledger, consumerId, consumerEventId, "SECOND_OPERATOR_REVIEW"),
+    ]);
+    expect(concurrentConsumer.map((outcome) => outcome.status).sort()).toEqual(["acknowledged", "alreadyAcknowledged"]);
+    expect(concurrentConsumer.every((outcome) => outcome.acknowledged && outcome.recoveryGeneration === 0)).toBe(true);
+    const consumerAfter = await admin.query<typeof consumerBefore.rows[number]>(
+      `SELECT failure_count, total_failure_count, disposition, recovery_generation
+       FROM model_procurement_internal.consumer_failure
+       WHERE consumer_id = $1 AND source_event_id = $2`,
+      [consumerId, consumerEventId],
+    );
+    expect(consumerAfter.rows).toEqual(consumerBefore.rows);
+    const consumerAcknowledgement = await admin.query<{
+      count: string; reason_codes: string[]; principals: string[];
+    }>(`SELECT count(*)::text AS count,
+          pg_catalog.array_agg(reason_code) AS reason_codes,
+          pg_catalog.array_agg(database_principal::text) AS principals
+        FROM model_procurement_internal.consumer_failure_acknowledgement
+        WHERE consumer_id = $1 AND source_event_id = $2`, [consumerId, consumerEventId]);
+    expect(consumerAcknowledgement.rows[0]!.count).toBe("1");
+    expect(consumerAcknowledgement.rows[0]!.principals).toEqual(["ml_failure_acknowledger"]);
+    expect(["OPERATOR_REVIEWED", "SECOND_OPERATOR_REVIEW"]).toContain(consumerAcknowledgement.rows[0]!.reason_codes[0]);
+
+    const observedAcknowledgedConsumer = (await observeProcurementTerminalConsumers(failureObserver, { limit: 100 })).items
+      .find((item) => item.eventInstanceId === consumerEventId)!;
+    expect(observedAcknowledgedConsumer.acknowledged).toBe(true);
+    expect(Object.keys(observedAcknowledgedConsumer)).not.toContain("reasonCode");
+    expect(Object.keys(observedAcknowledgedConsumer)).not.toContain("databasePrincipal");
+    expect(Object.keys(observedAcknowledgedConsumer)).not.toContain("acknowledgementAudit");
+
+    await expect(recoverObserveRequestApproval(recovery, consumerEventId, "NEW_CYCLE")).resolves.toMatchObject({
+      status: "recovered", recoveryGeneration: 1,
+    });
+    await terminalConsumer(consumerEventId, 4);
+    const laterConsumerCycle = (await observeProcurementTerminalConsumers(failureObserver, { limit: 100 })).items
+      .find((item) => item.eventInstanceId === consumerEventId)!;
+    expect(laterConsumerCycle).toMatchObject({ recoveryGeneration: 1, acknowledged: false });
+
+    const publicationTarget = await clients.employeeOne.openRequest({ amount: usd("45") }, commandOptions("failure-ack"));
+    const publicationEventId = await terminalPublication(publicationTarget.id);
+    const publicationBefore = await admin.query<{
+      publication_failure_count: number; publication_total_failure_count: number;
+      publication_disposition: string; publication_recovery_generation: number;
+    }>(`SELECT publication_failure_count, publication_total_failure_count,
+              publication_disposition, publication_recovery_generation
+        FROM model_procurement_internal.event_outbox WHERE id = $1`, [publicationEventId]);
+    await expect(acknowledgeProcurementTerminalPublication(
+      failureAcknowledger, publicationEventId, "OPERATOR_REVIEWED",
+    )).resolves.toEqual({ status: "acknowledged", acknowledged: true, recoveryGeneration: 0 });
+    await expect(acknowledgeProcurementTerminalPublication(
+      failureAcknowledger, publicationEventId, "DIFFERENT_REASON",
+    )).resolves.toEqual({ status: "alreadyAcknowledged", acknowledged: true, recoveryGeneration: 0 });
+    const publicationAfter = await admin.query<typeof publicationBefore.rows[number]>(
+      `SELECT publication_failure_count, publication_total_failure_count,
+              publication_disposition, publication_recovery_generation
+       FROM model_procurement_internal.event_outbox WHERE id = $1`, [publicationEventId]);
+    expect(publicationAfter.rows).toEqual(publicationBefore.rows);
+    const observedPublication = (await observeProcurementTerminalPublications(failureObserver, { limit: 100 })).items
+      .find((item) => item.eventInstanceId === publicationEventId)!;
+    expect(observedPublication.acknowledged).toBe(true);
+
+    const ackFirstTarget = await clients.employeeOne.openRequest({ amount: usd("46") }, commandOptions("ack-first"));
+    const ackFirstEventId = await terminalPublication(ackFirstTarget.id);
+    const acknowledgerConnection = await failureAcknowledger.connect();
+    const publicationRecoveryConnection = await publicationRecovery.connect();
+    try {
+      const recoveryPid = (await publicationRecoveryConnection.query<{ pid: number }>("SELECT pg_catalog.pg_backend_pid() AS pid")).rows[0]!.pid;
+      await acknowledgerConnection.query("BEGIN");
+      await acknowledgeProcurementTerminalPublication(acknowledgerConnection, ackFirstEventId, "ACK_FIRST");
+      const waitingRecovery = recoverProcurementEventPublication(publicationRecoveryConnection, ackFirstEventId, "RECOVER_AFTER_ACK");
+      await waitUntilLockWaiting([recoveryPid]);
+      await acknowledgerConnection.query("COMMIT");
+      await expect(waitingRecovery).resolves.toMatchObject({ status: "recovered", recoveryGeneration: 1 });
+    } finally {
+      await acknowledgerConnection.query("ROLLBACK").catch(() => undefined);
+      acknowledgerConnection.release();
+      publicationRecoveryConnection.release();
+    }
+    const retainedAck = await admin.query<{ count: string }>(
+      `SELECT count(*)::text AS count FROM model_procurement_internal.publication_failure_acknowledgement
+       WHERE event_outbox_id = $1 AND recovery_generation = 0`, [ackFirstEventId],
+    );
+    expect(retainedAck.rows[0]!.count).toBe("1");
+    await terminalPublication(ackFirstTarget.id);
+    const newPublicationCycle = (await observeProcurementTerminalPublications(failureObserver, { limit: 100 })).items
+      .find((item) => item.eventInstanceId === ackFirstEventId)!;
+    expect(newPublicationCycle).toMatchObject({ recoveryGeneration: 1, acknowledged: false });
+
+    const recoveryFirstTarget = await clients.employeeOne.openRequest({ amount: usd("47") }, commandOptions("recovery-first"));
+    const recoveryFirstEventId = await terminalPublication(recoveryFirstTarget.id);
+    const recoveryFirstConnection = await publicationRecovery.connect();
+    const blockedAcknowledger = await failureAcknowledger.connect();
+    try {
+      const acknowledgerPid = (await blockedAcknowledger.query<{ pid: number }>("SELECT pg_catalog.pg_backend_pid() AS pid")).rows[0]!.pid;
+      await recoveryFirstConnection.query("BEGIN");
+      await recoverProcurementEventPublication(recoveryFirstConnection, recoveryFirstEventId, "RECOVERY_FIRST");
+      const waitingAcknowledgement = acknowledgeProcurementTerminalPublication(
+        blockedAcknowledger, recoveryFirstEventId, "TOO_LATE",
+      );
+      await waitUntilLockWaiting([acknowledgerPid]);
+      await recoveryFirstConnection.query("COMMIT");
+      await expect(waitingAcknowledgement).rejects.toMatchObject({
+        code: "55000", message: expect.stringContaining("ML_PUBLICATION_FAILURE_ACKNOWLEDGEMENT_STATE"),
+      });
+    } finally {
+      await recoveryFirstConnection.query("ROLLBACK").catch(() => undefined);
+      recoveryFirstConnection.release();
+      blockedAcknowledger.release();
+    }
+
+    for (const unauthorized of [failureObserver, recovery, publicationRecovery, consumer, gateway, dispatcher, application, admin]) {
+      await expect(acknowledgeProcurementTerminalConsumer(
+        unauthorized, consumerId, consumerEventId, "FORGED",
+      )).rejects.toMatchObject({ code: "42501" });
+    }
+    await expect(acknowledgeProcurementTerminalConsumer(
+      failureAcknowledger, "consumer:unknown", consumerEventId, "VALID_REASON",
+    )).rejects.toMatchObject({ code: "22023" });
+    await expect(acknowledgeProcurementTerminalConsumer(
+      failureAcknowledger, consumerId, "not-a-uuid", "VALID_REASON",
+    )).rejects.toMatchObject({ code: "22023" });
+    await expect(acknowledgeProcurementTerminalConsumer(
+      failureAcknowledger, consumerId, consumerEventId, "invalid reason",
+    )).rejects.toMatchObject({ code: "22023" });
+
+    await expect(failureAcknowledger.query("SELECT * FROM model_procurement_internal.consumer_failure_acknowledgement"))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(observeProcurementTerminalConsumers(failureAcknowledger, { limit: 1 }))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(recoverObserveRequestApproval(failureAcknowledger, consumerEventId, "FORGED"))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(claimProcurementEvents(failureAcknowledger, 1, 60))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(failureAcknowledger.query(
+      "SELECT model_procurement_internal.consume_observe_request_approval('{}'::jsonb)",
+    )).rejects.toMatchObject({ code: "42501" });
+    await expect(failureAcknowledger.query("SELECT model_procurement.my_requests()"))
+      .rejects.toMatchObject({ code: "42501" });
+
+    const privileges = await admin.query<{
+      rolcanlogin: boolean; table_read: boolean; observe: boolean; recover: boolean; claim: boolean;
+      acknowledge_publication: boolean; acknowledge_consumer: boolean;
+    }>(`SELECT role_value.rolcanlogin,
+        pg_catalog.has_table_privilege('modellang_failure_acknowledger', 'model_procurement_internal.consumer_failure', 'SELECT') AS table_read,
+        pg_catalog.has_function_privilege('modellang_failure_acknowledger', 'model_procurement_internal.observe_terminal_consumers(timestamptz,timestamptz,text,uuid,integer)', 'EXECUTE') AS observe,
+        pg_catalog.has_function_privilege('modellang_failure_acknowledger', 'model_procurement_internal.recover_consumer_failure(text,text,text)', 'EXECUTE') AS recover,
+        pg_catalog.has_function_privilege('modellang_failure_acknowledger', 'model_procurement_internal.claim_events(integer,integer)', 'EXECUTE') AS claim,
+        pg_catalog.has_function_privilege('modellang_failure_acknowledger', 'model_procurement_internal.acknowledge_terminal_publication_failure(uuid,text)', 'EXECUTE') AS acknowledge_publication,
+        pg_catalog.has_function_privilege('modellang_failure_acknowledger', 'model_procurement_internal.acknowledge_terminal_consumer_failure(text,text,text)', 'EXECUTE') AS acknowledge_consumer
+      FROM pg_catalog.pg_roles AS role_value WHERE role_value.rolname = 'modellang_failure_acknowledger'`);
+    expect(privileges.rows[0]).toEqual({
+      rolcanlogin: false,
+      table_read: false,
+      observe: false,
+      recover: false,
+      claim: false,
+      acknowledge_publication: true,
+      acknowledge_consumer: true,
+    });
+  }, 30_000);
 
   it("allows exactly one competing lease transition to commit", async () => {
     const created = await clients.employeeOne.openRequest({ amount: usd("44") }, commandOptions("publication-race"));
@@ -687,7 +910,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.27.0', $1,
+        VALUES ('model:Procurement', '0.28.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1522,6 +1745,34 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the 0.28 failure-acknowledgement upgrade without changing state or fabricating acknowledgement", async () => {
+    const before = await admin.query<{
+      events: string; consumer_failures: string; publication_acknowledgements: string;
+      consumer_acknowledgements: string; observations: string; history: string;
+    }>(`SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.publication_failure_acknowledgement) AS publication_acknowledgements,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure_acknowledgement) AS consumer_acknowledgements,
+        (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/018_upgrade_0_28.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<typeof before.rows[number]>(`SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
+        (SELECT count(*)::text FROM model_procurement_internal.publication_failure_acknowledgement) AS publication_acknowledgements,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure_acknowledgement) AS consumer_acknowledgements,
         (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);

@@ -1460,6 +1460,12 @@ function buildEnforcement(
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_failure_observer NOLOGIN",
   }, {
+    id: "boundary:failure_acknowledger_role",
+    purpose: "Confine audited terminal-cycle acknowledgement to a separate non-login role with execute-only access and no observation or recovery authority.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_failure_acknowledger NOLOGIN",
+  }, {
     id: "boundary:dispatcher_role",
     purpose: "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
     layer: "PostgreSQL role",
