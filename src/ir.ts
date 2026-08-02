@@ -182,6 +182,9 @@ export interface IREvent {
   source:
     | { kind: "local" }
     | { kind: "imported"; modelId: string; modelVersion: string; sourceHash: string };
+  publicationFailurePolicy:
+    | { mode: "unboundedRetry" }
+    | { mode: "deadLetterAfterMaxAttempts"; maxAttempts: number };
   span: IRSpan;
   naming: { typescriptName: string };
 }
@@ -271,7 +274,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 16;
+  irVersion: 17;
   model: {
     id: string;
     name: string;

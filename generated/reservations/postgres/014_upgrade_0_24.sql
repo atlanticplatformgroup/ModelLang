@@ -25,9 +25,9 @@ BEGIN
   ORDER BY "id" DESC LIMIT 1;
   IF NOT FOUND
      OR v_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_version IS DISTINCT FROM '0.24.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae' THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae';
+     OR v_version IS DISTINCT FROM '0.25.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a';
   END IF;
 END
 $modellang_upgrade$;
@@ -340,8 +340,8 @@ BEGIN
   IF p_envelope->>'eventId' IS DISTINCT FROM 'event:evt_40d694c9a0a274dc79c6168e47d25968'
      OR p_envelope->>'eventName' IS DISTINCT FROM 'ReservationCreated'
      OR v_source_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_source_model_version IS DISTINCT FROM '0.24.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae'
+     OR v_source_model_version IS DISTINCT FROM '0.25.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a'
      OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)
               OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)
      OR (p_envelope->>'ordinal')::integer < 0
@@ -420,8 +420,8 @@ BEGIN
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at", 'indexed', v_result."indexed");
   INSERT INTO "model_reservations_internal"."consumer_audit" ("consumer_id", "source_event_id", "source_event_type", "source_model_id", "source_model_version", "source_hash", "target_id", "authorization_rule_id", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id")
   VALUES ('consumer:con_20d694c9a0a274dc79c6168e47d25968', v_source_event_id, 'event:evt_40d694c9a0a274dc79c6168e47d25968', v_source_model_id, v_source_model_version, v_source_hash, v_result."id", 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'consumed', 'consumerId', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', 'sourceEventId', v_source_event_id, 'sourceContract', pg_catalog.jsonb_build_object('eventId', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:consumer:con_20d694c9a0a274dc79c6168e47d25968.valid_interval', 'outcome', 'passed')), 'emittedEventIds', pg_catalog.to_jsonb(ARRAY['event:evt_60d694c9a0a274dc79c6168e47d25968']::text[]), 'failurePolicy', pg_catalog.jsonb_build_object('mode', 'deadLetterAfterMaxAttempts', 'maxAttempts', 3, 'recovery', 'manual')), v_correlation_id, v_causation_id) RETURNING "id" INTO v_consumer_audit_id;
-  INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal")
-  VALUES ('model:Reservations', '0.24.0', 'sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0);
+  INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts")
+  VALUES ('model:Reservations', '0.25.0', 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5);
 
   UPDATE "model_reservations_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = 3, "terminal_at" = (NULL::timestamptz), "resolved_at" = pg_catalog.clock_timestamp()
   WHERE "consumer_id" = 'consumer:con_20d694c9a0a274dc79c6168e47d25968' AND "source_event_id" = v_source_event_id::text;
@@ -460,6 +460,7 @@ GRANT EXECUTE ON FUNCTION "model_reservations_internal"."bind_gateway_identity"(
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."claim_events"(integer, integer) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."ack_event"(uuid, uuid) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."release_event"(uuid, uuid) TO modellang_dispatcher;
+GRANT EXECUTE ON FUNCTION "model_reservations_internal"."fail_event"(uuid, uuid, text) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consumer_failure_state"(text, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."record_consumer_failure"(text, text, integer, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."recover_consumer_failure"(text, text, text) TO modellang_recovery;

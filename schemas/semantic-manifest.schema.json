@@ -98,12 +98,12 @@
   "type": "object",
   "required": [
     "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
-    "model", "principal", "policies", "actions", "consumers", "queries"
+    "model", "principal", "policies", "events", "actions", "consumers", "queries"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 8 },
-    "profile": { "const": "sml-transactional-core/8" },
+    "manifestVersion": { "const": 9 },
+    "profile": { "const": "sml-transactional-core/9" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 16 },
+          "irVersion": { "const": 17 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -168,6 +168,30 @@
               "execution": { "type": "boolean" },
               "durableEvidence": { "type": "boolean" }
             },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "source", "payloadEntityId", "contractSource", "publicationFailurePolicy", "emittedByActionIds", "emittedByConsumerIds", "privacy"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^event:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "payloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "contractSource": { "type": "object" },
+          "publicationFailurePolicy": { "type": "object" },
+          "emittedByActionIds": { "type": "array", "items": { "type": "string", "pattern": "^action:" } },
+          "emittedByConsumerIds": { "type": "array", "items": { "type": "string", "pattern": "^consumer:" } },
+          "privacy": {
+            "type": "object",
+            "required": ["outbox", "runtimeProjection"],
+            "properties": { "outbox": { "const": "private" }, "runtimeProjection": { "const": false } },
             "additionalProperties": false
           }
         },

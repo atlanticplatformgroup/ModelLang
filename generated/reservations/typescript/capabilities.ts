@@ -6,8 +6,8 @@ export const capabilityManifest = {
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.24.0",
-    "sourceHash": "sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae"
+    "version": "0.25.0",
+    "sourceHash": "sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a"
   },
   "view": {
     "audience": "application",

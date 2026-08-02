@@ -28,6 +28,7 @@ export interface EventDecl {
     modelVersion: string;
     sourceHash: string;
   };
+  retry?: { maxAttempts: number; span: Span };
   span: Span;
 }
 

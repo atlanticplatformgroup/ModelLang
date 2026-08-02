@@ -1,10 +1,10 @@
 {
-  "irVersion": 16,
+  "irVersion": 17,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.24.0",
-    "sourceHash": "sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae",
+    "version": "0.25.0",
+    "sourceHash": "sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -425,12 +425,16 @@
       "source": {
         "kind": "local"
       },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
       "span": {
         "file": "examples/reservations.model",
         "line": 26,
         "column": 1,
         "endLine": 26,
-        "endColumn": 96
+        "endColumn": 116
       },
       "naming": {
         "typescriptName": "ReservationCreated"
@@ -447,12 +451,16 @@
       "source": {
         "kind": "local"
       },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
       "span": {
         "file": "examples/reservations.model",
         "line": 27,
         "column": 1,
         "endLine": 27,
-        "endColumn": 96
+        "endColumn": 116
       },
       "naming": {
         "typescriptName": "ReservationIndexed"
@@ -978,7 +986,7 @@
     },
     {
       "id": "boundary:dispatcher_role",
-      "purpose": "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
+      "purpose": "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_dispatcher NOLOGIN"
@@ -1443,6 +1451,34 @@
         "column": 1,
         "endLine": 24,
         "endColumn": 2
+      }
+    },
+    {
+      "id": "publication-failure-policy:event:evt_40d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "layer": "PostgreSQL event outbox publication state",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_outbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 26,
+        "column": 1,
+        "endLine": 26,
+        "endColumn": 116
+      }
+    },
+    {
+      "id": "publication-failure-policy:event:evt_60d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Record lease-bound publication failures durably and stop claiming after 5 failures.",
+      "layer": "PostgreSQL event outbox publication state",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_outbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 27,
+        "column": 1,
+        "endLine": 27,
+        "endColumn": 116
       }
     },
     {

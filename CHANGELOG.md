@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.25.0
+
+- Added optional `retry maxAttempts N` on local event declarations and preserved bounded or unbounded publication failure policy in canonical IR17.
+- Copied stable-event publication policy into each committed outbox instance so later source changes cannot reinterpret durable delivery state.
+- Added private lease-bound publication failure recording with exact durable counts, bounded error codes, policy-derived `retry`/`deadLetter`, terminal claim exclusion, and no inferred failure from release, lease expiry, or dispatcher crash.
+- Added a generated server-only broker-neutral dispatcher adapter for typed claim, acknowledgement, release, and failure outcomes while keeping runtime payloads, leases, attempts, errors, dispositions, and outcomes out of public and agent contracts.
+- Preserved isolated `modellang_dispatcher` authority and made competing acknowledgement, release, and failure transitions serialize through the live lease token; ModelLang still performs no network publication or broker administration.
+- Advanced event manifest to v4, engineering semantic manifest to v9, semantic diff to v10, and generator profile to `/9`; existing-event publication-policy changes require reviewed acknowledgement.
+- Added IR9–IR16 evolution normalization and baseline-checked idempotent `015_upgrade_0_25.sql`; existing outbox rows remain unbounded and no failure, terminal, publication, lease, or broker history is fabricated.
+- Updated Procurement and Reservations with five-failure publication policy plus compiler, schema, privacy, adapter, lease race, terminal exclusion, migration, and live PostgreSQL coverage.
+
 ## 0.24.0
 
 - Added optional `recovery manual;` on bounded consumers and preserved `none` or `manual` recovery policy in canonical IR16.

@@ -1,13 +1,13 @@
 # Procurement enforcement map
 
-Source hash: `sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee`
+Source hash: `sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
 | `boundary:principal_binding` | Bind a direct database session identity to the model principal through an owner-controlled table. | PostgreSQL session identity | `postgres/002_schema.sql`: `model_procurement_internal.principal_binding` | compiler-derived |
 | `boundary:consumer_role` | Confine event consumption to a dedicated non-login role with execute-only handler access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_consumer NOLOGIN` | compiler-derived |
 | `boundary:recovery_role` | Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_recovery NOLOGIN` | compiler-derived |
-| `boundary:dispatcher_role` | Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
+| `boundary:dispatcher_role` | Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
 | `boundary:gateway_role` | Confine shared-credential identity activation to a dedicated non-login gateway role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_gateway NOLOGIN` | compiler-derived |
 | `boundary:gateway_identity` | Resolve verified issuer and subject claims through an owner-controlled binding inside one transaction. | PostgreSQL transaction identity | `postgres/002_schema.sql`: `model_procurement_internal.gateway_principal_binding` | compiler-derived |
@@ -49,6 +49,10 @@ Source hash: `sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90
 | `invariant:inv_f8c6cf86f9d64874ac4159766e522cb8` | ((status != RequestStatus.APPROVED) or (approvedBy != requester)) | PostgreSQL constraint | `postgres/002_schema.sql`: `ck_purchase_request_approver_differs_from_requester` | examples/procurement.model:53:3 |
 | `boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_write` | Application principals cannot directly mutate entity rows. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.purchase_request` | examples/procurement.model:21:1 |
 | `boundary:entity:ent_9bc680209327484c8e98f5f740bcc702.direct_read` | Application principals cannot directly read entity rows outside generated queries. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_procurement.purchase_request` | examples/procurement.model:21:1 |
+| `publication-failure-policy:event:evt_10d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_procurement_internal.event_outbox` | examples/procurement.model:58:1 |
+| `publication-failure-policy:event:evt_20d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_procurement_internal.event_outbox` | examples/procurement.model:59:1 |
+| `publication-failure-policy:event:evt_30d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_procurement_internal.event_outbox` | examples/procurement.model:60:1 |
+| `publication-failure-policy:event:evt_50d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_procurement_internal.event_outbox` | examples/procurement.model:61:1 |
 | `caller:action:act_1e35db0451b1461e941af6283d86dca2.actor` | Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted. | PostgreSQL authenticated identity | `postgres/003_actions.sql`: `model_procurement.open_request` | examples/procurement.model:77:3 |
 | `money-parameter:parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount` | Validate amount against its exact currency, precision, and scale contract. | PostgreSQL action input validation | `postgres/003_actions.sql`: `model_procurement.open_request` | examples/procurement.model:78:3 |
 | `boundary:action:act_1e35db0451b1461e941af6283d86dca2.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_actions.sql`: `model_procurement.open_request search_path=pg_catalog,pg_temp` | compiler-derived |

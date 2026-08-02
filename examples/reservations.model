@@ -1,4 +1,4 @@
-model Reservations version "0.24.0";
+model Reservations version "0.25.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -23,8 +23,8 @@ entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
     noOverlap(resource, startsAt, endsAt);
 }
 
-event ReservationCreated @stableId("evt_40d694c9a0a274dc79c6168e47d25968") payload Reservation;
-event ReservationIndexed @stableId("evt_60d694c9a0a274dc79c6168e47d25968") payload Reservation;
+event ReservationCreated @stableId("evt_40d694c9a0a274dc79c6168e47d25968") payload Reservation retry maxAttempts 5;
+event ReservationIndexed @stableId("evt_60d694c9a0a274dc79c6168e47d25968") payload Reservation retry maxAttempts 5;
 
 action reserve @stableId("act_508ad810a19d4b79a5009871de5cd26b")(
   caller actor: User,

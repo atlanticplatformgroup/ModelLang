@@ -24,23 +24,24 @@ export function validateIR(ir: ModelIR): void {
 export function validateEvolutionIR(ir: ModelIR): void {
   const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
   const irVersion = Number(legacy.irVersion);
-  if (![9, 10, 11, 12, 13, 14, 15, 16].includes(irVersion)) {
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17].includes(irVersion)) {
     throw new ModelError(
       "E3002",
-      `Evolution input must use released canonical IR9, IR10, IR11, IR12, IR13, IR14, IR15, or IR16; received '${String(legacy.irVersion)}'.`,
+      `Evolution input must use released canonical IR9, IR10, IR11, IR12, IR13, IR14, IR15, IR16, or IR17; received '${String(legacy.irVersion)}'.`,
       internalSpan(),
       ir.model?.sourceFile,
     );
   }
   const normalized = {
     ...(ir as unknown as Record<string, unknown>),
-    irVersion: 16,
+    irVersion: 17,
     ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
     ...(irVersion < 12 && (legacy as { events?: unknown }).events === undefined ? { events: [] } : {}),
     ...(irVersion < 13 ? { consumers: [] } : {}),
     events: ((ir as unknown as { events?: ModelIR["events"] }).events ?? []).map((event) => ({
       ...event,
       ...(irVersion < 13 && !("source" in event) ? { source: { kind: "local" as const } } : {}),
+      ...(irVersion < 17 && !("publicationFailurePolicy" in event) ? { publicationFailurePolicy: { mode: "unboundedRetry" as const } } : {}),
     })),
     actions: (ir as unknown as ModelIR).actions.map((action) => ({
       ...action,

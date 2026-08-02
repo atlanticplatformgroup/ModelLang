@@ -1,13 +1,13 @@
 # Reservations enforcement map
 
-Source hash: `sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae`
+Source hash: `sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
 | `boundary:principal_binding` | Bind a direct database session identity to the model principal through an owner-controlled table. | PostgreSQL session identity | `postgres/002_schema.sql`: `model_reservations_internal.principal_binding` | compiler-derived |
 | `boundary:consumer_role` | Confine event consumption to a dedicated non-login role with execute-only handler access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_consumer NOLOGIN` | compiler-derived |
 | `boundary:recovery_role` | Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_recovery NOLOGIN` | compiler-derived |
-| `boundary:dispatcher_role` | Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
+| `boundary:dispatcher_role` | Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_dispatcher NOLOGIN` | compiler-derived |
 | `boundary:owner_role` | Generated objects are owned by a non-login role that application principals cannot assume. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_owner NOLOGIN` | compiler-derived |
 | `boundary:gateway_role` | Confine shared-credential identity activation to a dedicated non-login gateway role. | PostgreSQL role | `postgres/001_roles.sql`: `modellang_gateway NOLOGIN` | compiler-derived |
 | `boundary:gateway_identity` | Resolve verified issuer and subject claims through an owner-controlled binding inside one transaction. | PostgreSQL transaction identity | `postgres/002_schema.sql`: `model_reservations_internal.gateway_principal_binding` | compiler-derived |
@@ -44,6 +44,8 @@ Source hash: `sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff8
 | `derived:exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba.valid_interval` | Require interval start to be strictly before interval end. | PostgreSQL check constraint | `postgres/002_schema.sql`: `ck_reservation_no_overlapping_reservations_valid_interval` | examples/reservations.model:22:3 |
 | `boundary:entity:ent_ba2d028e915841d1ab90adfa40d38404.direct_write` | Application principals cannot directly mutate entity rows. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_reservations.reservation` | examples/reservations.model:13:1 |
 | `boundary:entity:ent_ba2d028e915841d1ab90adfa40d38404.direct_read` | Application principals cannot directly read entity rows outside generated queries. | PostgreSQL privilege | `postgres/004_grants.sql`: `model_reservations.reservation` | examples/reservations.model:13:1 |
+| `publication-failure-policy:event:evt_40d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_reservations_internal.event_outbox` | examples/reservations.model:26:1 |
+| `publication-failure-policy:event:evt_60d694c9a0a274dc79c6168e47d25968` | Record lease-bound publication failures durably and stop claiming after 5 failures. | PostgreSQL event outbox publication state | `postgres/002_schema.sql`: `model_reservations_internal.event_outbox` | examples/reservations.model:27:1 |
 | `caller:action:act_508ad810a19d4b79a5009871de5cd26b.actor` | Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted. | PostgreSQL authenticated identity | `postgres/003_actions.sql`: `model_reservations.reserve` | examples/reservations.model:30:3 |
 | `boundary:action:act_508ad810a19d4b79a5009871de5cd26b.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_actions.sql`: `model_reservations.reserve search_path=pg_catalog,pg_temp` | compiler-derived |
 | `boundary:action:act_508ad810a19d4b79a5009871de5cd26b.applicability` | Evaluate authenticated current-state applicability without mutation or authority grant from the same decision plan used by execution. | PostgreSQL stable function | `postgres/003_decisions.sql`: `model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b` | examples/reservations.model:29:1 |

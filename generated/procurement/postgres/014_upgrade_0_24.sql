@@ -25,9 +25,9 @@ BEGIN
   ORDER BY "id" DESC LIMIT 1;
   IF NOT FOUND
      OR v_model_id IS DISTINCT FROM 'model:Procurement'
-     OR v_version IS DISTINCT FROM '0.24.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee' THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee';
+     OR v_version IS DISTINCT FROM '0.25.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478';
   END IF;
 END
 $modellang_upgrade$;
@@ -340,8 +340,8 @@ BEGIN
   IF p_envelope->>'eventId' IS DISTINCT FROM 'event:evt_30d694c9a0a274dc79c6168e47d25968'
      OR p_envelope->>'eventName' IS DISTINCT FROM 'RequestApproved'
      OR v_source_model_id IS DISTINCT FROM 'model:Procurement'
-     OR v_source_model_version IS DISTINCT FROM '0.24.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee'
+     OR v_source_model_version IS DISTINCT FROM '0.25.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478'
      OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)
               OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)
      OR (p_envelope->>'ordinal')::integer < 0
@@ -426,8 +426,8 @@ BEGIN
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles", 'approvalObserved', v_result."approval_observed");
   INSERT INTO "model_procurement_internal"."consumer_audit" ("consumer_id", "source_event_id", "source_event_type", "source_model_id", "source_model_version", "source_hash", "target_id", "authorization_rule_id", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id")
   VALUES ('consumer:con_10d694c9a0a274dc79c6168e47d25968', v_source_event_id, 'event:evt_30d694c9a0a274dc79c6168e47d25968', v_source_model_id, v_source_model_version, v_source_hash, v_result."id", 'authorize:consumer:con_10d694c9a0a274dc79c6168e47d25968', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'consumed', 'consumerId', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', 'sourceEventId', v_source_event_id, 'sourceContract', pg_catalog.jsonb_build_object('eventId', 'event:evt_30d694c9a0a274dc79c6168e47d25968', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:consumer:con_10d694c9a0a274dc79c6168e47d25968', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:consumer:con_10d694c9a0a274dc79c6168e47d25968.is_approved', 'outcome', 'passed')), 'emittedEventIds', pg_catalog.to_jsonb(ARRAY['event:evt_50d694c9a0a274dc79c6168e47d25968']::text[]), 'failurePolicy', pg_catalog.jsonb_build_object('mode', 'deadLetterAfterMaxAttempts', 'maxAttempts', 3, 'recovery', 'manual')), v_correlation_id, v_causation_id) RETURNING "id" INTO v_consumer_audit_id;
-  INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal")
-  VALUES ('model:Procurement', '0.24.0', 'sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee', 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0);
+  INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts")
+  VALUES ('model:Procurement', '0.25.0', 'sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478', 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5);
 
   UPDATE "model_procurement_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = 3, "terminal_at" = (NULL::timestamptz), "resolved_at" = pg_catalog.clock_timestamp()
   WHERE "consumer_id" = 'consumer:con_10d694c9a0a274dc79c6168e47d25968' AND "source_event_id" = v_source_event_id::text;
@@ -473,6 +473,7 @@ GRANT EXECUTE ON FUNCTION "model_procurement_internal"."bind_gateway_identity"(t
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."claim_events"(integer, integer) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."ack_event"(uuid, uuid) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."release_event"(uuid, uuid) TO modellang_dispatcher;
+GRANT EXECUTE ON FUNCTION "model_procurement_internal"."fail_event"(uuid, uuid, text) TO modellang_dispatcher;
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."consumer_failure_state"(text, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."record_consumer_failure"(text, text, integer, text) TO modellang_consumer;
 GRANT EXECUTE ON FUNCTION "model_procurement_internal"."recover_consumer_failure"(text, text, text) TO modellang_recovery;

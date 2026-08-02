@@ -184,6 +184,12 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     if (!payload || event.payloadType.collection || event.payloadType.moneyCurrency) {
       throw new ModelError("E3101", `Event '${event.name}' payload type '${event.payloadType.name}' must be an entity.`, event.payloadType.span, file);
     }
+    if (event.retry && event.importedFrom) {
+      throw new ModelError("E3502", `Imported event '${event.name}' cannot declare local publication retry policy.`, event.retry.span, file);
+    }
+    if (event.retry && (!Number.isInteger(event.retry.maxAttempts) || event.retry.maxAttempts < 1 || event.retry.maxAttempts > 1000)) {
+      throw new ModelError("E3402", "Event publication retry maxAttempts must be an integer from 1 through 1000.", event.retry.span, file);
+    }
     return {
       id: eventId(event),
       name: event.name,
@@ -192,6 +198,9 @@ export function analyze(program: Program, source: string, file: string): ModelIR
       source: event.importedFrom
         ? { kind: "imported" as const, ...event.importedFrom }
         : { kind: "local" as const },
+      publicationFailurePolicy: event.retry
+        ? { mode: "deadLetterAfterMaxAttempts" as const, maxAttempts: event.retry.maxAttempts }
+        : { mode: "unboundedRetry" as const },
       span: irSpan(event.span, file),
       naming: { typescriptName: event.name },
     };
@@ -204,7 +213,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 16,
+    irVersion: 17,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1434,7 +1443,7 @@ function buildEnforcement(
     objectName: "modellang_recovery NOLOGIN",
   }, {
     id: "boundary:dispatcher_role",
-    purpose: "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
+    purpose: "Confine event delivery leasing, acknowledgement, release, and failure recording to a dedicated non-login dispatcher role.",
     layer: "PostgreSQL role",
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_dispatcher NOLOGIN",
@@ -1538,6 +1547,16 @@ function buildEnforcement(
     entries.push({ id: `boundary:${entity.id}.direct_write`, purpose: "Application principals cannot directly mutate entity rows.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
     entries.push({ id: `boundary:${entity.id}.direct_read`, purpose: "Application principals cannot directly read entity rows outside generated queries.", layer: "PostgreSQL privilege", artifact: "postgres/004_grants.sql", objectName: `${schema}.${entity.naming.sqlTable}`, source: entity.span });
   }
+  for (const event of events.filter((candidate) => candidate.source.kind === "local")) entries.push({
+    id: `publication-failure-policy:${event.id}`,
+    purpose: event.publicationFailurePolicy.mode === "deadLetterAfterMaxAttempts"
+      ? `Record lease-bound publication failures durably and stop claiming after ${event.publicationFailurePolicy.maxAttempts} failures.`
+      : "Record lease-bound publication failures durably while preserving unbounded retry.",
+    layer: "PostgreSQL event outbox publication state",
+    artifact: "postgres/002_schema.sql",
+    objectName: `${internalSchema}.event_outbox`,
+    source: event.span,
+  });
   for (const action of actions) {
     const fn = `${schema}.${action.naming.sqlFunction}`;
     const caller = action.parameters.find((parameter) => parameter.id === action.callerParameterId)!;

@@ -43,9 +43,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 9;
+  diffVersion: 10;
   compilerVersion: string;
-  irVersion: 16;
+  irVersion: 17;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -95,6 +95,12 @@ function compareEvents(changes: SemanticChange[], previous: ModelIR["events"], c
       kind: "eventSourceContractChanged", area: "eventDelivery", classification: "breaking",
       subject: subject("event", pair.current), before: text(pair.previous.source ?? { kind: "local" }), after: text(pair.current.source),
       persistenceRisk: true, explanation: "Changing an event source model, version, or hash changes the accepted durable contract.",
+    });
+    const previousPolicy = pair.previous.publicationFailurePolicy ?? { mode: "unboundedRetry" };
+    if (!same(previousPolicy, pair.current.publicationFailurePolicy)) addChange(changes, {
+      kind: "eventPublicationFailurePolicyChanged", area: "eventDelivery", classification: "review",
+      subject: subject("event", pair.current), before: text(previousPolicy), after: text(pair.current.publicationFailurePolicy),
+      persistenceRisk: true, explanation: "The event's durable publication retry or terminal disposition policy changed.",
     });
   }
 }
@@ -584,7 +590,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 9,
+    diffVersion: 10,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

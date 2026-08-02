@@ -1,6 +1,7 @@
 import type {
   IRAction,
   IRConsumer,
+  IREvent,
   IRExpression,
   IRQuery,
   IRRule,
@@ -40,8 +41,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 8;
-  profile: "sml-transactional-core/8";
+  manifestVersion: 9;
+  profile: "sml-transactional-core/9";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -50,7 +51,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 16;
+    irVersion: 17;
     generator: "semantic-manifest";
   };
   model: {
@@ -66,9 +67,22 @@ export interface SemanticManifest {
     requestSupplied: false;
   };
   policies: SemanticPolicy[];
+  events: SemanticEvent[];
   actions: SemanticAction[];
   consumers: SemanticConsumer[];
   queries: SemanticQuery[];
+}
+
+export interface SemanticEvent {
+  id: string;
+  name: string;
+  source: IRSpan;
+  payloadEntityId: string;
+  contractSource: IREvent["source"];
+  publicationFailurePolicy: IREvent["publicationFailurePolicy"];
+  emittedByActionIds: string[];
+  emittedByConsumerIds: string[];
+  privacy: { outbox: "private"; runtimeProjection: false };
 }
 
 export interface SemanticPolicy {
@@ -396,7 +410,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 8,
+    manifestVersion: 9,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -435,6 +449,17 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
           || use.usage === "consumerAuthorization" || use.usage === "consumerPrecondition"),
         durableEvidence: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "consumerAuthorization"),
       },
+    })),
+    events: ir.events.map((event) => ({
+      id: event.id,
+      name: event.name,
+      source: event.span,
+      payloadEntityId: event.payloadEntityId,
+      contractSource: event.source,
+      publicationFailurePolicy: event.publicationFailurePolicy,
+      emittedByActionIds: ir.actions.filter((action) => action.emittedEventIds.includes(event.id)).map((action) => action.id),
+      emittedByConsumerIds: ir.consumers.filter((consumer) => consumer.emittedEventIds.includes(event.id)).map((consumer) => consumer.id),
+      privacy: { outbox: "private", runtimeProjection: false },
     })),
     actions: ir.actions.map((action) => actionEntry(ir, operations, action)),
     consumers: ir.consumers.map((consumer) => consumerEntry(ir, consumer)),

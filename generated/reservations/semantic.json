@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 8,
-  "profile": "sml-transactional-core/8",
+  "manifestVersion": 9,
+  "profile": "sml-transactional-core/9",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.24.0",
-    "irVersion": 16,
+    "compilerVersion": "0.25.0",
+    "irVersion": 17,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.24.0",
-    "sourceHash": "sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae",
+    "version": "0.25.0",
+    "sourceHash": "sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -26,6 +26,62 @@
     "requestSupplied": false
   },
   "policies": [],
+  "events": [
+    {
+      "id": "event:evt_40d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationCreated",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 26,
+        "column": 1,
+        "endLine": 26,
+        "endColumn": 116
+      },
+      "payloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "contractSource": {
+        "kind": "local"
+      },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
+      "emittedByActionIds": [
+        "action:act_508ad810a19d4b79a5009871de5cd26b"
+      ],
+      "emittedByConsumerIds": [],
+      "privacy": {
+        "outbox": "private",
+        "runtimeProjection": false
+      }
+    },
+    {
+      "id": "event:evt_60d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationIndexed",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 27,
+        "column": 1,
+        "endLine": 27,
+        "endColumn": 116
+      },
+      "payloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "contractSource": {
+        "kind": "local"
+      },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
+      "emittedByActionIds": [],
+      "emittedByConsumerIds": [
+        "consumer:con_20d694c9a0a274dc79c6168e47d25968"
+      ],
+      "privacy": {
+        "outbox": "private",
+        "runtimeProjection": false
+      }
+    }
+  ],
   "actions": [
     {
       "id": "action:act_508ad810a19d4b79a5009871de5cd26b",

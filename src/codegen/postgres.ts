@@ -21,6 +21,7 @@ export interface PostgresOutput {
   "012_upgrade_0_22.sql": string;
   "013_upgrade_0_23.sql": string;
   "014_upgrade_0_24.sql": string;
+  "015_upgrade_0_25.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -699,6 +700,11 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     `  ${quoteIdent("ordinal")} integer NOT NULL,`,
     `  ${quoteIdent("occurred_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),`,
     `  ${quoteIdent("delivery_attempts")} integer NOT NULL DEFAULT 0,`,
+    `  ${quoteIdent("publication_failure_count")} integer NOT NULL DEFAULT 0,`,
+    `  ${quoteIdent("publication_max_attempts")} integer,`,
+    `  ${quoteIdent("publication_disposition")} text NOT NULL DEFAULT 'pending',`,
+    `  ${quoteIdent("last_publication_error_code")} text,`,
+    `  ${quoteIdent("publication_terminal_at")} timestamptz,`,
     `  ${quoteIdent("lease_token")} uuid,`,
     `  ${quoteIdent("leased_until")} timestamptz,`,
     `  ${quoteIdent("published_at")} timestamptz,`,
@@ -709,10 +715,30 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
       `${quoteIdent("action_id")} IS NULL AND ${quoteIdent("consumer_id")} IS NOT NULL AND ${quoteIdent("consumer_id")} ~ '^consumer:.+$' AND ${quoteIdent("action_audit_id")} IS NULL AND ${quoteIdent("consumer_audit_id")} IS NOT NULL AND ${quoteIdent("principal_id")} IS NULL AND ${quoteIdent("command_receipt_id")} IS NULL)),`,
     `  CONSTRAINT ${quoteIdent("ck_event_outbox_hash")} CHECK (${quoteIdent("source_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
     `  CONSTRAINT ${quoteIdent("ck_event_outbox_metadata")} CHECK (${quoteIdent("correlation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND (${quoteIdent("causation_id")} IS NULL OR ${quoteIdent("causation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),`,
-    `  CONSTRAINT ${quoteIdent("ck_event_outbox_delivery")} CHECK (${quoteIdent("delivery_attempts")} >= 0 AND ((${quoteIdent("lease_token")} IS NULL) = (${quoteIdent("leased_until")} IS NULL)) AND (${quoteIdent("published_at")} IS NULL OR (${quoteIdent("lease_token")} IS NULL AND ${quoteIdent("leased_until")} IS NULL)))`,
+    `  CONSTRAINT ${quoteIdent("ck_event_outbox_delivery")} CHECK (${quoteIdent("delivery_attempts")} >= 0 AND ${quoteIdent("publication_failure_count")} >= 0 AND (${quoteIdent("publication_max_attempts")} IS NULL OR ${quoteIdent("publication_max_attempts")} BETWEEN 1 AND 1000) AND ((${quoteIdent("lease_token")} IS NULL) = (${quoteIdent("leased_until")} IS NULL))),`,
+    `  CONSTRAINT ${quoteIdent("ck_event_outbox_publication_error")} CHECK (${quoteIdent("last_publication_error_code")} IS NULL OR ${quoteIdent("last_publication_error_code")} ~ '^ML_[A-Z_]+$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_event_outbox_publication_disposition")} CHECK ((` +
+      `${quoteIdent("publication_disposition")} = 'pending' AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("publication_terminal_at")} IS NULL) OR (` +
+      `${quoteIdent("publication_disposition")} = 'published' AND ${quoteIdent("published_at")} IS NOT NULL AND ${quoteIdent("publication_terminal_at")} IS NULL AND ${quoteIdent("lease_token")} IS NULL) OR (` +
+      `${quoteIdent("publication_disposition")} = 'deadLetter' AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("publication_terminal_at")} IS NOT NULL AND ${quoteIdent("lease_token")} IS NULL AND ${quoteIdent("publication_max_attempts")} IS NOT NULL AND ${quoteIdent("publication_failure_count")} >= ${quoteIdent("publication_max_attempts")}))`,
     ");",
     `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("consumer_id")} text;`,
     `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("consumer_audit_id")} bigint;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("publication_failure_count")} integer NOT NULL DEFAULT 0;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("publication_max_attempts")} integer;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("publication_disposition")} text NOT NULL DEFAULT 'pending';`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("last_publication_error_code")} text;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("publication_terminal_at")} timestamptz;`,
+    `UPDATE ${outbox} SET ${quoteIdent("publication_disposition")} = 'published' WHERE ${quoteIdent("published_at")} IS NOT NULL AND ${quoteIdent("publication_disposition")} = 'pending';`,
+    `ALTER TABLE ${outbox} DROP CONSTRAINT IF EXISTS ${quoteIdent("ck_event_outbox_delivery")};`,
+    `ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("ck_event_outbox_delivery")} CHECK (${quoteIdent("delivery_attempts")} >= 0 AND ${quoteIdent("publication_failure_count")} >= 0 AND (${quoteIdent("publication_max_attempts")} IS NULL OR ${quoteIdent("publication_max_attempts")} BETWEEN 1 AND 1000) AND ((${quoteIdent("lease_token")} IS NULL) = (${quoteIdent("leased_until")} IS NULL)));`,
+    `ALTER TABLE ${outbox} DROP CONSTRAINT IF EXISTS ${quoteIdent("ck_event_outbox_publication_error")};`,
+    `ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("ck_event_outbox_publication_error")} CHECK (${quoteIdent("last_publication_error_code")} IS NULL OR ${quoteIdent("last_publication_error_code")} ~ '^ML_[A-Z_]+$');`,
+    `ALTER TABLE ${outbox} DROP CONSTRAINT IF EXISTS ${quoteIdent("ck_event_outbox_publication_disposition")};`,
+    `ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("ck_event_outbox_publication_disposition")} CHECK ((` +
+      `${quoteIdent("publication_disposition")} = 'pending' AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("publication_terminal_at")} IS NULL) OR (` +
+      `${quoteIdent("publication_disposition")} = 'published' AND ${quoteIdent("published_at")} IS NOT NULL AND ${quoteIdent("publication_terminal_at")} IS NULL AND ${quoteIdent("lease_token")} IS NULL) OR (` +
+      `${quoteIdent("publication_disposition")} = 'deadLetter' AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("publication_terminal_at")} IS NOT NULL AND ${quoteIdent("lease_token")} IS NULL AND ${quoteIdent("publication_max_attempts")} IS NOT NULL AND ${quoteIdent("publication_failure_count")} >= ${quoteIdent("publication_max_attempts")}));`,
     `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("action_id")} DROP NOT NULL;`,
     `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("principal_id")} DROP NOT NULL;`,
     `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("action_audit_id")} DROP NOT NULL;`,
@@ -731,7 +757,7 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     "  END IF;",
     "END",
     "$modellang$;",
-    `CREATE INDEX IF NOT EXISTS ${quoteIdent("ix_event_outbox_delivery_v2")} ON ${outbox} (${quoteIdent("occurred_at")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("id")}) WHERE ${quoteIdent("published_at")} IS NULL;`,
+    `CREATE INDEX IF NOT EXISTS ${quoteIdent("ix_event_outbox_delivery_v3")} ON ${outbox} (${quoteIdent("occurred_at")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("id")}) WHERE ${quoteIdent("publication_disposition")} = 'pending';`,
     `CREATE OR REPLACE FUNCTION ${qname(internal, "claim_events")}(p_limit integer, p_lease_seconds integer)`,
     "RETURNS SETOF jsonb",
     "LANGUAGE plpgsql",
@@ -748,7 +774,7 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     "  RETURN QUERY",
     "  WITH candidates AS (",
     `    SELECT row_value.${quoteIdent("id")} FROM ${outbox} AS row_value`,
-    `    WHERE row_value.${quoteIdent("published_at")} IS NULL AND (row_value.${quoteIdent("leased_until")} IS NULL OR row_value.${quoteIdent("leased_until")} <= pg_catalog.clock_timestamp())`,
+    `    WHERE row_value.${quoteIdent("publication_disposition")} = 'pending' AND (row_value.${quoteIdent("leased_until")} IS NULL OR row_value.${quoteIdent("leased_until")} <= pg_catalog.clock_timestamp())`,
     `    ORDER BY row_value.${quoteIdent("occurred_at")}, (row_value.${quoteIdent("consumer_id")} IS NOT NULL), COALESCE(row_value.${quoteIdent("action_audit_id")}, row_value.${quoteIdent("consumer_audit_id")}), row_value.${quoteIdent("ordinal")}, row_value.${quoteIdent("id")}`,
     "    FOR UPDATE SKIP LOCKED LIMIT p_limit",
     "  ), leased AS (",
@@ -769,8 +795,8 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     "LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$",
     "BEGIN",
     ...dispatcherCheck,
-    `  UPDATE ${outbox} SET ${quoteIdent("published_at")} = pg_catalog.clock_timestamp(), ${quoteIdent("lease_token")} = (NULL::uuid), ${quoteIdent("leased_until")} = (NULL::timestamptz)`,
-    `  WHERE ${quoteIdent("id")} = p_event_id AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("lease_token")} = p_lease_token AND ${quoteIdent("leased_until")} > pg_catalog.clock_timestamp();`,
+    `  UPDATE ${outbox} SET ${quoteIdent("publication_disposition")} = 'published', ${quoteIdent("published_at")} = pg_catalog.clock_timestamp(), ${quoteIdent("lease_token")} = (NULL::uuid), ${quoteIdent("leased_until")} = (NULL::timestamptz)`,
+    `  WHERE ${quoteIdent("id")} = p_event_id AND ${quoteIdent("publication_disposition")} = 'pending' AND ${quoteIdent("lease_token")} = p_lease_token AND ${quoteIdent("leased_until")} > pg_catalog.clock_timestamp();`,
     "  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;",
     "END $modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "ack_event")}(uuid, uuid) FROM PUBLIC;`,
@@ -779,10 +805,31 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     "BEGIN",
     ...dispatcherCheck,
     `  UPDATE ${outbox} SET ${quoteIdent("lease_token")} = (NULL::uuid), ${quoteIdent("leased_until")} = (NULL::timestamptz)`,
-    `  WHERE ${quoteIdent("id")} = p_event_id AND ${quoteIdent("published_at")} IS NULL AND ${quoteIdent("lease_token")} = p_lease_token;`,
+    `  WHERE ${quoteIdent("id")} = p_event_id AND ${quoteIdent("publication_disposition")} = 'pending' AND ${quoteIdent("lease_token")} = p_lease_token AND ${quoteIdent("leased_until")} > pg_catalog.clock_timestamp();`,
     "  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;",
     "END $modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "release_event")}(uuid, uuid) FROM PUBLIC;`,
+    `CREATE OR REPLACE FUNCTION ${qname(internal, "fail_event")}(p_event_id uuid, p_lease_token uuid, p_error_code text) RETURNS jsonb`,
+    "LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$",
+    "DECLARE",
+    "  v_failure_count integer;",
+    "  v_max_attempts integer;",
+    "  v_disposition text;",
+    "BEGIN",
+    ...dispatcherCheck,
+    "  IF p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' OR pg_catalog.length(p_error_code) > 64 THEN",
+    "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:event_outbox';",
+    "  END IF;",
+    `  UPDATE ${outbox} SET ${quoteIdent("publication_failure_count")} = ${quoteIdent("publication_failure_count")} + 1,`,
+    `    ${quoteIdent("last_publication_error_code")} = p_error_code, ${quoteIdent("lease_token")} = (NULL::uuid), ${quoteIdent("leased_until")} = (NULL::timestamptz),`,
+    `    ${quoteIdent("publication_disposition")} = CASE WHEN ${quoteIdent("publication_max_attempts")} IS NOT NULL AND ${quoteIdent("publication_failure_count")} + 1 >= ${quoteIdent("publication_max_attempts")} THEN 'deadLetter' ELSE 'pending' END,`,
+    `    ${quoteIdent("publication_terminal_at")} = CASE WHEN ${quoteIdent("publication_max_attempts")} IS NOT NULL AND ${quoteIdent("publication_failure_count")} + 1 >= ${quoteIdent("publication_max_attempts")} THEN pg_catalog.clock_timestamp() ELSE (NULL::timestamptz) END`,
+    `  WHERE ${quoteIdent("id")} = p_event_id AND ${quoteIdent("publication_disposition")} = 'pending' AND ${quoteIdent("lease_token")} = p_lease_token AND ${quoteIdent("leased_until")} > pg_catalog.clock_timestamp()`,
+    `  RETURNING ${quoteIdent("publication_failure_count")}, ${quoteIdent("publication_max_attempts")}, ${quoteIdent("publication_disposition")} INTO v_failure_count, v_max_attempts, v_disposition;`,
+    "  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;",
+    "  RETURN pg_catalog.jsonb_build_object('status', CASE WHEN v_disposition = 'deadLetter' THEN 'deadLetter' ELSE 'retry' END, 'recorded', TRUE, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);",
+    "END $modellang$;",
+    `REVOKE ALL ON FUNCTION ${qname(internal, "fail_event")}(uuid, uuid, text) FROM PUBLIC;`,
   ];
 }
 
@@ -1450,8 +1497,8 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     const event = ir.events.find((candidate) => candidate.id === emittedEventId);
     if (!event) throw new Error(`E4013 Missing emitted event ${emittedEventId}`);
     body.push(
-      `  INSERT INTO ${qname(internal, "event_outbox")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("event_id")}, ${quoteIdent("event_name")}, ${quoteIdent("payload_entity_id")}, ${quoteIdent("action_id")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("command_receipt_id")}, ${quoteIdent("ordinal")})`,
-      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${event.id.replaceAll("'", "''")}', '${event.name.replaceAll("'", "''")}', '${event.payloadEntityId.replaceAll("'", "''")}', '${action.id.replaceAll("'", "''")}', v_principal_id, v_result.${quoteIdent("id")}, v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, ${ordinal});`,
+      `  INSERT INTO ${qname(internal, "event_outbox")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("event_id")}, ${quoteIdent("event_name")}, ${quoteIdent("payload_entity_id")}, ${quoteIdent("action_id")}, ${quoteIdent("principal_id")}, ${quoteIdent("target_id")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("command_receipt_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("publication_max_attempts")})`,
+      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${event.id.replaceAll("'", "''")}', '${event.name.replaceAll("'", "''")}', '${event.payloadEntityId.replaceAll("'", "''")}', '${action.id.replaceAll("'", "''")}', v_principal_id, v_result.${quoteIdent("id")}, v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, ${ordinal}, ${event.publicationFailurePolicy.mode === "deadLetterAfterMaxAttempts" ? event.publicationFailurePolicy.maxAttempts : "(NULL::integer)"});`,
       "",
     );
   });
@@ -1929,8 +1976,8 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     const emittedEvent = ir.events.find((candidate) => candidate.id === emittedEventId);
     if (!emittedEvent) throw new Error(`E4014 Missing consumer-emitted event ${emittedEventId}`);
     body.push(
-      `  INSERT INTO ${qname(internal, "event_outbox")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("event_id")}, ${quoteIdent("event_name")}, ${quoteIdent("payload_entity_id")}, ${quoteIdent("consumer_id")}, ${quoteIdent("target_id")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")})`,
-      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${emittedEvent.id.replaceAll("'", "''")}', '${emittedEvent.name.replaceAll("'", "''")}', '${emittedEvent.payloadEntityId.replaceAll("'", "''")}', '${consumer.id.replaceAll("'", "''")}', v_result.${quoteIdent("id")}, v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, ${ordinal});`,
+      `  INSERT INTO ${qname(internal, "event_outbox")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("event_id")}, ${quoteIdent("event_name")}, ${quoteIdent("payload_entity_id")}, ${quoteIdent("consumer_id")}, ${quoteIdent("target_id")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("publication_max_attempts")})`,
+      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${emittedEvent.id.replaceAll("'", "''")}', '${emittedEvent.name.replaceAll("'", "''")}', '${emittedEvent.payloadEntityId.replaceAll("'", "''")}', '${consumer.id.replaceAll("'", "''")}', v_result.${quoteIdent("id")}, v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, ${ordinal}, ${emittedEvent.publicationFailurePolicy.mode === "deadLetterAfterMaxAttempts" ? emittedEvent.publicationFailurePolicy.maxAttempts : "(NULL::integer)"});`,
       "",
     );
   });
@@ -2021,6 +2068,7 @@ function generateGrants(ir: ModelIR, includeApplicability = true): string {
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "claim_events")}(integer, integer) TO modellang_dispatcher;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "ack_event")}(uuid, uuid) TO modellang_dispatcher;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "release_event")}(uuid, uuid) TO modellang_dispatcher;`,
+    `GRANT EXECUTE ON FUNCTION ${qname(internal, "fail_event")}(uuid, uuid, text) TO modellang_dispatcher;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "consumer_failure_state")}(text, text) TO modellang_consumer;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "record_consumer_failure")}(text, text, integer, text) TO modellang_consumer;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "recover_consumer_failure")}(text, text, text) TO modellang_recovery;`,
@@ -2479,6 +2527,44 @@ COMMIT;
 `;
 }
 
+function generatePublicationFailureUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.24 -> 0.25 private bounded event-publication failure upgrade.
+-- Existing outbox rows retain unbounded retry and no failure or terminal history is fabricated.
+BEGIN;
+${generateDispatcherRoleStatements()}
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateActions(ir, plan).trim()}
+${generateConsumers(ir).trim()}
+${generateGrants(ir).trim()}
+COMMIT;
+`;
+}
+
 export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecisionPlan(ir)): PostgresOutput {
   return {
     "001_roles.sql": generateRoles(),
@@ -2498,5 +2584,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "012_upgrade_0_22.sql": generateEventChainUpgrade(ir, plan),
     "013_upgrade_0_23.sql": generateConsumerFailureUpgrade(ir),
     "014_upgrade_0_24.sql": generateConsumerRecoveryUpgrade(ir),
+    "015_upgrade_0_25.sql": generatePublicationFailureUpgrade(ir, plan),
   };
 }

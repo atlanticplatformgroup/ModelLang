@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/event-manifest.schema.json",
-  "eventManifestVersion": 3,
+  "eventManifestVersion": 4,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.24.0",
-    "sourceHash": "sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee"
+    "version": "0.25.0",
+    "sourceHash": "sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478"
   },
   "delivery": {
     "semantics": "atLeastOnce",
@@ -22,6 +22,10 @@
       "source": {
         "kind": "local"
       },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
       "emittedByActionIds": [
         "action:act_1e35db0451b1461e941af6283d86dca2"
       ],
@@ -33,6 +37,10 @@
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "source": {
         "kind": "local"
+      },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
       },
       "emittedByActionIds": [
         "action:act_ed2374e822704c51a2925338253d05d2"
@@ -46,6 +54,10 @@
       "source": {
         "kind": "local"
       },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
+      },
       "emittedByActionIds": [
         "action:act_d39dbb883b5f4019b9027b85add3de47"
       ],
@@ -57,6 +69,10 @@
       "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
       "source": {
         "kind": "local"
+      },
+      "publicationFailurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 5
       },
       "emittedByActionIds": [],
       "emittedByConsumerIds": [

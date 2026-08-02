@@ -130,8 +130,16 @@ class Parser {
         sourceHash: String(sourceHash.value),
       };
     }
+    let retry: EventDecl["retry"];
+    if (this.atWord("retry")) {
+      const retryStart = this.take();
+      this.expectWord("maxAttempts");
+      const maximum = this.expect("number", "Expected an integer event publication retry limit.");
+      retry = { maxAttempts: Number(maximum.value), span: this.span(retryStart, maximum.span) };
+      if (this.atWord("retry")) this.fail("E1142", "An event may declare at most one publication retry policy.");
+    }
     const end = this.expect(";");
-    return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, importedFrom, span: this.span(start, end) };
+    return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, importedFrom, retry, span: this.span(start, end) };
   }
 
   private parseStableId(subject: string): Annotation {

@@ -11,8 +11,8 @@ export const ProcurementUiManifest = {
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.24.0",
-    "sourceHash": "sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee",
+    "version": "0.25.0",
+    "sourceHash": "sha256:4363d02663617f74d8bdafc2df3b99cd8acb477d6f5157ff3170602573a4c478",
     "label": "Procurement"
   },
   "authentication": {

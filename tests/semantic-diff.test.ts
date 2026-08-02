@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 9,
-      compilerVersion: "0.24.0",
-      irVersion: 16,
+      diffVersion: 10,
+      compilerVersion: "0.25.0",
+      irVersion: 17,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -140,6 +140,25 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
       kind: "emittedEventsChanged",
       area: "eventDelivery",
       classification: "review",
+    }));
+  });
+
+  it("requires review when an existing event publication policy changes", () => {
+    const source = (version: string, policy: string) => `model PublicationDiff version "${version}";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id @generated(uuid); }
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record ${policy};
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) -> Record {
+  authorize true;
+  create Record { }
+  emit RecordCreated;
+}`;
+    const report = semanticDiff(compileText(source("1", "")), compileText(source("2", "retry maxAttempts 5")));
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "eventPublicationFailurePolicyChanged",
+      area: "eventDelivery",
+      classification: "review",
+      persistenceRisk: true,
     }));
   });
 

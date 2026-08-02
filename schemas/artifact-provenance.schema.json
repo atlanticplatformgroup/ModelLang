@@ -11,7 +11,7 @@
     "$schema": { "const": "https://modellang.dev/schemas/artifact-provenance.schema.json" },
     "provenanceVersion": { "const": 1 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-consumer-recovery/8" },
+    "generatorProfile": { "const": "postgresql-http-ui-publication-failures/9" },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -23,7 +23,7 @@
       },
       "additionalProperties": false
     },
-    "irVersion": { "const": 16 },
+    "irVersion": { "const": 17 },
     "artifacts": {
       "type": "array",
       "items": {

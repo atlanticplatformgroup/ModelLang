@@ -1,4 +1,4 @@
--- source sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae
+-- source sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;
@@ -511,6 +511,11 @@ CREATE TABLE IF NOT EXISTS "model_reservations_internal"."event_outbox" (
   "ordinal" integer NOT NULL,
   "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
   "delivery_attempts" integer NOT NULL DEFAULT 0,
+  "publication_failure_count" integer NOT NULL DEFAULT 0,
+  "publication_max_attempts" integer,
+  "publication_disposition" text NOT NULL DEFAULT 'pending',
+  "last_publication_error_code" text,
+  "publication_terminal_at" timestamptz,
   "lease_token" uuid,
   "leased_until" timestamptz,
   "published_at" timestamptz,
@@ -519,10 +524,24 @@ CREATE TABLE IF NOT EXISTS "model_reservations_internal"."event_outbox" (
   CONSTRAINT "ck_event_outbox_producer" CHECK (("action_id" IS NOT NULL AND "action_id" ~ '^action:.+$' AND "consumer_id" IS NULL AND "action_audit_id" IS NOT NULL AND "consumer_audit_id" IS NULL AND "principal_id" IS NOT NULL) OR ("action_id" IS NULL AND "consumer_id" IS NOT NULL AND "consumer_id" ~ '^consumer:.+$' AND "action_audit_id" IS NULL AND "consumer_audit_id" IS NOT NULL AND "principal_id" IS NULL AND "command_receipt_id" IS NULL)),
   CONSTRAINT "ck_event_outbox_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
   CONSTRAINT "ck_event_outbox_metadata" CHECK ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),
-  CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND (("lease_token" IS NULL) = ("leased_until" IS NULL)) AND ("published_at" IS NULL OR ("lease_token" IS NULL AND "leased_until" IS NULL)))
+  CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND (("lease_token" IS NULL) = ("leased_until" IS NULL))),
+  CONSTRAINT "ck_event_outbox_publication_error" CHECK ("last_publication_error_code" IS NULL OR "last_publication_error_code" ~ '^ML_[A-Z_]+$'),
+  CONSTRAINT "ck_event_outbox_publication_disposition" CHECK (("publication_disposition" = 'pending' AND "published_at" IS NULL AND "publication_terminal_at" IS NULL) OR ("publication_disposition" = 'published' AND "published_at" IS NOT NULL AND "publication_terminal_at" IS NULL AND "lease_token" IS NULL) OR ("publication_disposition" = 'deadLetter' AND "published_at" IS NULL AND "publication_terminal_at" IS NOT NULL AND "lease_token" IS NULL AND "publication_max_attempts" IS NOT NULL AND "publication_failure_count" >= "publication_max_attempts"))
 );
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "consumer_id" text;
 ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "consumer_audit_id" bigint;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_failure_count" integer NOT NULL DEFAULT 0;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_max_attempts" integer;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_disposition" text NOT NULL DEFAULT 'pending';
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "last_publication_error_code" text;
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD COLUMN IF NOT EXISTS "publication_terminal_at" timestamptz;
+UPDATE "model_reservations_internal"."event_outbox" SET "publication_disposition" = 'published' WHERE "published_at" IS NOT NULL AND "publication_disposition" = 'pending';
+ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_delivery";
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND "publication_failure_count" >= 0 AND ("publication_max_attempts" IS NULL OR "publication_max_attempts" BETWEEN 1 AND 1000) AND (("lease_token" IS NULL) = ("leased_until" IS NULL)));
+ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_publication_error";
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_publication_error" CHECK ("last_publication_error_code" IS NULL OR "last_publication_error_code" ~ '^ML_[A-Z_]+$');
+ALTER TABLE "model_reservations_internal"."event_outbox" DROP CONSTRAINT IF EXISTS "ck_event_outbox_publication_disposition";
+ALTER TABLE "model_reservations_internal"."event_outbox" ADD CONSTRAINT "ck_event_outbox_publication_disposition" CHECK (("publication_disposition" = 'pending' AND "published_at" IS NULL AND "publication_terminal_at" IS NULL) OR ("publication_disposition" = 'published' AND "published_at" IS NOT NULL AND "publication_terminal_at" IS NULL AND "lease_token" IS NULL) OR ("publication_disposition" = 'deadLetter' AND "published_at" IS NULL AND "publication_terminal_at" IS NOT NULL AND "lease_token" IS NULL AND "publication_max_attempts" IS NOT NULL AND "publication_failure_count" >= "publication_max_attempts"));
 ALTER TABLE "model_reservations_internal"."event_outbox" ALTER COLUMN "action_id" DROP NOT NULL;
 ALTER TABLE "model_reservations_internal"."event_outbox" ALTER COLUMN "principal_id" DROP NOT NULL;
 ALTER TABLE "model_reservations_internal"."event_outbox" ALTER COLUMN "action_audit_id" DROP NOT NULL;
@@ -539,7 +558,7 @@ BEGIN
   END IF;
 END
 $modellang$;
-CREATE INDEX IF NOT EXISTS "ix_event_outbox_delivery_v2" ON "model_reservations_internal"."event_outbox" ("occurred_at", "action_audit_id", "consumer_audit_id", "ordinal", "id") WHERE "published_at" IS NULL;
+CREATE INDEX IF NOT EXISTS "ix_event_outbox_delivery_v3" ON "model_reservations_internal"."event_outbox" ("occurred_at", "action_audit_id", "consumer_audit_id", "ordinal", "id") WHERE "publication_disposition" = 'pending';
 CREATE OR REPLACE FUNCTION "model_reservations_internal"."claim_events"(p_limit integer, p_lease_seconds integer)
 RETURNS SETOF jsonb
 LANGUAGE plpgsql
@@ -563,7 +582,7 @@ BEGIN
   RETURN QUERY
   WITH candidates AS (
     SELECT row_value."id" FROM "model_reservations_internal"."event_outbox" AS row_value
-    WHERE row_value."published_at" IS NULL AND (row_value."leased_until" IS NULL OR row_value."leased_until" <= pg_catalog.clock_timestamp())
+    WHERE row_value."publication_disposition" = 'pending' AND (row_value."leased_until" IS NULL OR row_value."leased_until" <= pg_catalog.clock_timestamp())
     ORDER BY row_value."occurred_at", (row_value."consumer_id" IS NOT NULL), COALESCE(row_value."action_audit_id", row_value."consumer_audit_id"), row_value."ordinal", row_value."id"
     FOR UPDATE SKIP LOCKED LIMIT p_limit
   ), leased AS (
@@ -591,8 +610,8 @@ BEGIN
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
   END IF;
-  UPDATE "model_reservations_internal"."event_outbox" SET "published_at" = pg_catalog.clock_timestamp(), "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
-  WHERE "id" = p_event_id AND "published_at" IS NULL AND "lease_token" = p_lease_token AND "leased_until" > pg_catalog.clock_timestamp();
+  UPDATE "model_reservations_internal"."event_outbox" SET "publication_disposition" = 'published', "published_at" = pg_catalog.clock_timestamp(), "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
+  WHERE "id" = p_event_id AND "publication_disposition" = 'pending' AND "lease_token" = p_lease_token AND "leased_until" > pg_catalog.clock_timestamp();
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."ack_event"(uuid, uuid) FROM PUBLIC;
@@ -608,10 +627,38 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
   END IF;
   UPDATE "model_reservations_internal"."event_outbox" SET "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
-  WHERE "id" = p_event_id AND "published_at" IS NULL AND "lease_token" = p_lease_token;
+  WHERE "id" = p_event_id AND "publication_disposition" = 'pending' AND "lease_token" = p_lease_token AND "leased_until" > pg_catalog.clock_timestamp();
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."release_event"(uuid, uuid) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_reservations_internal"."fail_event"(p_event_id uuid, p_lease_token uuid, p_error_code text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_failure_count integer;
+  v_max_attempts integer;
+  v_disposition text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS dispatcher_role ON dispatcher_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE dispatcher_role.rolname = 'modellang_dispatcher' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
+  END IF;
+  IF p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' OR pg_catalog.length(p_error_code) > 64 THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:event_outbox';
+  END IF;
+  UPDATE "model_reservations_internal"."event_outbox" SET "publication_failure_count" = "publication_failure_count" + 1,
+    "last_publication_error_code" = p_error_code, "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz),
+    "publication_disposition" = CASE WHEN "publication_max_attempts" IS NOT NULL AND "publication_failure_count" + 1 >= "publication_max_attempts" THEN 'deadLetter' ELSE 'pending' END,
+    "publication_terminal_at" = CASE WHEN "publication_max_attempts" IS NOT NULL AND "publication_failure_count" + 1 >= "publication_max_attempts" THEN pg_catalog.clock_timestamp() ELSE (NULL::timestamptz) END
+  WHERE "id" = p_event_id AND "publication_disposition" = 'pending' AND "lease_token" = p_lease_token AND "leased_until" > pg_catalog.clock_timestamp()
+  RETURNING "publication_failure_count", "publication_max_attempts", "publication_disposition" INTO v_failure_count, v_max_attempts, v_disposition;
+  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
+  RETURN pg_catalog.jsonb_build_object('status', CASE WHEN v_disposition = 'deadLetter' THEN 'deadLetter' ELSE 'retry' END, 'recorded', TRUE, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_reservations_internal"."fail_event"(uuid, uuid, text) FROM PUBLIC;
 
 CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -628,6 +675,6 @@ CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Reservations', '0.24.0', 'sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae', 'installation');
+VALUES ('model:Reservations', '0.25.0', 'sha256:c94a3a391562035aecd3cbb1db63e13e33a439d0c4e6b0ee2ffc1a3402ab6b4a', 'installation');
 RESET ROLE;
 

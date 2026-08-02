@@ -286,7 +286,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 16 },
+    "irVersion": { "const": 17 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -323,7 +323,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "identity", "payloadEntityId", "source", "span", "naming"],
+        "required": ["id", "name", "identity", "payloadEntityId", "source", "publicationFailurePolicy", "span", "naming"],
         "properties": {
           "id": { "type": "string", "pattern": "^event:" },
           "name": { "type": "string" },
@@ -345,6 +345,25 @@
                   "modelId": { "type": "string", "pattern": "^model:" },
                   "modelVersion": { "type": "string", "minLength": 1 },
                   "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "publicationFailurePolicy": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["mode"],
+                "properties": { "mode": { "const": "unboundedRetry" } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["mode", "maxAttempts"],
+                "properties": {
+                  "mode": { "const": "deadLetterAfterMaxAttempts" },
+                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 }
                 },
                 "additionalProperties": false
               }
