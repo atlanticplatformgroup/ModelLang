@@ -148,6 +148,48 @@ async function submittedRequest(amount: string): Promise<string> {
   return opened.id;
 }
 
+const recoverableConsumerId = "consumer:con_10d694c9a0a274dc79c6168e47d25968";
+
+function terminalFailureFixtures(dispatcher: Pool): {
+  terminalConsumer: (eventId: string, firstAttempt?: number) => Promise<void>;
+  terminalPublication: (targetId: string) => Promise<string>;
+} {
+  return {
+    async terminalConsumer(eventId: string, firstAttempt = 1): Promise<void> {
+      for (let attempt = firstAttempt; attempt < firstAttempt + 3; attempt += 1) {
+        await consumer.query(
+          "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4)",
+          [recoverableConsumerId, eventId, attempt, "ML_HANDLER_UNAVAILABLE"],
+        );
+      }
+    },
+    async terminalPublication(targetId: string): Promise<string> {
+      let eventInstanceId = "";
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        const claimedEvents = await claimProcurementEvents(dispatcher, 1000, 60);
+        const target = claimedEvents.find((event) => event.targetId === targetId)!;
+        expect(target).toBeTruthy();
+        eventInstanceId = target.id;
+        for (const event of claimedEvents) {
+          if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
+        }
+        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
+      }
+      return eventInstanceId;
+    },
+  };
+}
+
+async function loadBaselineCheckedUpgrade(path: string): Promise<string> {
+  const upgrade = await readFile(path, "utf8");
+  const mismatched = upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`);
+  await expect(admin.query(mismatched)).rejects.toMatchObject({
+    code: "55000",
+    message: expect.stringContaining("ML_MIGRATION_BASELINE:"),
+  });
+  return upgrade;
+}
+
 async function requestApprovedEnvelope(request: string): Promise<RequestApprovedEvent> {
   const result = await admin.query<{ envelope: RequestApprovedEvent }>(`
     SELECT pg_catalog.jsonb_build_object(
@@ -639,32 +681,11 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("acknowledges one current terminal cycle through an isolated audited authority", async () => {
-    const consumerId = "consumer:con_10d694c9a0a274dc79c6168e47d25968";
+    const consumerId = recoverableConsumerId;
     const dispatcher = poolFor("ml_dispatcher");
     const application = poolFor("ml_employee_one");
     pools.push(dispatcher, application);
-    const terminalConsumer = async (eventId: string, firstAttempt = 1): Promise<void> => {
-      for (let attempt = firstAttempt; attempt < firstAttempt + 3; attempt += 1) {
-        await consumer.query(
-          "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4)",
-          [consumerId, eventId, attempt, "ML_HANDLER_UNAVAILABLE"],
-        );
-      }
-    };
-    const terminalPublication = async (targetId: string): Promise<string> => {
-      let eventInstanceId = "";
-      for (let attempt = 1; attempt <= 5; attempt += 1) {
-        const claimed = await claimProcurementEvents(dispatcher, 1000, 60);
-        const target = claimed.find((event) => event.targetId === targetId)!;
-        expect(target).toBeTruthy();
-        eventInstanceId = target.id;
-        for (const event of claimed) {
-          if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
-        }
-        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
-      }
-      return eventInstanceId;
-    };
+    const { terminalConsumer, terminalPublication } = terminalFailureFixtures(dispatcher);
 
     const consumerEventId = randomUUID();
     await terminalConsumer(consumerEventId);
@@ -854,32 +875,11 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   }, 30_000);
 
   it("claims one current terminal cycle through an isolated first-writer authority", async () => {
-    const consumerId = "consumer:con_10d694c9a0a274dc79c6168e47d25968";
+    const consumerId = recoverableConsumerId;
     const dispatcher = poolFor("ml_dispatcher");
     const application = poolFor("ml_employee_one");
     pools.push(dispatcher, application);
-    const terminalConsumer = async (eventId: string, firstAttempt = 1): Promise<void> => {
-      for (let attempt = firstAttempt; attempt < firstAttempt + 3; attempt += 1) {
-        await consumer.query(
-          "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4)",
-          [consumerId, eventId, attempt, "ML_HANDLER_UNAVAILABLE"],
-        );
-      }
-    };
-    const terminalPublication = async (targetId: string): Promise<string> => {
-      let eventInstanceId = "";
-      for (let attempt = 1; attempt <= 5; attempt += 1) {
-        const claimedEvents = await claimProcurementEvents(dispatcher, 1000, 60);
-        const target = claimedEvents.find((event) => event.targetId === targetId)!;
-        expect(target).toBeTruthy();
-        eventInstanceId = target.id;
-        for (const event of claimedEvents) {
-          if (event.id !== target.id) await releaseProcurementEvent(dispatcher, event.id, event.leaseToken);
-        }
-        await failProcurementEvent(dispatcher, target.id, target.leaseToken, "ML_BROKER_UNAVAILABLE");
-      }
-      return eventInstanceId;
-    };
+    const { terminalConsumer, terminalPublication } = terminalFailureFixtures(dispatcher);
 
     const consumerEventId = randomUUID();
     await terminalConsumer(consumerEventId);
@@ -1701,12 +1701,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/006_upgrade_0_12.sql", "utf8");
-    const mismatched = upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`);
-    await expect(admin.query(mismatched)).rejects.toMatchObject({
-      code: "55000",
-      message: expect.stringContaining("ML_MIGRATION_BASELINE:"),
-    });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/006_upgrade_0_12.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; history: string }>(`
@@ -1723,9 +1718,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/007_upgrade_0_17.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/007_upgrade_0_17.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; history: string }>(`
@@ -1744,9 +1737,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/008_upgrade_0_18.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/008_upgrade_0_18.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; history: string }>(`
@@ -1764,9 +1755,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.command_receipt) AS receipts,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/009_upgrade_0_19.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/009_upgrade_0_19.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; receipts: string; history: string }>(`
@@ -1785,9 +1774,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/010_upgrade_0_20.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/010_upgrade_0_20.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; events: string; history: string }>(`
@@ -1807,9 +1794,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.consumer_audit) AS audits,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/011_upgrade_0_21.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/011_upgrade_0_21.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; inboxes: string; audits: string; history: string }>(`
@@ -1831,9 +1816,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.consumer_audit) AS audits,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/012_upgrade_0_22.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/012_upgrade_0_22.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; events: string; inboxes: string; audits: string; history: string }>(`
@@ -1855,9 +1838,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/013_upgrade_0_23.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/013_upgrade_0_23.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ requests: string; failures: string; inboxes: string; history: string }>(`
@@ -1878,9 +1859,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/014_upgrade_0_24.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/014_upgrade_0_24.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<{ failures: string; recoveries: string; inboxes: string; history: string }>(`
@@ -1902,9 +1881,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox WHERE publication_disposition = 'published') AS published,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/015_upgrade_0_25.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/015_upgrade_0_25.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<typeof before.rows[number]>(`
@@ -1927,9 +1904,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.publication_recovery_audit) AS recoveries,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/016_upgrade_0_26.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/016_upgrade_0_26.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<typeof before.rows[number]>(`
@@ -1951,9 +1926,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/017_upgrade_0_27.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/017_upgrade_0_27.sql");
     await expect(admin.query(upgrade))
       .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:27:29" });
     const after = await admin.query<typeof before.rows[number]>(`
@@ -1978,9 +1951,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/018_upgrade_0_28.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/018_upgrade_0_28.sql");
     await expect(admin.query(upgrade))
       .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:28:29" });
     const after = await admin.query<typeof before.rows[number]>(`SELECT
@@ -2009,9 +1980,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.failure_observation_audit) AS observations,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
-    const upgrade = await readFile("generated/procurement/postgres/019_upgrade_0_29.sql", "utf8");
-    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
-      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/019_upgrade_0_29.sql");
     await admin.query(upgrade);
     await admin.query(upgrade);
     const after = await admin.query<typeof before.rows[number]>(`SELECT
