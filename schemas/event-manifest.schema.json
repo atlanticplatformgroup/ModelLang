@@ -6,7 +6,7 @@
   "required": ["$schema", "eventManifestVersion", "model", "delivery", "events"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/event-manifest.schema.json" },
-    "eventManifestVersion": { "const": 1 },
+    "eventManifestVersion": { "const": 2 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -33,11 +33,32 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "payloadEntityId", "emittedByActionIds"],
+        "required": ["id", "name", "payloadEntityId", "source", "emittedByActionIds"],
         "properties": {
           "id": { "type": "string", "pattern": "^event:" },
           "name": { "type": "string" },
           "payloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["kind"],
+                "properties": { "kind": { "const": "local" } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["kind", "modelId", "modelVersion", "sourceHash"],
+                "properties": {
+                  "kind": { "const": "imported" },
+                  "modelId": { "type": "string" },
+                  "modelVersion": { "type": "string" },
+                  "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
           "emittedByActionIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^action:" } }
         },
         "additionalProperties": false

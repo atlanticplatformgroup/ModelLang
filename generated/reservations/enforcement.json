@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.20.0",
-    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1",
+    "version": "0.21.0",
+    "sourceHash": "sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -17,6 +17,13 @@
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.principal_binding"
+    },
+    {
+      "id": "boundary:consumer_role",
+      "purpose": "Confine event consumption to a dedicated non-login role with execute-only handler access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_consumer NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
@@ -404,6 +411,34 @@
       }
     },
     {
+      "id": "required:field:fld_ed818707952f4b388baea4c3132bce63",
+      "purpose": "indexed is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.indexed NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 20,
+        "endColumn": 78
+      }
+    },
+    {
+      "id": "default:field:fld_ed818707952f4b388baea4c3132bce63",
+      "purpose": "Apply the declared constant default for indexed.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.indexed",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 20,
+        "endColumn": 78
+      }
+    },
+    {
       "id": "exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba",
       "purpose": "noOverlap(resource, startsAt, endsAt) rejects overlapping half-open intervals for the same key.",
       "layer": "PostgreSQL exclusion constraint",
@@ -411,9 +446,9 @@
       "objectName": "ex_reservation_no_overlapping_reservations",
       "source": {
         "file": "examples/reservations.model",
-        "line": 21,
+        "line": 22,
         "column": 3,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 43
       }
     },
@@ -425,9 +460,9 @@
       "objectName": "ck_reservation_no_overlapping_reservations_valid_interval",
       "source": {
         "file": "examples/reservations.model",
-        "line": 21,
+        "line": 22,
         "column": 3,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 43
       }
     },
@@ -441,7 +476,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 2
       }
     },
@@ -455,7 +490,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 2
       }
     },
@@ -467,9 +502,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 3,
-        "endLine": 28,
+        "endLine": 29,
         "endColumn": 21
       }
     },
@@ -488,9 +523,9 @@
       "objectName": "model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -502,9 +537,9 @@
       "objectName": "model_reservations_internal.command_receipt",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -516,9 +551,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -530,9 +565,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 33,
+        "line": 34,
         "column": 13,
-        "endLine": 33,
+        "endLine": 34,
         "endColumn": 17
       }
     },
@@ -544,9 +579,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 34,
+        "line": 35,
         "column": 3,
-        "endLine": 34,
+        "endLine": 35,
         "endColumn": 45
       }
     },
@@ -558,9 +593,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -572,9 +607,9 @@
       "objectName": "model_reservations_internal.event_outbox",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -593,6 +628,34 @@
       "objectName": "FOR SHARE in model_reservations.reserve"
     },
     {
+      "id": "consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Consume event:evt_40d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication and one local committed effect.",
+      "layer": "PostgreSQL consumer function",
+      "artifact": "postgres/003_consumers.sql",
+      "objectName": "model_reservations_internal.consume_index_reservation",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 1,
+        "endLine": 56,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "inbox:consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Deduplicate one source event per stable consumer identity and replay the committed stored result.",
+      "layer": "PostgreSQL transactional inbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_inbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 1,
+        "endLine": 56,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "caller:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
       "purpose": "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.",
       "layer": "PostgreSQL authenticated identity",
@@ -600,9 +663,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 59,
         "column": 3,
-        "endLine": 47,
+        "endLine": 59,
         "endColumn": 21
       }
     },
@@ -621,9 +684,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 50,
+        "line": 62,
         "column": 13,
-        "endLine": 50,
+        "endLine": 62,
         "endColumn": 17
       }
     },
@@ -635,9 +698,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 51,
+        "line": 63,
         "column": 9,
-        "endLine": 51,
+        "endLine": 63,
         "endColumn": 41
       }
     },
@@ -649,9 +712,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -663,9 +726,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -677,9 +740,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -710,6 +773,13 @@
       "layer": "PostgreSQL transactional outbox",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.event_outbox"
+    },
+    {
+      "id": "boundary:event_inbox",
+      "purpose": "Commit consumer deduplication, validation, local effect, audit evidence, and stored result atomically.",
+      "layer": "PostgreSQL transactional inbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_inbox"
     }
   ]
 }

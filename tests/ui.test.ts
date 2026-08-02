@@ -17,6 +17,7 @@ const purchaseRequest = {
   status: "DRAFT" as const,
   approvedBy: null,
   approvedByRoles: null,
+  approvalObserved: false,
 };
 
 describe("generated UI boundary", () => {

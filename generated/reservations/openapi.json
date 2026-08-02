@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.20.0",
-    "description": "Generated from ModelLang operation manifest v4 (sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1)."
+    "version": "0.21.0",
+    "description": "Generated from ModelLang operation manifest v4 (sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -521,7 +521,8 @@
           "resource",
           "reservedBy",
           "startsAt",
-          "endsAt"
+          "endsAt",
+          "indexed"
         ],
         "properties": {
           "id": {
@@ -549,6 +550,9 @@
           "endsAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "indexed": {
+            "type": "boolean"
           }
         }
       },

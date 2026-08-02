@@ -281,6 +281,14 @@ const entityDefinitions = {
         "enumId": "enum:enm_025acdd67483499fbd780d0e19867e9b"
       },
       "nullable": true
+    },
+    {
+      "name": "approvalObserved",
+      "type": {
+        "kind": "scalar",
+        "name": "Boolean"
+      },
+      "nullable": false
     }
   ]
 } as Readonly<Record<

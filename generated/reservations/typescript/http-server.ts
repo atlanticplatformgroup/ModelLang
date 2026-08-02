@@ -223,6 +223,14 @@ const entityDefinitions = {
         "name": "DateTime"
       },
       "nullable": false
+    },
+    {
+      "name": "indexed",
+      "type": {
+        "kind": "scalar",
+        "name": "Boolean"
+      },
+      "nullable": false
     }
   ]
 } as Readonly<Record<

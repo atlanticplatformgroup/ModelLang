@@ -37,6 +37,7 @@ export interface Reservation {
   reservedBy: string;
   startsAt: string;
   endsAt: string;
+  indexed: boolean;
 }
 
 export interface ReserveInput {

@@ -1,6 +1,6 @@
 import { ModelError, internalSpan } from "./diagnostics.js";
 import type {
-  IRAction, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRQuery,
+  IRAction, IRConsumer, IREntity, IREnum, IREnumMember, IRField, IRInvariant, IRQuery,
   IRPolicy, IRTemporalExclusion, IRWorkflow, IRWorkflowTransition, ModelIR,
 } from "./ir.js";
 import {
@@ -10,6 +10,8 @@ import {
   generateDecisionEvidenceInfrastructureStatements,
   generateCommandReceiptInfrastructureStatements,
   generateEventOutboxInfrastructureStatements,
+  generateEventInboxInfrastructureStatements,
+  generateConsumerRoleStatements,
   generateDispatcherRoleStatements,
   generateGatewayInfrastructureStatements,
   generateGatewayRoleStatements,
@@ -39,6 +41,7 @@ export type AdditiveOperation =
   | { kind: "addEvent"; eventId: string; name: string }
   | { kind: "addField"; entityId: string; fieldId: string; name: string; table: string; column: string }
   | { kind: "addAction"; actionId: string; name: string }
+  | { kind: "addConsumer"; consumerId: string; name: string }
   | { kind: "addQuery"; queryId: string; name: string }
   | { kind: "addWorkflow"; workflowId: string; name: string }
   | { kind: "addTransition"; workflowId: string; transitionId: string; name: string };
@@ -98,6 +101,7 @@ export function requireExplicitIds(ir: ModelIR): void {
     for (const exclusion of entity.temporalExclusions) requireExplicit(ir, exclusion, `exclusion in '${entity.name}'`, "exclusion");
   }
   for (const action of ir.actions) requireExplicit(ir, action, "action", "action");
+  for (const consumer of (ir as ModelIR & { consumers?: IRConsumer[] }).consumers ?? []) requireExplicit(ir, consumer, "consumer", "consumer");
   for (const event of (ir as ModelIR & { events?: ModelIR["events"] }).events ?? []) requireExplicit(ir, event, "event", "event");
   for (const policy of (ir as ModelIR & { policies?: IRPolicy[] }).policies ?? []) {
     requireExplicit(ir, policy, "policy", "policy");
@@ -166,6 +170,11 @@ function entityStructure(entity: IREntity): unknown {
 function actionStructure(action: IRAction): unknown {
   const { name: _name, identity: _identity, emittedEventIds, ...structure } = action;
   return { ...structure, emittedEventIds: emittedEventIds ?? [] };
+}
+
+function consumerStructure(consumer: IRConsumer): unknown {
+  const { name: _name, identity: _identity, ...structure } = consumer;
+  return structure;
 }
 
 function policyStructure(policy: IRPolicy): unknown {
@@ -360,8 +369,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12].includes(Number(previous.irVersion)) || current.irVersion !== 12) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12 baseline and canonical IR12 current input.");
+  if (![9, 10, 11, 12, 13].includes(Number(previous.irVersion)) || current.irVersion !== 13) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12/IR13 baseline and canonical IR13 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -559,14 +568,25 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   const previousEventsById = byId(previousEvents);
   for (const currentEvent of eventDiff.existing) {
     const previousEvent = previousEventsById.get(currentEvent.id)!;
-    if (previousEvent.payloadEntityId !== currentEvent.payloadEntityId) {
-      fail(current, "E2807", `Event payload changed for '${currentEvent.name}'; payload changes require reviewed migration.`);
+    if (previousEvent.payloadEntityId !== currentEvent.payloadEntityId || !same(previousEvent.source ?? { kind: "local" }, currentEvent.source)) {
+      fail(current, "E2807", `Event payload or source contract changed for '${currentEvent.name}'; contract changes require reviewed migration.`);
     }
   }
 
   const actionDiff = additiveDiff(previous.actions, current.actions, "Action", current);
   for (const action of actionDiff.added) {
     operations.push({ kind: "addAction", actionId: action.id, name: action.name });
+  }
+
+  const previousConsumers = (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [];
+  const consumerDiff = additiveDiff(previousConsumers, current.consumers, "Consumer", current);
+  for (const consumer of consumerDiff.added) operations.push({ kind: "addConsumer", consumerId: consumer.id, name: consumer.name });
+  const previousConsumersById = byId(previousConsumers);
+  for (const currentConsumer of consumerDiff.existing) {
+    const previousConsumer = previousConsumersById.get(currentConsumer.id)!;
+    if (!same(consumerStructure(previousConsumer), consumerStructure(currentConsumer))) {
+      fail(current, "E2807", `Consumer contract or handler semantics changed for '${currentConsumer.name}'; reviewed migration is required.`);
+    }
   }
   const previousActions = byId(previous.actions);
   for (const currentAction of actionDiff.existing) {
@@ -727,6 +747,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     "-- Bootstrap the 0.12 shared gateway role before assuming the non-login owner role.",
     generateGatewayRoleStatements(),
     generateDispatcherRoleStatements(),
+    generateConsumerRoleStatements(),
     ...(entityDiff.added.some((entity) => entity.temporalExclusions.length > 0)
       ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;"]
       : []),
@@ -738,8 +759,10 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     ...generateDecisionEvidenceInfrastructureStatements(current),
     ...generateCommandReceiptInfrastructureStatements(current),
     ...generateEventOutboxInfrastructureStatements(current),
+    ...generateEventInboxInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
+    generated["003_consumers.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),
     generated["004_grants.sql"]!.trim(),

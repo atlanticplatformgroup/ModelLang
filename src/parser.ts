@@ -1,7 +1,7 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
-  ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, EventDecl, ExclusionDecl,
+  ActionDecl, Annotation, Assignment, ConsumerDecl, Declaration, Effect, EntityDecl, EventDecl, ExclusionDecl,
   Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
   PolicyDecl, WorkflowDecl,
 } from "./syntax-ast.js";
@@ -59,9 +59,10 @@ class Parser {
       else if (this.atWord("event")) declarations.push(this.parseEvent());
       else if (this.atWord("policy")) declarations.push(this.parsePolicy());
       else if (this.atWord("action")) declarations.push(this.parseAction());
+      else if (this.atWord("consumer")) declarations.push(this.parseConsumer());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
       else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
-      else this.fail("E1103", "Expected enum, entity, event, policy, action, query, or workflow declaration.");
+      else this.fail("E1103", "Expected enum, entity, event, policy, action, consumer, query, or workflow declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -115,8 +116,22 @@ class Parser {
     const stableId = this.at("@") ? this.parseStableId("event declaration") : undefined;
     this.expectWord("payload");
     const payloadType = this.parseTypeRef();
+    let importedFrom: EventDecl["importedFrom"];
+    if (this.atWord("from")) {
+      this.take();
+      const modelId = this.expect("string", "Expected imported event model ID string.");
+      this.expectWord("version");
+      const modelVersion = this.expect("string", "Expected imported event model version string.");
+      this.expectWord("sourceHash");
+      const sourceHash = this.expect("string", "Expected imported event source hash string.");
+      importedFrom = {
+        modelId: String(modelId.value),
+        modelVersion: String(modelVersion.value),
+        sourceHash: String(sourceHash.value),
+      };
+    }
     const end = this.expect(";");
-    return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, span: this.span(start, end) };
+    return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, importedFrom, span: this.span(start, end) };
   }
 
   private parseStableId(subject: string): Annotation {
@@ -271,6 +286,57 @@ class Parser {
     }
     const end = this.expect("}");
     return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effect, emits, span: this.span(start, end) };
+  }
+
+  private parseConsumer(): ConsumerDecl {
+    const start = this.expectWord("consumer");
+    const name = this.identifier("Expected consumer name.");
+    const stableId = this.at("@") ? this.parseStableId("consumer declaration") : undefined;
+    this.expectWord("on");
+    const event = this.identifier("Expected consumed event name.");
+    this.expect("(");
+    const payloadStart = this.expectWord("payload");
+    const payloadName = this.identifier("Expected payload parameter name.");
+    this.expect(":");
+    const payloadType = this.parseTypeRef();
+    const payloadParameter: ParameterDecl = {
+      name: payloadName.text,
+      type: payloadType,
+      caller: false,
+      span: this.span(payloadStart, payloadType.span),
+    };
+    this.expect(")");
+    this.expect("->");
+    const returnType = this.parseTypeRef();
+    this.expect("{");
+    this.expectWord("authorize");
+    const authorize = this.parseExpression();
+    this.expect(";");
+    const requires: RequireDecl[] = [];
+    while (this.atWord("require")) {
+      const requireStart = this.take();
+      const requireName = this.identifier();
+      this.expect(":");
+      const expression = this.parseExpression();
+      const end = this.expect(";");
+      requires.push({ name: requireName.text, expression, span: this.span(requireStart, end) });
+    }
+    const effect = this.parseEffect();
+    const end = this.expect("}");
+    return {
+      kind: "consumer",
+      name: name.text,
+      nameSpan: name.span,
+      stableId,
+      eventName: event.text,
+      eventSpan: event.span,
+      payloadParameter,
+      returnType,
+      authorize,
+      requires,
+      effect,
+      span: this.span(start, end),
+    };
   }
 
   private parsePolicy(): PolicyDecl {

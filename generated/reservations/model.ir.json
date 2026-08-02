@@ -1,10 +1,10 @@
 {
-  "irVersion": 12,
+  "irVersion": 13,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.20.0",
-    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1",
+    "version": "0.21.0",
+    "sourceHash": "sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -341,6 +341,35 @@
           "naming": {
             "sqlColumn": "ends_at"
           }
+        },
+        {
+          "id": "field:fld_ed818707952f4b388baea4c3132bce63",
+          "name": "indexed",
+          "identity": {
+            "strategy": "explicitStableId",
+            "stableId": "fld_ed818707952f4b388baea4c3132bce63"
+          },
+          "type": "Boolean",
+          "optional": false,
+          "default": {
+            "kind": "literal",
+            "value": false,
+            "type": "Boolean",
+            "nullable": false
+          },
+          "annotations": [],
+          "storage": "ordinary",
+          "mutability": "mutable",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 20,
+            "column": 3,
+            "endLine": 20,
+            "endColumn": 78
+          },
+          "naming": {
+            "sqlColumn": "indexed"
+          }
         }
       ],
       "invariants": [],
@@ -359,9 +388,9 @@
           "sourceExpression": "noOverlap(resource, startsAt, endsAt)",
           "span": {
             "file": "examples/reservations.model",
-            "line": 21,
+            "line": 22,
             "column": 3,
-            "endLine": 22,
+            "endLine": 23,
             "endColumn": 43
           },
           "naming": {
@@ -375,7 +404,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 2
       },
       "naming": {
@@ -393,11 +422,14 @@
         "stableId": "evt_40d694c9a0a274dc79c6168e47d25968"
       },
       "payloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "source": {
+        "kind": "local"
+      },
       "span": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 26,
         "column": 1,
-        "endLine": 25,
+        "endLine": 26,
         "endColumn": 96
       },
       "naming": {
@@ -423,9 +455,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 28,
+            "line": 29,
             "column": 3,
-            "endLine": 28,
+            "endLine": 29,
             "endColumn": 21
           },
           "naming": {
@@ -440,9 +472,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 29,
+            "line": 30,
             "column": 3,
-            "endLine": 29,
+            "endLine": 30,
             "endColumn": 21
           },
           "naming": {
@@ -457,9 +489,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 30,
+            "line": 31,
             "column": 3,
-            "endLine": 30,
+            "endLine": 31,
             "endColumn": 21
           },
           "naming": {
@@ -474,9 +506,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 31,
+            "line": 32,
             "column": 3,
-            "endLine": 31,
+            "endLine": 32,
             "endColumn": 19
           },
           "naming": {
@@ -504,9 +536,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 33,
+          "line": 34,
           "column": 13,
-          "endLine": 33,
+          "endLine": 34,
           "endColumn": 17
         }
       },
@@ -537,9 +569,9 @@
           "sourceExpression": "(startsAt < endsAt)",
           "span": {
             "file": "examples/reservations.model",
-            "line": 34,
+            "line": 35,
             "column": 3,
-            "endLine": 34,
+            "endLine": 35,
             "endColumn": 45
           }
         }
@@ -626,14 +658,144 @@
       ],
       "span": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       },
       "naming": {
         "sqlFunction": "reserve",
         "typescriptMethod": "reserve"
+      }
+    }
+  ],
+  "consumers": [
+    {
+      "id": "consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "name": "indexReservation",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "con_20d694c9a0a274dc79c6168e47d25968"
+      },
+      "sourceEventId": "event:evt_40d694c9a0a274dc79c6168e47d25968",
+      "payloadParameter": {
+        "id": "parameter:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+        "name": "reservation",
+        "type": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "caller": false,
+        "span": {
+          "file": "examples/reservations.model",
+          "line": 48,
+          "column": 3,
+          "endLine": 48,
+          "endColumn": 35
+        },
+        "naming": {
+          "sqlParameter": "p_envelope",
+          "typescriptProperty": "reservation"
+        }
+      },
+      "acceptedPayloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "returnEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "authorization": {
+        "id": "authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "span": {
+          "file": "examples/reservations.model",
+          "line": 50,
+          "column": 13,
+          "endLine": 50,
+          "endColumn": 17
+        }
+      },
+      "preconditions": [
+        {
+          "id": "require:consumer:con_20d694c9a0a274dc79c6168e47d25968.valid_interval",
+          "name": "valid_interval",
+          "expression": {
+            "kind": "binary",
+            "operator": "<",
+            "left": {
+              "kind": "fieldAccess",
+              "source": "parameter:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+              "parameter": "reservation",
+              "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+              "fieldName": "startsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "right": {
+              "kind": "fieldAccess",
+              "source": "parameter:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+              "parameter": "reservation",
+              "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+              "fieldName": "endsAt",
+              "type": "DateTime",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "(reservation.startsAt < reservation.endsAt)",
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 51,
+            "column": 3,
+            "endLine": 51,
+            "endColumn": 69
+          }
+        }
+      ],
+      "effect": {
+        "kind": "update",
+        "target": "reservation",
+        "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+        "assignments": [
+          {
+            "fieldId": "field:fld_ed818707952f4b388baea4c3132bce63",
+            "fieldName": "indexed",
+            "expression": {
+              "kind": "literal",
+              "value": true,
+              "type": "Boolean",
+              "nullable": false
+            }
+          }
+        ]
+      },
+      "lockPlan": [
+        {
+          "id": "lock:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+          "source": "parameter:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+          "parameterId": "parameter:consumer:con_20d694c9a0a274dc79c6168e47d25968.reservation",
+          "entityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+          "mode": "update",
+          "order": 0
+        }
+      ],
+      "delivery": {
+        "transport": "atLeastOnce",
+        "deduplication": "transactionalInbox",
+        "duplicateResult": "storedResult",
+        "identity": "consumerAndSourceEvent"
+      },
+      "span": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 1,
+        "endLine": 56,
+        "endColumn": 2
+      },
+      "naming": {
+        "sqlFunction": "consume_index_reservation",
+        "typescriptMethod": "indexReservation"
       }
     }
   ],
@@ -654,9 +816,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/reservations.model",
-            "line": 47,
+            "line": 59,
             "column": 3,
-            "endLine": 47,
+            "endLine": 59,
             "endColumn": 21
           },
           "naming": {
@@ -671,9 +833,9 @@
           "caller": false,
           "span": {
             "file": "examples/reservations.model",
-            "line": 48,
+            "line": 60,
             "column": 3,
-            "endLine": 48,
+            "endLine": 60,
             "endColumn": 21
           },
           "naming": {
@@ -700,9 +862,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 50,
+          "line": 62,
           "column": 13,
-          "endLine": 50,
+          "endLine": 62,
           "endColumn": 17
         }
       },
@@ -736,9 +898,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "span": {
           "file": "examples/reservations.model",
-          "line": 51,
+          "line": 63,
           "column": 9,
-          "endLine": 51,
+          "endLine": 63,
           "endColumn": 41
         }
       },
@@ -750,9 +912,9 @@
       "limit": 100,
       "span": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       },
       "naming": {
@@ -769,6 +931,13 @@
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.principal_binding"
+    },
+    {
+      "id": "boundary:consumer_role",
+      "purpose": "Confine event consumption to a dedicated non-login role with execute-only handler access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_consumer NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
@@ -1156,6 +1325,34 @@
       }
     },
     {
+      "id": "required:field:fld_ed818707952f4b388baea4c3132bce63",
+      "purpose": "indexed is required.",
+      "layer": "PostgreSQL constraint",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.indexed NOT NULL",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 20,
+        "endColumn": 78
+      }
+    },
+    {
+      "id": "default:field:fld_ed818707952f4b388baea4c3132bce63",
+      "purpose": "Apply the declared constant default for indexed.",
+      "layer": "PostgreSQL column default",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations.reservation.indexed",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 20,
+        "column": 3,
+        "endLine": 20,
+        "endColumn": 78
+      }
+    },
+    {
       "id": "exclusion:exc_d55bab6e14884cd5a7d2bacfc30458ba",
       "purpose": "noOverlap(resource, startsAt, endsAt) rejects overlapping half-open intervals for the same key.",
       "layer": "PostgreSQL exclusion constraint",
@@ -1163,9 +1360,9 @@
       "objectName": "ex_reservation_no_overlapping_reservations",
       "source": {
         "file": "examples/reservations.model",
-        "line": 21,
+        "line": 22,
         "column": 3,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 43
       }
     },
@@ -1177,9 +1374,9 @@
       "objectName": "ck_reservation_no_overlapping_reservations_valid_interval",
       "source": {
         "file": "examples/reservations.model",
-        "line": 21,
+        "line": 22,
         "column": 3,
-        "endLine": 22,
+        "endLine": 23,
         "endColumn": 43
       }
     },
@@ -1193,7 +1390,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 2
       }
     },
@@ -1207,7 +1404,7 @@
         "file": "examples/reservations.model",
         "line": 13,
         "column": 1,
-        "endLine": 23,
+        "endLine": 24,
         "endColumn": 2
       }
     },
@@ -1219,9 +1416,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 3,
-        "endLine": 28,
+        "endLine": 29,
         "endColumn": 21
       }
     },
@@ -1240,9 +1437,9 @@
       "objectName": "model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -1254,9 +1451,9 @@
       "objectName": "model_reservations_internal.command_receipt",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -1268,9 +1465,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -1282,9 +1479,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 33,
+        "line": 34,
         "column": 13,
-        "endLine": 33,
+        "endLine": 34,
         "endColumn": 17
       }
     },
@@ -1296,9 +1493,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 34,
+        "line": 35,
         "column": 3,
-        "endLine": 34,
+        "endLine": 35,
         "endColumn": 45
       }
     },
@@ -1310,9 +1507,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -1324,9 +1521,9 @@
       "objectName": "model_reservations_internal.event_outbox",
       "source": {
         "file": "examples/reservations.model",
-        "line": 27,
+        "line": 28,
         "column": 1,
-        "endLine": 44,
+        "endLine": 45,
         "endColumn": 2
       }
     },
@@ -1345,6 +1542,34 @@
       "objectName": "FOR SHARE in model_reservations.reserve"
     },
     {
+      "id": "consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Consume event:evt_40d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication and one local committed effect.",
+      "layer": "PostgreSQL consumer function",
+      "artifact": "postgres/003_consumers.sql",
+      "objectName": "model_reservations_internal.consume_index_reservation",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 1,
+        "endLine": 56,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "inbox:consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Deduplicate one source event per stable consumer identity and replay the committed stored result.",
+      "layer": "PostgreSQL transactional inbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_inbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 47,
+        "column": 1,
+        "endLine": 56,
+        "endColumn": 2
+      }
+    },
+    {
       "id": "caller:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
       "purpose": "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.",
       "layer": "PostgreSQL authenticated identity",
@@ -1352,9 +1577,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 59,
         "column": 3,
-        "endLine": 47,
+        "endLine": 59,
         "endColumn": 21
       }
     },
@@ -1373,9 +1598,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 50,
+        "line": 62,
         "column": 13,
-        "endLine": 50,
+        "endLine": 62,
         "endColumn": 17
       }
     },
@@ -1387,9 +1612,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 51,
+        "line": 63,
         "column": 9,
-        "endLine": 51,
+        "endLine": 63,
         "endColumn": 41
       }
     },
@@ -1401,9 +1626,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -1415,9 +1640,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -1429,9 +1654,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 46,
+        "line": 58,
         "column": 1,
-        "endLine": 54,
+        "endLine": 66,
         "endColumn": 2
       }
     },
@@ -1462,6 +1687,13 @@
       "layer": "PostgreSQL transactional outbox",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.event_outbox"
+    },
+    {
+      "id": "boundary:event_inbox",
+      "purpose": "Commit consumer deduplication, validation, local effect, audit evidence, and stored result atomically.",
+      "layer": "PostgreSQL transactional inbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_inbox"
     }
   ]
 }

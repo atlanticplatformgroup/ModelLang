@@ -6,8 +6,8 @@ export const capabilityManifest = {
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.20.0",
-    "sourceHash": "sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4"
+    "version": "0.21.0",
+    "sourceHash": "sha256:4e220226a36b53f1f7b4c07832805b191a425c721c61b5a77b2e767d4d5638ec"
   },
   "view": {
     "audience": "application",

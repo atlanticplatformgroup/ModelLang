@@ -18,6 +18,9 @@ flowchart LR
   action_act_508ad810a19d4b79a5009871de5cd26b -->|locks share| entity_ent_7cb2307972954d83a6f344764faaae39
   action_act_508ad810a19d4b79a5009871de5cd26b -->|locks share| entity_ent_82878bde58d948d4a84d85d01279e01d
   action_act_508ad810a19d4b79a5009871de5cd26b -->|emits atomically| event_evt_40d694c9a0a274dc79c6168e47d25968
+  consumer_con_20d694c9a0a274dc79c6168e47d25968["Consumer: indexReservation"]
+  event_evt_40d694c9a0a274dc79c6168e47d25968 -->|consumed through inbox| consumer_con_20d694c9a0a274dc79c6168e47d25968
+  consumer_con_20d694c9a0a274dc79c6168e47d25968 -->|update| entity_ent_ba2d028e915841d1ab90adfa40d38404
   query_qry_94d8a56f4c2640fab58a4c2190c35c69["Query: reservationsForResource"]
   principal -->|authenticated caller| query_qry_94d8a56f4c2640fab58a4c2190c35c69
   query_qry_94d8a56f4c2640fab58a4c2190c35c69 -->|reads| entity_ent_ba2d028e915841d1ab90adfa40d38404

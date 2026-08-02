@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.20](./spec/0.20/LANGUAGE.md). It retains the complete 0.19 boundary and adds stable typed domain events, post-effect action emission, atomic private outbox storage, replay suppression, and execute-only at-least-once lease delivery.
+The current normative specification is [ModelLang 0.21](./spec/0.21/LANGUAGE.md). It retains the complete 0.20 boundary and adds stable typed event consumers, exact local/imported source contracts, transactional inbox deduplication, committed-result replay, and execute-only broker-neutral handling.
+
+- [Reliable typed event-consumer semantics](./spec/0.21/EVENT_CONSUMERS.md)
+- [0.21 grammar additions](./spec/0.21/GRAMMAR.ebnf)
+- [0.21 conformance requirements](./spec/0.21/CONFORMANCE.md)
+- [0.21 unstable consumer boundaries](./spec/0.21/UNSTABLE.md)
 
 - [Transactional event semantics](./spec/0.20/EVENTS.md)
 - [0.20 grammar additions](./spec/0.20/GRAMMAR.ebnf)

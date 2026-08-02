@@ -1,20 +1,21 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
-  ActionDecl, Annotation, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
+  ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
 
 interface Scope {
-  kind: "invariant" | "policy" | "action" | "query";
+  kind: "invariant" | "policy" | "action" | "consumer" | "query";
   entity?: EntityDecl;
   action?: ActionDecl;
+  consumer?: ConsumerDecl;
   query?: QueryDecl;
   policy?: PolicyDecl;
   queryEntity?: EntityDecl;
@@ -29,6 +30,7 @@ interface Symbols {
   events: Map<string, EventDecl>;
   policies: Map<string, PolicyDecl>;
   actions: Map<string, ActionDecl>;
+  consumers: Map<string, ConsumerDecl>;
   queries: Map<string, QueryDecl>;
   workflows: Map<string, WorkflowDecl>;
   fields: Map<string, Map<string, FieldDecl>>;
@@ -96,6 +98,10 @@ function actionId(action: ActionDecl): string {
 
 function eventId(event: EventDecl): string {
   return `event:${String(event.stableId?.value ?? event.name)}`;
+}
+
+function consumerId(consumer: ConsumerDecl): string {
+  return `consumer:${String(consumer.stableId?.value ?? consumer.name)}`;
 }
 
 function policyId(policy: PolicyDecl): string {
@@ -183,17 +189,21 @@ export function analyze(program: Program, source: string, file: string): ModelIR
       name: event.name,
       identity: identity(event.stableId),
       payloadEntityId: entityId(payload),
+      source: event.importedFrom
+        ? { kind: "imported" as const, ...event.importedFrom }
+        : { kind: "local" as const },
       span: irSpan(event.span, file),
       naming: { typescriptName: event.name },
     };
   });
   const policies = [...symbols.policies.values()].map((policy) => lowerPolicy(policy, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
+  const consumers: IRConsumer[] = [...symbols.consumers.values()].map((consumer) => lowerConsumer(consumer, symbols, file));
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
-  const enforcement = buildEnforcement(enums, entities, events, policies, actions, queries, workflows, schema, internalSchema);
+  const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 12,
+    irVersion: 13,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -208,6 +218,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     events,
     policies,
     actions,
+    consumers,
     queries,
     workflows,
     enforcement,
@@ -220,6 +231,7 @@ function collectSymbols(program: Program, file: string): Symbols {
   const events = new Map<string, EventDecl>();
   const policies = new Map<string, PolicyDecl>();
   const actions = new Map<string, ActionDecl>();
+  const consumers = new Map<string, ConsumerDecl>();
   const queries = new Map<string, QueryDecl>();
   const workflows = new Map<string, WorkflowDecl>();
   const top = new Map<string, Declaration>();
@@ -232,6 +244,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     if (declaration.kind === "event") events.set(declaration.name, declaration);
     if (declaration.kind === "policy") policies.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
+    if (declaration.kind === "consumer") consumers.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
     if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
   }
@@ -258,10 +271,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, events, policies, actions, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
+  return { enums, entities, events, policies, actions, consumers, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
+type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "con" | "qry" | "inv" | "exc" | "wfl" | "trn";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -273,8 +286,19 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
   for (const action of symbols.actions.values()) {
     if (action.stableId) validateStableId(action.stableId, "act", stableIds, file);
   }
+  for (const consumer of symbols.consumers.values()) {
+    if (consumer.stableId) validateStableId(consumer.stableId, "con", stableIds, file);
+  }
   for (const event of symbols.events.values()) {
     if (event.stableId) validateStableId(event.stableId, "evt", stableIds, file);
+    if (event.importedFrom) {
+      if (!/^model:[A-Za-z][A-Za-z0-9_.-]*$/.test(event.importedFrom.modelId)) {
+        throw new ModelError("E3105", `Imported event '${event.name}' has invalid model ID '${event.importedFrom.modelId}'.`, event.span, file);
+      }
+      if (!event.importedFrom.modelVersion.length || !/^sha256:[0-9a-f]{64}$/.test(event.importedFrom.sourceHash)) {
+        throw new ModelError("E3106", `Imported event '${event.name}' requires a non-empty version and canonical SHA-256 source hash.`, event.span, file);
+      }
+    }
   }
   for (const policy of symbols.policies.values()) {
     if (policy.stableId) validateStableId(policy.stableId, "pol", stableIds, file);
@@ -404,6 +428,7 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
       pol: "policy",
       pbr: "policy branch",
       act: "action",
+      con: "consumer",
       qry: "query",
       inv: "invariant",
       exc: "exclusion",
@@ -668,6 +693,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   const emittedEventIds = action.emits.map((emission) => {
     const event = symbols.events.get(emission.eventName);
     if (!event) throw new ModelError("E3102", `Action '${action.name}' emits unknown event '${emission.eventName}'.`, emission.span, file);
+    if (event.importedFrom) throw new ModelError("E3107", `Action '${action.name}' cannot emit imported event contract '${event.name}'.`, emission.span, file);
     const payload = symbols.entities.get(event.payloadType.name);
     if (!payload || entityId(payload) !== entityId(effectEntity)) {
       throw new ModelError("E3103", `Event '${event.name}' payload must match action '${action.name}' return entity '${returnEntity.name}'.`, emission.span, file);
@@ -700,6 +726,129 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     lockPlan,
     span: irSpan(action.span, file),
     naming: { sqlFunction: snakeCase(action.name), typescriptMethod: action.name },
+  };
+}
+
+function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): IRConsumer {
+  const semanticId = consumerId(consumer);
+  const event = symbols.events.get(consumer.eventName);
+  if (!event) throw new ModelError("E3201", `Consumer '${consumer.name}' references unknown event '${consumer.eventName}'.`, consumer.eventSpan, file);
+  const payloadEntity = symbols.entities.get(event.payloadType.name)!;
+  if (consumer.payloadParameter.type.collection || consumer.payloadParameter.type.moneyCurrency
+    || consumer.payloadParameter.type.name !== payloadEntity.name) {
+    throw new ModelError("E3202", `Consumer '${consumer.name}' payload parameter must use event '${event.name}' payload entity '${payloadEntity.name}'.`, consumer.payloadParameter.span, file);
+  }
+  const payloadParameter: IRParameter = {
+    id: `parameter:${semanticId}.${consumer.payloadParameter.name}`,
+    name: consumer.payloadParameter.name,
+    type: entityId(payloadEntity),
+    caller: false,
+    span: irSpan(consumer.payloadParameter.span, file),
+    naming: { sqlParameter: "p_envelope", typescriptProperty: consumer.payloadParameter.name },
+  };
+  const scope: Scope = {
+    kind: "consumer",
+    consumer,
+    parameters: new Map([[payloadParameter.name, payloadParameter]]),
+  };
+  const authorizationExpression = typeExpression(consumer.authorize, scope, symbols, file);
+  requireBoolean(authorizationExpression, consumer.authorize.span, file, "Consumer authorization");
+  validateAuthorizationPolicyUse(authorizationExpression, consumer.authorize.span, file);
+  const preconditionNames = new Set<string>();
+  const preconditions = consumer.requires.map((requirement) => {
+    if (preconditionNames.has(requirement.name)) throw new ModelError("E3203", `Duplicate consumer precondition '${requirement.name}'.`, requirement.span, file);
+    preconditionNames.add(requirement.name);
+    const expression = typeExpression(requirement.expression, scope, symbols, file);
+    requireBoolean(expression, requirement.expression.span, file, "Consumer precondition");
+    return {
+      id: `require:${semanticId}.${requirement.name}`,
+      name: requirement.name,
+      expression,
+      sourceExpression: expressionText(requirement.expression),
+      span: irSpan(requirement.span, file),
+    };
+  });
+  const returnEntity = symbols.entities.get(consumer.returnType.name);
+  if (!returnEntity || consumer.returnType.collection || consumer.returnType.moneyCurrency) {
+    throw new ModelError("E3204", `Consumer return type '${consumer.returnType.name}' must be an entity.`, consumer.returnType.span, file);
+  }
+  let effectEntity: EntityDecl;
+  if (consumer.effect.kind === "create") {
+    const entity = symbols.entities.get(consumer.effect.target);
+    if (!entity) throw new ModelError("E3205", `Unknown consumer create target entity '${consumer.effect.target}'.`, consumer.effect.span, file);
+    effectEntity = entity;
+  } else {
+    if (consumer.effect.target !== payloadParameter.name) {
+      throw new ModelError("E3206", `Consumer update target '${consumer.effect.target}' must be its payload parameter '${payloadParameter.name}'.`, consumer.effect.span, file);
+    }
+    effectEntity = payloadEntity;
+  }
+  if (returnEntity.name !== effectEntity.name) {
+    throw new ModelError("E3207", "Consumer return type must match the created or updated entity.", consumer.returnType.span, file);
+  }
+  const effectFields = symbols.fields.get(effectEntity.name)!;
+  const assigned = new Set<string>();
+  const assignments = consumer.effect.assignments.map((assignment) => {
+    if (assigned.has(assignment.field)) throw new ModelError("E3208", `Field '${assignment.field}' is assigned more than once.`, assignment.span, file);
+    assigned.add(assignment.field);
+    const field = effectFields.get(assignment.field);
+    if (!field) throw new ModelError("E2313", `Unknown field '${effectEntity.name}.${assignment.field}'.`, assignment.span, file);
+    if (field.annotations.some((annotation) => annotation.name === "generated")) {
+      throw new ModelError("E2316", `Consumer effects may not assign database-generated field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+    }
+    if (consumer.effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "immutable" || annotation.name === "id")) {
+      throw new ModelError("E2317", `A consumer update may not change immutable field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+    }
+    for (const workflow of symbols.workflows.values()) {
+      if (consumer.effect.kind === "update" && workflow.entityName === effectEntity.name && workflow.fieldName === field.name) {
+        throw new ModelError("E3209", `Consumer '${consumer.name}' cannot update workflow field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+      }
+    }
+    const expression = typeExpression(assignment.expression, scope, symbols, file);
+    ensureAssignable(field, expression, symbols, assignment.expression.span, file);
+    if (field.annotations.some((annotation) => annotation.name === "snapshot")
+      && expression.kind !== "nullLiteral" && expression.kind !== "fieldAccess") {
+      throw new ModelError("E2415", `@snapshot field '${field.name}' must be assigned null or a direct field value.`, assignment.expression.span, file);
+    }
+    return { fieldId: fieldId(effectEntity, field), fieldName: field.name, expression };
+  });
+  if (consumer.effect.kind === "create") {
+    for (const field of effectFields.values()) {
+      if (!field.optional && !field.default
+        && !field.annotations.some((annotation) => annotation.name === "generated")
+        && !assigned.has(field.name)) {
+        throw new ModelError("E2315", `Consumer create effect must assign required field '${effectEntity.name}.${field.name}'.`, consumer.effect.span, file);
+      }
+    }
+  }
+  return {
+    id: semanticId,
+    name: consumer.name,
+    identity: identity(consumer.stableId),
+    sourceEventId: eventId(event),
+    payloadParameter,
+    acceptedPayloadEntityId: entityId(payloadEntity),
+    returnEntityId: entityId(returnEntity),
+    authorization: {
+      id: `authorize:${semanticId}`,
+      name: "authorize",
+      expression: authorizationExpression,
+      sourceExpression: expressionText(consumer.authorize),
+      span: irSpan(consumer.authorize.span, file),
+    },
+    preconditions,
+    effect: { kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
+    lockPlan: consumer.effect.kind === "update"
+      ? [{ id: `lock:${semanticId}.${payloadParameter.name}`, source: payloadParameter.id, parameterId: payloadParameter.id, entityId: entityId(effectEntity), mode: "update", order: 0 }]
+      : [],
+    delivery: {
+      transport: "atLeastOnce",
+      deduplication: "transactionalInbox",
+      duplicateResult: "storedResult",
+      identity: "consumerAndSourceEvent",
+    },
+    span: irSpan(consumer.span, file),
+    naming: { sqlFunction: `consume_${snakeCase(consumer.name)}`, typescriptMethod: consumer.name },
   };
 }
 
@@ -1198,6 +1347,7 @@ function buildEnforcement(
   events: IREvent[],
   policies: IRPolicy[],
   actions: IRAction[],
+  consumers: IRConsumer[],
   queries: IRQuery[],
   workflows: IRWorkflow[],
   schema: string,
@@ -1209,6 +1359,12 @@ function buildEnforcement(
     layer: "PostgreSQL session identity",
     artifact: "postgres/002_schema.sql",
     objectName: `${internalSchema}.principal_binding`,
+  }, {
+    id: "boundary:consumer_role",
+    purpose: "Confine event consumption to a dedicated non-login role with execute-only handler access.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_consumer NOLOGIN",
   }, {
     id: "boundary:dispatcher_role",
     purpose: "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
@@ -1335,6 +1491,24 @@ function buildEnforcement(
     }
     for (const lock of action.lockPlan) entries.push({ id: lock.id, purpose: `Stabilize ${lock.source} before evaluating guards and effects.`, layer: "PostgreSQL row lock", artifact: "postgres/003_actions.sql", objectName: `${lock.mode === "update" ? "FOR UPDATE" : "FOR SHARE"} in ${fn}` });
   }
+  for (const consumer of consumers) {
+    entries.push({
+      id: consumer.id,
+      purpose: `Consume ${consumer.sourceEventId} with transactional inbox deduplication and one local committed effect.`,
+      layer: "PostgreSQL consumer function",
+      artifact: "postgres/003_consumers.sql",
+      objectName: `${internalSchema}.${consumer.naming.sqlFunction}`,
+      source: consumer.span,
+    });
+    entries.push({
+      id: `inbox:${consumer.id}`,
+      purpose: "Deduplicate one source event per stable consumer identity and replay the committed stored result.",
+      layer: "PostgreSQL transactional inbox",
+      artifact: "postgres/002_schema.sql",
+      objectName: `${internalSchema}.event_inbox`,
+      source: consumer.span,
+    });
+  }
   for (const query of queries) {
     const fn = `${schema}.${query.naming.sqlFunction}`;
     const caller = query.parameters.find((parameter) => parameter.id === query.callerParameterId)!;
@@ -1373,5 +1547,6 @@ function buildEnforcement(
   entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });
   entries.push({ id: "boundary:command_receipts", purpose: "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.", layer: "PostgreSQL receipt boundary", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.command_receipt` });
   entries.push({ id: "boundary:event_outbox", purpose: "Commit domain events atomically with state, audit, evidence, and receipts, then deliver them through private leases with at-least-once semantics.", layer: "PostgreSQL transactional outbox", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.event_outbox` });
+  entries.push({ id: "boundary:event_inbox", purpose: "Commit consumer deduplication, validation, local effect, audit evidence, and stored result atomically.", layer: "PostgreSQL transactional inbox", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.event_inbox` });
   return entries;
 }

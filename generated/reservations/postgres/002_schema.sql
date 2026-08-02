@@ -1,4 +1,4 @@
--- source sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1
+-- source sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;
@@ -25,6 +25,7 @@ CREATE TABLE "model_reservations"."reservation" (
   "reserved_by_id" uuid NOT NULL,
   "starts_at" timestamptz NOT NULL,
   "ends_at" timestamptz NOT NULL,
+  "indexed" boolean NOT NULL DEFAULT FALSE,
   CONSTRAINT "ck_reservation_no_overlapping_reservations_valid_interval" CHECK (("starts_at" < "ends_at") IS TRUE),
   CONSTRAINT "ex_reservation_no_overlapping_reservations" EXCLUDE USING gist ("resource_id" WITH =, pg_catalog.tstzrange("starts_at", "ends_at", '[)') WITH &&)
 );
@@ -363,6 +364,87 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."release_event"(uuid, uuid) FROM PUBLIC;
+CREATE TABLE IF NOT EXISTS "model_reservations_internal"."consumer_audit" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "consumer_id" text NOT NULL,
+  "source_event_id" uuid NOT NULL,
+  "source_event_type" text NOT NULL,
+  "source_model_id" text NOT NULL,
+  "source_model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "target_id" uuid,
+  "decision_outcome" text NOT NULL DEFAULT 'executed',
+  "authorization_rule_id" text NOT NULL,
+  "policy_id" text,
+  "authority_id" text,
+  "decision_evidence" jsonb NOT NULL,
+  "correlation_id" text NOT NULL,
+  "causation_id" text,
+  "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  CONSTRAINT "uq_consumer_audit_event" UNIQUE ("consumer_id", "source_event_id"),
+  CONSTRAINT "ck_consumer_audit_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_consumer_audit_metadata" CHECK ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'))
+);
+CREATE TABLE IF NOT EXISTS "model_reservations_internal"."event_inbox" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "consumer_id" text NOT NULL,
+  "source_event_id" uuid NOT NULL,
+  "source_event_type" text NOT NULL,
+  "source_event_name" text NOT NULL,
+  "source_model_id" text NOT NULL,
+  "source_model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "envelope_hash" text NOT NULL,
+  "payload" jsonb NOT NULL,
+  "correlation_id" text NOT NULL,
+  "causation_id" text,
+  "first_delivery_attempt" integer NOT NULL,
+  "last_delivery_attempt" integer NOT NULL,
+  "status" text NOT NULL DEFAULT 'claimed',
+  "target_id" uuid,
+  "response" jsonb,
+  "consumer_audit_id" bigint REFERENCES "model_reservations_internal"."consumer_audit" ("id"),
+  "claimed_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  "completed_at" timestamptz,
+  CONSTRAINT "uq_event_inbox_identity" UNIQUE ("consumer_id", "source_event_id"),
+  CONSTRAINT "ck_event_inbox_hashes" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$' AND "envelope_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_event_inbox_attempts" CHECK ("first_delivery_attempt" >= 1 AND "last_delivery_attempt" >= "first_delivery_attempt"),
+  CONSTRAINT "ck_event_inbox_status" CHECK (("status" = 'claimed' AND "response" IS NULL AND "completed_at" IS NULL AND "consumer_audit_id" IS NULL) OR ("status" = 'executed' AND "response" IS NOT NULL AND "completed_at" IS NOT NULL AND "consumer_audit_id" IS NOT NULL))
+);
+CREATE TABLE IF NOT EXISTS "model_reservations_internal"."consumer_failure" (
+  "consumer_id" text NOT NULL,
+  "source_event_id" text NOT NULL,
+  "failure_count" integer NOT NULL DEFAULT 1,
+  "last_delivery_attempt" integer NOT NULL,
+  "last_error_code" text NOT NULL,
+  "last_failed_at" timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  PRIMARY KEY ("consumer_id", "source_event_id"),
+  CONSTRAINT "ck_consumer_failure_count" CHECK ("failure_count" >= 1 AND "last_delivery_attempt" >= 1),
+  CONSTRAINT "ck_consumer_failure_code" CHECK ("last_error_code" ~ '^ML_[A-Z_]+$')
+);
+CREATE OR REPLACE FUNCTION "model_reservations_internal"."record_consumer_failure"(p_consumer_id text, p_event_id text, p_delivery_attempt integer, p_error_code text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS consumer_role ON consumer_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE consumer_role.rolname = 'modellang_consumer' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_CONSUMER_REQUIRED';
+  END IF;
+  IF p_consumer_id IS NULL OR p_consumer_id NOT IN ('consumer:con_20d694c9a0a274dc79c6168e47d25968') OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$'
+     OR p_delivery_attempt IS NULL OR p_delivery_attempt < 1 OR p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';
+  END IF;
+  INSERT INTO "model_reservations_internal"."consumer_failure" ("consumer_id", "source_event_id", "last_delivery_attempt", "last_error_code")
+  VALUES (p_consumer_id, p_event_id, p_delivery_attempt, p_error_code)
+  ON CONFLICT ("consumer_id", "source_event_id") DO UPDATE SET
+    "failure_count" = "model_reservations_internal"."consumer_failure"."failure_count" + 1,
+    "last_delivery_attempt" = GREATEST("model_reservations_internal"."consumer_failure"."last_delivery_attempt", EXCLUDED."last_delivery_attempt"),
+    "last_error_code" = EXCLUDED."last_error_code", "last_failed_at" = pg_catalog.clock_timestamp();
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_reservations_internal"."record_consumer_failure"(text, text, integer, text) FROM PUBLIC;
 
 CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -379,6 +461,6 @@ CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Reservations', '0.20.0', 'sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1', 'installation');
+VALUES ('model:Reservations', '0.21.0', 'sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca', 'installation');
 RESET ROLE;
 

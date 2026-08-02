@@ -43,6 +43,104 @@ describe("lexer and parser", () => {
 });
 
 describe("semantic analysis", () => {
+  it("lowers typed event consumers into canonical IR13 delivery semantics", () => {
+    const ir = compileText(minimal(`event ItemChanged payload Item;
+      consumer observeItem on ItemChanged(payload item: Item) -> Item {
+        authorize true;
+        require nonnegative: item.value >= 0;
+        update item { optionalFlag = true; }
+      }
+      action touch(caller actor: User, item: Item) -> Item {
+        authorize true;
+        update item { optionalFlag = false; }
+      }`));
+    expect(ir.irVersion).toBe(13);
+    expect(ir.consumers).toEqual([expect.objectContaining({
+      id: "consumer:observeItem",
+      sourceEventId: "event:ItemChanged",
+      acceptedPayloadEntityId: "entity:Item",
+      delivery: {
+        transport: "atLeastOnce",
+        deduplication: "transactionalInbox",
+        identity: "consumerAndSourceEvent",
+        duplicateResult: "storedResult",
+      },
+      effect: expect.objectContaining({ kind: "update", target: "item" }),
+    })]);
+  });
+
+  it.each([
+    ["unknown event", "Missing", "Item", "E3201"],
+    ["wrong event payload", "ItemChanged", "User", "E3202"],
+  ])("rejects a consumer with %s", (_label, eventName, payloadType, code) => {
+    expect(failure(minimal(`event ItemChanged payload Item;
+      consumer observeItem on ${eventName}(payload item: ${payloadType}) -> Item {
+        authorize true;
+        update item { optionalFlag = true; }
+      }
+      action touch(caller actor: User, item: Item) -> Item {
+        authorize true;
+        update item { optionalFlag = false; }
+      }`)).code).toBe(code);
+  });
+
+  it("rejects emitting an imported event contract", () => {
+    expect(failure(minimal(`event ImportedChanged payload Item
+        from "model:Source" version "1.0.0" sourceHash "sha256:${"a".repeat(64)}";
+      action change(caller actor: User, item: Item) -> Item {
+        authorize true;
+        update item { optionalFlag = true; }
+        emit ImportedChanged;
+    }`)).code).toBe("E3107");
+  });
+
+  it("preserves an exact imported event source contract for consumption", () => {
+    const hash = `sha256:${"b".repeat(64)}`;
+    const ir = compileText(minimal(`event ImportedChanged payload Item
+        from "model:Source" version "1.2.3" sourceHash "${hash}";
+      consumer observeImported on ImportedChanged(payload item: Item) -> Item {
+        authorize true;
+        update item { optionalFlag = true; }
+      }
+      action touch(caller actor: User, item: Item) -> Item {
+        authorize true;
+        update item { optionalFlag = false; }
+      }`));
+    expect(ir.events[0]!.source).toEqual({
+      kind: "imported",
+      modelId: "model:Source",
+      modelVersion: "1.2.3",
+      sourceHash: hash,
+    });
+    expect(ir.consumers[0]!.sourceEventId).toBe(ir.events[0]!.id);
+  });
+
+  it("rejects a consumer effect that bypasses a declared workflow field", () => {
+    expect(failure(`model ConsumerWorkflow version "1";
+      enum State { DRAFT, DONE }
+      entity User { id: UUID @id; }
+      entity Task { id: UUID @id; state: State = State.DRAFT; }
+      event TaskCreated payload Task;
+      action open(caller actor: User, id: UUID) -> Task {
+        authorize true;
+        create Task { id = id; state = State.DRAFT; }
+        emit TaskCreated;
+      }
+      action finish(caller actor: User, task: Task) -> Task {
+        authorize true;
+        require is_draft: task.state == State.DRAFT;
+        update task { state = State.DONE; }
+      }
+      consumer skip on TaskCreated(payload task: Task) -> Task {
+        authorize true;
+        update task { state = State.DONE; }
+      }
+      workflow Lifecycle for Task.state {
+        initial State.DRAFT;
+        transition finish: State.DRAFT -> State.DONE by finish;
+      }`).code).toBe("E3209");
+  });
+
   it("lowers required action idempotency as execution metadata outside the callable ABI", () => {
     const ir = compileText(minimal(`action createItem(caller actor: User, id: UUID) -> Item {
       authorize true;
@@ -83,7 +181,7 @@ describe("semantic analysis", () => {
         require still_allowed: MayManage(actor, item);
         update item { value = 2; }
       }`, "policy.model");
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(ir.policies).toEqual([
       expect.objectContaining({
         id: "policy:MayManage",
@@ -145,7 +243,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -265,7 +363,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -335,7 +433,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -368,7 +466,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -472,7 +570,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -551,7 +649,7 @@ workflow TaskLifecycle for Task.state {
 describe("ModelLang 0.9 workflows", () => {
   it("lowers initial state, action-backed transitions, and enforcement targets into the current IR", () => {
     const ir = compileText(workflowModel, "workflow.model");
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(ir.workflows).toEqual([
       expect.objectContaining({
         id: "workflow:TaskLifecycle",
@@ -647,9 +745,9 @@ action make(caller actor: User) -> Record {
   emit ${emission};
 }`;
 
-  it("lowers stable typed events and ordered action emissions into IR12", () => {
+  it("preserves stable typed events and ordered action emissions in the current IR", () => {
     const ir = compileText(eventModel(), "events.model");
-    expect(ir.irVersion).toBe(12);
+    expect(ir.irVersion).toBe(13);
     expect(ir.events).toEqual([expect.objectContaining({
       id: "event:evt_11111111111111111111111111111111",
       name: "RecordChanged",

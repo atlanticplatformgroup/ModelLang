@@ -116,7 +116,7 @@ action make(caller actor: User) -> Record { authorize MayCreate(actor); create R
     const assigned = assignStableIds(source, "policy-ids.model", (kind) => {
       const prefix: Record<StableIdKind, string> = {
         entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
-        action: "act", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
+        action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
       };
       return `${prefix[kind]}_${kind === "policy" ? "a" : kind === "policyBranch" ? "b" : "c".repeat(1)}${"0".repeat(31)}`;
     });
@@ -183,7 +183,7 @@ workflow TaskLifecycle for Task.state {
 }`;
     const prefix: Record<StableIdKind, string> = {
       entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
-      action: "act", query: "qry", invariant: "inv", exclusion: "exc",
+      action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
     let sequence = 0;
@@ -217,6 +217,10 @@ action reserve(caller actor: User, id: UUID, resource: Resource, startsAt: DateT
   create Booking { id = id; resource = resource; startsAt = startsAt; endsAt = endsAt; state = State.OPEN; }
   emit BookingCreated;
 }
+consumer closeAfterCreate on BookingCreated(payload booking: Booking) -> Booking {
+  authorize true;
+  update booking { state = State.CLOSED; }
+}
 query bookings(caller actor: User) from Booking as booking {
   authorize true;
   where true;
@@ -227,7 +231,7 @@ query bookings(caller actor: User) from Booking as booking {
     const counters = new Map<StableIdKind, number>();
     const prefixes: Record<StableIdKind, string> = {
       entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
-      action: "act", query: "qry", invariant: "inv", exclusion: "exc",
+      action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
     const assigned = assignStableIds(source, "complete.model", (kind) => {
@@ -237,9 +241,9 @@ query bookings(caller actor: User) from Booking as booking {
       return `${prefixes[kind]}_${next.toString(16).padStart(32, "0")}`;
     });
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
-      "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "query",
+      "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(12);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(13);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -333,10 +337,39 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
-  it("accepts released IR9, IR10, and IR11 artifacts as previous baselines for an IR12 migration", () => {
+  it("plans a new stable consumer as an additive guarded boundary", () => {
+    const source = (version: string, consumer: boolean) => `model ConsumerEvolution version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  observed: Boolean = false @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record;
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Record {
+  authorize true;
+  create Record { id = id; }
+  emit RecordCreated;
+}
+${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") on RecordCreated(payload record: Record) -> Record {
+  authorize true;
+  update record { observed = true; }
+}` : ""}`;
+    const plan = planMigration(compileText(source("1", false)), compileText(source("2", true)));
+    expect(plan.operations).toContainEqual({
+      kind: "addConsumer",
+      consumerId: "consumer:con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      name: "observe",
+    });
+    expect(plan.sql).toContain("consume_observe");
+    expect(plan.sql).toContain("event_inbox");
+  });
+
+  it("accepts released IR9 through IR12 artifacts as previous baselines for an IR13 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11]) {
+    for (const irVersion of [9, 10, 11, 12]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
       if (irVersion === 9) delete legacy.policies;

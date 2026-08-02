@@ -18,7 +18,7 @@
             "strategy": { "const": "explicitStableId" },
             "stableId": {
               "type": "string",
-              "pattern": "^(ent|fld|enm|emv|evt|pol|pbr|act|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
+              "pattern": "^(ent|fld|enm|emv|evt|pol|pbr|act|con|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
             }
           },
           "additionalProperties": false
@@ -169,6 +169,36 @@
         }
       }
     },
+    "consumer": {
+      "type": "object",
+      "required": ["id", "name", "identity", "sourceEventId", "payloadParameter", "acceptedPayloadEntityId", "returnEntityId", "authorization", "preconditions", "effect", "lockPlan", "delivery", "span", "naming"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^consumer:" },
+        "name": { "type": "string" },
+        "identity": { "$ref": "#/$defs/identity" },
+        "sourceEventId": { "type": "string", "pattern": "^event:" },
+        "payloadParameter": { "type": "object" },
+        "acceptedPayloadEntityId": { "type": "string", "pattern": "^entity:" },
+        "returnEntityId": { "type": "string", "pattern": "^entity:" },
+        "authorization": { "type": "object" },
+        "preconditions": { "type": "array" },
+        "effect": { "type": "object" },
+        "lockPlan": { "type": "array" },
+        "delivery": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["transport", "deduplication", "duplicateResult", "identity"],
+          "properties": {
+            "transport": { "const": "atLeastOnce" },
+            "deduplication": { "const": "transactionalInbox" },
+            "duplicateResult": { "const": "storedResult" },
+            "identity": { "const": "consumerAndSourceEvent" }
+          }
+        },
+        "span": { "type": "object" },
+        "naming": { "type": "object" }
+      }
+    },
     "policyBranch": {
       "type": "object",
       "required": ["id", "name", "identity", "expression", "sourceExpression", "span"],
@@ -233,9 +263,9 @@
     }
   },
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "queries", "workflows", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 12 },
+    "irVersion": { "const": 13 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -272,12 +302,33 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "identity", "payloadEntityId", "span", "naming"],
+        "required": ["id", "name", "identity", "payloadEntityId", "source", "span", "naming"],
         "properties": {
           "id": { "type": "string", "pattern": "^event:" },
           "name": { "type": "string" },
           "identity": { "$ref": "#/$defs/identity" },
           "payloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["kind"],
+                "properties": { "kind": { "const": "local" } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["kind", "modelId", "modelVersion", "sourceHash"],
+                "properties": {
+                  "kind": { "const": "imported" },
+                  "modelId": { "type": "string", "pattern": "^model:" },
+                  "modelVersion": { "type": "string", "minLength": 1 },
+                  "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
           "span": { "type": "object" },
           "naming": { "type": "object" }
         }
@@ -285,6 +336,7 @@
     },
     "policies": { "type": "array", "items": { "$ref": "#/$defs/policy" } },
     "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
+    "consumers": { "type": "array", "items": { "$ref": "#/$defs/consumer" } },
     "queries": { "type": "array", "items": { "$ref": "#/$defs/query" } },
     "workflows": { "type": "array", "items": { "$ref": "#/$defs/workflow" } },
     "enforcement": { "type": "array" }

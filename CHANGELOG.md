@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0
+
+- Added stable typed `consumer ... on Event(payload value: Entity)` declarations plus exact imported event-source contracts, preserved in canonical IR13 with authorization, requirements, locks, effects, and duplicate-handling identity.
+- Added an isolated `modellang_consumer` boundary with strict closed-envelope and typed-payload validation, transactional inbox deduplication, exact committed-result replay, private consumer audit/evidence, and bounded failure telemetry.
+- Serialized equivalent concurrent deliveries by stable consumer ID plus event instance ID, rejected changed-envelope reuse with `ML_EVENT_CONFLICT`, and made inbox claim, local effect, evidence, completion, and result roll back together.
+- Added broker-neutral server TypeScript adapters and explicitly retained at-least-once network delivery; polling, acknowledgement, retries, dead letters, retention, and transport selection remain host-owned.
+- Advanced engineering semantic manifest to v5, event manifest to v2, and semantic diff to v6 while keeping operation manifest v4, capability manifest v3, UI manifest v4, decision plan v2, stable HTTP routes, and public privacy boundaries unchanged.
+- Added IR9–IR12 evolution normalization, guarded consumer evolution, and the baseline-checked idempotent `011_upgrade_0_21.sql` without historical consumption or fabricated completion.
+- Updated Procurement and Reservations with duplicate-safe local consumers plus golden, compiler, schema, privilege, conflict, concurrency, rollback, failure, migration, and live PostgreSQL coverage.
+
 ## 0.20.0
 
 - Added stable typed `event ... payload Entity;` declarations and post-effect `emit Event;` clauses, preserved in canonical IR12 and validated against action result types.

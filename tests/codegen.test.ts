@@ -181,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 4,
+      manifestVersion: 5,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 12 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 13 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -224,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 12 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 13 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -459,13 +459,21 @@ describe("backends", () => {
         id: UUID @id @generated(uuid);
         createdAt: DateTime @generated(now);
       }
+      entity Receipt { id: UUID @id @generated(uuid); }
+      event TokenIssued payload Token;
       action issue(caller actor: User) -> Token {
         authorize true;
         create Token { }
+        emit TokenIssued;
+      }
+      consumer recordIssue on TokenIssued(payload token: Token) -> Receipt {
+        authorize true;
+        create Receipt { }
       }`;
-    const sql = generateAll(compileText(source, "tokens.model"))["postgres/003_actions.sql"];
-    expect(sql).toContain('INSERT INTO "model_tokens"."token" DEFAULT VALUES');
-    expect(sql).toContain("RETURNING * INTO v_result");
+    const output = generateAll(compileText(source, "tokens.model"));
+    expect(output["postgres/003_actions.sql"]).toContain('INSERT INTO "model_tokens"."token" DEFAULT VALUES');
+    expect(output["postgres/003_actions.sql"]).toContain("RETURNING * INTO v_result");
+    expect(output["postgres/003_consumers.sql"]).toContain('INSERT INTO "model_tokens"."receipt" DEFAULT VALUES RETURNING * INTO v_result');
   });
 
   it("lowers null checks as IS NULL and never = NULL", () => {
@@ -621,7 +629,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.20.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.21.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -645,7 +653,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(contract), JSON.stringify(validate.errors)).toBe(true);
     expect(contract).toMatchObject({
-      eventManifestVersion: 1,
+      eventManifestVersion: 2,
       delivery: { semantics: "atLeastOnce", storage: "privateTransactionalOutbox", acknowledgement: "leaseToken" },
     });
     expect(contract.events).toHaveLength(3);
@@ -659,5 +667,48 @@ describe("backends", () => {
     expect(output["typescript/events.ts"]).toContain("export type RequestOpenedEvent");
     expect(output["typescript/index.ts"]).toContain('export * from "./events.js"');
     expect(output["model.mmd"]).toContain("emits atomically");
+  });
+
+  it("generates private transactional inbox consumers without widening public discovery", async () => {
+    const output = generateAll(await procurement());
+    const semantic = JSON.parse(output["semantic.json"]!) as { consumers: { name: string }[] };
+    expect(semantic.consumers).toEqual([expect.objectContaining({ name: "observeRequestApproval" })]);
+    for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json"]) {
+      expect(output[publicArtifact]).not.toContain("observeRequestApproval");
+      expect(output[publicArtifact]).not.toContain("event_inbox");
+    }
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_consumer NOLOGIN");
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_inbox"');
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_audit"');
+    expect(output["postgres/003_consumers.sql"]).toContain('ON CONFLICT ("consumer_id", "source_event_id") DO NOTHING');
+    expect(output["postgres/003_consumers.sql"]).toContain("p_envelope - 'deliveryAttempt'");
+    expect(output["postgres/003_consumers.sql"]).toContain("ML_EVENT_CONFLICT");
+    expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."consume_observe_request_approval"');
+    expect(output["typescript/consumers.ts"]).toContain("consumeObserveRequestApproval");
+    expect(output["typescript/consumers.ts"]).toContain("record_consumer_failure");
+    expect(output["postgres/011_upgrade_0_21.sql"]).toContain("reliable typed event-consumer upgrade");
+
+    const sourceHash = `sha256:${"c".repeat(64)}`;
+    const imported = generateAll(compileText(`model ImportedConsumer version "1";
+      entity User { id: UUID @id; }
+      entity Item { id: UUID @id; observed: Boolean = false; }
+      event ItemChanged payload Item from "model:Producer" version "2.3.4" sourceHash "${sourceHash}";
+      action touch(caller actor: User, item: Item) -> Item {
+        authorize true;
+        update item { observed = false; }
+      }
+      consumer observe on ItemChanged(payload item: Item) -> Item {
+        authorize true;
+        update item { observed = true; }
+      }`, "imported-consumer.model"));
+    expect(JSON.parse(imported["events.json"]!).events[0].source).toEqual({
+      kind: "imported",
+      modelId: "model:Producer",
+      modelVersion: "2.3.4",
+      sourceHash,
+    });
+    expect(imported["postgres/003_consumers.sql"]).toContain("v_source_model_id IS DISTINCT FROM 'model:Producer'");
+    expect(imported["postgres/003_consumers.sql"]).toContain(`v_source_hash IS DISTINCT FROM '${sourceHash}'`);
+    expect(imported["typescript/events.ts"]).toContain(`"model:Producer", "2.3.4", "${sourceHash}"`);
   });
 });

@@ -11,6 +11,8 @@ import {
   type ProcurementAuthenticator,
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
+import { consumeObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
+import type { RequestApprovedEvent } from "../../generated/procurement/typescript/events.js";
 import {
   createProcurementUiExecutor,
   createProcurementUiWorkflowExecutor,
@@ -34,6 +36,7 @@ const clients = {
 };
 let admin: Pool;
 let gateway: Pool;
+let consumer: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -94,7 +97,8 @@ beforeAll(async () => {
   const finance = poolFor("ml_finance");
   const unbound = poolFor("ml_unbound");
   gateway = new Pool({ connectionString: loginUrl("ml_gateway"), max: 1 });
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway);
+  consumer = poolFor("ml_consumer");
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -180,7 +184,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.20.0",
+      model_version: "0.21.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -303,6 +307,104 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     } finally {
       await dispatcher.end();
     }
+  });
+
+  it("serializes duplicate event delivery, replays the committed result, and keeps inbox state private", async () => {
+    const request = await submittedRequest("82");
+    const approved = await clients.manager.approveRequest({ request });
+    expect(approved.approvalObserved).toBe(false);
+    const dispatcher = new Client({ connectionString: loginUrl("ml_dispatcher") });
+    await dispatcher.connect();
+    try {
+      const claimed = await dispatcher.query<{ claim_events: RequestApprovedEvent & { leaseToken: string } }>(
+        "SELECT model_procurement_internal.claim_events(1000, 60)",
+      );
+      const target = claimed.rows.map((row) => row.claim_events).find((event) =>
+        event.targetId === request && event.eventId === "event:evt_30d694c9a0a274dc79c6168e47d25968")!;
+      expect(target).toBeTruthy();
+      for (const event of claimed.rows.map((row) => row.claim_events)) {
+        if (event.id !== target.id) {
+          await dispatcher.query("SELECT model_procurement_internal.release_event($1, $2)", [event.id, event.leaseToken]);
+        }
+      }
+      const { leaseToken, ...envelope } = target;
+      await expect(consumer.query(
+        "SELECT model_procurement_internal.consume_observe_request_approval($1::jsonb)",
+        [{ ...envelope, deliveryAttempt: "1" }],
+      )).rejects.toMatchObject({ code: "22023", message: expect.stringContaining("ML_EVENT_ENVELOPE") });
+      await expect(consumer.query(
+        "SELECT model_procurement_internal.consume_observe_request_approval($1::jsonb)",
+        [{ ...envelope, payload: { ...envelope.payload, amount: { currency: "USD", amount: "1e3" } } }],
+      )).rejects.toMatchObject({ code: "22023", message: expect.stringContaining("ML_EVENT_PAYLOAD") });
+      const [first, equivalent] = await Promise.all([
+        consumeObserveRequestApproval(consumer, envelope),
+        consumeObserveRequestApproval(consumer, envelope),
+      ]);
+      expect(first).toEqual(equivalent);
+      expect(first).toMatchObject({ id: request, status: "APPROVED", approvalObserved: true });
+      expect(await consumeObserveRequestApproval(consumer, { ...envelope, deliveryAttempt: 2 })).toEqual(first);
+
+      const conflict = await consumeObserveRequestApproval(consumer, {
+        ...envelope,
+        payload: { ...envelope.payload, approvalObserved: true },
+      }).catch((error: unknown) => error as { code?: string; message?: string });
+      expect(conflict).toMatchObject({ code: "40001", message: expect.stringContaining("ML_EVENT_CONFLICT") });
+
+      await expect(consumer.query("SELECT * FROM model_procurement_internal.event_inbox"))
+        .rejects.toMatchObject({ code: "42501" });
+      await expect(gateway.query(
+        "SELECT model_procurement_internal.consume_observe_request_approval($1::jsonb)",
+        [envelope],
+      )).rejects.toMatchObject({ code: "42501" });
+      const evidence = await admin.query<{ inboxes: string; audits: string; failures: string; attempt: number }>(`
+        SELECT
+          (SELECT count(*)::text FROM model_procurement_internal.event_inbox WHERE source_event_id = $1) AS inboxes,
+          (SELECT count(*)::text FROM model_procurement_internal.consumer_audit WHERE source_event_id = $1) AS audits,
+          (SELECT count(*)::text FROM model_procurement_internal.consumer_failure WHERE source_event_id = $1::text) AS failures,
+          (SELECT last_delivery_attempt FROM model_procurement_internal.event_inbox WHERE source_event_id = $1) AS attempt
+      `, [envelope.id]);
+      expect(evidence.rows[0]).toEqual({ inboxes: "1", audits: "1", failures: "1", attempt: 2 });
+      await dispatcher.query("SELECT model_procurement_internal.ack_event($1, $2)", [target.id, leaseToken]);
+    } finally {
+      await dispatcher.end();
+    }
+  });
+
+  it("rolls back inbox claim, handler effect, audit, and result as one consumer transaction", async () => {
+    const request = await submittedRequest("83");
+    await clients.manager.approveRequest({ request });
+    const eventResult = await admin.query<{ envelope: RequestApprovedEvent }>(`
+      SELECT pg_catalog.jsonb_build_object(
+        'id', id, 'eventId', event_id, 'eventName', event_name, 'modelId', model_id,
+        'modelVersion', model_version, 'sourceHash', source_hash, 'actionId', action_id,
+        'targetId', target_id, 'payload', payload, 'correlationId', correlation_id,
+        'causationId', causation_id, 'occurredAt', occurred_at, 'ordinal', ordinal,
+        'deliveryAttempt', 1
+      ) AS envelope
+      FROM model_procurement_internal.event_outbox
+      WHERE target_id = $1 AND event_id = 'event:evt_30d694c9a0a274dc79c6168e47d25968'
+    `, [request]);
+    const envelope = eventResult.rows[0]!.envelope;
+    const connection = new Client({ connectionString: loginUrl("ml_consumer") });
+    await connection.connect();
+    try {
+      await connection.query("BEGIN");
+      await consumeObserveRequestApproval(connection, envelope);
+      await connection.query("ROLLBACK");
+    } finally {
+      await connection.end();
+    }
+    const rolledBack = await admin.query<{ observed: boolean; inboxes: string; audits: string }>(`
+      SELECT
+        (SELECT approval_observed FROM model_procurement.purchase_request WHERE id = $1) AS observed,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox WHERE source_event_id = $2) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_audit WHERE source_event_id = $2) AS audits
+    `, [request, envelope.id]);
+    expect(rolledBack.rows[0]).toEqual({ observed: false, inboxes: "0", audits: "0" });
+    await expect(consumeObserveRequestApproval(consumer, envelope)).resolves.toMatchObject({
+      id: request,
+      approvalObserved: true,
+    });
   });
 
   it("rejects changed retry inputs without disclosing the stored result", async () => {
@@ -659,6 +761,29 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       SELECT
         (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the transactional 0.21 consumer upgrade without changing effects, inboxes, or history", async () => {
+    const before = await admin.query<{ requests: string; inboxes: string; audits: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_audit) AS audits,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/011_upgrade_0_21.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; inboxes: string; audits: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_audit) AS audits,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);

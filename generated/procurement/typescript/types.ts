@@ -45,6 +45,7 @@ export interface PurchaseRequest {
   approvedBy: string | null;
   /** Stored point-in-time snapshot; it is not re-derived from a related entity. */
   approvedByRoles: Role[] | null;
+  approvalObserved: boolean;
 }
 
 export interface OpenRequestInput {

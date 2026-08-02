@@ -1,4 +1,4 @@
-model Procurement version "0.20.0";
+model Procurement version "0.21.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -26,6 +26,7 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
   status: RequestStatus = RequestStatus.DRAFT @stableId("fld_afb1dee14dfa48c98961fdb40e2b0be2");
   approvedBy: User? @stableId("fld_5da56f04460f4deba9ccda4f552c2b97");
   approvedByRoles: Set<Role>? @snapshot @stableId("fld_577b4c94c9cd4b469aded37614712fba");
+  approvalObserved: Boolean = false @stableId("fld_677b4c94c9cd4b469aded37614712fba");
 
   invariant approval_fields_match_status @stableId("inv_b70e8aa03e6d498f8b0bccf413636b19"):
     (
@@ -121,6 +122,17 @@ action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
     approvedByRoles = actor.roles;
   }
   emit RequestApproved;
+}
+
+consumer observeRequestApproval @stableId("con_10d694c9a0a274dc79c6168e47d25968") on RequestApproved(
+  payload request: PurchaseRequest
+) -> PurchaseRequest {
+  authorize true;
+  require is_approved: request.status == RequestStatus.APPROVED;
+
+  update request {
+    approvalObserved = true;
+  }
 }
 
 workflow PurchaseRequestLifecycle @stableId("wfl_96a1115ba9bf42f2a206374822eeaa87") for PurchaseRequest.status {

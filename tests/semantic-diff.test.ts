@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 5,
-      compilerVersion: "0.20.0",
-      irVersion: 12,
+      diffVersion: 6,
+      compilerVersion: "0.21.0",
+      irVersion: 13,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -140,6 +140,40 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
       kind: "emittedEventsChanged",
       area: "eventDelivery",
       classification: "review",
+    }));
+  });
+
+  it("tracks consumer additions and fails review-sensitive handler changes closed", () => {
+    const source = (version: string, authorization: string | null) => `model ConsumerDiff version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  observed: Boolean = false @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record;
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Record {
+  authorize true;
+  create Record { id = id; }
+  emit RecordCreated;
+}
+${authorization === null ? "" : `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") on RecordCreated(payload record: Record) -> Record {
+  authorize ${authorization};
+  update record { observed = true; }
+}`}`;
+    const without = compileText(source("1", null));
+    const added = compileText(source("2", "true"));
+    expect(semanticDiff(without, added).changes).toContainEqual(expect.objectContaining({
+      kind: "declarationAdded",
+      area: "eventConsumption",
+      classification: "additive",
+      subject: expect.objectContaining({ kind: "consumer" }),
+    }));
+    expect(semanticDiff(added, compileText(source("3", "false"))).changes).toContainEqual(expect.objectContaining({
+      kind: "consumerAuthorizationChanged",
+      area: "authorization",
+      classification: "restrictive",
     }));
   });
 });

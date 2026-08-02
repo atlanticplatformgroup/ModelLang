@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.20.0",
-    "description": "Generated from ModelLang operation manifest v4 (sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4)."
+    "version": "0.21.0",
+    "description": "Generated from ModelLang operation manifest v4 (sha256:4e220226a36b53f1f7b4c07832805b191a425c721c61b5a77b2e767d4d5638ec)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1086,7 +1086,8 @@
           "amount",
           "status",
           "approvedBy",
-          "approvedByRoles"
+          "approvedByRoles",
+          "approvalObserved"
         ],
         "properties": {
           "id": {
@@ -1149,6 +1150,9 @@
               }
             ],
             "description": "Stored point-in-time snapshot."
+          },
+          "approvalObserved": {
+            "type": "boolean"
           }
         }
       },

@@ -7,7 +7,7 @@ export const demoPassword = process.env.MODELLANG_DEMO_PASSWORD ?? "modellang-de
 
 export const demoRoles = [
   "ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound",
-  "ml_reserver_one", "ml_reserver_two", "ml_gateway", "ml_dispatcher",
+  "ml_reserver_one", "ml_reserver_two", "ml_gateway", "ml_dispatcher", "ml_consumer",
 ] as const;
 
 export function loginUrl(role: typeof demoRoles[number]): string {
@@ -34,7 +34,7 @@ export async function resetGeneratedSchemas(): Promise<void> {
 
 export async function applyGeneratedSql(options: { includeSeed?: boolean; directory?: string } = {}): Promise<void> {
   const directory = resolve(options.directory ?? "generated/procurement/postgres");
-  const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "003_queries.sql", "003_decisions.sql", "004_grants.sql"];
+  const files = ["001_roles.sql", "002_schema.sql", "003_actions.sql", "003_consumers.sql", "003_queries.sql", "003_decisions.sql", "004_grants.sql"];
   if (options.includeSeed) files.push("005_seed.sql");
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
@@ -63,12 +63,16 @@ $provision$;`);
       await client.query(`ALTER ROLE "${role}" LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${demoPassword.replaceAll("'", "''")}'`);
       await client.query(`REVOKE modellang_gateway FROM "${role}"`);
       await client.query(`REVOKE modellang_dispatcher FROM "${role}"`);
+      await client.query(`REVOKE modellang_consumer FROM "${role}"`);
       if (role === "ml_gateway") {
         await client.query(`REVOKE modellang_app FROM "${role}"`);
         await client.query(`GRANT modellang_gateway TO "${role}"`);
       } else if (role === "ml_dispatcher") {
         await client.query(`REVOKE modellang_app FROM "${role}"`);
         await client.query(`GRANT modellang_dispatcher TO "${role}"`);
+      } else if (role === "ml_consumer") {
+        await client.query(`REVOKE modellang_app FROM "${role}"`);
+        await client.query(`GRANT modellang_consumer TO "${role}"`);
       } else {
         await client.query(`GRANT modellang_app TO "${role}"`);
       }

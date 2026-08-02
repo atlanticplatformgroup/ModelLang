@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 4,
-  "profile": "sml-transactional-core/4",
+  "manifestVersion": 5,
+  "profile": "sml-transactional-core/5",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.20.0",
-    "irVersion": 12,
+    "compilerVersion": "0.21.0",
+    "irVersion": 13,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.20.0",
-    "sourceHash": "sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4",
+    "version": "0.21.0",
+    "sourceHash": "sha256:4e220226a36b53f1f7b4c07832805b191a425c721c61b5a77b2e767d4d5638ec",
     "sourceFile": "examples/procurement.model"
   },
   "principal": {
@@ -31,9 +31,9 @@
       "name": "ApprovalAuthority",
       "source": {
         "file": "examples/procurement.model",
-        "line": 62,
+        "line": 63,
         "column": 1,
-        "endLine": 70,
+        "endLine": 71,
         "endColumn": 2
       },
       "parameters": [
@@ -110,9 +110,9 @@
           "sourceExpression": "((request.amount <= USD 10000) and (Role.MANAGER in actor.roles))",
           "source": {
             "file": "examples/procurement.model",
-            "line": 66,
+            "line": 67,
             "column": 3,
-            "endLine": 67,
+            "endLine": 68,
             "endColumn": 65
           },
           "dependencies": [
@@ -198,9 +198,9 @@
           "sourceExpression": "((request.amount > USD 10000) and (Role.FINANCE in actor.roles))",
           "source": {
             "file": "examples/procurement.model",
-            "line": 68,
+            "line": 69,
             "column": 3,
-            "endLine": 69,
+            "endLine": 70,
             "endColumn": 64
           },
           "dependencies": [
@@ -247,9 +247,9 @@
       "name": "openRequest",
       "source": {
         "file": "examples/procurement.model",
-        "line": 74,
+        "line": 75,
         "column": 1,
-        "endLine": 93,
+        "endLine": 94,
         "endColumn": 2
       },
       "caller": {
@@ -363,9 +363,9 @@
         "sourceExpression": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
         "source": {
           "file": "examples/procurement.model",
-          "line": 79,
+          "line": 80,
           "column": 5,
-          "endLine": 81,
+          "endLine": 82,
           "endColumn": 35
         },
         "dependencies": [
@@ -420,9 +420,9 @@
           "sourceExpression": "(amount > USD 0)",
           "source": {
             "file": "examples/procurement.model",
-            "line": 82,
+            "line": 83,
             "column": 3,
-            "endLine": 82,
+            "endLine": 83,
             "endColumn": 43
           },
           "dependencies": [
@@ -537,9 +537,9 @@
       "name": "submitRequest",
       "source": {
         "file": "examples/procurement.model",
-        "line": 95,
+        "line": 96,
         "column": 1,
-        "endLine": 106,
+        "endLine": 107,
         "endColumn": 2
       },
       "caller": {
@@ -591,9 +591,9 @@
         "sourceExpression": "(actor == request.requester)",
         "source": {
           "file": "examples/procurement.model",
-          "line": 99,
+          "line": 100,
           "column": 13,
-          "endLine": 99,
+          "endLine": 100,
           "endColumn": 39
         },
         "dependencies": [
@@ -641,9 +641,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "source": {
             "file": "examples/procurement.model",
-            "line": 100,
+            "line": 101,
             "column": 3,
-            "endLine": 100,
+            "endLine": 101,
             "endColumn": 59
           },
           "dependencies": [
@@ -740,9 +740,9 @@
       "name": "approveRequest",
       "source": {
         "file": "examples/procurement.model",
-        "line": 108,
+        "line": 109,
         "column": 1,
-        "endLine": 124,
+        "endLine": 125,
         "endColumn": 2
       },
       "caller": {
@@ -824,9 +824,9 @@
         "sourceExpression": "((actor != request.requester) and ApprovalAuthority(actor, request))",
         "source": {
           "file": "examples/procurement.model",
-          "line": 113,
+          "line": 114,
           "column": 5,
-          "endLine": 114,
+          "endLine": 115,
           "endColumn": 42
         },
         "dependencies": [
@@ -878,9 +878,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "source": {
             "file": "examples/procurement.model",
-            "line": 116,
+            "line": 117,
             "column": 3,
-            "endLine": 116,
+            "endLine": 117,
             "endColumn": 67
           },
           "dependencies": [
@@ -998,15 +998,148 @@
       ]
     }
   ],
+  "consumers": [
+    {
+      "id": "consumer:con_10d694c9a0a274dc79c6168e47d25968",
+      "name": "observeRequestApproval",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 127,
+        "column": 1,
+        "endLine": 136,
+        "endColumn": 2
+      },
+      "sourceEventId": "event:evt_30d694c9a0a274dc79c6168e47d25968",
+      "acceptedPayloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+      "output": {
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "cardinality": "one"
+      },
+      "authorization": {
+        "id": "authorize:consumer:con_10d694c9a0a274dc79c6168e47d25968",
+        "name": "authorize",
+        "expression": {
+          "kind": "literal",
+          "value": true,
+          "type": "Boolean",
+          "nullable": false
+        },
+        "sourceExpression": "true",
+        "source": {
+          "file": "examples/procurement.model",
+          "line": 130,
+          "column": 13,
+          "endLine": 130,
+          "endColumn": 17
+        },
+        "dependencies": []
+      },
+      "preconditions": [
+        {
+          "id": "require:consumer:con_10d694c9a0a274dc79c6168e47d25968.is_approved",
+          "name": "is_approved",
+          "expression": {
+            "kind": "binary",
+            "operator": "==",
+            "left": {
+              "kind": "fieldAccess",
+              "source": "parameter:consumer:con_10d694c9a0a274dc79c6168e47d25968.request",
+              "parameter": "request",
+              "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+              "fieldName": "status",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "right": {
+              "kind": "enumLiteral",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d",
+              "memberName": "APPROVED",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "(request.status == RequestStatus.APPROVED)",
+          "source": {
+            "file": "examples/procurement.model",
+            "line": 131,
+            "column": 3,
+            "endLine": 131,
+            "endColumn": 65
+          },
+          "dependencies": [
+            {
+              "kind": "enumMember",
+              "id": "enumMember:emv_8ad72d5d6c314e12864c247677e51b8d"
+            },
+            {
+              "kind": "field",
+              "id": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2"
+            },
+            {
+              "kind": "parameter",
+              "id": "parameter:consumer:con_10d694c9a0a274dc79c6168e47d25968.request"
+            }
+          ]
+        }
+      ],
+      "readSet": {
+        "entityIds": [
+          "entity:ent_9bc680209327484c8e98f5f740bcc702"
+        ],
+        "fieldIds": [
+          "field:fld_afb1dee14dfa48c98961fdb40e2b0be2"
+        ]
+      },
+      "lockPlan": [
+        {
+          "id": "lock:consumer:con_10d694c9a0a274dc79c6168e47d25968.request",
+          "source": "parameter:consumer:con_10d694c9a0a274dc79c6168e47d25968.request",
+          "parameterId": "parameter:consumer:con_10d694c9a0a274dc79c6168e47d25968.request",
+          "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+          "mode": "update",
+          "order": 0
+        }
+      ],
+      "effect": {
+        "kind": "update",
+        "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+        "assignments": [
+          {
+            "fieldId": "field:fld_677b4c94c9cd4b469aded37614712fba",
+            "expression": {
+              "kind": "literal",
+              "value": true,
+              "type": "Boolean",
+              "nullable": false
+            }
+          }
+        ]
+      },
+      "delivery": {
+        "transport": "atLeastOnce",
+        "deduplication": "transactionalInbox",
+        "duplicateResult": "storedResult",
+        "identity": "consumerAndSourceEvent"
+      },
+      "privacy": {
+        "inbox": "private",
+        "evidence": "private",
+        "publicCapabilityProjection": false
+      }
+    }
+  ],
   "queries": [
     {
       "id": "query:qry_4406b045404a48449282db804f6167a8",
       "name": "myRequests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 134,
+        "line": 146,
         "column": 1,
-        "endLine": 141,
+        "endLine": 153,
         "endColumn": 2
       },
       "caller": {
@@ -1032,9 +1165,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/procurement.model",
-          "line": 137,
+          "line": 149,
           "column": 13,
-          "endLine": 137,
+          "endLine": 149,
           "endColumn": 17
         },
         "dependencies": []
@@ -1069,9 +1202,9 @@
         "sourceExpression": "(request.requester == actor)",
         "source": {
           "file": "examples/procurement.model",
-          "line": 138,
+          "line": 150,
           "column": 9,
-          "endLine": 138,
+          "endLine": 150,
           "endColumn": 35
         },
         "dependencies": [

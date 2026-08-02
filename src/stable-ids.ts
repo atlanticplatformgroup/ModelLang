@@ -10,6 +10,7 @@ export type StableIdKind =
   | "policy"
   | "policyBranch"
   | "action"
+  | "consumer"
   | "query"
   | "invariant"
   | "exclusion"
@@ -31,6 +32,7 @@ function generatedId(kind: StableIdKind): string {
     policy: "pol",
     policyBranch: "pbr",
     action: "act",
+    consumer: "con",
     query: "qry",
     invariant: "inv",
     exclusion: "exc",

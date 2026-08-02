@@ -98,12 +98,12 @@
   "type": "object",
   "required": [
     "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
-    "model", "principal", "policies", "actions", "queries"
+    "model", "principal", "policies", "actions", "consumers", "queries"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 4 },
-    "profile": { "const": "sml-transactional-core/4" },
+    "manifestVersion": { "const": 5 },
+    "profile": { "const": "sml-transactional-core/5" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-        "irVersion": { "const": 12 },
+        "irVersion": { "const": 13 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -262,6 +262,53 @@
           },
           "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
           "failureClasses": { "$ref": "#/$defs/errors" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "consumers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "source", "sourceEventId", "acceptedPayloadEntityId", "output", "authorization", "preconditions", "readSet", "lockPlan", "effect", "delivery", "privacy"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^consumer:" },
+          "name": { "type": "string" },
+          "source": { "$ref": "#/$defs/span" },
+          "sourceEventId": { "type": "string", "pattern": "^event:" },
+          "acceptedPayloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "output": {
+            "type": "object",
+            "required": ["entityId", "cardinality"],
+            "properties": { "entityId": { "type": "string", "pattern": "^entity:" }, "cardinality": { "const": "one" } },
+            "additionalProperties": false
+          },
+          "authorization": { "$ref": "#/$defs/rule" },
+          "preconditions": { "type": "array", "items": { "$ref": "#/$defs/rule" } },
+          "readSet": { "$ref": "#/$defs/readSet" },
+          "lockPlan": { "type": "array" },
+          "effect": { "type": "object" },
+          "delivery": {
+            "type": "object",
+            "required": ["transport", "deduplication", "duplicateResult", "identity"],
+            "properties": {
+              "transport": { "const": "atLeastOnce" },
+              "deduplication": { "const": "transactionalInbox" },
+              "duplicateResult": { "const": "storedResult" },
+              "identity": { "const": "consumerAndSourceEvent" }
+            },
+            "additionalProperties": false
+          },
+          "privacy": {
+            "type": "object",
+            "required": ["inbox", "evidence", "publicCapabilityProjection"],
+            "properties": {
+              "inbox": { "const": "private" },
+              "evidence": { "const": "private" },
+              "publicCapabilityProjection": { "const": false }
+            },
+            "additionalProperties": false
+          }
         },
         "additionalProperties": false
       }

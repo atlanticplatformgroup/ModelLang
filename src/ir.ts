@@ -179,8 +179,33 @@ export interface IREvent {
   name: string;
   identity: IRIdentity;
   payloadEntityId: string;
+  source:
+    | { kind: "local" }
+    | { kind: "imported"; modelId: string; modelVersion: string; sourceHash: string };
   span: IRSpan;
   naming: { typescriptName: string };
+}
+
+export interface IRConsumer {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  sourceEventId: string;
+  payloadParameter: IRParameter;
+  acceptedPayloadEntityId: string;
+  returnEntityId: string;
+  authorization: IRRule;
+  preconditions: IRRule[];
+  effect: IREffect;
+  lockPlan: IRLock[];
+  delivery: {
+    transport: "atLeastOnce";
+    deduplication: "transactionalInbox";
+    duplicateResult: "storedResult";
+    identity: "consumerAndSourceEvent";
+  };
+  span: IRSpan;
+  naming: { sqlFunction: string; typescriptMethod: string };
 }
 
 export interface IRQuery {
@@ -242,7 +267,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 12;
+  irVersion: 13;
   model: {
     id: string;
     name: string;
@@ -257,6 +282,7 @@ export interface ModelIR {
   events: IREvent[];
   policies: IRPolicy[];
   actions: IRAction[];
+  consumers: IRConsumer[];
   queries: IRQuery[];
   workflows: IRWorkflow[];
   enforcement: EnforcementEntry[];

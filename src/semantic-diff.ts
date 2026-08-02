@@ -1,5 +1,6 @@
 import type {
   IRAction,
+  IRConsumer,
   IREntity,
   IREnum,
   IRPolicy,
@@ -26,6 +27,7 @@ export type SemanticChangeArea =
   | "effect"
   | "executionReliability"
   | "eventDelivery"
+  | "eventConsumption"
   | "persistence";
 
 export interface SemanticChange {
@@ -41,9 +43,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 5;
+  diffVersion: 6;
   compilerVersion: string;
-  irVersion: 12;
+  irVersion: 13;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -83,6 +85,50 @@ function compareEvents(changes: SemanticChange[], previous: ModelIR["events"], c
       kind: "eventPayloadChanged", area: "eventDelivery", classification: "breaking",
       subject: subject("event", pair.current), before: pair.previous.payloadEntityId, after: pair.current.payloadEntityId,
       persistenceRisk: true, explanation: "Changing an event payload entity breaks the durable event contract.",
+    });
+    if (!same(pair.previous.source ?? { kind: "local" }, pair.current.source)) addChange(changes, {
+      kind: "eventSourceContractChanged", area: "eventDelivery", classification: "breaking",
+      subject: subject("event", pair.current), before: text(pair.previous.source ?? { kind: "local" }), after: text(pair.current.source),
+      persistenceRisk: true, explanation: "Changing an event source model, version, or hash changes the accepted durable contract.",
+    });
+  }
+}
+
+function compareConsumers(changes: SemanticChange[], previous: IRConsumer[], current: IRConsumer[]): void {
+  for (const pair of pairById(changes, "consumer", previous, current, "eventConsumption", "additive", "breaking", true)) {
+    compareNamed(changes, "consumer", pair.previous, pair.current);
+    const previousContract = {
+      sourceEventId: pair.previous.sourceEventId,
+      acceptedPayloadEntityId: pair.previous.acceptedPayloadEntityId,
+      returnEntityId: pair.previous.returnEntityId,
+      delivery: pair.previous.delivery,
+    };
+    const currentContract = {
+      sourceEventId: pair.current.sourceEventId,
+      acceptedPayloadEntityId: pair.current.acceptedPayloadEntityId,
+      returnEntityId: pair.current.returnEntityId,
+      delivery: pair.current.delivery,
+    };
+    if (!same(previousContract, currentContract)) addChange(changes, {
+      kind: "consumerContractChanged", area: "eventConsumption", classification: "breaking",
+      subject: subject("consumer", pair.current), before: text(previousContract), after: text(currentContract),
+      persistenceRisk: true, explanation: "The consumer source contract, payload, result, or duplicate-handling identity changed.",
+    });
+    if (!same(pair.previous.authorization.expression, pair.current.authorization.expression)) addChange(changes, {
+      kind: "consumerAuthorizationChanged", area: "authorization",
+      classification: authorizationClassification(pair.previous.authorization, pair.current.authorization),
+      subject: subject("consumer", pair.current), before: pair.previous.authorization.sourceExpression, after: pair.current.authorization.sourceExpression,
+      persistenceRisk: true, explanation: "The consumer acceptance authority changed.",
+    });
+    if (!same(pair.previous.preconditions, pair.current.preconditions)) addChange(changes, {
+      kind: "consumerPreconditionsChanged", area: "validation", classification: "review",
+      subject: subject("consumer", pair.current), before: text(pair.previous.preconditions), after: text(pair.current.preconditions),
+      persistenceRisk: true, explanation: "The duplicate-safe handler preconditions changed and require reviewed acknowledgement.",
+    });
+    if (!same(pair.previous.effect, pair.current.effect)) addChange(changes, {
+      kind: "consumerEffectChanged", area: "effect", classification: "review",
+      subject: subject("consumer", pair.current), before: text(pair.previous.effect), after: text(pair.current.effect),
+      persistenceRisk: true, explanation: "The local committed effect performed for a consumed event changed.",
     });
   }
 }
@@ -508,6 +554,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   comparePolicies(changes, (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [], current.policies);
   compareEvents(changes, (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [], current.events);
   compareActions(changes, previous.actions, current.actions);
+  compareConsumers(changes, (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [], current.consumers);
   compareQueries(changes, previous.queries, current.queries);
   compareWorkflows(changes, previous.workflows, current.workflows);
   const summary: SemanticDiff["summary"] = {
@@ -520,7 +567,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 5,
+    diffVersion: 6,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

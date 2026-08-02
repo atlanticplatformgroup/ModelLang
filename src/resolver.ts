@@ -1,12 +1,13 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { moneyProfile } from "./money.js";
-import type { ActionDecl, Declaration, EntityDecl, Program, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
+import type { ActionDecl, ConsumerDecl, Declaration, EntityDecl, Program, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
   program: Program;
   declarations: ReadonlyMap<string, Declaration>;
   entities: ReadonlyMap<string, EntityDecl>;
   actions: ReadonlyMap<string, ActionDecl>;
+  consumers: ReadonlyMap<string, ConsumerDecl>;
   queries: ReadonlyMap<string, QueryDecl>;
   workflows: ReadonlyMap<string, WorkflowDecl>;
   typeNames: ReadonlySet<string>;
@@ -28,6 +29,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
   const declarations = new Map<string, Declaration>();
   const entities = new Map<string, EntityDecl>();
   const actions = new Map<string, ActionDecl>();
+  const consumers = new Map<string, ConsumerDecl>();
   const queries = new Map<string, QueryDecl>();
   const workflows = new Map<string, WorkflowDecl>();
   for (const declaration of program.declarations) {
@@ -41,6 +43,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     declarations.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
+    if (declaration.kind === "consumer") consumers.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
     if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
   }
@@ -68,6 +71,12 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
         throw new ModelError("E2307", `Action return type '${declaration.returnType.name}' must be an entity.`, declaration.returnType.span, file);
       }
     }
+    if (declaration.kind === "consumer") {
+      validateType(declaration.payloadParameter.type, typeNames, file);
+      if (!entities.has(declaration.returnType.name)) {
+        throw new ModelError("E3204", `Consumer return type '${declaration.returnType.name}' must be an entity.`, declaration.returnType.span, file);
+      }
+    }
     if (declaration.kind === "query") {
       for (const parameter of declaration.parameters) {
         if (parameter.type.collection === "set") throw new ModelError("E2704", "Set-valued action and query parameters are not supported in 0.4.", parameter.type.span, file);
@@ -78,5 +87,5 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
       }
     }
   }
-  return { program, declarations, entities, actions, queries, workflows, typeNames };
+  return { program, declarations, entities, actions, consumers, queries, workflows, typeNames };
 }

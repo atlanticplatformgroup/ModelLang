@@ -1,4 +1,4 @@
-model Reservations version "0.20.0";
+model Reservations version "0.21.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -17,6 +17,7 @@ entity Reservation @stableId("ent_ba2d028e915841d1ab90adfa40d38404") {
   reservedBy: User @stableId("fld_8380b65e5a2a4c399a2743cee1a3a93a");
   startsAt: DateTime @stableId("fld_59e1f90fae57481f921c5a81dfd3a234");
   endsAt: DateTime @stableId("fld_fd818707952f4b388baea4c3132bce63");
+  indexed: Boolean = false @stableId("fld_ed818707952f4b388baea4c3132bce63");
 
   exclusion no_overlapping_reservations @stableId("exc_d55bab6e14884cd5a7d2bacfc30458ba"):
     noOverlap(resource, startsAt, endsAt);
@@ -41,6 +42,17 @@ action reserve @stableId("act_508ad810a19d4b79a5009871de5cd26b")(
     endsAt = endsAt;
   }
   emit ReservationCreated;
+}
+
+consumer indexReservation @stableId("con_20d694c9a0a274dc79c6168e47d25968") on ReservationCreated(
+  payload reservation: Reservation
+) -> Reservation {
+  authorize true;
+  require valid_interval: reservation.startsAt < reservation.endsAt;
+
+  update reservation {
+    indexed = true;
+  }
 }
 
 query reservationsForResource @stableId("qry_94d8a56f4c2640fab58a4c2190c35c69")(

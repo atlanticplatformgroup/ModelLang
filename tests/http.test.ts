@@ -20,6 +20,7 @@ const purchaseRequest = {
   status: "DRAFT",
   approvedBy: null,
   approvedByRoles: null,
+  approvalObserved: false,
 };
 const applicableDecision = {
   operationId: "action:act_1e35db0451b1461e941af6283d86dca2",

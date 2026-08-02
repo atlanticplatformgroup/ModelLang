@@ -8,6 +8,8 @@ import {
   generateDecisionEvidenceInfrastructureStatements,
   generateCommandReceiptInfrastructureStatements,
   generateEventOutboxInfrastructureStatements,
+  generateEventInboxInfrastructureStatements,
+  generateConsumerRoleStatements,
   generateDispatcherRoleStatements,
   generateGatewayRoleStatements,
   generatePostgres,
@@ -365,7 +367,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11, 12].includes(Number(previous.irVersion)) || current.irVersion !== 12) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11/IR12 baseline and canonical IR12 current input.");
+  if (![9, 10, 11, 12, 13].includes(Number(previous.irVersion)) || current.irVersion !== 13) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11/IR12/IR13 baseline and canonical IR13 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -478,6 +480,7 @@ export function planReviewedMigration(
     "BEGIN;",
     generateGatewayRoleStatements(),
     generateDispatcherRoleStatements(),
+    generateConsumerRoleStatements(),
     "SET LOCAL ROLE modellang_owner;",
     ...historyBootstrapStatements(previous, current),
     ...(lockTargets.length ? [`LOCK TABLE ${lockTargets.join(", ")} IN ACCESS EXCLUSIVE MODE;`] : []),
@@ -496,6 +499,8 @@ export function planReviewedMigration(
       `DROP FUNCTION ${qname(schema, operation.naming.sqlFunction)}(${callableSignature(operation)});`),
     ...previous.actions.map((action) =>
       `DROP FUNCTION IF EXISTS ${qname(schema, decisionFunctionName(action.id))}(${[...action.callableParameters.map((id) => sqlType(action.parameters.find((parameter) => parameter.id === id)!.type)), "text"].join(", ")});`),
+    ...((previous as ModelIR & { consumers?: ModelIR["consumers"] }).consumers ?? []).map((consumer) =>
+      `DROP FUNCTION IF EXISTS ${qname(internal, consumer.naming.sqlFunction)}(jsonb);`),
     `DROP TABLE ${previous.entities.map((entity) => qname(schema, entity.naming.sqlTable)).join(", ")};`,
     ...previous.workflows.map((workflow) => `DROP FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`),
     "RESET ROLE;",
@@ -510,7 +515,9 @@ export function planReviewedMigration(
     ...generateDecisionEvidenceInfrastructureStatements(current),
     ...generateCommandReceiptInfrastructureStatements(current),
     ...generateEventOutboxInfrastructureStatements(current),
+    ...generateEventInboxInfrastructureStatements(current),
     generated["003_actions.sql"]!.trim(),
+    generated["003_consumers.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),
     generated["004_grants.sql"]!.trim(),

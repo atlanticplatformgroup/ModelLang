@@ -1,5 +1,6 @@
 import type {
   IRAction,
+  IRConsumer,
   IRExpression,
   IRQuery,
   IRRule,
@@ -39,8 +40,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 4;
-  profile: "sml-transactional-core/4";
+  manifestVersion: 5;
+  profile: "sml-transactional-core/5";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -49,7 +50,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 12;
+    irVersion: 13;
     generator: "semantic-manifest";
   };
   model: {
@@ -66,6 +67,7 @@ export interface SemanticManifest {
   };
   policies: SemanticPolicy[];
   actions: SemanticAction[];
+  consumers: SemanticConsumer[];
   queries: SemanticQuery[];
 }
 
@@ -76,7 +78,7 @@ export interface SemanticPolicy {
   parameters: { id: string; name: string; type: string }[];
   evaluation: "exactlyOneBranch";
   branches: SemanticRule[];
-  usedBy: { operationId: string; ruleId: string; usage: "authorization" | "precondition" | "queryAuthorization" | "rowPolicy" }[];
+  usedBy: { operationId: string; ruleId: string; usage: "authorization" | "precondition" | "consumerAuthorization" | "consumerPrecondition" | "queryAuthorization" | "rowPolicy" }[];
   coverage: { applicability: boolean; execution: boolean; durableEvidence: boolean };
 }
 
@@ -131,6 +133,22 @@ export interface SemanticQuery {
   readSet: SemanticReadSet;
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
   failureClasses: ManifestErrorKind[];
+}
+
+export interface SemanticConsumer {
+  id: string;
+  name: string;
+  source: IRSpan;
+  sourceEventId: string;
+  acceptedPayloadEntityId: string;
+  output: { entityId: string; cardinality: "one" };
+  authorization: SemanticRule;
+  preconditions: SemanticRule[];
+  readSet: SemanticReadSet;
+  lockPlan: IRConsumer["lockPlan"];
+  effect: { kind: "create" | "update"; entityId: string; assignments: { fieldId: string; expression: IRExpression }[] };
+  delivery: IRConsumer["delivery"];
+  privacy: { inbox: "private"; evidence: "private"; publicCapabilityProjection: false };
 }
 
 function dependencyKey(dependency: SemanticDependency): string {
@@ -210,8 +228,12 @@ function readSet(ir: ModelIR, rules: IRRule[], expressions: IRExpression[] = [])
       if (entity) entityIds.add(entity.id);
     }
     if (dependency.kind === "parameter") {
-      const parameter = [...ir.actions, ...ir.queries, ...ir.policies]
-        .flatMap((operation) => operation.parameters)
+      const parameter = [
+        ...ir.actions.flatMap((operation) => operation.parameters),
+        ...ir.consumers.map((consumer) => consumer.payloadParameter),
+        ...ir.queries.flatMap((operation) => operation.parameters),
+        ...ir.policies.flatMap((operation) => operation.parameters),
+      ]
         .find((candidate) => candidate.id === dependency.id);
       if (parameter?.type.startsWith("entity:")) entityIds.add(parameter.type);
     }
@@ -327,6 +349,28 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
   };
 }
 
+function consumerEntry(ir: ModelIR, consumer: IRConsumer): SemanticConsumer {
+  return {
+    id: consumer.id,
+    name: consumer.name,
+    source: consumer.span,
+    sourceEventId: consumer.sourceEventId,
+    acceptedPayloadEntityId: consumer.acceptedPayloadEntityId,
+    output: { entityId: consumer.returnEntityId, cardinality: "one" },
+    authorization: semanticRule(consumer.authorization),
+    preconditions: consumer.preconditions.map(semanticRule),
+    readSet: readSet(ir, [consumer.authorization, ...consumer.preconditions], consumer.effect.assignments.map((assignment) => assignment.expression)),
+    lockPlan: consumer.lockPlan,
+    effect: {
+      kind: consumer.effect.kind,
+      entityId: consumer.effect.entityId,
+      assignments: consumer.effect.assignments.map((assignment) => ({ fieldId: assignment.fieldId, expression: assignment.expression })),
+    },
+    delivery: consumer.delivery,
+    privacy: { inbox: "private", evidence: "private", publicCapabilityProjection: false },
+  };
+}
+
 export function generateSemanticManifest(ir: ModelIR, operations: OperationManifest): SemanticManifest {
   const uses = (policyId: string): SemanticPolicy["usedBy"] => {
     const result: SemanticPolicy["usedBy"] = [];
@@ -336,6 +380,10 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
       if (has(action.authorization.expression)) result.push({ operationId: action.id, ruleId: action.authorization.id, usage: "authorization" });
       for (const rule of action.preconditions) if (has(rule.expression)) result.push({ operationId: action.id, ruleId: rule.id, usage: "precondition" });
     }
+    for (const consumer of ir.consumers) {
+      if (has(consumer.authorization.expression)) result.push({ operationId: consumer.id, ruleId: consumer.authorization.id, usage: "consumerAuthorization" });
+      for (const rule of consumer.preconditions) if (has(rule.expression)) result.push({ operationId: consumer.id, ruleId: rule.id, usage: "consumerPrecondition" });
+    }
     for (const query of ir.queries) {
       if (has(query.authorization.expression)) result.push({ operationId: query.id, ruleId: query.authorization.id, usage: "queryAuthorization" });
       if (has(query.rowPolicy.expression)) result.push({ operationId: query.id, ruleId: query.rowPolicy.id, usage: "rowPolicy" });
@@ -344,7 +392,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 4,
+    manifestVersion: 5,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -379,11 +427,13 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
       usedBy: uses(policy.id),
       coverage: {
         applicability: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "precondition"),
-        execution: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "precondition"),
-        durableEvidence: uses(policy.id).some((use) => use.usage === "authorization"),
+        execution: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "precondition"
+          || use.usage === "consumerAuthorization" || use.usage === "consumerPrecondition"),
+        durableEvidence: uses(policy.id).some((use) => use.usage === "authorization" || use.usage === "consumerAuthorization"),
       },
     })),
     actions: ir.actions.map((action) => actionEntry(ir, operations, action)),
+    consumers: ir.consumers.map((consumer) => consumerEntry(ir, consumer)),
     queries: ir.queries.map((query) => queryEntry(ir, operations, query)),
   };
 }
