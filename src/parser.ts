@@ -321,6 +321,15 @@ class Parser {
       const end = this.expect(";");
       requires.push({ name: requireName.text, expression, span: this.span(requireStart, end) });
     }
+    let retry: ConsumerDecl["retry"];
+    if (this.atWord("retry")) {
+      const retryStart = this.take();
+      this.expectWord("maxAttempts");
+      const maximum = this.expect("number", "Expected an integer consumer retry limit.");
+      const retryEnd = this.expect(";");
+      retry = { maxAttempts: Number(maximum.value), span: this.span(retryStart, retryEnd) };
+      if (this.atWord("retry")) this.fail("E1140", "A consumer may declare at most one retry policy.");
+    }
     const effect = this.parseEffect();
     const emits: ConsumerDecl["emits"] = [];
     while (this.atWord("emit")) {
@@ -341,6 +350,7 @@ class Parser {
       returnType,
       authorize,
       requires,
+      retry,
       effect,
       emits,
       span: this.span(start, end),

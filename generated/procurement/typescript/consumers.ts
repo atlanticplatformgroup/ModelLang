@@ -6,20 +6,60 @@ export interface ConsumerDatabaseClient {
   query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
 }
 
+export type ConsumerDeliveryFailure = {
+  readonly status: "retry" | "deadLetter";
+  readonly recorded: boolean;
+  readonly errorCode: string;
+  readonly failureCount: number | null;
+  readonly maxAttempts: number | null;
+};
+export type ConsumerDeliveryOutcome<Result> = { readonly status: "consumed"; readonly result: Result } | ConsumerDeliveryFailure;
+type ConsumerFailureRecord = ConsumerDeliveryFailure | { readonly status: "ready" | "ignoredCommitted"; readonly recorded?: boolean; readonly errorCode?: string; readonly failureCount?: number | null; readonly maxAttempts?: number | null };
+
 function privateFailureCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.match(/ML_[A-Z_]+/)?.[0] ?? "ML_CONSUMER_HANDLER";
 }
 
+async function invokeObserveRequestApproval(client: ConsumerDatabaseClient, event: RequestApprovedEvent): Promise<PurchaseRequest> {
+  const response = await client.query<{ result: PurchaseRequest }>("SELECT \"model_procurement_internal\".\"consume_observe_request_approval\"($1::jsonb) AS result", [event]);
+  if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+  return response.rows[0]!.result;
+}
+
+async function recordObserveRequestApprovalFailure(client: ConsumerDatabaseClient, event: RequestApprovedEvent, errorCode: string): Promise<ConsumerFailureRecord> {
+  const response = await client.query<{ result: ConsumerFailureRecord }>("SELECT \"model_procurement_internal\".\"record_consumer_failure\"($1, $2, $3, $4) AS result", ["consumer:con_10d694c9a0a274dc79c6168e47d25968", event.id, event.deliveryAttempt, errorCode]);
+  if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+  return response.rows[0]!.result;
+}
+
 export async function consumeObserveRequestApproval(client: ConsumerDatabaseClient, event: RequestApprovedEvent): Promise<PurchaseRequest> {
   try {
-    const response = await client.query<{ result: PurchaseRequest }>("SELECT \"model_procurement_internal\".\"consume_observe_request_approval\"($1::jsonb) AS result", [event]);
-    if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
-    return response.rows[0]!.result;
+    return await invokeObserveRequestApproval(client, event);
   } catch (error) {
     try {
-      await client.query("SELECT \"model_procurement_internal\".\"record_consumer_failure\"($1, $2, $3, $4)", ["consumer:con_10d694c9a0a274dc79c6168e47d25968", event.id, event.deliveryAttempt, privateFailureCode(error)]);
+      await recordObserveRequestApprovalFailure(client, event, privateFailureCode(error));
     } catch { /* Failure telemetry is private and best effort; handler failure remains authoritative. */ }
     throw error;
+  }
+}
+
+export async function deliverObserveRequestApproval(client: ConsumerDatabaseClient, event: RequestApprovedEvent): Promise<ConsumerDeliveryOutcome<PurchaseRequest>> {
+  try {
+    const state = await client.query<{ result: ConsumerFailureRecord }>("SELECT \"model_procurement_internal\".\"consumer_failure_state\"($1, $2) AS result", ["consumer:con_10d694c9a0a274dc79c6168e47d25968", event.id]);
+    if (state.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+    if (state.rows[0]!.result.status === "deadLetter") return state.rows[0]!.result;
+  } catch (error) {
+    return { status: "retry", recorded: false, errorCode: privateFailureCode(error), failureCount: null, maxAttempts: 3 };
+  }
+  try {
+    return { status: "consumed", result: await invokeObserveRequestApproval(client, event) };
+  } catch (error) {
+    const errorCode = privateFailureCode(error);
+    try {
+      const failure = await recordObserveRequestApprovalFailure(client, event, errorCode);
+      if (failure.status === "retry" || failure.status === "deadLetter") return failure;
+    } catch { /* A terminal disposition is never inferred when durable recording fails. */ }
+    return { status: "retry", recorded: false, errorCode, failureCount: null, maxAttempts: 3 };
   }
 }

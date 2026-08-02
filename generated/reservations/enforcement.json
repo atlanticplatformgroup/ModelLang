@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.22.0",
-    "sourceHash": "sha256:4734c3fc4c4486ee33c643c1d76fd68984d2883c1555f1469a54a97b3368e046",
+    "version": "0.23.0",
+    "sourceHash": "sha256:c586f8489334a72fbd59eecbd99b85856cd9729a81610b778a9d41dcaa94f122",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -637,7 +637,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 58,
+        "endLine": 59,
         "endColumn": 2
       }
     },
@@ -651,7 +651,21 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 58,
+        "endLine": 59,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "failure-policy:consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Record failed deliveries durably and return terminal deadLetter after 3 attempts.",
+      "layer": "PostgreSQL consumer failure state",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.consumer_failure",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 48,
+        "column": 1,
+        "endLine": 59,
         "endColumn": 2
       }
     },
@@ -665,7 +679,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 58,
+        "endLine": 59,
         "endColumn": 2
       }
     },
@@ -677,9 +691,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 61,
+        "line": 62,
         "column": 3,
-        "endLine": 61,
+        "endLine": 62,
         "endColumn": 21
       }
     },
@@ -698,9 +712,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 64,
+        "line": 65,
         "column": 13,
-        "endLine": 64,
+        "endLine": 65,
         "endColumn": 17
       }
     },
@@ -712,9 +726,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 65,
+        "line": 66,
         "column": 9,
-        "endLine": 65,
+        "endLine": 66,
         "endColumn": 41
       }
     },
@@ -726,9 +740,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 60,
+        "line": 61,
         "column": 1,
-        "endLine": 68,
+        "endLine": 69,
         "endColumn": 2
       }
     },
@@ -740,9 +754,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 60,
+        "line": 61,
         "column": 1,
-        "endLine": 68,
+        "endLine": 69,
         "endColumn": 2
       }
     },
@@ -754,9 +768,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 60,
+        "line": 61,
         "column": 1,
-        "endLine": 68,
+        "endLine": 69,
         "endColumn": 2
       }
     },

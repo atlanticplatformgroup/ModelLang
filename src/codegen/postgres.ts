@@ -19,6 +19,7 @@ export interface PostgresOutput {
   "010_upgrade_0_20.sql": string;
   "011_upgrade_0_21.sql": string;
   "012_upgrade_0_22.sql": string;
+  "013_upgrade_0_23.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -786,7 +787,13 @@ export function generateEventInboxInfrastructureStatements(ir: ModelIR): string[
   const audit = qname(internal, "consumer_audit");
   const inbox = qname(internal, "event_inbox");
   const failures = qname(internal, "consumer_failure");
-  const consumerIds = ir.consumers.map((consumer) => `'${consumer.id.replaceAll("'", "''")}'`).join(", ") || "NULL";
+  const consumerIds = ir.consumers.map((consumer) => `'${consumer.id.replaceAll("'", "''")}'`).join(", ");
+  const invalidConsumerIdentity = consumerIds.length > 0 ? `p_consumer_id NOT IN (${consumerIds})` : "TRUE";
+  const maximumByConsumer = ir.consumers.length > 0
+    ? `CASE p_consumer_id ${ir.consumers.map((consumer) =>
+      `WHEN '${consumer.id.replaceAll("'", "''")}' THEN ${consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts" ? consumer.failurePolicy.maxAttempts : "NULL"}`
+    ).join(" ")} ELSE NULL END`
+    : "(NULL::integer)";
   return [
     `CREATE TABLE IF NOT EXISTS ${audit} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -841,25 +848,95 @@ export function generateEventInboxInfrastructureStatements(ir: ModelIR): string[
     `  ${quoteIdent("failure_count")} integer NOT NULL DEFAULT 1,`,
     `  ${quoteIdent("last_delivery_attempt")} integer NOT NULL,`,
     `  ${quoteIdent("last_error_code")} text NOT NULL,`,
+    `  ${quoteIdent("max_attempts")} integer,`,
+    `  ${quoteIdent("disposition")} text NOT NULL DEFAULT 'retry',`,
     `  ${quoteIdent("last_failed_at")} timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),`,
+    `  ${quoteIdent("terminal_at")} timestamptz,`,
+    `  ${quoteIdent("resolved_at")} timestamptz,`,
     `  PRIMARY KEY (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}),`,
     `  CONSTRAINT ${quoteIdent("ck_consumer_failure_count")} CHECK (${quoteIdent("failure_count")} >= 1 AND ${quoteIdent("last_delivery_attempt")} >= 1),`,
-    `  CONSTRAINT ${quoteIdent("ck_consumer_failure_code")} CHECK (${quoteIdent("last_error_code")} ~ '^ML_[A-Z_]+$')`,
+    `  CONSTRAINT ${quoteIdent("ck_consumer_failure_code")} CHECK (${quoteIdent("last_error_code")} ~ '^ML_[A-Z_]+$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_consumer_failure_disposition")} CHECK (`,
+    `    (${quoteIdent("disposition")} = 'retry' AND ${quoteIdent("terminal_at")} IS NULL AND ${quoteIdent("resolved_at")} IS NULL)`,
+    `    OR (${quoteIdent("disposition")} = 'deadLetter' AND ${quoteIdent("max_attempts")} IS NOT NULL AND ${quoteIdent("failure_count")} >= ${quoteIdent("max_attempts")} AND ${quoteIdent("terminal_at")} IS NOT NULL AND ${quoteIdent("resolved_at")} IS NULL)`,
+    `    OR (${quoteIdent("disposition")} = 'resolved' AND ${quoteIdent("terminal_at")} IS NULL AND ${quoteIdent("resolved_at")} IS NOT NULL)`,
+    "  )",
     ");",
-    `CREATE OR REPLACE FUNCTION ${qname(internal, "record_consumer_failure")}(p_consumer_id text, p_event_id text, p_delivery_attempt integer, p_error_code text) RETURNS void`,
+    `ALTER TABLE ${failures} ADD COLUMN IF NOT EXISTS ${quoteIdent("max_attempts")} integer;`,
+    `ALTER TABLE ${failures} ADD COLUMN IF NOT EXISTS ${quoteIdent("disposition")} text NOT NULL DEFAULT 'retry';`,
+    `ALTER TABLE ${failures} ADD COLUMN IF NOT EXISTS ${quoteIdent("terminal_at")} timestamptz;`,
+    `ALTER TABLE ${failures} ADD COLUMN IF NOT EXISTS ${quoteIdent("resolved_at")} timestamptz;`,
+    "DO $modellang$",
+    "BEGIN",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${failures}'::regclass AND conname = 'ck_consumer_failure_disposition') THEN`,
+    `    ALTER TABLE ${failures} ADD CONSTRAINT ${quoteIdent("ck_consumer_failure_disposition")} CHECK (`,
+    `      (${quoteIdent("disposition")} = 'retry' AND ${quoteIdent("terminal_at")} IS NULL AND ${quoteIdent("resolved_at")} IS NULL)`,
+    `      OR (${quoteIdent("disposition")} = 'deadLetter' AND ${quoteIdent("max_attempts")} IS NOT NULL AND ${quoteIdent("failure_count")} >= ${quoteIdent("max_attempts")} AND ${quoteIdent("terminal_at")} IS NOT NULL AND ${quoteIdent("resolved_at")} IS NULL)`,
+    `      OR (${quoteIdent("disposition")} = 'resolved' AND ${quoteIdent("terminal_at")} IS NULL AND ${quoteIdent("resolved_at")} IS NOT NULL)`,
+    "    );",
+    "  END IF;",
+    "END",
+    "$modellang$;",
+    `CREATE OR REPLACE FUNCTION ${qname(internal, "consumer_failure_state")}(p_consumer_id text, p_event_id text) RETURNS jsonb`,
     "LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$",
+    "DECLARE",
+    "  v_max_attempts integer;",
+    "  v_failure_count integer;",
+    "  v_error_code text;",
+    "  v_disposition text;",
     "BEGIN",
     ...consumerRoleCheck(),
-    `  IF p_consumer_id IS NULL OR p_consumer_id NOT IN (${consumerIds}) OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$'`,
+    `  IF p_consumer_id IS NULL OR ${invalidConsumerIdentity} OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$' THEN`,
+    "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
+    "  END IF;",
+    `  v_max_attempts := ${maximumByConsumer};`,
+    `  SELECT ${quoteIdent("failure_count")}, ${quoteIdent("last_error_code")}, ${quoteIdent("disposition")} INTO v_failure_count, v_error_code, v_disposition`,
+    `  FROM ${failures} WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id FOR UPDATE;`,
+    "  IF NOT FOUND OR v_disposition = 'resolved' THEN RETURN pg_catalog.jsonb_build_object('status', 'ready'); END IF;",
+    "  v_disposition := CASE WHEN v_max_attempts IS NOT NULL AND v_failure_count >= v_max_attempts THEN 'deadLetter' ELSE 'retry' END;",
+    `  UPDATE ${failures} SET ${quoteIdent("max_attempts")} = v_max_attempts, ${quoteIdent("disposition")} = v_disposition,`,
+    `    ${quoteIdent("terminal_at")} = CASE WHEN v_disposition = 'deadLetter' THEN COALESCE(${quoteIdent("terminal_at")}, pg_catalog.clock_timestamp()) ELSE NULL END, ${quoteIdent("resolved_at")} = (NULL::timestamptz)`,
+    `  WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id;`,
+    "  RETURN pg_catalog.jsonb_build_object('status', v_disposition, 'recorded', TRUE, 'errorCode', v_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);",
+    "END $modellang$;",
+    `REVOKE ALL ON FUNCTION ${qname(internal, "consumer_failure_state")}(text, text) FROM PUBLIC;`,
+    `DROP FUNCTION IF EXISTS ${qname(internal, "record_consumer_failure")}(text, text, integer, text);`,
+    `CREATE FUNCTION ${qname(internal, "record_consumer_failure")}(p_consumer_id text, p_event_id text, p_delivery_attempt integer, p_error_code text) RETURNS jsonb`,
+    "LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$",
+    "DECLARE",
+    "  v_max_attempts integer;",
+    "  v_failure_count integer;",
+    "  v_disposition text;",
+    "BEGIN",
+    ...consumerRoleCheck(),
+    `  IF p_consumer_id IS NULL OR ${invalidConsumerIdentity} OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$'`,
     "     OR p_delivery_attempt IS NULL OR p_delivery_attempt < 1 OR p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' THEN",
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
     "  END IF;",
-    `  INSERT INTO ${failures} (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}, ${quoteIdent("last_delivery_attempt")}, ${quoteIdent("last_error_code")})`,
-    "  VALUES (p_consumer_id, p_event_id, p_delivery_attempt, p_error_code)",
+    "  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_consumer_id || ':' || p_event_id, 0));",
+    `  v_max_attempts := ${maximumByConsumer};`,
+    `  IF EXISTS (SELECT 1 FROM ${inbox} WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id::uuid AND ${quoteIdent("status")} = 'executed') THEN`,
+    `    UPDATE ${failures} SET ${quoteIdent("disposition")} = 'resolved', ${quoteIdent("max_attempts")} = v_max_attempts, ${quoteIdent("terminal_at")} = (NULL::timestamptz), ${quoteIdent("resolved_at")} = COALESCE(${quoteIdent("resolved_at")}, pg_catalog.clock_timestamp())`,
+    `    WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id;`,
+    "    RETURN pg_catalog.jsonb_build_object('status', 'ignoredCommitted', 'recorded', FALSE, 'errorCode', p_error_code, 'failureCount', NULL, 'maxAttempts', v_max_attempts);",
+    "  END IF;",
+    `  SELECT ${quoteIdent("failure_count")}, ${quoteIdent("disposition")} INTO v_failure_count, v_disposition FROM ${failures}`,
+    `  WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id FOR UPDATE;`,
+    "  IF FOUND AND v_disposition = 'deadLetter' THEN",
+    "    RETURN pg_catalog.jsonb_build_object('status', 'deadLetter', 'recorded', TRUE, 'errorCode', p_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);",
+    "  END IF;",
+    `  INSERT INTO ${failures} AS failure_row (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}, ${quoteIdent("failure_count")}, ${quoteIdent("last_delivery_attempt")}, ${quoteIdent("last_error_code")}, ${quoteIdent("max_attempts")}, ${quoteIdent("disposition")}, ${quoteIdent("terminal_at")})`,
+    "  VALUES (p_consumer_id, p_event_id, 1, p_delivery_attempt, p_error_code, v_max_attempts, 'retry', NULL)",
     `  ON CONFLICT (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}) DO UPDATE SET`,
-    `    ${quoteIdent("failure_count")} = ${failures}.${quoteIdent("failure_count")} + 1,`,
-    `    ${quoteIdent("last_delivery_attempt")} = GREATEST(${failures}.${quoteIdent("last_delivery_attempt")}, EXCLUDED.${quoteIdent("last_delivery_attempt")}),`,
-    `    ${quoteIdent("last_error_code")} = EXCLUDED.${quoteIdent("last_error_code")}, ${quoteIdent("last_failed_at")} = pg_catalog.clock_timestamp();`,
+    `    ${quoteIdent("failure_count")} = failure_row.${quoteIdent("failure_count")} + 1, ${quoteIdent("last_delivery_attempt")} = GREATEST(failure_row.${quoteIdent("last_delivery_attempt")}, EXCLUDED.${quoteIdent("last_delivery_attempt")}),`,
+    `    ${quoteIdent("last_error_code")} = EXCLUDED.${quoteIdent("last_error_code")}, ${quoteIdent("max_attempts")} = v_max_attempts,`,
+    `    ${quoteIdent("last_failed_at")} = pg_catalog.clock_timestamp(), ${quoteIdent("resolved_at")} = (NULL::timestamptz)`,
+    `  RETURNING ${quoteIdent("failure_count")} INTO v_failure_count;`,
+    "  v_disposition := CASE WHEN v_max_attempts IS NOT NULL AND v_failure_count >= v_max_attempts THEN 'deadLetter' ELSE 'retry' END;",
+    `  UPDATE ${failures} SET ${quoteIdent("max_attempts")} = v_max_attempts, ${quoteIdent("disposition")} = v_disposition,`,
+    `    ${quoteIdent("terminal_at")} = CASE WHEN v_disposition = 'deadLetter' THEN COALESCE(${quoteIdent("terminal_at")}, pg_catalog.clock_timestamp()) ELSE NULL END, ${quoteIdent("resolved_at")} = (NULL::timestamptz)`,
+    `  WHERE ${quoteIdent("consumer_id")} = p_consumer_id AND ${quoteIdent("source_event_id")} = p_event_id;`,
+    "  RETURN pg_catalog.jsonb_build_object('status', v_disposition, 'recorded', TRUE, 'errorCode', p_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);",
     "END $modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "record_consumer_failure")}(text, text, integer, text) FROM PUBLIC;`,
   ];
@@ -1572,7 +1649,8 @@ function consumerEvidenceSql(ir: ModelIR, consumer: IRConsumer): string {
     + `'sourceContract', pg_catalog.jsonb_build_object('eventId', '${consumer.sourceEventId.replaceAll("'", "''")}', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), `
     + `'authorization', pg_catalog.jsonb_build_object('ruleId', '${consumer.authorization.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), `
     + `'requirements', pg_catalog.jsonb_build_array(${requirements.join(", ")}), `
-    + `'emittedEventIds', pg_catalog.to_jsonb(ARRAY[${consumer.emittedEventIds.map((id) => `'${id.replaceAll("'", "''")}'`).join(", ")}]::text[]))`;
+    + `'emittedEventIds', pg_catalog.to_jsonb(ARRAY[${consumer.emittedEventIds.map((id) => `'${id.replaceAll("'", "''")}'`).join(", ")}]::text[]), `
+    + `'failurePolicy', pg_catalog.jsonb_build_object('mode', '${consumer.failurePolicy.mode}'${consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts" ? `, 'maxAttempts', ${consumer.failurePolicy.maxAttempts}` : ""}))`;
 }
 
 function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
@@ -1610,6 +1688,7 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     "  v_payload_json jsonb;",
     "  v_envelope_keys text[];",
     "  v_payload_keys text[];",
+    "  v_failure_state jsonb;",
     "  v_inbox_id bigint;",
     "  v_consumer_audit_id bigint;",
     "  v_authority_policy_id text;",
@@ -1672,6 +1751,11 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     "     OR v_correlation_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'",
     "     OR (v_causation_id IS NOT NULL AND v_causation_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$') THEN",
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_CONTRACT';",
+    "  END IF;",
+    `  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('${consumer.id.replaceAll("'", "''")}:' || v_source_event_id::text, 0));`,
+    `  v_failure_state := ${qname(internal, "consumer_failure_state")}('${consumer.id.replaceAll("'", "''")}', v_source_event_id::text);`,
+    "  IF v_failure_state->>'status' = 'deadLetter' THEN",
+    "    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_CONSUMER_DEAD_LETTER';",
     "  END IF;",
     "  v_envelope_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(((p_envelope - 'deliveryAttempt'))::text, 'UTF8')), 'hex');",
     `  INSERT INTO ${qname(internal, "event_inbox")} (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}, ${quoteIdent("source_event_type")}, ${quoteIdent("source_event_name")}, ${quoteIdent("source_model_id")}, ${quoteIdent("source_model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("envelope_hash")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("first_delivery_attempt")}, ${quoteIdent("last_delivery_attempt")})`,
@@ -1753,6 +1837,8 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     );
   });
   body.push(
+    `  UPDATE ${qname(internal, "consumer_failure")} SET ${quoteIdent("disposition")} = 'resolved', ${quoteIdent("max_attempts")} = ${consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts" ? consumer.failurePolicy.maxAttempts : "(NULL::integer)"}, ${quoteIdent("terminal_at")} = (NULL::timestamptz), ${quoteIdent("resolved_at")} = pg_catalog.clock_timestamp()`,
+    `  WHERE ${quoteIdent("consumer_id")} = '${consumer.id.replaceAll("'", "''")}' AND ${quoteIdent("source_event_id")} = v_source_event_id::text;`,
     `  UPDATE ${qname(internal, "event_inbox")} SET ${quoteIdent("status")} = 'executed', ${quoteIdent("target_id")} = v_result.${quoteIdent("id")}, ${quoteIdent("response")} = v_response, ${quoteIdent("consumer_audit_id")} = v_consumer_audit_id, ${quoteIdent("completed_at")} = pg_catalog.transaction_timestamp() WHERE ${quoteIdent("id")} = v_inbox_id;`,
     "  RETURN v_response;",
   );
@@ -1836,6 +1922,7 @@ function generateGrants(ir: ModelIR, includeApplicability = true): string {
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "claim_events")}(integer, integer) TO modellang_dispatcher;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "ack_event")}(uuid, uuid) TO modellang_dispatcher;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "release_event")}(uuid, uuid) TO modellang_dispatcher;`,
+    `GRANT EXECUTE ON FUNCTION ${qname(internal, "consumer_failure_state")}(text, text) TO modellang_consumer;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "record_consumer_failure")}(text, text, integer, text) TO modellang_consumer;`,
   );
   for (const consumer of ir.consumers) {
@@ -2208,6 +2295,43 @@ COMMIT;
 `;
 }
 
+function generateConsumerFailureUpgrade(ir: ModelIR): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.22 -> 0.23 durable consumer-failure disposition upgrade.
+-- Existing failure rows remain non-terminal until evaluated under a declared current policy.
+BEGIN;
+${generateConsumerRoleStatements()}
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateEventInboxInfrastructureStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateConsumers(ir).trim()}
+${generateGrants(ir).trim()}
+COMMIT;
+`;
+}
+
 export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecisionPlan(ir)): PostgresOutput {
   return {
     "001_roles.sql": generateRoles(),
@@ -2225,5 +2349,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "010_upgrade_0_20.sql": generateDomainEventUpgrade(ir, plan),
     "011_upgrade_0_21.sql": generateEventConsumerUpgrade(ir, plan),
     "012_upgrade_0_22.sql": generateEventChainUpgrade(ir, plan),
+    "013_upgrade_0_23.sql": generateConsumerFailureUpgrade(ir),
   };
 }

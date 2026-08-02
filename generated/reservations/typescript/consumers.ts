@@ -6,20 +6,60 @@ export interface ConsumerDatabaseClient {
   query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
 }
 
+export type ConsumerDeliveryFailure = {
+  readonly status: "retry" | "deadLetter";
+  readonly recorded: boolean;
+  readonly errorCode: string;
+  readonly failureCount: number | null;
+  readonly maxAttempts: number | null;
+};
+export type ConsumerDeliveryOutcome<Result> = { readonly status: "consumed"; readonly result: Result } | ConsumerDeliveryFailure;
+type ConsumerFailureRecord = ConsumerDeliveryFailure | { readonly status: "ready" | "ignoredCommitted"; readonly recorded?: boolean; readonly errorCode?: string; readonly failureCount?: number | null; readonly maxAttempts?: number | null };
+
 function privateFailureCode(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message.match(/ML_[A-Z_]+/)?.[0] ?? "ML_CONSUMER_HANDLER";
 }
 
+async function invokeIndexReservation(client: ConsumerDatabaseClient, event: ReservationCreatedEvent): Promise<Reservation> {
+  const response = await client.query<{ result: Reservation }>("SELECT \"model_reservations_internal\".\"consume_index_reservation\"($1::jsonb) AS result", [event]);
+  if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+  return response.rows[0]!.result;
+}
+
+async function recordIndexReservationFailure(client: ConsumerDatabaseClient, event: ReservationCreatedEvent, errorCode: string): Promise<ConsumerFailureRecord> {
+  const response = await client.query<{ result: ConsumerFailureRecord }>("SELECT \"model_reservations_internal\".\"record_consumer_failure\"($1, $2, $3, $4) AS result", ["consumer:con_20d694c9a0a274dc79c6168e47d25968", event.id, event.deliveryAttempt, errorCode]);
+  if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+  return response.rows[0]!.result;
+}
+
 export async function consumeIndexReservation(client: ConsumerDatabaseClient, event: ReservationCreatedEvent): Promise<Reservation> {
   try {
-    const response = await client.query<{ result: Reservation }>("SELECT \"model_reservations_internal\".\"consume_index_reservation\"($1::jsonb) AS result", [event]);
-    if (response.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
-    return response.rows[0]!.result;
+    return await invokeIndexReservation(client, event);
   } catch (error) {
     try {
-      await client.query("SELECT \"model_reservations_internal\".\"record_consumer_failure\"($1, $2, $3, $4)", ["consumer:con_20d694c9a0a274dc79c6168e47d25968", event.id, event.deliveryAttempt, privateFailureCode(error)]);
+      await recordIndexReservationFailure(client, event, privateFailureCode(error));
     } catch { /* Failure telemetry is private and best effort; handler failure remains authoritative. */ }
     throw error;
+  }
+}
+
+export async function deliverIndexReservation(client: ConsumerDatabaseClient, event: ReservationCreatedEvent): Promise<ConsumerDeliveryOutcome<Reservation>> {
+  try {
+    const state = await client.query<{ result: ConsumerFailureRecord }>("SELECT \"model_reservations_internal\".\"consumer_failure_state\"($1, $2) AS result", ["consumer:con_20d694c9a0a274dc79c6168e47d25968", event.id]);
+    if (state.rows.length !== 1) throw new Error("ML_CONSUMER_PROTOCOL");
+    if (state.rows[0]!.result.status === "deadLetter") return state.rows[0]!.result;
+  } catch (error) {
+    return { status: "retry", recorded: false, errorCode: privateFailureCode(error), failureCount: null, maxAttempts: 3 };
+  }
+  try {
+    return { status: "consumed", result: await invokeIndexReservation(client, event) };
+  } catch (error) {
+    const errorCode = privateFailureCode(error);
+    try {
+      const failure = await recordIndexReservationFailure(client, event, errorCode);
+      if (failure.status === "retry" || failure.status === "deadLetter") return failure;
+    } catch { /* A terminal disposition is never inferred when durable recording fails. */ }
+    return { status: "retry", recorded: false, errorCode, failureCount: null, maxAttempts: 3 };
   }
 }

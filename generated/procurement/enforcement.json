@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.22.0",
-    "sourceHash": "sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972",
+    "version": "0.23.0",
+    "sourceHash": "sha256:80fbd2d1c323960f6c3521d8607e6669048353cd3f6055a75a43d8eea765dc17",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -952,7 +952,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 138,
+        "endLine": 139,
         "endColumn": 2
       }
     },
@@ -966,7 +966,21 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 138,
+        "endLine": 139,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "failure-policy:consumer:con_10d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Record failed deliveries durably and return terminal deadLetter after 3 attempts.",
+      "layer": "PostgreSQL consumer failure state",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.consumer_failure",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 128,
+        "column": 1,
+        "endLine": 139,
         "endColumn": 2
       }
     },
@@ -980,7 +994,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 138,
+        "endLine": 139,
         "endColumn": 2
       }
     },
@@ -992,9 +1006,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 150,
         "column": 3,
-        "endLine": 149,
+        "endLine": 150,
         "endColumn": 21
       }
     },
@@ -1013,9 +1027,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 151,
+        "line": 152,
         "column": 13,
-        "endLine": 151,
+        "endLine": 152,
         "endColumn": 17
       }
     },
@@ -1027,9 +1041,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 152,
+        "line": 153,
         "column": 9,
-        "endLine": 152,
+        "endLine": 153,
         "endColumn": 35
       }
     },
@@ -1041,9 +1055,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 148,
+        "line": 149,
         "column": 1,
-        "endLine": 155,
+        "endLine": 156,
         "endColumn": 2
       }
     },
@@ -1055,9 +1069,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 148,
+        "line": 149,
         "column": 1,
-        "endLine": 155,
+        "endLine": 156,
         "endColumn": 2
       }
     },
@@ -1069,9 +1083,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 148,
+        "line": 149,
         "column": 1,
-        "endLine": 155,
+        "endLine": 156,
         "endColumn": 2
       }
     },
@@ -1083,9 +1097,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 140,
+        "line": 141,
         "column": 1,
-        "endLine": 146,
+        "endLine": 147,
         "endColumn": 2
       }
     },
@@ -1097,9 +1111,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 142,
+        "line": 143,
         "column": 3,
-        "endLine": 143,
+        "endLine": 144,
         "endColumn": 69
       }
     },
@@ -1111,9 +1125,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 144,
+        "line": 145,
         "column": 3,
-        "endLine": 145,
+        "endLine": 146,
         "endColumn": 73
       }
     },

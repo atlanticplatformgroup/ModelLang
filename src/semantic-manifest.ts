@@ -40,8 +40,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 6;
-  profile: "sml-transactional-core/6";
+  manifestVersion: 7;
+  profile: "sml-transactional-core/7";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -50,7 +50,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 14;
+    irVersion: 15;
     generator: "semantic-manifest";
   };
   model: {
@@ -148,6 +148,7 @@ export interface SemanticConsumer {
   lockPlan: IRConsumer["lockPlan"];
   effect: { kind: "create" | "update"; entityId: string; assignments: { fieldId: string; expression: IRExpression }[] };
   emittedEventIds: string[];
+  failurePolicy: IRConsumer["failurePolicy"];
   delivery: IRConsumer["delivery"];
   privacy: { inbox: "private"; evidence: "private"; publicCapabilityProjection: false };
 }
@@ -368,6 +369,7 @@ function consumerEntry(ir: ModelIR, consumer: IRConsumer): SemanticConsumer {
       assignments: consumer.effect.assignments.map((assignment) => ({ fieldId: assignment.fieldId, expression: assignment.expression })),
     },
     emittedEventIds: [...consumer.emittedEventIds],
+    failurePolicy: consumer.failurePolicy,
     delivery: consumer.delivery,
     privacy: { inbox: "private", evidence: "private", publicCapabilityProjection: false },
   };
@@ -394,7 +396,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 6,
+    manifestVersion: 7,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

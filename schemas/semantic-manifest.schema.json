@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 6 },
-    "profile": { "const": "sml-transactional-core/6" },
+    "manifestVersion": { "const": 7 },
+    "profile": { "const": "sml-transactional-core/7" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 14 },
+          "irVersion": { "const": 15 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -270,7 +270,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "source", "sourceEventId", "acceptedPayloadEntityId", "output", "authorization", "preconditions", "readSet", "lockPlan", "effect", "emittedEventIds", "delivery", "privacy"],
+        "required": ["id", "name", "source", "sourceEventId", "acceptedPayloadEntityId", "output", "authorization", "preconditions", "readSet", "lockPlan", "effect", "emittedEventIds", "failurePolicy", "delivery", "privacy"],
         "properties": {
           "id": { "type": "string", "pattern": "^consumer:" },
           "name": { "type": "string" },
@@ -289,6 +289,25 @@
           "lockPlan": { "type": "array" },
           "effect": { "type": "object" },
           "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
+          "failurePolicy": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["mode"],
+                "properties": { "mode": { "const": "unboundedRetry" } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["mode", "maxAttempts"],
+                "properties": {
+                  "mode": { "const": "deadLetterAfterMaxAttempts" },
+                  "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
           "delivery": {
             "type": "object",
             "required": ["transport", "deduplication", "duplicateResult", "identity"],

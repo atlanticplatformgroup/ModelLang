@@ -1,11 +1,11 @@
-# ModelLang 0.22 reference compiler
+# ModelLang 0.23 reference compiler
 
 ModelLang compiles a small domain ontology into an authenticated application boundary backed by PostgreSQL enforcement. The compiler produces a typed canonical IR with persistent semantic identity, reusable closed policies, reliable commands, typed domain events and consumers, one canonical enforcement decision plan, filtered public applicability, private transactional decision evidence, engineering policy coverage, a workflow-aware operation and UI boundary, deterministic provenance, guarded evolution, generated clients, and PostgreSQL enforcement.
 
 Two canonical applications drive the language:
 
-- Procurement proves authenticated callers, principal-scoped exactly-once command replay, atomic request lifecycle events, duplicate-safe `RequestApproved` consumption and chained `ApprovalObserved` emission, reusable manager/finance authority, exact executed decision evidence, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
-- Reservations proves reliable creation with atomic `ReservationCreated` events, duplicate-safe local indexing and chained `ReservationIndexed` emission, parameterized reads, temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
+- Procurement proves authenticated callers, principal-scoped exactly-once command replay, atomic request lifecycle events, duplicate-safe `RequestApproved` consumption, bounded durable failure disposition, and chained `ApprovalObserved` emission, reusable manager/finance authority, exact executed decision evidence, caller-scoped reads, guarded state transitions, audit snapshots, stale-read prevention, and restricted authority.
+- Reservations proves reliable creation with atomic `ReservationCreated` events, duplicate-safe bounded-retry local indexing and chained `ReservationIndexed` emission, parameterized reads, temporal rules, half-open intervals, atomic conflict detection, and concurrent double-booking prevention.
 
 ## Quick start
 
@@ -61,7 +61,7 @@ node dist/src/cli.js check examples/procurement.model
 
 ## What is generated
 
-Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.22 advances to IR14 because ordered consumer emissions and producer provenance cannot be retained faithfully by IR13. IR14 preserves IR13 reliable-consumer semantics and adds stable downstream event IDs. Released IR9 through IR13 remain accepted evolution baselines when current source compiles to IR14. Both committed subtrees are golden fixtures and migration baselines.
+Each model has a generated subtree: `generated/procurement/` and `generated/reservations/`. Its `model.ir.json` is the only compiler-backend input. ModelLang 0.23 advances to IR15 because bounded consumer failure policy cannot be retained faithfully by IR14. IR15 preserves IR14 transactional event-chain semantics and adds explicit per-consumer failure policy. Released IR9 through IR14 remain accepted evolution baselines when current source compiles to IR15. Both committed subtrees are golden fixtures and migration baselines.
 
 `operations.json` is manifest v4 derived exclusively from canonical IR. It contains JSON-visible entity and enum types, canonical entity identity-field IDs, declared action/query inputs and outputs, stable operation IDs, result cardinality, authenticated caller context, action reliability and emitted-event IDs, and stable workflow bindings. It contains no runtime events, leases, keys, receipts, request hashes, HTTP paths, SQL names, database roles, or connection details. `openapi.json` and the generated HTTP TypeScript boundary are derived from this manifest.
 
@@ -71,7 +71,7 @@ Each model has a generated subtree: `generated/procurement/` and `generated/rese
 
 `capabilities.json` is public capability manifest v3, a filtered projection derived from the operation manifest and decision plan. It exposes action/input and emitted-event IDs, static reliability requirements, fixed applicability outcomes, safe explanation rule IDs, and opaque-revision behavior. It contains no command or event instances, keys, correlations, receipts, expressions, current state, SQL details, or authority grant.
 
-`semantic.json` is engineering semantic manifest v6. It includes stable consumers, accepted source contracts, delivery identity, rules, read/lock sets, local effects, and ordered downstream event IDs in the existing action, policy, reliability, event, workflow, failure, and source-span closure.
+`semantic.json` is engineering semantic manifest v7. It includes stable consumers, accepted source contracts, delivery identity, bounded or unbounded failure policy, rules, read/lock sets, local effects, and ordered downstream event IDs in the existing action, policy, reliability, event, workflow, failure, and source-span closure.
 
 `ui.json` is UI manifest v4 derived exclusively from operation manifest v4. It adds static emitted-event IDs to the existing action, query, entity, enum, workflow, presentation, error, and reliability metadata.
 
@@ -89,11 +89,11 @@ The PostgreSQL backend emits:
 - private exact-authority evidence written transactionally with successful action audit;
 - private principal-scoped command receipts with canonical SHA-256 request fingerprints, stored results, and audit/correlation links;
 - a private transactional event outbox plus bounded lease/ack/release functions for an isolated dispatcher role;
-- private transactional inbox, consumer audit, stored-result replay, atomic downstream outbox insertion, and bounded failure metadata for an isolated consumer role;
+- private transactional inbox, consumer audit, stored-result replay, atomic downstream outbox insertion, and policy-derived durable failure dispositions for an isolated consumer role;
 - `SECURITY DEFINER` query functions with fail-closed filters and bounded JSON-array results;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
-- idempotent administrative upgrades through the 0.22 transactional-event-chain boundary.
+- idempotent administrative upgrades through the 0.23 durable-consumer-failure boundary.
 
 The generated TypeScript clients expose only declared actions, queries, and action applicability. They have no generic table or mutation API. Caller identity is not an input field.
 
@@ -128,6 +128,7 @@ consumer observeRequestApproval @stableId("con_10d694c9a0a274dc79c6168e47d25968"
 ) -> PurchaseRequest {
   authorize true;
   require is_approved: request.status == RequestStatus.APPROVED;
+  retry maxAttempts 3;
   update request { approvalObserved = true; }
   emit ApprovalObserved;
 }
@@ -136,12 +137,12 @@ consumer observeRequestApproval @stableId("con_10d694c9a0a274dc79c6168e47d25968"
 The host-owned dispatcher publishes or receives an at-least-once envelope, removes broker-private lease data, and invokes the generated adapter with a connection that can assume only `modellang_consumer`:
 
 ```ts
-import { consumeObserveRequestApproval } from "./generated/procurement/typescript/consumers.js";
+import { deliverObserveRequestApproval } from "./generated/procurement/typescript/consumers.js";
 
-const result = await consumeObserveRequestApproval(consumerDatabase, event);
+const outcome = await deliverObserveRequestApproval(consumerDatabase, event);
 ```
 
-The adapter does not acknowledge the broker. The host acknowledges only after the promise resolves; a crash or negative acknowledgement may redeliver the same event, which the transactional inbox safely replays.
+The adapter does not acknowledge or move broker messages. It returns a closed `consumed`, `retry`, or `deadLetter` outcome. The host owns acknowledgement, backoff, queue movement, and destination selection; a crash or negative acknowledgement may redeliver the same event, which the transactional inbox safely replays. If failure recording is unavailable, the adapter returns non-terminal `retry` with `recorded: false` and never guesses a terminal outcome.
 
 Consumer emissions use the complete committed post-effect entity as payload. They inherit correlation from the consumed event, set causation to the consumed event instance ID, and record stable consumer provenance. Duplicate delivery returns before emission, so one committed consumer audit can produce at most one event at each declared ordinal.
 
@@ -363,7 +364,16 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
 
 The baseline-checked artifact generalizes private outbox producer provenance, installs envelope-v2 dispatch and current handlers, and refreshes grants. It is transactional and idempotent, preserves existing action-produced events, and emits nothing until a new consumer execution commits.
 
-The safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. Policy and branch renames preserve stable identity, while changed policy signatures, branches, action authority, or idempotency requirements require reviewed evolution. Unsupported transformations still fail closed rather than becoming compiler guesses.
+Existing installations can add the private 0.23 durable consumer-failure boundary without fabricating historical failures:
+
+```bash
+psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f generated/procurement/postgres/013_upgrade_0_23.sql
+```
+
+The baseline-checked artifact upgrades private failure state, installs policy-derived state and recorder functions plus current handlers, and refreshes execute-only grants. It is transactional and idempotent. Existing inbox completions remain authoritative, no historical attempt or terminal disposition is inferred, and a model change that adds or changes a consumer policy still uses reviewed evolution.
+
+The safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. Policy and branch renames preserve stable identity, while changed policy signatures, branches, action authority, idempotency requirements, or existing-consumer failure policies require reviewed evolution. Unsupported transformations still fail closed rather than becoming compiler guesses.
 
 ## Explicit language semantics
 
@@ -384,7 +394,9 @@ The safe planner continues to refuse removals, existing semantic changes, requir
 - Inbox claim, local effect, consumer audit/evidence, completion, and stored result commit or roll back together. This is exactly-once local committed handling for one consumer identity over at-least-once transport, not exactly-once network delivery.
 - A consumer may list distinct local `emit Event;` clauses after its effect. Each payload is the complete post-effect result; correlation is inherited, causation is the consumed source event UUID, and stable consumer identity is private producer provenance. The compiler rejects payload mismatches, imported emissions, duplicates, and local event cycles.
 - Downstream outbox rows commit with the consumer effect, audit, inbox completion, and stored result. Duplicate replay returns before emission and never produces a second downstream row.
-- Consumers, inbox rows, payloads, fingerprints, stored responses, and failure metadata are absent from operation, capability, UI, OpenAPI, and agent-facing contracts. The generated adapter is broker-neutral; polling, acknowledgement, retry, retention, and dead-letter policy remain host-owned.
+- `retry maxAttempts N;` counts durably recorded failed handler deliveries for one stable consumer and source-event identity. At the limit the generated adapter returns a durable `deadLetter` disposition; omission preserves unbounded retry.
+- A successful handler resolves prior failure state atomically with its effect, audit, emissions, inbox completion, and result. Failure recording happens only after the failed handler transaction rolls back and cannot make a failed effect durable.
+- Consumers, inbox rows, payloads, fingerprints, stored responses, failure records, and delivery outcomes are absent from operation, capability, UI, OpenAPI, and agent-facing contracts. The generated adapter is broker-neutral; polling, acknowledgement, retry timing/backoff, retention, dead-letter destinations, and message movement remain host-owned.
 
 - Entity equality is identity equality. `actor == request.requester` compares the two `User` primary keys, never every field on the two rows. The canonical IR marks this as `entityIdentity`, and PostgreSQL lowers it to UUID comparison.
 - `caller actor: User` is semantic context, not a user-supplied action or query argument. It is omitted from both the generated SQL and TypeScript callable signatures. A direct login resolves through the owner-controlled `session_user` binding; a gateway transaction resolves through an owner-controlled `{issuer, subject}` binding.
@@ -458,7 +470,7 @@ Run live database tests after `npm run db:up`:
 npm run test:integration
 ```
 
-The full suite validates reliable-command replay and conflicts, event-consumer duplicate serialization, atomic downstream emission and rollback, correlation/causation propagation, cycle rejection, canonical fingerprints, policy typing, reuse, stable identity, recursion and ambiguity rejection, exact durable authority, receipt/inbox/evidence rollback, parsing and spans, migration planning and live row preservation, baseline rejection, workflow contracts, exact money, generated values, operation/UI/semantic/provenance schemas, semantic change classification, caller rules, query policies, deterministic output, privileges, auditing, invariants, conflicts, and real races.
+The full suite validates reliable-command replay and conflicts, event-consumer duplicate serialization, bounded failure counting and terminal disposition, success resolution, atomic downstream emission and rollback, correlation/causation propagation, cycle rejection, canonical fingerprints, policy typing, reuse, stable identity, recursion and ambiguity rejection, exact durable authority, receipt/inbox/evidence rollback, parsing and spans, migration planning and live row preservation, baseline rejection, workflow contracts, exact money, generated values, operation/UI/semantic/provenance schemas, semantic change classification, caller rules, query policies, deterministic output, privileges, auditing, invariants, conflicts, and real races.
 
 ## Deliberate PoC boundaries
 
@@ -473,9 +485,9 @@ The full suite validates reliable-command replay and conflicts, event-consumer d
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
 - The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, transport retry scheduling, package publication, deployment, and observability to the host.
 - Reliable commands intentionally omit automatic retry scheduling, receipt expiry/deletion, multi-action sagas, asynchronous recovery, external side-effect deduplication, cross-model keys, and signed/public receipts. Retention is deployment-governed.
-- Event consumers intentionally omit broker-specific polling and acknowledgement, retry/backoff schedules, dead-letter routing, retention, replay administration, arbitrary payload transformations, imported-event emission, cyclic chains, cross-context translation, partition assignment, global ordering, sagas, and exactly-once network delivery.
+- Event consumers intentionally omit broker-specific polling and acknowledgement, retry timing/backoff schedules, dead-letter destinations or message movement, retention, replay administration, arbitrary payload transformations, imported-event emission, cyclic chains, cross-context translation, partition assignment, global ordering, sagas, and exactly-once network delivery. ModelLang supplies only durable private failure accounting and a broker-neutral disposition.
 - UI manifest v4 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, pagination controls, optimistic concurrency, and client-side validation policy. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
-- Engineering semantic manifest v6 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
+- Engineering semantic manifest v7 is intentionally a trusted static artifact, not an authorization-filtered capability view. Public policy traces, freshness lifetimes, recovery workflows, external operations, extensions, target capability profiles, and agent/MCP generation remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.22 language is in [spec/0.22/LANGUAGE.md](./spec/0.22/LANGUAGE.md), with its [transactional event-chain contract](./spec/0.22/EVENT_CHAINS.md), [conformance requirements](./spec/0.22/CONFORMANCE.md), and [unstable boundaries](./spec/0.22/UNSTABLE.md). Earlier reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.22 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.
+The normative 0.23 language is in [spec/0.23/LANGUAGE.md](./spec/0.23/LANGUAGE.md), with its [durable consumer-failure contract](./spec/0.23/CONSUMER_FAILURES.md), [conformance requirements](./spec/0.23/CONFORMANCE.md), and [unstable boundaries](./spec/0.23/UNSTABLE.md). Earlier event-chain, reliable-consumer, transactional-event, reliable-command, policy, applicability, reviewed evolution, semantic closure, workflow, UI, gateway, transport, and safe-evolution contracts remain normative where 0.23 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.

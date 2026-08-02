@@ -1,4 +1,4 @@
--- source sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972
+-- source sha256:80fbd2d1c323960f6c3521d8607e6669048353cd3f6055a75a43d8eea765dc17
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -352,13 +352,72 @@ CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure" (
   "failure_count" integer NOT NULL DEFAULT 1,
   "last_delivery_attempt" integer NOT NULL,
   "last_error_code" text NOT NULL,
+  "max_attempts" integer,
+  "disposition" text NOT NULL DEFAULT 'retry',
   "last_failed_at" timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+  "terminal_at" timestamptz,
+  "resolved_at" timestamptz,
   PRIMARY KEY ("consumer_id", "source_event_id"),
   CONSTRAINT "ck_consumer_failure_count" CHECK ("failure_count" >= 1 AND "last_delivery_attempt" >= 1),
-  CONSTRAINT "ck_consumer_failure_code" CHECK ("last_error_code" ~ '^ML_[A-Z_]+$')
+  CONSTRAINT "ck_consumer_failure_code" CHECK ("last_error_code" ~ '^ML_[A-Z_]+$'),
+  CONSTRAINT "ck_consumer_failure_disposition" CHECK (
+    ("disposition" = 'retry' AND "terminal_at" IS NULL AND "resolved_at" IS NULL)
+    OR ("disposition" = 'deadLetter' AND "max_attempts" IS NOT NULL AND "failure_count" >= "max_attempts" AND "terminal_at" IS NOT NULL AND "resolved_at" IS NULL)
+    OR ("disposition" = 'resolved' AND "terminal_at" IS NULL AND "resolved_at" IS NOT NULL)
+  )
 );
-CREATE OR REPLACE FUNCTION "model_procurement_internal"."record_consumer_failure"(p_consumer_id text, p_event_id text, p_delivery_attempt integer, p_error_code text) RETURNS void
+ALTER TABLE "model_procurement_internal"."consumer_failure" ADD COLUMN IF NOT EXISTS "max_attempts" integer;
+ALTER TABLE "model_procurement_internal"."consumer_failure" ADD COLUMN IF NOT EXISTS "disposition" text NOT NULL DEFAULT 'retry';
+ALTER TABLE "model_procurement_internal"."consumer_failure" ADD COLUMN IF NOT EXISTS "terminal_at" timestamptz;
+ALTER TABLE "model_procurement_internal"."consumer_failure" ADD COLUMN IF NOT EXISTS "resolved_at" timestamptz;
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '"model_procurement_internal"."consumer_failure"'::regclass AND conname = 'ck_consumer_failure_disposition') THEN
+    ALTER TABLE "model_procurement_internal"."consumer_failure" ADD CONSTRAINT "ck_consumer_failure_disposition" CHECK (
+      ("disposition" = 'retry' AND "terminal_at" IS NULL AND "resolved_at" IS NULL)
+      OR ("disposition" = 'deadLetter' AND "max_attempts" IS NOT NULL AND "failure_count" >= "max_attempts" AND "terminal_at" IS NOT NULL AND "resolved_at" IS NULL)
+      OR ("disposition" = 'resolved' AND "terminal_at" IS NULL AND "resolved_at" IS NOT NULL)
+    );
+  END IF;
+END
+$modellang$;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."consumer_failure_state"(p_consumer_id text, p_event_id text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_max_attempts integer;
+  v_failure_count integer;
+  v_error_code text;
+  v_disposition text;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS consumer_role ON consumer_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE consumer_role.rolname = 'modellang_consumer' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_CONSUMER_REQUIRED';
+  END IF;
+  IF p_consumer_id IS NULL OR p_consumer_id NOT IN ('consumer:con_10d694c9a0a274dc79c6168e47d25968') OR p_event_id IS NULL OR p_event_id !~ '^[0-9a-fA-F-]{36}$' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';
+  END IF;
+  v_max_attempts := CASE p_consumer_id WHEN 'consumer:con_10d694c9a0a274dc79c6168e47d25968' THEN 3 ELSE NULL END;
+  SELECT "failure_count", "last_error_code", "disposition" INTO v_failure_count, v_error_code, v_disposition
+  FROM "model_procurement_internal"."consumer_failure" WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id FOR UPDATE;
+  IF NOT FOUND OR v_disposition = 'resolved' THEN RETURN pg_catalog.jsonb_build_object('status', 'ready'); END IF;
+  v_disposition := CASE WHEN v_max_attempts IS NOT NULL AND v_failure_count >= v_max_attempts THEN 'deadLetter' ELSE 'retry' END;
+  UPDATE "model_procurement_internal"."consumer_failure" SET "max_attempts" = v_max_attempts, "disposition" = v_disposition,
+    "terminal_at" = CASE WHEN v_disposition = 'deadLetter' THEN COALESCE("terminal_at", pg_catalog.clock_timestamp()) ELSE NULL END, "resolved_at" = (NULL::timestamptz)
+  WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id;
+  RETURN pg_catalog.jsonb_build_object('status', v_disposition, 'recorded', TRUE, 'errorCode', v_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."consumer_failure_state"(text, text) FROM PUBLIC;
+DROP FUNCTION IF EXISTS "model_procurement_internal"."record_consumer_failure"(text, text, integer, text);
+CREATE FUNCTION "model_procurement_internal"."record_consumer_failure"(p_consumer_id text, p_event_id text, p_delivery_attempt integer, p_error_code text) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+DECLARE
+  v_max_attempts integer;
+  v_failure_count integer;
+  v_disposition text;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_auth_members AS membership
@@ -372,12 +431,30 @@ BEGIN
      OR p_delivery_attempt IS NULL OR p_delivery_attempt < 1 OR p_error_code IS NULL OR p_error_code !~ '^ML_[A-Z_]+$' THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';
   END IF;
-  INSERT INTO "model_procurement_internal"."consumer_failure" ("consumer_id", "source_event_id", "last_delivery_attempt", "last_error_code")
-  VALUES (p_consumer_id, p_event_id, p_delivery_attempt, p_error_code)
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_consumer_id || ':' || p_event_id, 0));
+  v_max_attempts := CASE p_consumer_id WHEN 'consumer:con_10d694c9a0a274dc79c6168e47d25968' THEN 3 ELSE NULL END;
+  IF EXISTS (SELECT 1 FROM "model_procurement_internal"."event_inbox" WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id::uuid AND "status" = 'executed') THEN
+    UPDATE "model_procurement_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = v_max_attempts, "terminal_at" = (NULL::timestamptz), "resolved_at" = COALESCE("resolved_at", pg_catalog.clock_timestamp())
+    WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id;
+    RETURN pg_catalog.jsonb_build_object('status', 'ignoredCommitted', 'recorded', FALSE, 'errorCode', p_error_code, 'failureCount', NULL, 'maxAttempts', v_max_attempts);
+  END IF;
+  SELECT "failure_count", "disposition" INTO v_failure_count, v_disposition FROM "model_procurement_internal"."consumer_failure"
+  WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id FOR UPDATE;
+  IF FOUND AND v_disposition = 'deadLetter' THEN
+    RETURN pg_catalog.jsonb_build_object('status', 'deadLetter', 'recorded', TRUE, 'errorCode', p_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);
+  END IF;
+  INSERT INTO "model_procurement_internal"."consumer_failure" AS failure_row ("consumer_id", "source_event_id", "failure_count", "last_delivery_attempt", "last_error_code", "max_attempts", "disposition", "terminal_at")
+  VALUES (p_consumer_id, p_event_id, 1, p_delivery_attempt, p_error_code, v_max_attempts, 'retry', NULL)
   ON CONFLICT ("consumer_id", "source_event_id") DO UPDATE SET
-    "failure_count" = "model_procurement_internal"."consumer_failure"."failure_count" + 1,
-    "last_delivery_attempt" = GREATEST("model_procurement_internal"."consumer_failure"."last_delivery_attempt", EXCLUDED."last_delivery_attempt"),
-    "last_error_code" = EXCLUDED."last_error_code", "last_failed_at" = pg_catalog.clock_timestamp();
+    "failure_count" = failure_row."failure_count" + 1, "last_delivery_attempt" = GREATEST(failure_row."last_delivery_attempt", EXCLUDED."last_delivery_attempt"),
+    "last_error_code" = EXCLUDED."last_error_code", "max_attempts" = v_max_attempts,
+    "last_failed_at" = pg_catalog.clock_timestamp(), "resolved_at" = (NULL::timestamptz)
+  RETURNING "failure_count" INTO v_failure_count;
+  v_disposition := CASE WHEN v_max_attempts IS NOT NULL AND v_failure_count >= v_max_attempts THEN 'deadLetter' ELSE 'retry' END;
+  UPDATE "model_procurement_internal"."consumer_failure" SET "max_attempts" = v_max_attempts, "disposition" = v_disposition,
+    "terminal_at" = CASE WHEN v_disposition = 'deadLetter' THEN COALESCE("terminal_at", pg_catalog.clock_timestamp()) ELSE NULL END, "resolved_at" = (NULL::timestamptz)
+  WHERE "consumer_id" = p_consumer_id AND "source_event_id" = p_event_id;
+  RETURN pg_catalog.jsonb_build_object('status', v_disposition, 'recorded', TRUE, 'errorCode', p_error_code, 'failureCount', v_failure_count, 'maxAttempts', v_max_attempts);
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."record_consumer_failure"(text, text, integer, text) FROM PUBLIC;
 CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_outbox" (
@@ -518,6 +595,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.22.0', 'sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972', 'installation');
+VALUES ('model:Procurement', '0.23.0', 'sha256:80fbd2d1c323960f6c3521d8607e6669048353cd3f6055a75a43d8eea765dc17', 'installation');
 RESET ROLE;
 

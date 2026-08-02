@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 6,
-  "profile": "sml-transactional-core/6",
+  "manifestVersion": 7,
+  "profile": "sml-transactional-core/7",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.22.0",
-    "irVersion": 14,
+    "compilerVersion": "0.23.0",
+    "irVersion": 15,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.22.0",
-    "sourceHash": "sha256:4734c3fc4c4486ee33c643c1d76fd68984d2883c1555f1469a54a97b3368e046",
+    "version": "0.23.0",
+    "sourceHash": "sha256:c586f8489334a72fbd59eecbd99b85856cd9729a81610b778a9d41dcaa94f122",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -241,7 +241,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 58,
+        "endLine": 59,
         "endColumn": 2
       },
       "sourceEventId": "event:evt_40d694c9a0a274dc79c6168e47d25968",
@@ -358,6 +358,10 @@
       "emittedEventIds": [
         "event:evt_60d694c9a0a274dc79c6168e47d25968"
       ],
+      "failurePolicy": {
+        "mode": "deadLetterAfterMaxAttempts",
+        "maxAttempts": 3
+      },
       "delivery": {
         "transport": "atLeastOnce",
         "deduplication": "transactionalInbox",
@@ -377,9 +381,9 @@
       "name": "reservationsForResource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 60,
+        "line": 61,
         "column": 1,
-        "endLine": 68,
+        "endLine": 69,
         "endColumn": 2
       },
       "caller": {
@@ -414,9 +418,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/reservations.model",
-          "line": 64,
+          "line": 65,
           "column": 13,
-          "endLine": 64,
+          "endLine": 65,
           "endColumn": 17
         },
         "dependencies": []
@@ -451,9 +455,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "source": {
           "file": "examples/reservations.model",
-          "line": 65,
+          "line": 66,
           "column": 9,
-          "endLine": 65,
+          "endLine": 66,
           "endColumn": 41
         },
         "dependencies": [

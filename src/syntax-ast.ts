@@ -163,6 +163,7 @@ export interface ConsumerDecl {
   returnType: TypeRef;
   authorize: Expression;
   requires: RequireDecl[];
+  retry?: { maxAttempts: number; span: Span };
   effect: Effect;
   emits: { eventName: string; span: Span }[];
   span: Span;

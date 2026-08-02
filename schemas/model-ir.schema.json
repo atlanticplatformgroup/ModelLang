@@ -171,7 +171,7 @@
     },
     "consumer": {
       "type": "object",
-      "required": ["id", "name", "identity", "sourceEventId", "payloadParameter", "acceptedPayloadEntityId", "returnEntityId", "authorization", "preconditions", "effect", "emittedEventIds", "lockPlan", "delivery", "span", "naming"],
+      "required": ["id", "name", "identity", "sourceEventId", "payloadParameter", "acceptedPayloadEntityId", "returnEntityId", "authorization", "preconditions", "failurePolicy", "effect", "emittedEventIds", "lockPlan", "delivery", "span", "naming"],
       "properties": {
         "id": { "type": "string", "pattern": "^consumer:" },
         "name": { "type": "string" },
@@ -182,6 +182,25 @@
         "returnEntityId": { "type": "string", "pattern": "^entity:" },
         "authorization": { "type": "object" },
         "preconditions": { "type": "array" },
+        "failurePolicy": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["mode"],
+              "properties": { "mode": { "const": "unboundedRetry" } },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["mode", "maxAttempts"],
+              "properties": {
+                "mode": { "const": "deadLetterAfterMaxAttempts" },
+                "maxAttempts": { "type": "integer", "minimum": 1, "maximum": 1000 }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "effect": { "type": "object" },
         "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
         "lockPlan": { "type": "array" },
@@ -266,7 +285,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 14 },
+    "irVersion": { "const": 15 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

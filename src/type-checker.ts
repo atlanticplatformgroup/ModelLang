@@ -204,7 +204,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 14,
+    irVersion: 15,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -852,6 +852,14 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
       span: irSpan(consumer.authorize.span, file),
     },
     preconditions,
+    failurePolicy: consumer.retry
+      ? (() => {
+          if (!Number.isInteger(consumer.retry.maxAttempts) || consumer.retry.maxAttempts < 1 || consumer.retry.maxAttempts > 1000) {
+            throw new ModelError("E3401", "Consumer retry maxAttempts must be an integer from 1 through 1000.", consumer.retry.span, file);
+          }
+          return { mode: "deadLetterAfterMaxAttempts" as const, maxAttempts: consumer.retry.maxAttempts };
+        })()
+      : { mode: "unboundedRetry" as const },
     effect: { kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
     emittedEventIds,
     lockPlan: consumer.effect.kind === "update"
@@ -1550,6 +1558,16 @@ function buildEnforcement(
       layer: "PostgreSQL transactional inbox",
       artifact: "postgres/002_schema.sql",
       objectName: `${internalSchema}.event_inbox`,
+      source: consumer.span,
+    });
+    entries.push({
+      id: `failure-policy:${consumer.id}`,
+      purpose: consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts"
+        ? `Record failed deliveries durably and return terminal deadLetter after ${consumer.failurePolicy.maxAttempts} attempts.`
+        : "Record failed deliveries durably while preserving unbounded retry disposition.",
+      layer: "PostgreSQL consumer failure state",
+      artifact: "postgres/002_schema.sql",
+      objectName: `${internalSchema}.consumer_failure`,
       source: consumer.span,
     });
     for (const eventId of consumer.emittedEventIds) {

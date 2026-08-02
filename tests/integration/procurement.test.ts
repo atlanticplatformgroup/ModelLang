@@ -11,7 +11,7 @@ import {
   type ProcurementAuthenticator,
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
-import { consumeObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
+import { consumeObserveRequestApproval, deliverObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
 import type { RequestApprovedEvent } from "../../generated/procurement/typescript/events.js";
 import {
   createProcurementUiExecutor,
@@ -118,6 +118,21 @@ async function submittedRequest(amount: string): Promise<string> {
   return opened.id;
 }
 
+async function requestApprovedEnvelope(request: string): Promise<RequestApprovedEvent> {
+  const result = await admin.query<{ envelope: RequestApprovedEvent }>(`
+    SELECT pg_catalog.jsonb_build_object(
+      'id', id, 'eventId', event_id, 'eventName', event_name, 'modelId', model_id,
+      'modelVersion', model_version, 'sourceHash', source_hash, 'actionId', action_id,
+      'consumerId', consumer_id, 'targetId', target_id, 'payload', payload,
+      'correlationId', correlation_id, 'causationId', causation_id, 'occurredAt', occurred_at,
+      'ordinal', ordinal, 'deliveryAttempt', 1
+    ) AS envelope
+    FROM model_procurement_internal.event_outbox
+    WHERE target_id = $1 AND event_id = 'event:evt_30d694c9a0a274dc79c6168e47d25968'
+  `, [request]);
+  return result.rows[0]!.envelope;
+}
+
 async function waitUntilLockWaiting(pids: number[], timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -184,7 +199,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.22.0",
+      model_version: "0.23.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -344,7 +359,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.22.0', $1,
+        VALUES ('model:Procurement', '0.23.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -375,7 +390,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
           (SELECT count(*)::text FROM model_procurement_internal.consumer_failure WHERE source_event_id = $1::text) AS failures,
           (SELECT last_delivery_attempt FROM model_procurement_internal.event_inbox WHERE source_event_id = $1) AS attempt
       `, [envelope.id]);
-      expect(evidence.rows[0]).toEqual({ inboxes: "1", audits: "1", failures: "1", attempt: 2 });
+      expect(evidence.rows[0]).toEqual({ inboxes: "1", audits: "1", failures: "0", attempt: 2 });
       const downstream = await admin.query<{
         count: string; action_id: string | null; consumer_id: string; correlation_id: string; causation_id: string;
         action_audit_id: string | null; consumer_audit_id: string; command_receipt_id: string | null; payload: { id: string };
@@ -439,6 +454,125 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       id: request,
       approvalObserved: true,
     });
+  });
+
+  it("returns durable retry and dead-letter dispositions without repeating a local effect", async () => {
+    const request = await submittedRequest("84");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const invalid = { ...envelope, payload: { ...envelope.payload, status: "SUBMITTED" as const } };
+
+    await expect(deliverObserveRequestApproval(consumer, invalid)).resolves.toMatchObject({
+      status: "retry", recorded: true, failureCount: 1, maxAttempts: 3,
+      errorCode: "ML_CONSUMER_PRECONDITION",
+    });
+    await expect(deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt: 2 })).resolves.toMatchObject({
+      status: "retry", recorded: true, failureCount: 2, maxAttempts: 3,
+    });
+    await expect(deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt: 3 })).resolves.toMatchObject({
+      status: "deadLetter", recorded: true, failureCount: 3, maxAttempts: 3,
+    });
+    await expect(deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt: 4 })).resolves.toMatchObject({
+      status: "deadLetter", recorded: true, failureCount: 3, maxAttempts: 3,
+    });
+
+    const state = await admin.query<{ observed: boolean; failures: string; disposition: string; inboxes: string; audits: string; downstream: string }>(`
+      SELECT
+        (SELECT approval_observed FROM model_procurement.purchase_request WHERE id = $1) AS observed,
+        failure.failure_count::text AS failures,
+        failure.disposition,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox WHERE source_event_id = $2) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_audit WHERE source_event_id = $2) AS audits,
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox
+         WHERE target_id = $1 AND event_id = 'event:evt_50d694c9a0a274dc79c6168e47d25968') AS downstream
+      FROM model_procurement_internal.consumer_failure AS failure
+      WHERE failure.consumer_id = 'consumer:con_10d694c9a0a274dc79c6168e47d25968'
+        AND failure.source_event_id = $2::text
+    `, [request, envelope.id]);
+    expect(state.rows[0]).toEqual({ observed: false, failures: "3", disposition: "deadLetter", inboxes: "0", audits: "0", downstream: "0" });
+    await expect(consumer.query("SELECT * FROM model_procurement_internal.consumer_failure"))
+      .rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("resolves durable retry state atomically when a later delivery succeeds", async () => {
+    const request = await submittedRequest("85");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const invalid = { ...envelope, payload: { ...envelope.payload, status: "SUBMITTED" as const } };
+    await expect(deliverObserveRequestApproval(consumer, invalid)).resolves.toMatchObject({ status: "retry", failureCount: 1 });
+    const consumed = await deliverObserveRequestApproval(consumer, { ...envelope, deliveryAttempt: 2 });
+    expect(consumed).toMatchObject({ status: "consumed", result: { id: request, approvalObserved: true } });
+
+    const state = await admin.query<{ disposition: string; failures: string; resolved: boolean; downstream: string }>(`
+      SELECT failure.disposition, failure.failure_count::text AS failures, failure.resolved_at IS NOT NULL AS resolved,
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox
+         WHERE target_id = $1 AND event_id = 'event:evt_50d694c9a0a274dc79c6168e47d25968') AS downstream
+      FROM model_procurement_internal.consumer_failure AS failure
+      WHERE failure.consumer_id = 'consumer:con_10d694c9a0a274dc79c6168e47d25968'
+        AND failure.source_event_id = $2::text
+    `, [request, envelope.id]);
+    expect(state.rows[0]).toEqual({ disposition: "resolved", failures: "1", resolved: true, downstream: "1" });
+  });
+
+  it("serializes concurrent failure recording without losing an attempt", async () => {
+    const request = await submittedRequest("86");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const invalid = { ...envelope, payload: { ...envelope.payload, status: "SUBMITTED" as const } };
+
+    const outcomes = await Promise.all([
+      deliverObserveRequestApproval(consumer, invalid),
+      deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt: 2 }),
+    ]);
+    expect(outcomes.every((outcome) => outcome.status === "retry" && outcome.recorded)).toBe(true);
+    expect(outcomes.map((outcome) => outcome.status === "consumed" ? null : outcome.failureCount).sort()).toEqual([1, 2]);
+
+    const state = await admin.query<{ failures: string; disposition: string }>(`
+      SELECT failure_count::text AS failures, disposition
+      FROM model_procurement_internal.consumer_failure
+      WHERE consumer_id = 'consumer:con_10d694c9a0a274dc79c6168e47d25968'
+        AND source_event_id = $1::text
+    `, [envelope.id]);
+    expect(state.rows[0]).toEqual({ failures: "2", disposition: "retry" });
+  });
+
+  it("lets an in-flight committed success dominate concurrent failure telemetry", async () => {
+    const request = await submittedRequest("87");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const blocker = new Client({ connectionString: databaseUrl });
+    const handler = new Client({ connectionString: loginUrl("ml_consumer") });
+    const recorder = new Client({ connectionString: loginUrl("ml_consumer") });
+    await Promise.all([blocker.connect(), handler.connect(), recorder.connect()]);
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query("SELECT 1 FROM model_procurement.purchase_request WHERE id = $1 FOR UPDATE", [request]);
+      const handlerPid = (await handler.query<{ pid: number }>("SELECT pg_catalog.pg_backend_pid() AS pid")).rows[0]!.pid;
+      const recorderPid = (await recorder.query<{ pid: number }>("SELECT pg_catalog.pg_backend_pid() AS pid")).rows[0]!.pid;
+      const handled = handler.query<{ result: object }>(
+        'SELECT model_procurement_internal.consume_observe_request_approval($1::jsonb) AS result',
+        [envelope],
+      );
+      await waitUntilLockWaiting([handlerPid]);
+      const recorded = recorder.query<{ result: { status: string; recorded: boolean } }>(
+        "SELECT model_procurement_internal.record_consumer_failure($1, $2, $3, $4) AS result",
+        ["consumer:con_10d694c9a0a274dc79c6168e47d25968", envelope.id, 2, "ML_CONSUMER_HANDLER"],
+      );
+      await waitUntilLockWaiting([handlerPid, recorderPid]);
+      await blocker.query("COMMIT");
+      await expect(handled).resolves.toMatchObject({ rows: [{ result: { id: request, approvalObserved: true } }] });
+      await expect(recorded).resolves.toMatchObject({ rows: [{ result: { status: "ignoredCommitted", recorded: false } }] });
+
+      const state = await admin.query<{ failures: string; inboxes: string }>(`
+        SELECT
+          (SELECT count(*)::text FROM model_procurement_internal.consumer_failure WHERE source_event_id = $1::text) AS failures,
+          (SELECT count(*)::text FROM model_procurement_internal.event_inbox WHERE source_event_id = $1::uuid) AS inboxes
+      `, [envelope.id]);
+      expect(state.rows[0]).toEqual({ failures: "0", inboxes: "1" });
+    } finally {
+      await blocker.query("ROLLBACK").catch(() => undefined);
+      await Promise.all([blocker.end(), handler.end(), recorder.end()]);
+    }
   });
 
   it("rejects changed retry inputs without disclosing the stored result", async () => {
@@ -843,6 +977,29 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_audit) AS audits,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the transactional 0.23 consumer-failure upgrade without fabricating failure state", async () => {
+    const before = await admin.query<{ requests: string; failures: string; inboxes: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS failures,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/013_upgrade_0_23.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; failures: string; inboxes: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS failures,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);

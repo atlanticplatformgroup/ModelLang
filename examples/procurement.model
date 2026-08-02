@@ -1,4 +1,4 @@
-model Procurement version "0.22.0";
+model Procurement version "0.23.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -130,6 +130,7 @@ consumer observeRequestApproval @stableId("con_10d694c9a0a274dc79c6168e47d25968"
 ) -> PurchaseRequest {
   authorize true;
   require is_approved: request.status == RequestStatus.APPROVED;
+  retry maxAttempts 3;
 
   update request {
     approvalObserved = true;

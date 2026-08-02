@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.22](./spec/0.22/LANGUAGE.md). It retains the complete 0.21 boundary and adds ordered local event emission from consumers, atomic event-chain commits, inherited correlation, source-event causation, stable producer provenance, replay suppression, and compile-time cycle rejection.
+The current normative specification is [ModelLang 0.23](./spec/0.23/LANGUAGE.md). It retains the complete 0.22 boundary and adds declarative bounded consumer failure policy, private durable failure accounting, and broker-neutral retry/dead-letter dispositions without claiming broker control or exactly-once network delivery.
+
+- [Durable consumer-failure semantics](./spec/0.23/CONSUMER_FAILURES.md)
+- [0.23 grammar additions](./spec/0.23/GRAMMAR.ebnf)
+- [0.23 conformance requirements](./spec/0.23/CONFORMANCE.md)
+- [0.23 unstable consumer-failure boundaries](./spec/0.23/UNSTABLE.md)
 
 - [Transactional event-chain semantics](./spec/0.22/EVENT_CHAINS.md)
 - [0.22 grammar additions](./spec/0.22/GRAMMAR.ebnf)

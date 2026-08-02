@@ -1,45 +1,45 @@
 {
   "$schema": "https://modellang.dev/schemas/artifact-provenance.schema.json",
   "provenanceVersion": 1,
-  "compilerVersion": "0.22.0",
-  "generatorProfile": "postgresql-http-ui-event-chains/6",
+  "compilerVersion": "0.23.0",
+  "generatorProfile": "postgresql-http-ui-consumer-failures/7",
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.22.0",
-    "sourceHash": "sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972"
+    "version": "0.23.0",
+    "sourceHash": "sha256:80fbd2d1c323960f6c3521d8607e6669048353cd3f6055a75a43d8eea765dc17"
   },
-  "irVersion": 14,
+  "irVersion": 15,
   "artifacts": [
     {
       "path": "capabilities.json",
       "role": "contract",
-      "sha256": "sha256:3828d08b744702b177785fbe29ad6c0baeecb737cc951690ded1e7e734fb97f2"
+      "sha256": "sha256:8af5585cc57ed7e6646c1256d10f4230e7d57773462b4c92643cee590d80608f"
     },
     {
       "path": "decisions.json",
       "role": "contract",
-      "sha256": "sha256:2d3c751334d5b17a286da26ddf3ab18021a32375493c03b68e6fdfc5ef609990"
+      "sha256": "sha256:ef4839ad8beacff75eb1f7886a41a038ae4e91aac08738fd27d94a6b76ef79e7"
     },
     {
       "path": "enforcement.json",
       "role": "assurance",
-      "sha256": "sha256:8a2314784ed97d0fd43cb8622923916f181b84a6dd3b58867d9543c9158e7d16"
+      "sha256": "sha256:ce38b24afde743ea074da396aa1298003e486cceac8846ceeddc0a0e96dca90f"
     },
     {
       "path": "enforcement.md",
       "role": "assurance",
-      "sha256": "sha256:992b6b19051814e3114b26a5a801bed72fc1a951ab3c5d6a7fff8c877756c579"
+      "sha256": "sha256:692272292c777248ac096c4eb770648eb9872e07231f89cf610083c5cabdca86"
     },
     {
       "path": "events.json",
       "role": "contract",
-      "sha256": "sha256:03a2c8674540f67f6ee3148dcc167fa9b7874d4abce8578fb3329cc84b157ad3"
+      "sha256": "sha256:805c867df701c8c151f7a45f4f48b5f914dc396521e53bdc29b805071c4bdf4e"
     },
     {
       "path": "model.ir.json",
       "role": "canonical",
-      "sha256": "sha256:d6c58198773e55788598fda96c8d45e0f5118ca3153e103d9e759d226d74fa2f"
+      "sha256": "sha256:3bd37c7ec977528ef97f1d550e64af1ccaa0c1451d46aedeea16cbbe23d68212"
     },
     {
       "path": "model.mmd",
@@ -49,12 +49,12 @@
     {
       "path": "openapi.json",
       "role": "contract",
-      "sha256": "sha256:326daa57b9851a3501716619aeb32a0561cd9e2844b8b3df524ef4941ff780c8"
+      "sha256": "sha256:9801ea1937e287534ef5aaa5d1107008639bbb8813bdcf687e60c7653c3338c0"
     },
     {
       "path": "operations.json",
       "role": "contract",
-      "sha256": "sha256:49da0abf18524006c4f355ae20d30bf90051bf6646dc943687eb473ab4f975d1"
+      "sha256": "sha256:a2ecef2b8f64d28df3860a568034c2347d977bb16c4682183c5153298840a7d1"
     },
     {
       "path": "postgres/001_roles.sql",
@@ -64,22 +64,22 @@
     {
       "path": "postgres/002_schema.sql",
       "role": "projection",
-      "sha256": "sha256:1952633e9b673b1ad2bbcf72e41b1d392023b8b4644396e1af1b845ae8238047"
+      "sha256": "sha256:1fa818f01ff74d2a540b1e8603eef4813e70c978d3b9874b7a9f6708f32aac31"
     },
     {
       "path": "postgres/003_actions.sql",
       "role": "projection",
-      "sha256": "sha256:5fc2afdbd868378179ecfa69254863f1102d4dbf43e37126157fadd92cd11d66"
+      "sha256": "sha256:ec2435685afb8a2c7d77d4d0fd7f61bd435c382187f6e512ec0f20207b5e8e67"
     },
     {
       "path": "postgres/003_consumers.sql",
       "role": "projection",
-      "sha256": "sha256:b8e34b03265d7ccbd99a989b006cbc560c663c744f0a6df89854f53daa2d8016"
+      "sha256": "sha256:da7566813b129fb518e058e7c0553e73fa7234ab187bb1fd2cce0bd13837c3e0"
     },
     {
       "path": "postgres/003_decisions.sql",
       "role": "projection",
-      "sha256": "sha256:6da94bb5f9c3530f5a1880fd856ee2f76988d2aef6ebc8c3eb32181f2ddacf87"
+      "sha256": "sha256:e40d57213bd430a1a63258972bf6cace377b5a0e4f265f16940bf345140eed46"
     },
     {
       "path": "postgres/003_queries.sql",
@@ -89,7 +89,7 @@
     {
       "path": "postgres/004_grants.sql",
       "role": "projection",
-      "sha256": "sha256:fa0a705a617f787d3efce8c70ca5dba5ece3864b09aed205da0e4249ca632bc3"
+      "sha256": "sha256:c614fb6b7dc5dbc1c7203ea6820cfcfbde1170dfc7386dc208e4bcd14199fc44"
     },
     {
       "path": "postgres/005_seed.sql",
@@ -99,42 +99,47 @@
     {
       "path": "postgres/006_upgrade_0_12.sql",
       "role": "projection",
-      "sha256": "sha256:21230570b0bf0ea32435bbe1f0976de32fac255ceaaf9097841c391ccae92a7d"
+      "sha256": "sha256:b8c67058958a71df7f65e50e681685e668cab70d6b000ccdb9a44c1b3d3fb01b"
     },
     {
       "path": "postgres/007_upgrade_0_17.sql",
       "role": "projection",
-      "sha256": "sha256:8c3a0cb2aeec56df39a812cf6c94671a88965e62395fc8294c6f4eed01a55de5"
+      "sha256": "sha256:1597e701862e4295c3cab6f5565b04504acad335685c89ec10e4fb2045bd3100"
     },
     {
       "path": "postgres/008_upgrade_0_18.sql",
       "role": "projection",
-      "sha256": "sha256:7bf70a56e236f91564dba2e8c88638db71421e21b9a3a3317db935c08625e582"
+      "sha256": "sha256:a11362159273edcd74763b0cce88a304a3453f1c362d065753d239570e9f211e"
     },
     {
       "path": "postgres/009_upgrade_0_19.sql",
       "role": "projection",
-      "sha256": "sha256:0626b536d96fb8f3e1fef2e1530a5faa347a0214309e823e4d35029ecdaf2943"
+      "sha256": "sha256:4a9329c526c1a79330d907bab5bea9084145e742fe7b5de491614579141d78a4"
     },
     {
       "path": "postgres/010_upgrade_0_20.sql",
       "role": "projection",
-      "sha256": "sha256:2fdeadc184bbe4063978159867cf231a1e465220dfb464d0c10dffea8b43dda4"
+      "sha256": "sha256:51c3e00129bf062415de5fe792cf39f73dd2a2435837ff7a5e86b2b15e019184"
     },
     {
       "path": "postgres/011_upgrade_0_21.sql",
       "role": "projection",
-      "sha256": "sha256:145d603525261487f7d5151316ba731e09e8444dd55320b88da943eb66b316bc"
+      "sha256": "sha256:189220873eee30f16672e2238f6376b5b2b1776af3dab7257a9655661f82dffd"
     },
     {
       "path": "postgres/012_upgrade_0_22.sql",
       "role": "projection",
-      "sha256": "sha256:d712d9190959afc39ea98d1eb8dd767a1a3b1dd521b62fc2928579f2a3e55866"
+      "sha256": "sha256:52e7f64320bda8aa6d230bb1fc93724e829dceedd88b8e835ee574efe92fe93c"
+    },
+    {
+      "path": "postgres/013_upgrade_0_23.sql",
+      "role": "projection",
+      "sha256": "sha256:bb31a2574a1700ac34cfd924ce7dd3fc1e7a57210872f6a49ca67a4a79c5e061"
     },
     {
       "path": "semantic.json",
       "role": "contract",
-      "sha256": "sha256:506d2022b54bfbb7e729370e42e41d2b7d6ff13696e9341484e3aae838737147"
+      "sha256": "sha256:2787a92e49feea8c0fc9ceea184be8e5d24195b448d4a1d63171c0712f5b3023"
     },
     {
       "path": "typescript/browser.ts",
@@ -144,7 +149,7 @@
     {
       "path": "typescript/capabilities.ts",
       "role": "projection",
-      "sha256": "sha256:ffec38e0c6556513bccb27db3932585cccc3bd22c3bbb873cce3f4cbbf661d05"
+      "sha256": "sha256:d03d306c9dd06c897b533f17ce6a947c80a164b375de53a21f71f8858d95ad6c"
     },
     {
       "path": "typescript/client.ts",
@@ -154,7 +159,7 @@
     {
       "path": "typescript/consumers.ts",
       "role": "projection",
-      "sha256": "sha256:5e8362e6a3be333d1fd15bf49aa42061de6e1e90b5acffa3fa720c6eeb30e36e"
+      "sha256": "sha256:724e0857bb8a743bfd371fd05ad40e2a7d28d5b25a2f484ac321d27ff9348e62"
     },
     {
       "path": "typescript/errors.ts",
@@ -164,7 +169,7 @@
     {
       "path": "typescript/events.ts",
       "role": "projection",
-      "sha256": "sha256:436b21627f835d60b634a8d29fd9b967001353aa8e67dbdaaef2fffc3360403f"
+      "sha256": "sha256:3da11034f6776ba17643d8431d38469503ea296eb6fb9ccd495ae80075f9599b"
     },
     {
       "path": "typescript/gateway.ts",
@@ -194,7 +199,7 @@
     {
       "path": "typescript/ui.ts",
       "role": "projection",
-      "sha256": "sha256:250bb83bf0c62fe47374c4e2bfcb566f737cd479582131a1b386bdb35a706f2c"
+      "sha256": "sha256:3acb972a601fbfe0260716131d05cd13cc60b926a54d385cc1fc58d278be707e"
     },
     {
       "path": "typescript/workflows.ts",
@@ -204,7 +209,7 @@
     {
       "path": "ui.json",
       "role": "contract",
-      "sha256": "sha256:d6ac2f22b65f04447fe8a19d0e137edd1042ac3c4ac46a074e3b9ad3aba9434c"
+      "sha256": "sha256:10f40113a6afd8e78ed711438d852ebb55ee4a061aae18f3de28923e0689bba3"
     }
   ]
 }

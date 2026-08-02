@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.23.0
+
+- Added optional consumer-local `retry maxAttempts N;` declarations with validated limits from 1 through 1000, preserved in canonical IR15 as bounded or unbounded failure policy.
+- Added private durable failure state keyed by stable consumer plus source event, with atomically serialized attempt counts and policy-derived `retry`, `deadLetter`, and `resolved` dispositions.
+- Added generated broker-neutral `deliver...` adapters with closed typed outcomes, durable-only terminal decisions, fail-safe unrecorded retry, and pre-handler terminal checks; broker acknowledgement, timing, movement, and destinations remain host-owned.
+- Resolved prior failure state atomically with successful consumer effect, evidence, downstream emission, inbox completion, and stored result while keeping post-rollback failure telemetry outside the failed transaction.
+- Kept failure records, attempts, dispositions, errors, payloads, and outcomes private; event manifest v3, operation manifest v4, capability manifest v3, UI manifest v4, decision plan v2, envelope v2, and stable HTTP routes remain unchanged.
+- Advanced engineering semantic manifest to v7, semantic diff to v8, and generator profile to `/7`; existing-consumer policy changes require reviewed acknowledgement.
+- Added IR9–IR14 evolution normalization and baseline-checked idempotent `013_upgrade_0_23.sql` without fabricated failures, retries, terminal dispositions, effects, or inbox completions.
+- Updated Procurement and Reservations with three-attempt policies plus compiler, schema, adapter, privacy, conflict, concurrency, resolution, migration, and live PostgreSQL coverage.
+
 ## 0.22.0
 
 - Added ordered local `emit Event;` clauses to stable typed consumers, preserved in canonical IR14 with compile-time payload, locality, uniqueness, and acyclic event-graph checks.
