@@ -89,6 +89,31 @@ describe("generated HTTP boundary", () => {
       { expectedRevision: undefined },
     );
 
+    const explicitNull = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({
+        resource: "20000000-0000-4000-8000-000000000001",
+        startsAtOrAfter: null,
+      }),
+    }));
+    expect(explicitNull.status).toBe(200);
+    expect(execute).toHaveBeenLastCalledWith(
+      "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      { resource: "20000000-0000-4000-8000-000000000001", startsAtOrAfter: null },
+      { expectedRevision: undefined },
+    );
+
+    const invalidFilter = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({
+        resource: "20000000-0000-4000-8000-000000000001",
+        startsAtOrAfter: "tomorrow",
+      }),
+    }));
+    expect(invalidFilter.status).toBe(400);
+
     const malformed = await handler(new Request(route, {
       method: "POST",
       headers: { authorization: "Bearer valid", "content-type": "application/json" },

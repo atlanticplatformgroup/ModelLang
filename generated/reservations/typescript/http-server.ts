@@ -33,7 +33,7 @@ interface OperationDefinition {
   id: ReservationsOperationId;
   route: string;
   endpoint: "execution" | "applicability";
-  input: readonly { name: string; type: RuntimeValueType }[];
+  input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   output:
     | { entityId: string; cardinality: "one" }
     | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -97,6 +97,15 @@ const operationDefinitions = [
           "kind": "entity",
           "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
         }
+      },
+      {
+        "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+        "name": "startsAtOrAfter",
+        "type": {
+          "kind": "scalar",
+          "name": "DateTime"
+        },
+        "optional": true
       }
     ],
     "output": {
@@ -106,7 +115,7 @@ const operationDefinitions = [
       "pagination": {
         "kind": "cursor",
         "cursorVersion": 1,
-        "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2",
+        "queryRevision": "sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2",
         "cursorInput": "cursor"
       }
     },
@@ -412,7 +421,9 @@ function validateInput(
     throw new ValidationError(`Unknown operation input property '${unknown}'`, "ML_VALIDATION", "transport:request_body");
   }
   for (const parameter of definition.input) {
-    if (!Object.hasOwn(input, parameter.name) || !validValue(input[parameter.name], parameter.type)) {
+    const present = Object.hasOwn(input, parameter.name);
+    if ((!present && parameter.optional) || (present && input[parameter.name] === null && parameter.optional)) continue;
+    if (!present || !validValue(input[parameter.name], parameter.type)) {
       throw new ValidationError(
         `Invalid operation input property '${parameter.name}'`,
         "ML_VALIDATION",

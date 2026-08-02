@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 7;
+  manifestVersion: 8;
   model: {
     id: string;
     name: string;
@@ -65,6 +65,7 @@ export interface ManifestParameter {
   id: string;
   name: string;
   type: OperationValueType;
+  optional?: true;
 }
 
 export function operationInputName(operation: Pick<ManifestOperation, "name">): string {
@@ -168,7 +169,12 @@ function callableInput(operation: IRAction | IRQuery): ManifestParameter[] {
   return operation.callableParameters.map((id) => {
     const parameter = operation.parameters.find((candidate) => candidate.id === id);
     if (!parameter) throw new Error(`E6001 Missing callable parameter '${id}' in operation '${operation.id}'.`);
-    return { id: parameter.id, name: parameter.name, type: operationValueType(parameter.type) };
+    return {
+      id: parameter.id,
+      name: parameter.name,
+      type: operationValueType(parameter.type),
+      ...(parameter.optional ? { optional: true as const } : {}),
+    };
   });
 }
 
@@ -261,7 +267,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 7,
+    manifestVersion: 8,
     model: {
       id: ir.model.id,
       name: ir.model.name,

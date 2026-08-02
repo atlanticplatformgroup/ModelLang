@@ -1,10 +1,10 @@
 {
-  "irVersion": 21,
+  "irVersion": 22,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.32.0",
-    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
+    "version": "0.33.0",
+    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -1023,11 +1023,30 @@
             "sqlParameter": "p_resource",
             "typescriptProperty": "resource"
           }
+        },
+        {
+          "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+          "name": "startsAtOrAfter",
+          "type": "DateTime",
+          "caller": false,
+          "optional": true,
+          "span": {
+            "file": "examples/reservations.model",
+            "line": 77,
+            "column": 3,
+            "endLine": 77,
+            "endColumn": 29
+          },
+          "naming": {
+            "sqlParameter": "p_starts_at_or_after",
+            "typescriptProperty": "startsAtOrAfter"
+          }
         }
       ],
       "callerParameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor",
       "callableParameters": [
-        "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource"
+        "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
+        "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter"
       ],
       "sourceEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
       "returnProjectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
@@ -1044,9 +1063,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/reservations.model",
-          "line": 78,
+          "line": 79,
           "column": 13,
-          "endLine": 78,
+          "endLine": 79,
           "endColumn": 17
         }
       },
@@ -1055,35 +1074,82 @@
         "name": "where",
         "expression": {
           "kind": "binary",
-          "operator": "==",
+          "operator": "and",
           "left": {
-            "kind": "fieldAccess",
-            "source": "queryRow",
-            "parameter": "reservation",
-            "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
-            "fieldName": "resource",
-            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
-            "nullable": false
+            "kind": "binary",
+            "operator": "==",
+            "left": {
+              "kind": "fieldAccess",
+              "source": "queryRow",
+              "parameter": "reservation",
+              "fieldId": "field:fld_8df4f409794e4c66acdbb162b6063d57",
+              "fieldName": "resource",
+              "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "nullable": false
+            },
+            "right": {
+              "kind": "entityValue",
+              "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
+              "name": "resource",
+              "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false,
+            "comparisonSemantics": "entityIdentity"
           },
           "right": {
-            "kind": "entityValue",
-            "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
-            "name": "resource",
-            "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39",
-            "type": "entity:ent_7cb2307972954d83a6f344764faaae39",
-            "nullable": false
+            "kind": "binary",
+            "operator": "or",
+            "left": {
+              "kind": "nullComparison",
+              "operator": "isNull",
+              "operand": {
+                "kind": "parameter",
+                "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+                "name": "startsAtOrAfter",
+                "type": "DateTime",
+                "nullable": true
+              },
+              "type": "Boolean",
+              "nullable": false
+            },
+            "right": {
+              "kind": "binary",
+              "operator": ">=",
+              "left": {
+                "kind": "fieldAccess",
+                "source": "queryRow",
+                "parameter": "reservation",
+                "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+                "fieldName": "startsAt",
+                "type": "DateTime",
+                "nullable": false
+              },
+              "right": {
+                "kind": "parameter",
+                "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+                "name": "startsAtOrAfter",
+                "type": "DateTime",
+                "nullable": true
+              },
+              "type": "Boolean",
+              "nullable": true
+            },
+            "type": "Boolean",
+            "nullable": true
           },
           "type": "Boolean",
-          "nullable": false,
-          "comparisonSemantics": "entityIdentity"
+          "nullable": true
         },
-        "sourceExpression": "(reservation.resource == resource)",
+        "sourceExpression": "((reservation.resource == resource) and ((startsAtOrAfter == null) or (reservation.startsAt >= startsAtOrAfter)))",
         "span": {
           "file": "examples/reservations.model",
-          "line": 79,
+          "line": 80,
           "column": 9,
-          "endLine": 79,
-          "endColumn": 41
+          "endLine": 80,
+          "endColumn": 113
         }
       },
       "orderBy": {
@@ -1095,13 +1161,13 @@
       "pagination": {
         "kind": "cursor",
         "cursorVersion": 1,
-        "revision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2"
+        "revision": "sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2"
       },
       "span": {
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       },
       "naming": {
@@ -1876,6 +1942,20 @@
       }
     },
     {
+      "id": "optional-filter:parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+      "purpose": "Accept omission or null for startsAtOrAfter; only the authored query predicate determines whether that absence broadens visible rows.",
+      "layer": "PostgreSQL query input and predicate",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 77,
+        "column": 3,
+        "endLine": 77,
+        "endColumn": 29
+      }
+    },
+    {
       "id": "boundary:query:qry_94d8a56f4c2640fab58a4c2190c35c69.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
@@ -1890,24 +1970,24 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 78,
+        "line": 79,
         "column": 13,
-        "endLine": 78,
+        "endLine": 79,
         "endColumn": 17
       }
     },
     {
       "id": "where:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "(reservation.resource == resource)",
+      "purpose": "((reservation.resource == resource) and ((startsAtOrAfter == null) or (reservation.startsAt >= startsAtOrAfter)))",
       "layer": "PostgreSQL row policy",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 79,
+        "line": 80,
         "column": 9,
-        "endLine": 79,
-        "endColumn": 41
+        "endLine": 80,
+        "endColumn": 113
       }
     },
     {
@@ -1920,7 +2000,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -1934,7 +2014,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -1948,7 +2028,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -1962,7 +2042,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -1976,7 +2056,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },

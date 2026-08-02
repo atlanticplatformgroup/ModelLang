@@ -468,7 +468,14 @@ class Parser {
         const parameterName = this.identifier("Expected parameter name.");
         this.expect(":");
         const type = this.parseTypeRef();
-        parameters.push({ name: parameterName.text, type, caller, span: this.span(parameterStart, type.span) });
+        const optionalToken = this.at("?") ? this.take() : undefined;
+        parameters.push({
+          name: parameterName.text,
+          type,
+          caller,
+          ...(optionalToken ? { optional: true } : {}),
+          span: this.span(parameterStart, optionalToken ?? type.span),
+        });
         if (!this.at(",")) break;
         this.take();
       } while (!this.at(")"));

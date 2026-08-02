@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 14;
+  diffVersion: 15;
   compilerVersion: string;
-  irVersion: 21;
+  irVersion: 22;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -320,7 +320,7 @@ function authorizationClassification(previous: { expression: unknown }, current:
 function operationShape(operation: IRAction | IRQuery): unknown {
   return operation.callableParameters.map((id) => {
     const parameter = operation.parameters.find((candidate) => candidate.id === id)!;
-    return { name: parameter.name, type: parameter.type };
+    return { name: parameter.name, type: parameter.type, optional: parameter.optional === true };
   });
 }
 
@@ -676,7 +676,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 14,
+    diffVersion: 15,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

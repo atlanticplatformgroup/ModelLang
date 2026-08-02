@@ -5,6 +5,15 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.33.0
+
+- Added `?` on non-caller query parameters for authored optional filters; actions, policies, consumers, and caller parameters remain required.
+- Defined omission and explicit JSON `null` as the same nullable input state, with no compiler-inferred predicate: only the model's explicit null-aware `where` expression can broaden visible rows.
+- Propagated query-parameter optionality through nullable IR expressions, PostgreSQL entity loading and exact-money validation, TypeScript inputs and clients, operation and semantic manifests, closed OpenAPI/HTTP validation, UI filter descriptors, enforcement coverage, and cursor input fingerprints.
+- Classified query input optionality changes as breaking callable-contract changes and retained fail-closed authorization, fixed ordering/limits, disclosure projections, and per-page policy evaluation.
+- Advanced canonical IR to IR22, operation manifest to v8, capability manifest to v7, UI manifest to v8, engineering semantic manifest/profile to v14, semantic diff to v15, and generator profile to `postgresql-http-ui-optional-query-filters/17`.
+- Updated Reservations with an optional `startsAtOrAfter` filter plus unit, transport, golden, and live PostgreSQL coverage for omission, explicit null, concrete filtering, invalid values, and filter-bound cursor staleness.
+
 ## 0.32.0
 
 - Added opt-in `paginate cursor;` after a query's fixed authored limit while preserving array results and callable ABIs for unpaginated queries.

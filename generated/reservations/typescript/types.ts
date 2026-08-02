@@ -64,6 +64,7 @@ export interface ReserveInput {
 
 export interface ReservationsForResourceInput {
   resource: string;
+  startsAtOrAfter?: string | null;
   cursor?: string;
 }
 

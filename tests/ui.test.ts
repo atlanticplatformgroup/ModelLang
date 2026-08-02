@@ -25,6 +25,14 @@ describe("generated UI boundary", () => {
     expect(ReservationsUiManifest.workflows).toEqual([]);
   });
 
+  it("marks authored query filters as optional and nullable", () => {
+    const query = ReservationsUiManifest.queries.find((candidate) => candidate.name === "reservationsForResource")!;
+    expect(query.filters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "resource", required: true, nullable: false }),
+      expect.objectContaining({ name: "startsAtOrAfter", required: false, nullable: true }),
+    ]));
+  });
+
   it("executes a descriptor's stable operation ID through the browser HTTP client", async () => {
     const fetch = vi.fn(async () => Response.json(purchaseRequest));
     const client = new ProcurementHttpClient({

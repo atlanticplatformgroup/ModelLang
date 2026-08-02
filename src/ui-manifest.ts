@@ -21,7 +21,8 @@ export interface UiInputField {
   parameterId: string;
   name: string;
   label: string;
-  required: true;
+  required: boolean;
+  nullable: boolean;
   presentation: UiPresentation;
 }
 
@@ -64,8 +65,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 7;
-  operationManifestVersion: 7;
+  uiManifestVersion: 8;
+  operationManifestVersion: 8;
   model: {
     id: string;
     name: string;
@@ -181,18 +182,19 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
     parameterId: parameter.id,
     name: parameter.name,
     label: uiLabel(parameter.name),
-    required: true,
+    required: !parameter.optional,
+    nullable: parameter.optional === true,
     presentation: uiPresentation(parameter.type),
   }));
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 7) {
-    throw new Error(`E6201 UI generation requires operation manifest version 7, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 8) {
+    throw new Error(`E6201 UI generation requires operation manifest version 8, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 7,
+    uiManifestVersion: 8,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,

@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 7,
+  "manifestVersion": 8,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.32.0",
-    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea"
+    "version": "0.33.0",
+    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9"
   },
   "authentication": {
     "required": true,
@@ -308,6 +308,15 @@
             "kind": "entity",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
           }
+        },
+        {
+          "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+          "name": "startsAtOrAfter",
+          "type": {
+            "kind": "scalar",
+            "name": "DateTime"
+          },
+          "optional": true
         }
       ],
       "caller": {
@@ -323,7 +332,7 @@
         "pagination": {
           "kind": "cursor",
           "cursorVersion": 1,
-          "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2",
+          "queryRevision": "sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2",
           "cursorInput": "cursor"
         }
       },

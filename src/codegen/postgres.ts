@@ -1675,8 +1675,9 @@ function moneyParameterValidation(parameter: IRParameter): string[] {
   const profile = moneyProfileFromType(parameter.type)!;
   const value = quoteIdent(parameter.naming.sqlParameter);
   const ruleId = `money-parameter:${parameter.id}`;
+  const invalid = `((${value} <> 'NaN'::numeric AND pg_catalog.scale(${value}) <= ${profile.scale} AND pg_catalog.abs(${value}) < ${moneyMagnitudeLimit(profile)}) IS TRUE)`;
   return [
-    `  IF NOT ((${value} <> 'NaN'::numeric AND pg_catalog.scale(${value}) <= ${profile.scale} AND pg_catalog.abs(${value}) < ${moneyMagnitudeLimit(profile)}) IS TRUE) THEN`,
+    `  IF ${parameter.optional ? `${value} IS NOT NULL AND NOT ${invalid}` : `NOT ${invalid}`} THEN`,
     `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:${ruleId}';`,
     "  END IF;",
     "",
@@ -2105,7 +2106,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     const entity = entityById(ir, parameter.type);
     const idFieldForParameter = fieldById(ir, entity.idFieldId).field;
     const idValue = parameter.caller ? "v_principal_id" : quoteIdent(parameter.naming.sqlParameter);
-    body.push(
+    const load = [
       `  SELECT * INTO ${recordNames.get(parameter.id)}`,
       `  FROM ${qname(schema, entity.naming.sqlTable)}`,
       `  WHERE ${quoteIdent(idFieldForParameter.naming.sqlColumn)} = ${idValue};`,
@@ -2114,7 +2115,17 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${query.authorization.id}';`,
       "  END IF;",
       "",
-    );
+    ];
+    if (parameter.optional) {
+      body.push(
+        `  IF ${quoteIdent(parameter.naming.sqlParameter)} IS NOT NULL THEN`,
+        ...load.map((line) => line ? `  ${line}` : line),
+        "  END IF;",
+        "",
+      );
+    } else {
+      body.push(...load);
+    }
   }
   const context = { ir, query, recordNames };
   body.push(

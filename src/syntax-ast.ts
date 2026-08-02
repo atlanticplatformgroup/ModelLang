@@ -117,6 +117,7 @@ export interface ParameterDecl {
   name: string;
   type: TypeRef;
   caller: boolean;
+  optional?: boolean;
   span: Span;
 }
 

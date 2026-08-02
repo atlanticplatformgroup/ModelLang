@@ -247,7 +247,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(21);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(22);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 

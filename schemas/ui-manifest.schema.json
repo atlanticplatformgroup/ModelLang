@@ -44,12 +44,13 @@
     },
     "inputField": {
       "type": "object",
-      "required": ["parameterId", "name", "label", "required", "presentation"],
+      "required": ["parameterId", "name", "label", "required", "nullable", "presentation"],
       "properties": {
         "parameterId": { "type": "string", "pattern": "^parameter:" },
         "name": { "type": "string" },
         "label": { "type": "string" },
-        "required": { "const": true },
+        "required": { "type": "boolean" },
+        "nullable": { "type": "boolean" },
         "presentation": { "$ref": "#/$defs/presentation" }
       },
       "additionalProperties": false
@@ -165,8 +166,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 7 },
-    "operationManifestVersion": { "const": 7 },
+    "uiManifestVersion": { "const": 8 },
+    "operationManifestVersion": { "const": 8 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],

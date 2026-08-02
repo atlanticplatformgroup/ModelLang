@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.32.0",
-    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
+    "version": "0.33.0",
+    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -775,6 +775,20 @@
       }
     },
     {
+      "id": "optional-filter:parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+      "purpose": "Accept omission or null for startsAtOrAfter; only the authored query predicate determines whether that absence broadens visible rows.",
+      "layer": "PostgreSQL query input and predicate",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 77,
+        "column": 3,
+        "endLine": 77,
+        "endColumn": 29
+      }
+    },
+    {
       "id": "boundary:query:qry_94d8a56f4c2640fab58a4c2190c35c69.safe_search_path",
       "purpose": "Prevent caller-controlled object shadowing inside the privileged function.",
       "layer": "PostgreSQL function configuration",
@@ -789,24 +803,24 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 78,
+        "line": 79,
         "column": 13,
-        "endLine": 78,
+        "endLine": 79,
         "endColumn": 17
       }
     },
     {
       "id": "where:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "(reservation.resource == resource)",
+      "purpose": "((reservation.resource == resource) and ((startsAtOrAfter == null) or (reservation.startsAt >= startsAtOrAfter)))",
       "layer": "PostgreSQL row policy",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 79,
+        "line": 80,
         "column": 9,
-        "endLine": 79,
-        "endColumn": 41
+        "endLine": 80,
+        "endColumn": 113
       }
     },
     {
@@ -819,7 +833,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -833,7 +847,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -847,7 +861,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -861,7 +875,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },
@@ -875,7 +889,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 2
       }
     },

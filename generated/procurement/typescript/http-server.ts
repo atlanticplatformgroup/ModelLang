@@ -33,7 +33,7 @@ interface OperationDefinition {
   id: ProcurementOperationId;
   route: string;
   endpoint: "execution" | "applicability";
-  input: readonly { name: string; type: RuntimeValueType }[];
+  input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   output:
     | { entityId: string; cardinality: "one" }
     | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -492,7 +492,9 @@ function validateInput(
     throw new ValidationError(`Unknown operation input property '${unknown}'`, "ML_VALIDATION", "transport:request_body");
   }
   for (const parameter of definition.input) {
-    if (!Object.hasOwn(input, parameter.name) || !validValue(input[parameter.name], parameter.type)) {
+    const present = Object.hasOwn(input, parameter.name);
+    if ((!present && parameter.optional) || (present && input[parameter.name] === null && parameter.optional)) continue;
+    if (!present || !validValue(input[parameter.name], parameter.type)) {
       throw new ValidationError(
         `Invalid operation input property '${parameter.name}'`,
         "ML_VALIDATION",

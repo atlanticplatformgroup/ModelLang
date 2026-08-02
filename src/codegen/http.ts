@@ -196,9 +196,11 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
                 schema: {
                   type: "object",
                   additionalProperties: false,
-                  required: operation.input.map((parameter) => parameter.name),
+                  required: operation.input.filter((parameter) => !parameter.optional).map((parameter) => parameter.name),
                   properties: Object.fromEntries([
-                    ...operation.input.map((parameter) => [parameter.name, valueSchema(manifest, parameter.type)] as const),
+                    ...operation.input.map((parameter) => [parameter.name, parameter.optional
+                      ? nullable(valueSchema(manifest, parameter.type))
+                      : valueSchema(manifest, parameter.type)] as const),
                     ...(operation.kind === "query" && operation.output.cardinality === "page"
                       ? [[operation.output.pagination.cursorInput, { type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }] as const]
                       : []),
@@ -237,8 +239,10 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
               schema: {
                 type: "object",
                 additionalProperties: false,
-                required: operation.input.map((parameter) => parameter.name),
-                properties: Object.fromEntries(operation.input.map((parameter) => [parameter.name, valueSchema(manifest, parameter.type)])),
+                required: operation.input.filter((parameter) => !parameter.optional).map((parameter) => parameter.name),
+                properties: Object.fromEntries(operation.input.map((parameter) => [parameter.name, parameter.optional
+                  ? nullable(valueSchema(manifest, parameter.type))
+                  : valueSchema(manifest, parameter.type)])),
               },
             },
           },
@@ -549,7 +553,7 @@ interface OperationDefinition {
   id: ${manifest.model.name}OperationId;
   route: string;
   endpoint: "execution" | "applicability";
-  input: readonly { name: string; type: RuntimeValueType }[];
+  input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   output:
     | { entityId: string; cardinality: "one" }
     | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -667,7 +671,9 @@ function validateInput(
     throw new ValidationError(\`Unknown operation input property '\${unknown}'\`, "ML_VALIDATION", "transport:request_body");
   }
   for (const parameter of definition.input) {
-    if (!Object.hasOwn(input, parameter.name) || !validValue(input[parameter.name], parameter.type)) {
+    const present = Object.hasOwn(input, parameter.name);
+    if ((!present && parameter.optional) || (present && input[parameter.name] === null && parameter.optional)) continue;
+    if (!present || !validValue(input[parameter.name], parameter.type)) {
       throw new ValidationError(
         \`Invalid operation input property '\${parameter.name}'\`,
         "ML_VALIDATION",

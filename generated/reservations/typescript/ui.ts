@@ -6,13 +6,13 @@ import { ReservationsHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 7,
-  "operationManifestVersion": 7,
+  "uiManifestVersion": 8,
+  "operationManifestVersion": 8,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.32.0",
-    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
+    "version": "0.33.0",
+    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9",
     "label": "Reservations"
   },
   "authentication": {
@@ -262,6 +262,7 @@ export const ReservationsUiManifest = {
           "name": "resource",
           "label": "Resource",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "entityReference",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
@@ -272,6 +273,7 @@ export const ReservationsUiManifest = {
           "name": "startsAt",
           "label": "Starts at",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "dateTime"
           }
@@ -281,6 +283,7 @@ export const ReservationsUiManifest = {
           "name": "endsAt",
           "label": "Ends at",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "dateTime"
           }
@@ -315,9 +318,20 @@ export const ReservationsUiManifest = {
           "name": "resource",
           "label": "Resource",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "entityReference",
             "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+          }
+        },
+        {
+          "parameterId": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+          "name": "startsAtOrAfter",
+          "label": "Starts at or after",
+          "required": false,
+          "nullable": true,
+          "presentation": {
+            "kind": "dateTime"
           }
         }
       ],
@@ -326,7 +340,7 @@ export const ReservationsUiManifest = {
       "pagination": {
         "kind": "cursor",
         "cursorInput": "cursor",
-        "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2"
+        "queryRevision": "sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2"
       },
       "errors": [
         "identityBinding",

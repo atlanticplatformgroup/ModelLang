@@ -58,8 +58,8 @@ export class ReservationsClient {
   async reservationsForResource(input: ReservationsForResourceInput): Promise<CursorPage<ReservationSummary>> {
     try {
       const result = await this.adapter.query<{ value: CursorPage<ReservationSummary> }>(
-        'SELECT "model_reservations"."reservations_for_resource"($1, $2) AS value',
-        [input.resource, input.cursor ?? null],
+        'SELECT "model_reservations"."reservations_for_resource"($1, $2, $3) AS value',
+        [input.resource, input.startsAtOrAfter == null ? null : input.startsAtOrAfter, input.cursor ?? null],
       );
       return result.rows[0]!.value;
     } catch (error) {

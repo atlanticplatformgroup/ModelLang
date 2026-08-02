@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.32](./spec/0.32/LANGUAGE.md). It retains the complete 0.31 language and adds opt-in fixed-limit keyset cursor pagination without offsets, caller-controlled limits or ordering, or cursor-derived authority.
+The current normative specification is [ModelLang 0.33](./spec/0.33/LANGUAGE.md). It retains the complete 0.32 language and adds optional authored query filters with explicit null semantics and no inferred predicate.
 
-- [Cursor pagination semantics](./spec/0.32/CURSOR_PAGINATION.md)
-- [0.32 grammar additions](./spec/0.32/GRAMMAR.ebnf)
-- [0.32 conformance requirements](./spec/0.32/CONFORMANCE.md)
-- [0.32 unstable pagination boundaries](./spec/0.32/UNSTABLE.md)
+- [Optional query-filter semantics](./spec/0.33/OPTIONAL_QUERY_FILTERS.md)
+- [0.33 grammar additions](./spec/0.33/GRAMMAR.ebnf)
+- [0.33 conformance requirements](./spec/0.33/CONFORMANCE.md)
+- [0.33 unstable read boundaries](./spec/0.33/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

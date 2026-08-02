@@ -1,0 +1,7 @@
+(* ModelLang 0.33 extends the complete ModelLang 0.32 grammar. *)
+
+query_parameter = [ "caller" ], identifier, ":", type_ref, [ "?" ] ;
+
+(* The optional marker is valid only for non-caller query parameters. *)
+(* Action, policy, and consumer parameter productions are unchanged. *)
+(* No implicit filter predicate or runtime-selected ordering/limit syntax exists. *)

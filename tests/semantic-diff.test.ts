@@ -68,6 +68,34 @@ describe("semantic change analysis", () => {
     }));
   });
 
+  it("classifies query filter optionality as a breaking callable contract change", () => {
+    const source = (version: string, optional: boolean) => `model FilterEvolution version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") { id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); }
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  value: String @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+projection RecordSummary @stableId("prj_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") from Record {
+  id @stableId("pfd_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(
+  caller actor: User,
+  value: String${optional ? "?" : ""}
+) returns RecordSummary from Record as row {
+  authorize true;
+  where ${optional ? "value == null or row.value == value" : "row.value == value"};
+  orderBy row.id asc;
+  limit 10;
+}`;
+    const report = semanticDiff(compileText(source("1", false)), compileText(source("2", true)));
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "operationShapeChanged",
+      area: "structure",
+      classification: "breaking",
+      after: expect.stringContaining('"optional":true'),
+    }));
+  });
+
   it("classifies projection member and legacy entity-output changes as breaking disclosure changes", () => {
     const source = (version: string, includeValue: boolean) => `model ProjectionEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -178,9 +206,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 14,
-      compilerVersion: "0.32.0",
-      irVersion: 21,
+      diffVersion: 15,
+      compilerVersion: "0.33.0",
+      irVersion: 22,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

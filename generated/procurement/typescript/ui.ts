@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 7,
-  "operationManifestVersion": 7,
+  "uiManifestVersion": 8,
+  "operationManifestVersion": 8,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.32.0",
-    "sourceHash": "sha256:f88b6d6270a9e5d6cb6a4b49979477d8e58cc060d0b423099f1dc1695653960f",
+    "version": "0.33.0",
+    "sourceHash": "sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd0aab8",
     "label": "Procurement"
   },
   "authentication": {
@@ -319,6 +319,7 @@ export const ProcurementUiManifest = {
           "name": "amount",
           "label": "Amount",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "money",
             "currency": "USD",
@@ -354,6 +355,7 @@ export const ProcurementUiManifest = {
           "name": "request",
           "label": "Request",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "entityReference",
             "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702"
@@ -386,6 +388,7 @@ export const ProcurementUiManifest = {
           "name": "request",
           "label": "Request",
           "required": true,
+          "nullable": false,
           "presentation": {
             "kind": "entityReference",
             "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702"

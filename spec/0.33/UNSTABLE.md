@@ -1,0 +1,5 @@
+# ModelLang 0.33 unstable boundaries
+
+The following remain outside the stable read contract: authored sort profiles, offset or page-number pagination, caller-controlled page size or ordering, cursor signing or encryption, frozen cross-request snapshots, collection or reverse traversal, inferred joins, runtime-selected projection paths or depth, aliases, computed fields, inline anonymous shapes, nested authorization, conditional disclosure, aggregates, grouping, full-text search, caching, field-level capability negotiation, MCP-specific result contracts, and generic CRUD.
+
+Optional filters have no compiler-inferred meaning. Omission and explicit null produce one nullable value, and only the authored query expression decides whether that value broadens, narrows, or denies rows. Optionality grants no authority. A cursor remains opaque continuation state bound to the exact caller and filter inputs; each page is a new authenticated and policy-filtered read under its own database statement snapshot.

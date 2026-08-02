@@ -20,8 +20,8 @@ export type IRExpression =
   | { kind: "literal"; value: string | number | boolean; type: string; nullable: false }
   | { kind: "moneyLiteral"; currency: string; amount: string; precision: number; scale: number; type: string; nullable: false }
   | { kind: "nullLiteral"; type: "null"; nullable: true }
-  | { kind: "parameter"; parameterId: string; name: string; type: string; nullable: false }
-  | { kind: "entityValue"; parameterId: string; name: string; entityId: string; type: string; nullable: false }
+  | { kind: "parameter"; parameterId: string; name: string; type: string; nullable: boolean }
+  | { kind: "entityValue"; parameterId: string; name: string; entityId: string; type: string; nullable: boolean }
   | { kind: "fieldAccess"; source: string; parameter?: string; fieldId: string; fieldName: string; type: string; nullable: boolean }
   | { kind: "enumLiteral"; enumId: string; memberId: string; memberName: string; type: string; nullable: false }
   | { kind: "policyCall"; policyId: string; arguments: IRExpression[]; type: "Boolean"; nullable: false }
@@ -123,6 +123,7 @@ export interface IRParameter {
   name: string;
   type: string;
   caller: boolean;
+  optional?: true;
   binding?: "session_user";
   span: IRSpan;
   naming: { sqlParameter: string; typescriptProperty: string };
@@ -299,7 +300,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 21;
+  irVersion: 22;
   model: {
     id: string;
     name: string;

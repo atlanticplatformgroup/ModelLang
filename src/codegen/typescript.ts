@@ -123,7 +123,7 @@ function generateTypes(ir: ModelIR): string {
     lines.push(`export interface ${operationInputName(query)} {`);
     for (const id of query.callableParameters) {
       const parameter = query.parameters.find((candidate) => candidate.id === id)!;
-      lines.push(`  ${parameter.name}: ${parameterType(ir, parameter.type)};`);
+      lines.push(`  ${parameter.name}${parameter.optional ? "?" : ""}: ${parameterType(ir, parameter.type)}${parameter.optional ? " | null" : ""};`);
     }
     if (query.pagination) lines.push("  cursor?: string;");
     lines.push("}", "");
@@ -207,10 +207,14 @@ export function mapHttpProblem(problem: unknown, httpStatus: number): ModelOpera
 }
 `;
 
-function clientParameterValue(parameter: { id: string; name: string; type: string }): string {
-  if (!isMoneyType(parameter.type)) return `input.${parameter.name}`;
-  const profile = moneyProfileFromType(parameter.type)!;
-  return `moneyAmount(input.${parameter.name}, ${JSON.stringify(profile.currency)}, ${profile.precision}, ${profile.scale}, ${JSON.stringify(`money-parameter:${parameter.id}`)})`;
+function clientParameterValue(parameter: { id: string; name: string; type: string; optional?: true }): string {
+  const value = isMoneyType(parameter.type)
+    ? (() => {
+        const profile = moneyProfileFromType(parameter.type)!;
+        return `moneyAmount(input.${parameter.name}, ${JSON.stringify(profile.currency)}, ${profile.precision}, ${profile.scale}, ${JSON.stringify(`money-parameter:${parameter.id}`)})`;
+      })()
+    : `input.${parameter.name}`;
+  return parameter.optional ? `input.${parameter.name} == null ? null : ${value}` : value;
 }
 
 function actionMethod(ir: ModelIR, action: IRAction): string {

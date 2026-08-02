@@ -67,6 +67,9 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
     if (!moneyProfileFromType(parameter.type)) fail(ir, `Query '${query.name}' has an invalid money parameter type.`, parameter.span);
     requireEntry(ir, `money-parameter:${parameter.id}`, parameter.span);
   }
+  for (const parameter of query.parameters.filter((candidate) => candidate.optional)) {
+    requireEntry(ir, `optional-filter:${parameter.id}`, parameter.span);
+  }
   requireEntry(ir, `boundary:${query.id}.safe_search_path`, query.span);
   requireEntry(ir, query.authorization.id, query.authorization.span);
   requireEntry(ir, query.rowPolicy.id, query.rowPolicy.span);

@@ -61,7 +61,8 @@
       "properties": {
         "id": { "type": "string", "pattern": "^parameter:" },
         "name": { "type": "string" },
-        "type": { "type": "object" }
+        "type": { "type": "object" },
+        "optional": { "const": true }
       },
       "additionalProperties": false
     },
@@ -102,8 +103,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 13 },
-    "profile": { "const": "sml-transactional-core/13" },
+    "manifestVersion": { "const": 14 },
+    "profile": { "const": "sml-transactional-core/14" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +121,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 21 },
+          "irVersion": { "const": 22 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false

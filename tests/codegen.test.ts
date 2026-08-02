@@ -45,7 +45,7 @@ describe("backends", () => {
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(7);
+    expect(manifest.manifestVersion).toBe(8);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -209,10 +209,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 13,
+      manifestVersion: 14,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 21 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 22 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -261,7 +261,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 21 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 22 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -292,8 +292,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 7,
-      operationManifestVersion: 7,
+      uiManifestVersion: 8,
+      operationManifestVersion: 8,
       authentication: { required: true, callerInput: false },
     });
 
@@ -520,6 +520,28 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["enforcement.md"]).toContain("money-parameter:parameter:query:under.ceiling");
   });
 
+  it("skips optional money validation and entity loading only for null query inputs", () => {
+    const source = `model OptionalQueryInputs version "0.33.0";
+      entity User { id: UUID @id; }
+      entity Vendor { id: UUID @id; }
+      entity Invoice { id: UUID @id; vendor: Vendor; amount: Money<USD>; }
+      projection InvoiceSummary from Invoice { id; amount; }
+      query under(caller actor: User, vendor: Vendor?, ceiling: Money<USD>?) returns InvoiceSummary from Invoice as invoice {
+        authorize true;
+        where (vendor == null or invoice.vendor == vendor) and (ceiling == null or invoice.amount <= ceiling);
+        orderBy invoice.id asc;
+        limit 10;
+      }`;
+    const output = generateAll(compileText(source, "optional-query-inputs.model"));
+    const sql = output["postgres/003_queries.sql"];
+    expect(sql).toContain('IF "p_vendor" IS NOT NULL THEN');
+    expect(sql).toContain('IF "p_ceiling" IS NOT NULL AND NOT');
+    expect(sql).toContain('ML_AUTHORIZATION:authorize:query:under');
+    expect(output["typescript/types.ts"]).toContain('vendor?: string | null;');
+    expect(output["typescript/types.ts"]).toContain('ceiling?: Money<"USD"> | null;');
+    expect(output["typescript/client.ts"]).toContain('input.ceiling == null ? null : moneyAmount(input.ceiling');
+  });
+
   it("uses DEFAULT VALUES when a create effect assigns no fields", () => {
     const source = `model Tokens version "0.7.0";
       entity User { id: UUID @id; }
@@ -651,8 +673,9 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   it("generates opaque keyset cursor pages bound to query and filter identity", async () => {
     const output = generateAll(await reservations());
     const sql = output["postgres/003_queries.sql"];
-    expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, p_cursor text DEFAULT NULL)');
-    expect(sql).toContain("'modelVersion', '0.32.0'");
+    expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_cursor text DEFAULT NULL)');
+    expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
+    expect(sql).toContain("'modelVersion', '0.33.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -666,14 +689,20 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(sql).toContain("ML_STALE:cursor:query:");
 
     expect(output["typescript/types.ts"]).toContain("export interface CursorPage<T>");
+    expect(output["typescript/types.ts"]).toContain("startsAtOrAfter?: string | null;");
     expect(output["typescript/types.ts"]).toContain("cursor?: string;");
     expect(output["typescript/client.ts"]).toContain("Promise<CursorPage<ReservationSummary>>");
 
     const operations = JSON.parse(output["operations.json"]!) as {
-      operations: { kind: string; name: string; errors: string[]; output: Record<string, unknown> }[];
+      operations: { kind: string; name: string; errors: string[]; input: { name: string; optional?: true }[]; output: Record<string, unknown> }[];
     };
-    expect(operations.operations.find((operation) => operation.name === "reservationsForResource")).toMatchObject({
+    const reservationQuery = operations.operations.find((operation) => operation.name === "reservationsForResource")!;
+    expect(reservationQuery).toMatchObject({
       errors: ["identityBinding", "authorization", "validation", "stale"],
+      input: [
+        expect.objectContaining({ name: "resource" }),
+        expect.objectContaining({ name: "startsAtOrAfter", optional: true }),
+      ],
       output: {
         cardinality: "page",
         maxItems: 2,
@@ -691,11 +720,18 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const route = openapi.paths["/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69"]!.post;
     expect(route.requestBody.content["application/json"].schema.required).toEqual(["resource"]);
     expect(route.requestBody.content["application/json"].schema.properties).toHaveProperty("cursor");
+    expect(route.requestBody.content["application/json"].schema.properties.startsAtOrAfter).toMatchObject({
+      anyOf: expect.arrayContaining([{ type: "null" }]),
+    });
     expect(route.responses["200"].content["application/json"].schema).toMatchObject({
       type: "object",
       required: ["items", "nextCursor"],
     });
-    expect(JSON.parse(output["ui.json"]!).queries[0].pagination).toMatchObject({ kind: "cursor", cursorInput: "cursor" });
+    const uiQuery = JSON.parse(output["ui.json"]!).queries[0];
+    expect(uiQuery.pagination).toMatchObject({ kind: "cursor", cursorInput: "cursor" });
+    expect(uiQuery.filters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "startsAtOrAfter", required: false, nullable: true }),
+    ]));
     expect(JSON.parse(output["semantic.json"]!).queries[0].output.cardinality).toBe("page");
   });
 
@@ -756,7 +792,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.32.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.33.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

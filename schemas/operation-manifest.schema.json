@@ -51,7 +51,8 @@
       "properties": {
         "id": { "type": "string", "pattern": "^parameter:" },
         "name": { "type": "string" },
-        "type": { "$ref": "#/$defs/valueType" }
+        "type": { "$ref": "#/$defs/valueType" },
+        "optional": { "const": true }
       },
       "additionalProperties": false
     },
@@ -228,7 +229,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 7 },
+    "manifestVersion": { "const": 8 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

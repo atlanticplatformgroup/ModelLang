@@ -1,7 +1,7 @@
 -- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
-CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid, p_cursor text DEFAULT NULL)
+CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_cursor text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -42,7 +42,7 @@ BEGIN
 
   v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
     'caller', pg_catalog.to_jsonb(v_principal_id),
-    'inputs', pg_catalog.jsonb_build_object('parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource', pg_catalog.to_jsonb("p_resource"))
+    'inputs', pg_catalog.jsonb_build_object('parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource', pg_catalog.to_jsonb("p_resource"), 'parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter', pg_catalog.to_jsonb("p_starts_at_or_after"))
   ))::text, 'UTF8')), 'hex');
 
   IF p_cursor IS NOT NULL THEN
@@ -76,10 +76,10 @@ BEGIN
     END;
 
     IF v_cursor_json ->> 'modelId' IS DISTINCT FROM 'model:Reservations'
-      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.32.0'
-      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea'
+      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.33.0'
+      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9'
       OR v_cursor_json ->> 'queryId' IS DISTINCT FROM 'query:qry_94d8a56f4c2640fab58a4c2190c35c69'
-      OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2'
+      OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2'
       OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM 'field:fld_59e1f90fae57481f921c5a81dfd3a234'
       OR v_cursor_json ->> 'direction' IS DISTINCT FROM 'asc'
       OR v_cursor_json ->> 'inputHash' IS DISTINCT FROM v_input_hash THEN
@@ -92,7 +92,7 @@ BEGIN
            v_row."starts_at" AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_reservations"."reservation" AS v_row
-    WHERE (((v_row."resource_id" = v_resource."id")) IS TRUE)
+    WHERE ((((v_row."resource_id" = v_resource."id") AND (("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")))) IS TRUE)
       AND (p_cursor IS NULL
         OR v_row."starts_at" > v_cursor_sort
         OR (v_row."starts_at" = v_cursor_sort AND v_row."id" > v_cursor_identity))
@@ -109,7 +109,7 @@ BEGIN
       FROM visible_rows
     ), '[]'::jsonb),
     'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > 2 THEN (
-      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.32.0', 'sourceHash', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2', 'orderFieldId', 'field:fld_59e1f90fae57481f921c5a81dfd3a234', 'direction', 'asc', 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
+      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.33.0', 'sourceHash', 'sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2', 'orderFieldId', 'field:fld_59e1f90fae57481f921c5a81dfd3a234', 'direction', 'asc', 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
       FROM visible_rows
       ORDER BY "sort_value" DESC, "identity" DESC
       LIMIT 1
@@ -120,6 +120,6 @@ BEGIN
 END
 $modellang$;
 
-REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, timestamptz, text) FROM PUBLIC;
 
 RESET ROLE;

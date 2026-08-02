@@ -24,11 +24,11 @@ function commandOptions(label = "reservation"): { idempotencyKey: string } {
   return { idempotencyKey: `${label}-${commandSequence}` };
 }
 
-async function allReservationsForResource(resourceId: string): Promise<ReservationSummary[]> {
+async function allReservationsForResource(resourceId: string, startsAtOrAfter?: string | null): Promise<ReservationSummary[]> {
   const rows: ReservationSummary[] = [];
   let cursor: string | undefined;
   do {
-    const page = await firstClient.reservationsForResource({ resource: resourceId, cursor });
+    const page = await firstClient.reservationsForResource({ resource: resourceId, startsAtOrAfter, cursor });
     rows.push(...page.items);
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
@@ -135,6 +135,11 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     expect(firstRows.every((reservation) => reservation.resource.id === resource && reservation.resource.name === "Conference Room A")).toBe(true);
     expect(secondRows.every((reservation) => reservation.resource.id === otherResource && reservation.resource.name === "Conference Room B")).toBe(true);
     expect(firstRows.some((reservation) => reservation.id === secondId)).toBe(false);
+    const filteredRows = await allReservationsForResource(resource, "2031-01-01T09:00:00.000Z");
+    expect(filteredRows.some((reservation) => reservation.id === firstId)).toBe(true);
+    expect(filteredRows.every((reservation) => Date.parse(reservation.startsAt) >= Date.parse("2031-01-01T09:00:00.000Z"))).toBe(true);
+    const explicitNull = await firstClient.reservationsForResource({ resource, startsAtOrAfter: null });
+    expect(explicitNull.items).toEqual(firstPage.items);
     await expect(firstClient.reservationsForResource({ resource, cursor: "not_a_valid_cursor" }))
       .rejects.toBeInstanceOf(ValidationError);
     const decoded = JSON.parse(Buffer.from(firstPage.nextCursor!, "base64url").toString("utf8")) as Record<string, unknown>;
@@ -153,6 +158,11 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       .rejects.toBeInstanceOf(StaleError);
     await expect(secondClient.reservationsForResource({ resource, cursor: firstPage.nextCursor! }))
       .rejects.toBeInstanceOf(StaleError);
+    await expect(firstClient.reservationsForResource({
+      resource,
+      startsAtOrAfter: "2031-01-01T09:00:00.000Z",
+      cursor: firstPage.nextCursor!,
+    })).rejects.toBeInstanceOf(StaleError);
     await expect(firstClient.reservationsForResource({
       resource: "20000000-0000-4000-8000-000000000099",
     })).rejects.toBeInstanceOf(AuthorizationError);

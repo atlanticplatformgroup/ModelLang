@@ -1,6 +1,6 @@
 # Reservations enforcement map
 
-Source hash: `sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea`
+Source hash: `sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -67,9 +67,10 @@ Source hash: `sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a
 | `recovery-policy:consumer:con_20d694c9a0a274dc79c6168e47d25968` | Permit only isolated, audited manual reopening of durable terminal failure without invoking the handler or mutating broker state. | PostgreSQL consumer recovery | `postgres/002_schema.sql`: `model_reservations_internal.consumer_recovery_audit` | examples/reservations.model:48:1 |
 | `emit:consumer:con_20d694c9a0a274dc79c6168e47d25968.event:evt_60d694c9a0a274dc79c6168e47d25968` | Append ReservationIndexed with the committed post-effect entity payload, inherited correlation, and source-event causation. | PostgreSQL transactional outbox | `postgres/003_consumers.sql`: `model_reservations_internal.event_outbox` | examples/reservations.model:48:1 |
 | `caller:query:qry_94d8a56f4c2640fab58a4c2190c35c69.actor` | Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted. | PostgreSQL authenticated identity | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:75:3 |
+| `optional-filter:parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter` | Accept omission or null for startsAtOrAfter; only the authored query predicate determines whether that absence broadens visible rows. | PostgreSQL query input and predicate | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:77:3 |
 | `boundary:query:qry_94d8a56f4c2640fab58a4c2190c35c69.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource search_path=pg_catalog,pg_temp` | compiler-derived |
-| `authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:78:13 |
-| `where:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | (reservation.resource == resource) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:79:9 |
+| `authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:79:13 |
+| `where:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | ((reservation.resource == resource) and ((startsAtOrAfter == null) or (reservation.startsAt >= startsAtOrAfter))) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:80:9 |
 | `order:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `limit:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Return at most 2 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Continue by the declared order and identity key; bind the opaque cursor to model/query identity, source, caller, filters, and ordering, and re-evaluate authorization and row policy. | PostgreSQL keyset pagination | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |

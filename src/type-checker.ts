@@ -230,7 +230,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 21,
+    irVersion: 22,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1062,11 +1062,15 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       throw new ModelError("E2005", `Unknown type '${parameter.type.name}'.`, parameter.type.span, file);
     }
     const type = resolvedType(parameter.type, symbols);
+    if (parameter.caller && parameter.optional) {
+      throw new ModelError("E2612", "A query caller parameter cannot be optional.", parameter.span, file);
+    }
     return {
       id: `parameter:${semanticId}.${parameter.name}`,
       name: parameter.name,
       type,
       caller: parameter.caller,
+      ...(parameter.optional ? { optional: true as const } : {}),
       ...(parameter.caller ? { binding: "session_user" as const } : {}),
       span: irSpan(parameter.span, file),
       naming: { sqlParameter: `p_${snakeCase(parameter.name)}`, typescriptProperty: parameter.name },
@@ -1137,7 +1141,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   const paginationRevision = query.pagination
     ? `sha256:${createHash("sha256").update(JSON.stringify({
         id: semanticId,
-        parameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => ({ id: parameter.id, type: parameter.type })),
+        parameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => ({ id: parameter.id, type: parameter.type, optional: parameter.optional === true })),
         sourceEntityId: entityId(sourceEntity),
         returnProjectionId: projectionId(projection),
         authorization,
@@ -1495,14 +1499,14 @@ function typePath(expression: Extract<Expression, { kind: "path" }>, scope: Scop
     throw new ModelError("E2009", `Unknown parameter or enum '${first}'.`, expression.span, file);
   }
   if (!second) {
-    if (isEntityType(parameter.type)) return { kind: "entityValue", parameterId: parameter.id, name: parameter.name, entityId: parameter.type, type: parameter.type, nullable: false };
-    return { kind: "parameter", parameterId: parameter.id, name: parameter.name, type: parameter.type, nullable: false };
+    if (isEntityType(parameter.type)) return { kind: "entityValue", parameterId: parameter.id, name: parameter.name, entityId: parameter.type, type: parameter.type, nullable: parameter.optional === true };
+    return { kind: "parameter", parameterId: parameter.id, name: parameter.name, type: parameter.type, nullable: parameter.optional === true };
   }
   if (!isEntityType(parameter.type)) throw new ModelError("E2410", `Cannot access a field on non-entity parameter '${parameter.name}'.`, expression.span, file);
   const entity = entityForType(symbols, parameter.type);
   const field = symbols.fields.get(entity.name)!.get(second);
   if (!field) throw new ModelError("E2007", `Unknown field '${entity.name}.${second}'.`, expression.span, file);
-  return { kind: "fieldAccess", source: parameter.id, parameter: parameter.name, fieldId: fieldId(entity, field), fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional };
+  return { kind: "fieldAccess", source: parameter.id, parameter: parameter.name, fieldId: fieldId(entity, field), fieldName: field.name, type: fieldType(field, symbols), nullable: field.optional || parameter.optional === true };
 }
 
 function compatibleTypes(left: string, right: string): boolean {
@@ -1815,6 +1819,16 @@ function buildEnforcement(
     entries.push({ id: `caller:${query.id}.${caller.name}`, purpose: "Resolve the semantic caller from direct session identity or transaction-bound gateway claims; no caller UUID is accepted.", layer: "PostgreSQL authenticated identity", artifact: "postgres/003_queries.sql", objectName: fn, source: caller.span });
     for (const parameter of query.parameters.filter((candidate) => isMoneyType(candidate.type))) {
       entries.push({ id: `money-parameter:${parameter.id}`, purpose: `Validate ${parameter.name} against its exact currency, precision, and scale contract.`, layer: "PostgreSQL query input validation", artifact: "postgres/003_queries.sql", objectName: fn, source: parameter.span });
+    }
+    for (const parameter of query.parameters.filter((candidate) => candidate.optional)) {
+      entries.push({
+        id: `optional-filter:${parameter.id}`,
+        purpose: `Accept omission or null for ${parameter.name}; only the authored query predicate determines whether that absence broadens visible rows.`,
+        layer: "PostgreSQL query input and predicate",
+        artifact: "postgres/003_queries.sql",
+        objectName: fn,
+        source: parameter.span,
+      });
     }
     entries.push({ id: `boundary:${query.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
