@@ -25,6 +25,7 @@ export type SemanticChangeArea =
   | "lifecycle"
   | "effect"
   | "executionReliability"
+  | "eventDelivery"
   | "persistence";
 
 export interface SemanticChange {
@@ -40,9 +41,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 4;
+  diffVersion: 5;
   compilerVersion: string;
-  irVersion: 11;
+  irVersion: 12;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -73,6 +74,17 @@ function subject(kind: string, value: { id: string; name: string }): SemanticCha
 
 function addChange(changes: SemanticChange[], change: SemanticChange): void {
   changes.push(change);
+}
+
+function compareEvents(changes: SemanticChange[], previous: ModelIR["events"], current: ModelIR["events"]): void {
+  for (const pair of pairById(changes, "event", previous, current, "eventDelivery")) {
+    compareNamed(changes, "event", pair.previous, pair.current);
+    if (pair.previous.payloadEntityId !== pair.current.payloadEntityId) addChange(changes, {
+      kind: "eventPayloadChanged", area: "eventDelivery", classification: "breaking",
+      subject: subject("event", pair.current), before: pair.previous.payloadEntityId, after: pair.current.payloadEntityId,
+      persistenceRisk: true, explanation: "Changing an event payload entity breaks the durable event contract.",
+    });
+  }
 }
 
 function compareNamed<T extends { id: string; name: string }>(
@@ -310,6 +322,16 @@ function compareActions(changes: SemanticChange[], previous: IRAction[], current
       persistenceRisk: true,
       explanation: "The action's retry, receipt, or replay contract changed.",
     });
+    if (!same(pair.previous.emittedEventIds ?? [], pair.current.emittedEventIds)) addChange(changes, {
+      kind: "emittedEventsChanged",
+      area: "eventDelivery",
+      classification: "review",
+      subject: subject("action", pair.current),
+      before: text(pair.previous.emittedEventIds ?? []),
+      after: text(pair.current.emittedEventIds),
+      persistenceRisk: true,
+      explanation: "The action's durable externally delivered effects changed.",
+    });
     if (!same(pair.previous.effect, pair.current.effect)) addChange(changes, {
       kind: "effectChanged",
       area: "effect",
@@ -484,6 +506,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
     compareExclusions(changes, pair.previous, pair.current);
   }
   comparePolicies(changes, (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [], current.policies);
+  compareEvents(changes, (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [], current.events);
   compareActions(changes, previous.actions, current.actions);
   compareQueries(changes, previous.queries, current.queries);
   compareWorkflows(changes, previous.workflows, current.workflows);
@@ -497,7 +520,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 4,
+    diffVersion: 5,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

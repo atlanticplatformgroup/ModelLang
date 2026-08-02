@@ -1,4 +1,4 @@
--- source sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad
+-- source sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -298,6 +298,106 @@ BEGIN
   END IF;
 END
 $modellang$;
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_outbox" (
+  "id" uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
+  "model_id" text NOT NULL,
+  "model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "event_id" text NOT NULL,
+  "event_name" text NOT NULL,
+  "payload_entity_id" text NOT NULL,
+  "action_id" text NOT NULL,
+  "principal_id" uuid NOT NULL,
+  "target_id" uuid NOT NULL,
+  "payload" jsonb NOT NULL,
+  "correlation_id" text NOT NULL,
+  "causation_id" text,
+  "action_audit_id" bigint NOT NULL REFERENCES "model_procurement_internal"."action_audit" ("id"),
+  "command_receipt_id" bigint REFERENCES "model_procurement_internal"."command_receipt" ("id"),
+  "ordinal" integer NOT NULL,
+  "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  "delivery_attempts" integer NOT NULL DEFAULT 0,
+  "lease_token" uuid,
+  "leased_until" timestamptz,
+  "published_at" timestamptz,
+  CONSTRAINT "uq_event_outbox_action_ordinal" UNIQUE ("action_audit_id", "ordinal"),
+  CONSTRAINT "ck_event_outbox_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_event_outbox_metadata" CHECK ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),
+  CONSTRAINT "ck_event_outbox_delivery" CHECK ("delivery_attempts" >= 0 AND (("lease_token" IS NULL) = ("leased_until" IS NULL)) AND ("published_at" IS NULL OR ("lease_token" IS NULL AND "leased_until" IS NULL)))
+);
+CREATE INDEX IF NOT EXISTS "ix_event_outbox_delivery" ON "model_procurement_internal"."event_outbox" ("occurred_at", "action_audit_id", "ordinal", "id") WHERE "published_at" IS NULL;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."claim_events"(p_limit integer, p_lease_seconds integer)
+RETURNS SETOF jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, pg_temp
+AS $modellang$
+DECLARE
+  v_lease_token uuid := pg_catalog.gen_random_uuid();
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS dispatcher_role ON dispatcher_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE dispatcher_role.rolname = 'modellang_dispatcher' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
+  END IF;
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 1000 OR p_lease_seconds IS NULL OR p_lease_seconds NOT BETWEEN 1 AND 3600 THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:event_outbox';
+  END IF;
+  RETURN QUERY
+  WITH candidates AS (
+    SELECT row_value."id" FROM "model_procurement_internal"."event_outbox" AS row_value
+    WHERE row_value."published_at" IS NULL AND (row_value."leased_until" IS NULL OR row_value."leased_until" <= pg_catalog.clock_timestamp())
+    ORDER BY row_value."occurred_at", row_value."action_audit_id", row_value."ordinal", row_value."id"
+    FOR UPDATE SKIP LOCKED LIMIT p_limit
+  ), leased AS (
+    UPDATE "model_procurement_internal"."event_outbox" AS row_value SET "lease_token" = v_lease_token,
+      "leased_until" = pg_catalog.clock_timestamp() + pg_catalog.make_interval(secs => p_lease_seconds),
+      "delivery_attempts" = row_value."delivery_attempts" + 1
+    FROM candidates WHERE row_value."id" = candidates."id" RETURNING row_value.*
+  )
+  SELECT pg_catalog.jsonb_build_object('id', "id", 'eventId', "event_id", 'eventName', "event_name",
+    'modelId', "model_id", 'modelVersion', "model_version", 'sourceHash', "source_hash", 'actionId', "action_id",
+    'targetId', "target_id", 'payload', "payload", 'correlationId', "correlation_id",
+    'causationId', "causation_id", 'occurredAt', "occurred_at", 'ordinal', "ordinal", 'deliveryAttempt', "delivery_attempts", 'leaseToken', "lease_token")
+  FROM leased ORDER BY "occurred_at", "action_audit_id", "ordinal", "id";
+END
+$modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."claim_events"(integer, integer) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."ack_event"(p_event_id uuid, p_lease_token uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS dispatcher_role ON dispatcher_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE dispatcher_role.rolname = 'modellang_dispatcher' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
+  END IF;
+  UPDATE "model_procurement_internal"."event_outbox" SET "published_at" = pg_catalog.clock_timestamp(), "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
+  WHERE "id" = p_event_id AND "published_at" IS NULL AND "lease_token" = p_lease_token AND "leased_until" > pg_catalog.clock_timestamp();
+  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."ack_event"(uuid, uuid) FROM PUBLIC;
+CREATE OR REPLACE FUNCTION "model_procurement_internal"."release_event"(p_event_id uuid, p_lease_token uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $modellang$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members AS membership
+    JOIN pg_catalog.pg_roles AS dispatcher_role ON dispatcher_role.oid = membership.roleid
+    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
+    WHERE dispatcher_role.rolname = 'modellang_dispatcher' AND identity_role.rolname = session_user
+  ) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_DISPATCHER_REQUIRED';
+  END IF;
+  UPDATE "model_procurement_internal"."event_outbox" SET "lease_token" = (NULL::uuid), "leased_until" = (NULL::timestamptz)
+  WHERE "id" = p_event_id AND "published_at" IS NULL AND "lease_token" = p_lease_token;
+  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_OUTBOX_LEASE'; END IF;
+END $modellang$;
+REVOKE ALL ON FUNCTION "model_procurement_internal"."release_event"(uuid, uuid) FROM PUBLIC;
 
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -314,6 +414,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.12.0', 'sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad', 'installation');
+VALUES ('model:Procurement', '0.20.0', 'sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4', 'installation');
 RESET ROLE;
 

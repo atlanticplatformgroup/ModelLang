@@ -6,6 +6,7 @@ export type StableIdKind =
   | "field"
   | "enum"
   | "enumMember"
+  | "event"
   | "policy"
   | "policyBranch"
   | "action"
@@ -26,6 +27,7 @@ function generatedId(kind: StableIdKind): string {
     field: "fld",
     enum: "enm",
     enumMember: "emv",
+    event: "evt",
     policy: "pol",
     policyBranch: "pbr",
     action: "act",

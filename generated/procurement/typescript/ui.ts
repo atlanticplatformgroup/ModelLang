@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 3,
-  "operationManifestVersion": 3,
+  "uiManifestVersion": 4,
+  "operationManifestVersion": 4,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.12.0",
-    "sourceHash": "sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad",
+    "version": "0.20.0",
+    "sourceHash": "sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4",
     "label": "Procurement"
   },
   "authentication": {
@@ -234,7 +234,10 @@ export const ProcurementUiManifest = {
       "reliability": {
         "idempotency": "required",
         "scope": "authenticatedPrincipal"
-      }
+      },
+      "emittedEventIds": [
+        "event:evt_10d694c9a0a274dc79c6168e47d25968"
+      ]
     },
     {
       "operationId": "action:act_ed2374e822704c51a2925338253d05d2",
@@ -263,7 +266,10 @@ export const ProcurementUiManifest = {
       "reliability": {
         "idempotency": "unsupported",
         "scope": "authenticatedPrincipal"
-      }
+      },
+      "emittedEventIds": [
+        "event:evt_20d694c9a0a274dc79c6168e47d25968"
+      ]
     },
     {
       "operationId": "action:act_d39dbb883b5f4019b9027b85add3de47",
@@ -292,7 +298,10 @@ export const ProcurementUiManifest = {
       "reliability": {
         "idempotency": "unsupported",
         "scope": "authenticatedPrincipal"
-      }
+      },
+      "emittedEventIds": [
+        "event:evt_30d694c9a0a274dc79c6168e47d25968"
+      ]
     }
   ],
   "queries": [

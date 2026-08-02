@@ -115,7 +115,7 @@ policy MayCreate(actor: User) { allow authenticated: actor == actor; }
 action make(caller actor: User) -> Record { authorize MayCreate(actor); create Record { } }`;
     const assigned = assignStableIds(source, "policy-ids.model", (kind) => {
       const prefix: Record<StableIdKind, string> = {
-        entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
+        entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
         action: "act", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
       };
       return `${prefix[kind]}_${kind === "policy" ? "a" : kind === "policyBranch" ? "b" : "c".repeat(1)}${"0".repeat(31)}`;
@@ -182,7 +182,7 @@ workflow TaskLifecycle for Task.state {
   transition submit: State.DRAFT -> State.SUBMITTED by submit;
 }`;
     const prefix: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
+      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -197,7 +197,7 @@ workflow TaskLifecycle for Task.state {
     expect(assignStableIds(assigned.source, "workflow-ids.model").assigned).toBe(0);
   });
 
-  it("assigns IDs to enums, enum members, invariants, exclusions, actions, and queries", () => {
+  it("assigns IDs to enums, enum members, events, invariants, exclusions, actions, and queries", () => {
     const source = `model CompleteIds version "1";
 enum State { OPEN, CLOSED }
 entity User { id: UUID @id; }
@@ -211,9 +211,11 @@ entity Booking {
   invariant valid_interval: startsAt < endsAt;
   exclusion no_overlap: noOverlap(resource, startsAt, endsAt);
 }
+event BookingCreated payload Booking;
 action reserve(caller actor: User, id: UUID, resource: Resource, startsAt: DateTime, endsAt: DateTime) -> Booking {
   authorize true;
   create Booking { id = id; resource = resource; startsAt = startsAt; endsAt = endsAt; state = State.OPEN; }
+  emit BookingCreated;
 }
 query bookings(caller actor: User) from Booking as booking {
   authorize true;
@@ -224,7 +226,7 @@ query bookings(caller actor: User) from Booking as booking {
     const seen: StableIdKind[] = [];
     const counters = new Map<StableIdKind, number>();
     const prefixes: Record<StableIdKind, string> = {
-      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", policy: "pol", policyBranch: "pbr",
+      entity: "ent", field: "fld", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", query: "qry", invariant: "inv", exclusion: "exc",
       workflow: "wfl", transition: "trn",
     };
@@ -235,9 +237,9 @@ query bookings(caller actor: User) from Booking as booking {
       return `${prefixes[kind]}_${next.toString(16).padStart(32, "0")}`;
     });
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
-      "enum", "enumMember", "entity", "field", "invariant", "exclusion", "action", "query",
+      "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(11);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(12);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -254,6 +256,7 @@ query bookings(caller actor: User) from Booking as booking {
   it.each([
     ["enum", `enum E @stableId("bad") { A } entity User { id: UUID @id; }`],
     ["enum member", `enum E { A @stableId("bad") } entity User { id: UUID @id; }`],
+    ["event", `entity User { id: UUID @id; } event UserChanged @stableId("bad") payload User;`],
     ["invariant", `entity User { id: UUID @id; invariant valid @stableId("bad"): id == id; }`],
     ["exclusion", `entity User { id: UUID @id; } entity Resource { id: UUID @id; } entity Slot { id: UUID @id; resource: Resource; starts: DateTime; ends: DateTime; exclusion no_overlap @stableId("bad"): noOverlap(resource, starts, ends); }`],
     ["action", `entity User { id: UUID @id; } action make @stableId("bad")(caller actor: User, id: UUID) -> User { authorize true; create User { id = id; } }`],
@@ -330,13 +333,17 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
-  it("accepts released IR9 and IR10 artifacts as previous baselines for an IR11 migration", () => {
+  it("accepts released IR9, IR10, and IR11 artifacts as previous baselines for an IR12 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10]) {
+    for (const irVersion of [9, 10, 11]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
       if (irVersion === 9) delete legacy.policies;
+      if (irVersion < 12) {
+        delete legacy.events;
+        for (const action of legacy.actions as Record<string, unknown>[]) delete action.emittedEventIds;
+      }
       expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
       const plan = planMigration(legacy as unknown as typeof previous, current);
       expect(plan.previousVersion).toBe("1.0.0");

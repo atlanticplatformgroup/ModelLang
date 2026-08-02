@@ -7,6 +7,8 @@ import {
   generateGatewayInfrastructureStatements,
   generateDecisionEvidenceInfrastructureStatements,
   generateCommandReceiptInfrastructureStatements,
+  generateEventOutboxInfrastructureStatements,
+  generateDispatcherRoleStatements,
   generateGatewayRoleStatements,
   generatePostgres,
   generateWorkflowStatements,
@@ -363,7 +365,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11].includes(Number(previous.irVersion)) || current.irVersion !== 11) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11 baseline and canonical IR11 current input.");
+  if (![9, 10, 11, 12].includes(Number(previous.irVersion)) || current.irVersion !== 12) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11/IR12 baseline and canonical IR12 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -475,6 +477,7 @@ export function planReviewedMigration(
     "-- This offline migration validates copied data in a staging schema before replacement.",
     "BEGIN;",
     generateGatewayRoleStatements(),
+    generateDispatcherRoleStatements(),
     "SET LOCAL ROLE modellang_owner;",
     ...historyBootstrapStatements(previous, current),
     ...(lockTargets.length ? [`LOCK TABLE ${lockTargets.join(", ")} IN ACCESS EXCLUSIVE MODE;`] : []),
@@ -506,6 +509,7 @@ export function planReviewedMigration(
     ...generateGatewayInfrastructureStatements(current),
     ...generateDecisionEvidenceInfrastructureStatements(current),
     ...generateCommandReceiptInfrastructureStatements(current),
+    ...generateEventOutboxInfrastructureStatements(current),
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),
     generated["003_queries.sql"]!.trim(),

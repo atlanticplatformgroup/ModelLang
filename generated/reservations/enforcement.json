@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.11.0",
-    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418",
+    "version": "0.20.0",
+    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -17,6 +17,13 @@
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.principal_binding"
+    },
+    {
+      "id": "boundary:dispatcher_role",
+      "purpose": "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_dispatcher NOLOGIN"
     },
     {
       "id": "boundary:owner_role",
@@ -460,9 +467,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 26,
+        "line": 28,
         "column": 3,
-        "endLine": 26,
+        "endLine": 28,
         "endColumn": 21
       }
     },
@@ -481,9 +488,9 @@
       "objectName": "model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 27,
         "column": 1,
-        "endLine": 41,
+        "endLine": 44,
         "endColumn": 2
       }
     },
@@ -495,9 +502,9 @@
       "objectName": "model_reservations_internal.command_receipt",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 27,
         "column": 1,
-        "endLine": 41,
+        "endLine": 44,
         "endColumn": 2
       }
     },
@@ -509,9 +516,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 27,
         "column": 1,
-        "endLine": 41,
+        "endLine": 44,
         "endColumn": 2
       }
     },
@@ -523,9 +530,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 31,
+        "line": 33,
         "column": 13,
-        "endLine": 31,
+        "endLine": 33,
         "endColumn": 17
       }
     },
@@ -537,9 +544,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 32,
+        "line": 34,
         "column": 3,
-        "endLine": 32,
+        "endLine": 34,
         "endColumn": 45
       }
     },
@@ -551,9 +558,23 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 27,
         "column": 1,
-        "endLine": 41,
+        "endLine": 44,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:action:act_508ad810a19d4b79a5009871de5cd26b.event:evt_40d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append ReservationCreated with the committed post-effect entity payload.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_reservations_internal.event_outbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 27,
+        "column": 1,
+        "endLine": 44,
         "endColumn": 2
       }
     },
@@ -579,9 +600,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 44,
+        "line": 47,
         "column": 3,
-        "endLine": 44,
+        "endLine": 47,
         "endColumn": 21
       }
     },
@@ -600,9 +621,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 50,
         "column": 13,
-        "endLine": 47,
+        "endLine": 50,
         "endColumn": 17
       }
     },
@@ -614,9 +635,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 48,
+        "line": 51,
         "column": 9,
-        "endLine": 48,
+        "endLine": 51,
         "endColumn": 41
       }
     },
@@ -628,9 +649,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 46,
         "column": 1,
-        "endLine": 51,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -642,9 +663,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 46,
         "column": 1,
-        "endLine": 51,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -656,9 +677,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 46,
         "column": 1,
-        "endLine": 51,
+        "endLine": 54,
         "endColumn": 2
       }
     },
@@ -682,6 +703,13 @@
       "layer": "PostgreSQL receipt boundary",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_reservations_internal.command_receipt"
+    },
+    {
+      "id": "boundary:event_outbox",
+      "purpose": "Commit domain events atomically with state, audit, evidence, and receipts, then deliver them through private leases with at-least-once semantics.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.event_outbox"
     }
   ]
 }

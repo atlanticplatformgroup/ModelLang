@@ -6,10 +6,15 @@ function actionIdempotency(operations: OperationManifest, operationId: string): 
   return operation?.kind === "action" ? operation.reliability.idempotency : "unsupported";
 }
 
+function actionEventIds(operations: OperationManifest, operationId: string): string[] {
+  const operation = operations.operations.find((candidate) => candidate.id === operationId);
+  return operation?.kind === "action" ? [...operation.emittedEventIds] : [];
+}
+
 export interface CapabilityManifest {
   $schema: "https://modellang.dev/schemas/capability-manifest.schema.json";
-  capabilityManifestVersion: 2;
-  operationManifestVersion: 3;
+  capabilityManifestVersion: 3;
+  operationManifestVersion: 4;
   model: { id: string; name: string; version: string; sourceHash: string };
   view: {
     audience: "application";
@@ -39,6 +44,7 @@ export interface CapabilityManifest {
       scope: "authenticatedPrincipal";
       grantsAuthority: false;
     };
+    emittedEventIds: string[];
   }[];
 }
 
@@ -48,7 +54,7 @@ export function generateCapabilityManifest(
 ): CapabilityManifest {
   return {
     $schema: "https://modellang.dev/schemas/capability-manifest.schema.json",
-    capabilityManifestVersion: 2,
+    capabilityManifestVersion: 3,
     operationManifestVersion: operations.manifestVersion,
     model: { ...operations.model },
     view: {
@@ -79,6 +85,7 @@ export function generateCapabilityManifest(
         scope: "authenticatedPrincipal",
         grantsAuthority: false,
       },
+      emittedEventIds: actionEventIds(operations, decision.operationId),
     })),
   };
 }

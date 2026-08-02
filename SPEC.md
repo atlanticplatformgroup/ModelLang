@@ -1,11 +1,12 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.19](./spec/0.19/LANGUAGE.md). It retains the complete 0.18 boundary and adds required action idempotency with private principal-scoped transactional receipts, canonical request fingerprints, exact committed-result replay, and correlation/causation links. Public applicability remains side-effect free and grants no authority.
+The current normative specification is [ModelLang 0.20](./spec/0.20/LANGUAGE.md). It retains the complete 0.19 boundary and adds stable typed domain events, post-effect action emission, atomic private outbox storage, replay suppression, and execute-only at-least-once lease delivery.
 
-- [Reliable command semantics](./spec/0.19/RELIABLE_COMMANDS.md)
-- [0.19 grammar additions](./spec/0.19/GRAMMAR.ebnf)
-- [0.19 conformance requirements](./spec/0.19/CONFORMANCE.md)
-- [0.19 unstable reliability boundaries](./spec/0.19/UNSTABLE.md)
+- [Transactional event semantics](./spec/0.20/EVENTS.md)
+- [0.20 grammar additions](./spec/0.20/GRAMMAR.ebnf)
+- [0.20 conformance requirements](./spec/0.20/CONFORMANCE.md)
+- [0.20 unstable event boundaries](./spec/0.20/UNSTABLE.md)
+- [Reliable command semantics inherited from 0.19](./spec/0.19/RELIABLE_COMMANDS.md)
 
 - [Authenticated applicability semantics](./spec/0.17/APPLICABILITY.md)
 - [0.17 unchanged grammar statement](./spec/0.17/GRAMMAR.ebnf)

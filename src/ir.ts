@@ -168,9 +168,19 @@ export interface IRAction {
     fingerprint: "canonicalSha256";
   };
   effect: IREffect;
+  emittedEventIds: string[];
   lockPlan: IRLock[];
   span: IRSpan;
   naming: { sqlFunction: string; typescriptMethod: string };
+}
+
+export interface IREvent {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  payloadEntityId: string;
+  span: IRSpan;
+  naming: { typescriptName: string };
 }
 
 export interface IRQuery {
@@ -232,7 +242,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 11;
+  irVersion: 12;
   model: {
     id: string;
     name: string;
@@ -244,6 +254,7 @@ export interface ModelIR {
   principal: { entityId: string; bindingMechanism: "session_user" };
   enums: IREnum[];
   entities: IREntity[];
+  events: IREvent[];
   policies: IRPolicy[];
   actions: IRAction[];
   queries: IRQuery[];

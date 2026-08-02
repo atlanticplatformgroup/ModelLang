@@ -15,6 +15,7 @@ import { generateSemanticManifest } from "./semantic-manifest.js";
 import { generateArtifactProvenance } from "./provenance.js";
 import { generateDecisionPlan } from "./decision-plan.js";
 import { generateCapabilityManifest } from "./capability-manifest.js";
+import { generateEventManifest } from "./event-manifest.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -26,6 +27,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   const capabilityManifest = generateCapabilityManifest(operationManifest, decisionPlan);
   const uiManifest = generateUiManifest(operationManifest);
   const semanticManifest = generateSemanticManifest(ir, operationManifest);
+  const eventManifest = generateEventManifest(ir);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
@@ -33,6 +35,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "capabilities.json": stableJson(capabilityManifest),
     "ui.json": stableJson(uiManifest),
     "semantic.json": stableJson(semanticManifest),
+    "events.json": stableJson(eventManifest),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),

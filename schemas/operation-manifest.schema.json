@@ -85,7 +85,7 @@
     },
     "action": {
       "type": "object",
-      "required": ["id", "name", "kind", "input", "caller", "output", "reliability", "errors"],
+      "required": ["id", "name", "kind", "input", "caller", "output", "reliability", "emittedEventIds", "errors"],
       "properties": {
         "id": { "type": "string", "pattern": "^action:" },
         "name": { "type": "string" },
@@ -122,6 +122,7 @@
             }
           ]
         },
+        "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
         "errors": { "$ref": "#/$defs/errors" }
       },
       "additionalProperties": false
@@ -200,7 +201,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 3 },
+    "manifestVersion": { "const": 4 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

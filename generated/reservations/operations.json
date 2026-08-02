@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 3,
+  "manifestVersion": 4,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.11.0",
-    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418"
+    "version": "0.20.0",
+    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1"
   },
   "authentication": {
     "required": true,
@@ -196,6 +196,9 @@
         "replay": "storedResult",
         "fingerprint": "canonicalSha256"
       },
+      "emittedEventIds": [
+        "event:evt_40d694c9a0a274dc79c6168e47d25968"
+      ],
       "errors": [
         "identityBinding",
         "authorization",

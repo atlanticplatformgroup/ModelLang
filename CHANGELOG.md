@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.20.0
+
+- Added stable typed `event ... payload Entity;` declarations and post-effect `emit Event;` clauses, preserved in canonical IR12 and validated against action result types.
+- Added atomic private PostgreSQL event outboxes, isolated `modellang_dispatcher` lease/ack/release functions, replay suppression, rollback safety, deterministic within-action ordinals, and explicit at-least-once delivery semantics.
+- Added event manifest v1 and generated TypeScript event-envelope unions; operation manifest v4, capability manifest v3, UI manifest v4, and engineering semantic manifest v4 now expose filtered static emission metadata.
+- Added semantic diff v5 event/effect evolution, IR9–IR11 baseline normalization to IR12, reviewed acknowledgements, and the baseline-checked idempotent `010_upgrade_0_20.sql` without fabricated historical events.
+- Updated Procurement with `RequestOpened`, `RequestSubmitted`, and `RequestApproved`, and Reservations with `ReservationCreated`, plus golden, compiler, schema, privilege, replay, rollback, and dispatcher coverage.
+
 ## 0.19.0
 
 - Added the `idempotency required;` action declaration and advanced the canonical backend boundary to IR11.

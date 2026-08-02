@@ -1,0 +1,26 @@
+{
+  "$schema": "https://modellang.dev/schemas/event-manifest.schema.json",
+  "eventManifestVersion": 1,
+  "model": {
+    "id": "model:Reservations",
+    "name": "Reservations",
+    "version": "0.20.0",
+    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1"
+  },
+  "delivery": {
+    "semantics": "atLeastOnce",
+    "storage": "privateTransactionalOutbox",
+    "ordering": "occurredAtThenActionOrdinal",
+    "acknowledgement": "leaseToken"
+  },
+  "events": [
+    {
+      "id": "event:evt_40d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationCreated",
+      "payloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "emittedByActionIds": [
+        "action:act_508ad810a19d4b79a5009871de5cd26b"
+      ]
+    }
+  ]
+}

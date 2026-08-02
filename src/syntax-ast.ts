@@ -15,7 +15,16 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | PolicyDecl | ActionDecl | QueryDecl | WorkflowDecl;
+export type Declaration = EnumDecl | EntityDecl | EventDecl | PolicyDecl | ActionDecl | QueryDecl | WorkflowDecl;
+
+export interface EventDecl {
+  kind: "event";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  payloadType: TypeRef;
+  span: Span;
+}
 
 export interface EnumDecl {
   kind: "enum";
@@ -134,6 +143,7 @@ export interface ActionDecl {
   requires: RequireDecl[];
   idempotency?: { mode: "required"; span: Span };
   effect: Effect;
+  emits: { eventName: string; span: Span }[];
   span: Span;
 }
 

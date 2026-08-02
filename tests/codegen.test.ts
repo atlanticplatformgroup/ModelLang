@@ -44,7 +44,7 @@ describe("backends", () => {
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(3);
+    expect(manifest.manifestVersion).toBe(4);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -181,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 3,
+      manifestVersion: 4,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 11 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 12 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -224,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 11 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 12 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -254,8 +254,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 3,
-      operationManifestVersion: 3,
+      uiManifestVersion: 4,
+      operationManifestVersion: 4,
       authentication: { required: true, callerInput: false },
     });
 
@@ -621,7 +621,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.12.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.20.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -636,5 +636,28 @@ describe("backends", () => {
     expect(output["model.mmd"]).toContain("approve via approveRequest");
     expect(output["enforcement.md"]).toContain("workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(output["enforcement.md"]).toContain("transition:trn_efd18c8576154ba8b138c97b551afae3");
+  });
+
+  it("generates a private atomic outbox, execute-only dispatcher, and typed event contracts", async () => {
+    const output = generateAll(await procurement());
+    const contract = JSON.parse(output["events.json"]!);
+    const schema = JSON.parse(await readFile("schemas/event-manifest.schema.json", "utf8"));
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(contract), JSON.stringify(validate.errors)).toBe(true);
+    expect(contract).toMatchObject({
+      eventManifestVersion: 1,
+      delivery: { semantics: "atLeastOnce", storage: "privateTransactionalOutbox", acknowledgement: "leaseToken" },
+    });
+    expect(contract.events).toHaveLength(3);
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_dispatcher NOLOGIN");
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_outbox"');
+    expect(output["postgres/002_schema.sql"]).toContain("FOR UPDATE SKIP LOCKED LIMIT p_limit");
+    expect(output["postgres/002_schema.sql"]).toContain('row_value."action_audit_id", row_value."ordinal", row_value."id"');
+    expect(output["postgres/003_actions.sql"]).toContain('INSERT INTO "model_procurement_internal"."event_outbox"');
+    expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."claim_events"');
+    expect(output["postgres/010_upgrade_0_20.sql"]).toContain("transactional domain-event upgrade");
+    expect(output["typescript/events.ts"]).toContain("export type RequestOpenedEvent");
+    expect(output["typescript/index.ts"]).toContain('export * from "./events.js"');
+    expect(output["model.mmd"]).toContain("emits atomically");
   });
 });

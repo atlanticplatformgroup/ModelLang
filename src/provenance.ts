@@ -16,7 +16,7 @@ export interface ArtifactProvenance {
     version: string;
     sourceHash: string;
   };
-  irVersion: 11;
+  irVersion: 12;
   artifacts: {
     path: string;
     role: "canonical" | "contract" | "projection" | "assurance";
@@ -30,7 +30,7 @@ function sha256(content: string): string {
 
 function artifactRole(path: string): ArtifactProvenance["artifacts"][number]["role"] {
   if (path === "model.ir.json") return "canonical";
-  if (["operations.json", "decisions.json", "capabilities.json", "ui.json", "semantic.json", "openapi.json"].includes(path)) return "contract";
+  if (["operations.json", "decisions.json", "capabilities.json", "ui.json", "semantic.json", "events.json", "openapi.json"].includes(path)) return "contract";
   if (path === "enforcement.json" || path === "enforcement.md") return "assurance";
   return "projection";
 }

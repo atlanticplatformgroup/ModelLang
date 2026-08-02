@@ -1,0 +1,9 @@
+program         = modelDeclaration, { declaration } ;
+declaration     = enumDeclaration | entityDeclaration | eventDeclaration | policyDeclaration | actionDeclaration | queryDeclaration | workflowDeclaration ;
+eventDeclaration = "event", identifier, [ stableId ], "payload", identifier, ";" ;
+actionDeclaration = "action", identifier, [ stableId ], parameters, "->", type, "{",
+                    "authorize", expression, ";", { requirement }, [ idempotency ], effect, { emission }, "}" ;
+emission        = "emit", identifier, ";" ;
+stableId        = "@stableId", "(", string, ")" ;
+
+(* Productions not replaced above are inherited from ModelLang 0.19. *)

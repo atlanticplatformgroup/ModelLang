@@ -163,8 +163,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 3 },
-    "operationManifestVersion": { "const": 3 },
+    "uiManifestVersion": { "const": 4 },
+    "operationManifestVersion": { "const": 4 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -249,7 +249,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["operationId", "name", "label", "fields", "resultEntityId", "errors", "reliability"],
+        "required": ["operationId", "name", "label", "fields", "resultEntityId", "errors", "reliability", "emittedEventIds"],
         "properties": {
           "operationId": { "type": "string", "pattern": "^action:" },
           "name": { "type": "string" },
@@ -265,7 +265,8 @@
               "idempotency": { "enum": ["required", "unsupported"] },
               "scope": { "const": "authenticatedPrincipal" }
             }
-          }
+          },
+          "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } }
         },
         "additionalProperties": false
       }

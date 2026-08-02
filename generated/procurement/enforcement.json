@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.12.0",
-    "sourceHash": "sha256:0a9c4bc4ebf0fc2c92472b586ce11a09dae23b02a5870678a20bd1caa88851ad",
+    "version": "0.20.0",
+    "sourceHash": "sha256:007526853c759d424c2cfdaf07a18cffbef523a5b1f501a5fe5fc1fd58462cf4",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -17,6 +17,13 @@
       "layer": "PostgreSQL session identity",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.principal_binding"
+    },
+    {
+      "id": "boundary:dispatcher_role",
+      "purpose": "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_dispatcher NOLOGIN"
     },
     {
       "id": "boundary:owner_role",
@@ -68,9 +75,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 58,
+        "line": 62,
         "column": 1,
-        "endLine": 66,
+        "endLine": 70,
         "endColumn": 2
       }
     },
@@ -82,9 +89,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 62,
+        "line": 66,
         "column": 3,
-        "endLine": 63,
+        "endLine": 67,
         "endColumn": 65
       }
     },
@@ -96,9 +103,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 64,
+        "line": 68,
         "column": 3,
-        "endLine": 65,
+        "endLine": 69,
         "endColumn": 64
       }
     },
@@ -530,9 +537,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 71,
+        "line": 75,
         "column": 3,
-        "endLine": 71,
+        "endLine": 75,
         "endColumn": 21
       }
     },
@@ -544,9 +551,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 72,
+        "line": 76,
         "column": 3,
-        "endLine": 72,
+        "endLine": 76,
         "endColumn": 21
       }
     },
@@ -565,9 +572,9 @@
       "objectName": "model_procurement.decide_act_1e35db0451b1461e941af6283d86dca2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 70,
+        "line": 74,
         "column": 1,
-        "endLine": 88,
+        "endLine": 93,
         "endColumn": 2
       }
     },
@@ -579,9 +586,9 @@
       "objectName": "model_procurement_internal.command_receipt",
       "source": {
         "file": "examples/procurement.model",
-        "line": 70,
+        "line": 74,
         "column": 1,
-        "endLine": 88,
+        "endLine": 93,
         "endColumn": 2
       }
     },
@@ -593,9 +600,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 70,
+        "line": 74,
         "column": 1,
-        "endLine": 88,
+        "endLine": 93,
         "endColumn": 2
       }
     },
@@ -607,9 +614,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 79,
         "column": 5,
-        "endLine": 77,
+        "endLine": 81,
         "endColumn": 35
       }
     },
@@ -621,9 +628,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 78,
+        "line": 82,
         "column": 3,
-        "endLine": 78,
+        "endLine": 82,
         "endColumn": 43
       }
     },
@@ -635,9 +642,23 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 70,
+        "line": 74,
         "column": 1,
-        "endLine": 88,
+        "endLine": 93,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:action:act_1e35db0451b1461e941af6283d86dca2.event:evt_10d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append RequestOpened with the committed post-effect entity payload.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.event_outbox",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 74,
+        "column": 1,
+        "endLine": 93,
         "endColumn": 2
       }
     },
@@ -656,9 +677,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 91,
+        "line": 96,
         "column": 3,
-        "endLine": 91,
+        "endLine": 96,
         "endColumn": 21
       }
     },
@@ -677,9 +698,9 @@
       "objectName": "model_procurement.decide_act_ed2374e822704c51a2925338253d05d2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 95,
         "column": 1,
-        "endLine": 100,
+        "endLine": 106,
         "endColumn": 2
       }
     },
@@ -691,9 +712,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 95,
         "column": 1,
-        "endLine": 100,
+        "endLine": 106,
         "endColumn": 2
       }
     },
@@ -705,9 +726,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 94,
+        "line": 99,
         "column": 13,
-        "endLine": 94,
+        "endLine": 99,
         "endColumn": 39
       }
     },
@@ -719,9 +740,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 95,
+        "line": 100,
         "column": 3,
-        "endLine": 95,
+        "endLine": 100,
         "endColumn": 59
       }
     },
@@ -733,9 +754,23 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 90,
+        "line": 95,
         "column": 1,
-        "endLine": 100,
+        "endLine": 106,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:action:act_ed2374e822704c51a2925338253d05d2.event:evt_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append RequestSubmitted with the committed post-effect entity payload.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.event_outbox",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 95,
+        "column": 1,
+        "endLine": 106,
         "endColumn": 2
       }
     },
@@ -761,9 +796,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 103,
+        "line": 109,
         "column": 3,
-        "endLine": 103,
+        "endLine": 109,
         "endColumn": 21
       }
     },
@@ -782,9 +817,9 @@
       "objectName": "model_procurement.decide_act_d39dbb883b5f4019b9027b85add3de47",
       "source": {
         "file": "examples/procurement.model",
-        "line": 102,
+        "line": 108,
         "column": 1,
-        "endLine": 117,
+        "endLine": 124,
         "endColumn": 2
       }
     },
@@ -796,9 +831,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 102,
+        "line": 108,
         "column": 1,
-        "endLine": 117,
+        "endLine": 124,
         "endColumn": 2
       }
     },
@@ -810,9 +845,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 107,
+        "line": 113,
         "column": 5,
-        "endLine": 108,
+        "endLine": 114,
         "endColumn": 42
       }
     },
@@ -824,9 +859,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 110,
+        "line": 116,
         "column": 3,
-        "endLine": 110,
+        "endLine": 116,
         "endColumn": 67
       }
     },
@@ -838,9 +873,23 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 102,
+        "line": 108,
         "column": 1,
-        "endLine": 117,
+        "endLine": 124,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:action:act_d39dbb883b5f4019b9027b85add3de47.event:evt_30d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append RequestApproved with the committed post-effect entity payload.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_actions.sql",
+      "objectName": "model_procurement_internal.event_outbox",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 108,
+        "column": 1,
+        "endLine": 124,
         "endColumn": 2
       }
     },
@@ -866,9 +915,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 128,
+        "line": 135,
         "column": 3,
-        "endLine": 128,
+        "endLine": 135,
         "endColumn": 21
       }
     },
@@ -887,9 +936,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 130,
+        "line": 137,
         "column": 13,
-        "endLine": 130,
+        "endLine": 137,
         "endColumn": 17
       }
     },
@@ -901,9 +950,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 131,
+        "line": 138,
         "column": 9,
-        "endLine": 131,
+        "endLine": 138,
         "endColumn": 35
       }
     },
@@ -915,9 +964,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 134,
         "column": 1,
-        "endLine": 134,
+        "endLine": 141,
         "endColumn": 2
       }
     },
@@ -929,9 +978,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 134,
         "column": 1,
-        "endLine": 134,
+        "endLine": 141,
         "endColumn": 2
       }
     },
@@ -943,9 +992,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 134,
         "column": 1,
-        "endLine": 134,
+        "endLine": 141,
         "endColumn": 2
       }
     },
@@ -957,9 +1006,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 119,
+        "line": 126,
         "column": 1,
-        "endLine": 125,
+        "endLine": 132,
         "endColumn": 2
       }
     },
@@ -971,9 +1020,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 121,
+        "line": 128,
         "column": 3,
-        "endLine": 122,
+        "endLine": 129,
         "endColumn": 69
       }
     },
@@ -985,9 +1034,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 123,
+        "line": 130,
         "column": 3,
-        "endLine": 124,
+        "endLine": 131,
         "endColumn": 73
       }
     },
@@ -1011,6 +1060,13 @@
       "layer": "PostgreSQL receipt boundary",
       "artifact": "postgres/002_schema.sql",
       "objectName": "model_procurement_internal.command_receipt"
+    },
+    {
+      "id": "boundary:event_outbox",
+      "purpose": "Commit domain events atomically with state, audit, evidence, and receipts, then deliver them through private leases with at-least-once semantics.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.event_outbox"
     }
   ]
 }

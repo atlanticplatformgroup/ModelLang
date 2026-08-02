@@ -180,7 +180,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.12.0",
+      model_version: "0.20.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -246,6 +246,63 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       audit_receipt_id: receipt.rows[0]!.evidence_receipt_id,
     });
     expect(receipt.rows[0]!.action_audit_id).toBeTruthy();
+    const events = await admin.query<{ count: string; event_id: string; payload: { id: string } }>(`
+      SELECT count(*) OVER ()::text AS count, event_id, payload
+      FROM model_procurement_internal.event_outbox WHERE target_id = $1
+    `, [first.id]);
+    expect(events.rows).toEqual([expect.objectContaining({
+      count: "1",
+      event_id: "event:evt_10d694c9a0a274dc79c6168e47d25968",
+      payload: expect.objectContaining({ id: first.id }),
+    })]);
+  });
+
+  it("redelivers expired leases and acknowledges private events through the execute-only dispatcher boundary", async () => {
+    const created = await clients.employeeOne.openRequest({ amount: usd("42") }, commandOptions("outbox"));
+    const dispatcher = new Client({ connectionString: loginUrl("ml_dispatcher") });
+    await dispatcher.connect();
+    try {
+      await expect(dispatcher.query("SELECT * FROM model_procurement_internal.event_outbox"))
+        .rejects.toMatchObject({ code: "42501" });
+      const claimed = await dispatcher.query<{ claim_events: {
+        id: string; targetId: string; eventId: string; leaseToken: string; deliveryAttempt: number;
+      } }>("SELECT model_procurement_internal.claim_events(1000, 60)");
+      const target = claimed.rows.map((row) => row.claim_events).find((event) => event.targetId === created.id)!;
+      expect(target).toMatchObject({
+        targetId: created.id,
+        eventId: "event:evt_10d694c9a0a274dc79c6168e47d25968",
+        deliveryAttempt: 1,
+      });
+      for (const event of claimed.rows.map((row) => row.claim_events)) {
+        if (event.id !== target.id) {
+          await dispatcher.query("SELECT model_procurement_internal.release_event($1, $2)", [event.id, event.leaseToken]);
+        }
+      }
+      await admin.query(
+        "UPDATE model_procurement_internal.event_outbox SET leased_until = clock_timestamp() - interval '1 second' WHERE id = $1",
+        [target.id],
+      );
+      const reclaimed = await dispatcher.query<typeof claimed.rows[number]>(
+        "SELECT model_procurement_internal.claim_events(1000, 60)",
+      );
+      const redelivery = reclaimed.rows.map((row) => row.claim_events).find((event) => event.id === target.id)!;
+      expect(redelivery).toMatchObject({ id: target.id, deliveryAttempt: 2 });
+      expect(redelivery.leaseToken).not.toBe(target.leaseToken);
+      for (const event of reclaimed.rows.map((row) => row.claim_events)) {
+        if (event.id === redelivery.id) {
+          await dispatcher.query("SELECT model_procurement_internal.ack_event($1, $2)", [event.id, event.leaseToken]);
+        } else {
+          await dispatcher.query("SELECT model_procurement_internal.release_event($1, $2)", [event.id, event.leaseToken]);
+        }
+      }
+      const stored = await admin.query<{ published: boolean }>(
+        "SELECT published_at IS NOT NULL AS published FROM model_procurement_internal.event_outbox WHERE id = $1",
+        [target.id],
+      );
+      expect(stored.rows[0]!.published).toBe(true);
+    } finally {
+      await dispatcher.end();
+    }
   });
 
   it("rejects changed retry inputs without disclosing the stored result", async () => {
@@ -586,6 +643,27 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
+  it("reapplies the transactional 0.20 event upgrade without changing data, queued events, or history", async () => {
+    const before = await admin.query<{ requests: string; events: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/010_upgrade_0_20.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ requests: string; events: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
   it("rolls back durable decision evidence with the action transaction", async () => {
     const connection = new Client({ connectionString: loginUrl("ml_manager") });
     await connection.connect();
@@ -601,13 +679,14 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       ).catch(() => ({ rows: [{ count: "private" }] }));
       expect(inside.rows[0]!.count).toBe("private");
       await connection.query("ROLLBACK");
-      const persisted = await admin.query<{ rows: string; evidence: string; receipts: string }>(`
+      const persisted = await admin.query<{ rows: string; evidence: string; receipts: string; events: string }>(`
         SELECT
           (SELECT count(*)::text FROM model_procurement.purchase_request WHERE id = $1) AS rows,
           (SELECT count(*)::text FROM model_procurement_internal.action_audit WHERE target_id = $1) AS evidence,
-          (SELECT count(*)::text FROM model_procurement_internal.command_receipt WHERE idempotency_key = $2) AS receipts
+          (SELECT count(*)::text FROM model_procurement_internal.command_receipt WHERE idempotency_key = $2) AS receipts,
+          (SELECT count(*)::text FROM model_procurement_internal.event_outbox WHERE target_id = $1) AS events
       `, [target, rollbackOptions.idempotencyKey]);
-      expect(persisted.rows[0]).toEqual({ rows: "0", evidence: "0", receipts: "0" });
+      expect(persisted.rows[0]).toEqual({ rows: "0", evidence: "0", receipts: "0", events: "0" });
     } finally {
       await connection.query("ROLLBACK").catch(() => undefined);
       await connection.end();

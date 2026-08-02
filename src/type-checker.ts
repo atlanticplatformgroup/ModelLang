@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IREntity, IREnum, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
-  ActionDecl, Annotation, Declaration, EntityDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
+  ActionDecl, Annotation, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
 
@@ -26,6 +26,7 @@ interface Scope {
 interface Symbols {
   enums: Map<string, Extract<Declaration, { kind: "enum" }>>;
   entities: Map<string, EntityDecl>;
+  events: Map<string, EventDecl>;
   policies: Map<string, PolicyDecl>;
   actions: Map<string, ActionDecl>;
   queries: Map<string, QueryDecl>;
@@ -91,6 +92,10 @@ function enumMemberId(
 
 function actionId(action: ActionDecl): string {
   return `action:${String(action.stableId?.value ?? action.name)}`;
+}
+
+function eventId(event: EventDecl): string {
+  return `event:${String(event.stableId?.value ?? event.name)}`;
 }
 
 function policyId(policy: PolicyDecl): string {
@@ -168,13 +173,27 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     naming: { sqlCheckPrefix: `ck_enum_${snakeCase(declaration.name)}`, typescriptName: declaration.name },
   }));
   const entities: IREntity[] = [...symbols.entities.values()].map((entity) => lowerEntity(entity, symbols, file));
+  const events: IREvent[] = [...symbols.events.values()].map((event) => {
+    const payload = symbols.entities.get(event.payloadType.name);
+    if (!payload || event.payloadType.collection || event.payloadType.moneyCurrency) {
+      throw new ModelError("E3101", `Event '${event.name}' payload type '${event.payloadType.name}' must be an entity.`, event.payloadType.span, file);
+    }
+    return {
+      id: eventId(event),
+      name: event.name,
+      identity: identity(event.stableId),
+      payloadEntityId: entityId(payload),
+      span: irSpan(event.span, file),
+      naming: { typescriptName: event.name },
+    };
+  });
   const policies = [...symbols.policies.values()].map((policy) => lowerPolicy(policy, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
-  const enforcement = buildEnforcement(enums, entities, policies, actions, queries, workflows, schema, internalSchema);
+  const enforcement = buildEnforcement(enums, entities, events, policies, actions, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 11,
+    irVersion: 12,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -186,6 +205,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     principal: { entityId: entityId(symbols.entities.get(principalName)!), bindingMechanism: "session_user" },
     enums,
     entities,
+    events,
     policies,
     actions,
     queries,
@@ -197,6 +217,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
 function collectSymbols(program: Program, file: string): Symbols {
   const enums = new Map<string, Extract<Declaration, { kind: "enum" }>>();
   const entities = new Map<string, EntityDecl>();
+  const events = new Map<string, EventDecl>();
   const policies = new Map<string, PolicyDecl>();
   const actions = new Map<string, ActionDecl>();
   const queries = new Map<string, QueryDecl>();
@@ -208,6 +229,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     top.set(declaration.name, declaration);
     if (declaration.kind === "enum") enums.set(declaration.name, declaration);
     if (declaration.kind === "entity") entities.set(declaration.name, declaration);
+    if (declaration.kind === "event") events.set(declaration.name, declaration);
     if (declaration.kind === "policy") policies.set(declaration.name, declaration);
     if (declaration.kind === "action") actions.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
@@ -236,10 +258,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, policies, actions, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
+  return { enums, entities, events, policies, actions, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "pol" | "pbr" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
+type StableDeclarationKind = "ent" | "fld" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "qry" | "inv" | "exc" | "wfl" | "trn";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -250,6 +272,9 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
   }
   for (const action of symbols.actions.values()) {
     if (action.stableId) validateStableId(action.stableId, "act", stableIds, file);
+  }
+  for (const event of symbols.events.values()) {
+    if (event.stableId) validateStableId(event.stableId, "evt", stableIds, file);
   }
   for (const policy of symbols.policies.values()) {
     if (policy.stableId) validateStableId(policy.stableId, "pol", stableIds, file);
@@ -375,6 +400,7 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
       fld: "field",
       enm: "enum",
       emv: "enum member",
+      evt: "event",
       pol: "policy",
       pbr: "policy branch",
       act: "action",
@@ -638,6 +664,19 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   }
   locks.sort((left, right) => left.entityId.localeCompare(right.entityId) || left.source.localeCompare(right.source));
   const lockPlan = locks.map((lock, order) => ({ ...lock, order }));
+  const emitted = new Set<string>();
+  const emittedEventIds = action.emits.map((emission) => {
+    const event = symbols.events.get(emission.eventName);
+    if (!event) throw new ModelError("E3102", `Action '${action.name}' emits unknown event '${emission.eventName}'.`, emission.span, file);
+    const payload = symbols.entities.get(event.payloadType.name);
+    if (!payload || entityId(payload) !== entityId(effectEntity)) {
+      throw new ModelError("E3103", `Event '${event.name}' payload must match action '${action.name}' return entity '${returnEntity.name}'.`, emission.span, file);
+    }
+    const id = eventId(event);
+    if (emitted.has(id)) throw new ModelError("E3104", `Action '${action.name}' may emit event '${event.name}' at most once.`, emission.span, file);
+    emitted.add(id);
+    return id;
+  });
   return {
     id: semanticId,
     name: action.name,
@@ -657,6 +696,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
       },
     } : {}),
     effect: { kind: action.effect.kind, target: action.effect.target, entityId: entityId(effectEntity), assignments },
+    emittedEventIds,
     lockPlan,
     span: irSpan(action.span, file),
     naming: { sqlFunction: snakeCase(action.name), typescriptMethod: action.name },
@@ -1155,6 +1195,7 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
 function buildEnforcement(
   enums: IREnum[],
   entities: IREntity[],
+  events: IREvent[],
   policies: IRPolicy[],
   actions: IRAction[],
   queries: IRQuery[],
@@ -1168,6 +1209,12 @@ function buildEnforcement(
     layer: "PostgreSQL session identity",
     artifact: "postgres/002_schema.sql",
     objectName: `${internalSchema}.principal_binding`,
+  }, {
+    id: "boundary:dispatcher_role",
+    purpose: "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_dispatcher NOLOGIN",
   }, {
     id: "boundary:owner_role",
     purpose: "Generated objects are owned by a non-login role that application principals cannot assume.",
@@ -1282,6 +1329,10 @@ function buildEnforcement(
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
     entries.push({ id: `effect:${action.id}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
+    for (const eventId of action.emittedEventIds) {
+      const event = events.find((candidate) => candidate.id === eventId)!;
+      entries.push({ id: `emit:${action.id}.${event.id}`, purpose: `Append ${event.name} with the committed post-effect entity payload.`, layer: "PostgreSQL transactional outbox", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.event_outbox`, source: action.span });
+    }
     for (const lock of action.lockPlan) entries.push({ id: lock.id, purpose: `Stabilize ${lock.source} before evaluating guards and effects.`, layer: "PostgreSQL row lock", artifact: "postgres/003_actions.sql", objectName: `${lock.mode === "update" ? "FOR UPDATE" : "FOR SHARE"} in ${fn}` });
   }
   for (const query of queries) {
@@ -1321,5 +1372,6 @@ function buildEnforcement(
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });
   entries.push({ id: "boundary:command_receipts", purpose: "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.", layer: "PostgreSQL receipt boundary", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.command_receipt` });
+  entries.push({ id: "boundary:event_outbox", purpose: "Commit domain events atomically with state, audit, evidence, and receipts, then deliver them through private leases with at-least-once semantics.", layer: "PostgreSQL transactional outbox", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.event_outbox` });
   return entries;
 }

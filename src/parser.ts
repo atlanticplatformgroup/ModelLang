@@ -1,7 +1,7 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
-  ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, ExclusionDecl,
+  ActionDecl, Annotation, Assignment, Declaration, Effect, EntityDecl, EventDecl, ExclusionDecl,
   Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, QueryDecl, RequireDecl, TypeRef,
   PolicyDecl, WorkflowDecl,
 } from "./syntax-ast.js";
@@ -56,11 +56,12 @@ class Parser {
     while (!this.at("eof")) {
       if (this.atWord("enum")) declarations.push(this.parseEnum());
       else if (this.atWord("entity")) declarations.push(this.parseEntity());
+      else if (this.atWord("event")) declarations.push(this.parseEvent());
       else if (this.atWord("policy")) declarations.push(this.parsePolicy());
       else if (this.atWord("action")) declarations.push(this.parseAction());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
       else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
-      else this.fail("E1103", "Expected enum, entity, policy, action, query, or workflow declaration.");
+      else this.fail("E1103", "Expected enum, entity, event, policy, action, query, or workflow declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -106,6 +107,16 @@ class Parser {
     }
     const end = this.expect("}");
     return { kind: "entity", name: name.text, nameSpan: name.span, stableId, members, span: this.span(start, end) };
+  }
+
+  private parseEvent(): EventDecl {
+    const start = this.expectWord("event");
+    const name = this.identifier("Expected event name.");
+    const stableId = this.at("@") ? this.parseStableId("event declaration") : undefined;
+    this.expectWord("payload");
+    const payloadType = this.parseTypeRef();
+    const end = this.expect(";");
+    return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, span: this.span(start, end) };
   }
 
   private parseStableId(subject: string): Annotation {
@@ -251,8 +262,15 @@ class Parser {
       if (this.atWord("idempotency")) this.fail("E1122", "An action may declare idempotency at most once.");
     }
     const effect = this.parseEffect();
+    const emits: ActionDecl["emits"] = [];
+    while (this.atWord("emit")) {
+      const emitStart = this.take();
+      const eventName = this.identifier("Expected event name after 'emit'.");
+      const emitEnd = this.expect(";");
+      emits.push({ eventName: eventName.text, span: this.span(emitStart, emitEnd) });
+    }
     const end = this.expect("}");
-    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effect, span: this.span(start, end) };
+    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effect, emits, span: this.span(start, end) };
   }
 
   private parsePolicy(): PolicyDecl {

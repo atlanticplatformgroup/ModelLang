@@ -7,7 +7,7 @@ export const demoPassword = process.env.MODELLANG_DEMO_PASSWORD ?? "modellang-de
 
 export const demoRoles = [
   "ml_employee_one", "ml_employee_two", "ml_manager", "ml_finance", "ml_unbound",
-  "ml_reserver_one", "ml_reserver_two", "ml_gateway",
+  "ml_reserver_one", "ml_reserver_two", "ml_gateway", "ml_dispatcher",
 ] as const;
 
 export function loginUrl(role: typeof demoRoles[number]): string {
@@ -62,9 +62,13 @@ END
 $provision$;`);
       await client.query(`ALTER ROLE "${role}" LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE PASSWORD '${demoPassword.replaceAll("'", "''")}'`);
       await client.query(`REVOKE modellang_gateway FROM "${role}"`);
+      await client.query(`REVOKE modellang_dispatcher FROM "${role}"`);
       if (role === "ml_gateway") {
         await client.query(`REVOKE modellang_app FROM "${role}"`);
         await client.query(`GRANT modellang_gateway TO "${role}"`);
+      } else if (role === "ml_dispatcher") {
+        await client.query(`REVOKE modellang_app FROM "${role}"`);
+        await client.query(`GRANT modellang_dispatcher TO "${role}"`);
       } else {
         await client.query(`GRANT modellang_app TO "${role}"`);
       }

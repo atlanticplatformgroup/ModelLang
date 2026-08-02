@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/event-manifest.schema.json",
+  "title": "ModelLang event contract",
+  "type": "object",
+  "required": ["$schema", "eventManifestVersion", "model", "delivery", "events"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/event-manifest.schema.json" },
+    "eventManifestVersion": { "const": 1 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["semantics", "storage", "ordering", "acknowledgement"],
+      "properties": {
+        "semantics": { "const": "atLeastOnce" },
+        "storage": { "const": "privateTransactionalOutbox" },
+        "ordering": { "const": "occurredAtThenActionOrdinal" },
+        "acknowledgement": { "const": "leaseToken" }
+      },
+      "additionalProperties": false
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "payloadEntityId", "emittedByActionIds"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^event:" },
+          "name": { "type": "string" },
+          "payloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "emittedByActionIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^action:" } }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

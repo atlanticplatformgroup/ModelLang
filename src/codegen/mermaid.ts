@@ -16,6 +16,10 @@ export function generateMermaid(ir: ModelIR): string {
       lines.push(`  ${safe(exclusion.id)}["Temporal exclusion: ${exclusion.name}"] -->|prevents overlap| ${safe(entity.id)}`);
     }
   }
+  for (const event of ir.events) {
+    lines.push(`  ${safe(event.id)}["Event: ${event.name}"]`);
+    lines.push(`  ${safe(event.id)} -->|payload| ${safe(event.payloadEntityId)}`);
+  }
   for (const action of ir.actions) {
     lines.push(`  ${safe(action.id)}["Action: ${action.name}"]`);
     lines.push(`  principal -->|authenticated caller| ${safe(action.id)}`);
@@ -23,6 +27,10 @@ export function generateMermaid(ir: ModelIR): string {
     lines.push(`  ${safe(action.authorization.id)}["Authorize"] -->|guards| ${safe(action.id)}`);
     for (const precondition of action.preconditions) lines.push(`  ${safe(precondition.id)}["Require: ${precondition.name}"] -->|guards| ${safe(action.id)}`);
     for (const lock of action.lockPlan) lines.push(`  ${safe(action.id)} -->|locks ${lock.mode}| ${safe(lock.entityId)}`);
+    for (const eventId of action.emittedEventIds) {
+      const event = ir.events.find((candidate) => candidate.id === eventId)!;
+      lines.push(`  ${safe(action.id)} -->|emits atomically| ${safe(event.id)}`);
+    }
   }
   for (const query of ir.queries) {
     lines.push(`  ${safe(query.id)}["Query: ${query.name}"]`);

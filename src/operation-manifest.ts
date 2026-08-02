@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 3;
+  manifestVersion: 4;
   model: {
     id: string;
     name: string;
@@ -92,6 +92,7 @@ export type ManifestOperation =
         replay: "storedResult" | "none";
         fingerprint: "canonicalSha256" | "none";
       };
+      emittedEventIds: string[];
     })
   | (ManifestOperationBase & {
       kind: "query";
@@ -219,7 +220,7 @@ function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
 export function generateOperationManifest(ir: ModelIR): OperationManifest {
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 3,
+    manifestVersion: 4,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -274,6 +275,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
           replay: "none",
           fingerprint: "none",
         },
+        emittedEventIds: [...action.emittedEventIds],
         errors: actionErrors(ir, action),
       })),
       ...ir.queries.map((query): ManifestOperation => ({

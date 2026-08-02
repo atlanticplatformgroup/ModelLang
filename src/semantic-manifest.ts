@@ -39,8 +39,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 3;
-  profile: "sml-transactional-core/3";
+  manifestVersion: 4;
+  profile: "sml-transactional-core/4";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -49,7 +49,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 11;
+    irVersion: 12;
     generator: "semantic-manifest";
   };
   model: {
@@ -115,6 +115,7 @@ export interface SemanticAction {
     durableReceipt: boolean;
     correlation: true;
   };
+  emittedEventIds: string[];
   failureClasses: ManifestErrorKind[];
 }
 
@@ -301,6 +302,7 @@ function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction)
       durableReceipt: false,
       correlation: true,
     },
+    emittedEventIds: [...action.emittedEventIds],
     failureClasses: operation.errors,
   };
 }
@@ -342,7 +344,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 3,
+    manifestVersion: 4,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

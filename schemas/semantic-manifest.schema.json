@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 3 },
-    "profile": { "const": "sml-transactional-core/3" },
+    "manifestVersion": { "const": 4 },
+    "profile": { "const": "sml-transactional-core/4" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-        "irVersion": { "const": 11 },
+        "irVersion": { "const": 12 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -181,7 +181,7 @@
         "required": [
           "id", "name", "source", "caller", "input", "output", "authorization",
           "preconditions", "readSet", "lockPlan", "effect", "postconditions",
-          "workflowTransitionIds", "reliability", "failureClasses"
+          "workflowTransitionIds", "reliability", "emittedEventIds", "failureClasses"
         ],
         "properties": {
           "id": { "type": "string", "pattern": "^action:" },
@@ -260,6 +260,7 @@
               "correlation": { "const": true }
             }
           },
+          "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
           "failureClasses": { "$ref": "#/$defs/errors" }
         },
         "additionalProperties": false

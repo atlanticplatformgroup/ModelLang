@@ -7,8 +7,8 @@
   "required": ["$schema", "capabilityManifestVersion", "operationManifestVersion", "model", "view", "authentication", "actions"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/capability-manifest.schema.json" },
-    "capabilityManifestVersion": { "const": 2 },
-    "operationManifestVersion": { "const": 3 },
+    "capabilityManifestVersion": { "const": 3 },
+    "operationManifestVersion": { "const": 4 },
     "model": {
       "type": "object",
       "additionalProperties": false,
@@ -43,7 +43,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["operationId", "inputParameterIds", "outcomes", "explanation", "revision", "reliability"],
+        "required": ["operationId", "inputParameterIds", "outcomes", "explanation", "revision", "reliability", "emittedEventIds"],
         "properties": {
           "operationId": { "type": "string", "pattern": "^action:" },
           "inputParameterIds": { "type": "array", "items": { "type": "string", "pattern": "^parameter:" } },
@@ -86,7 +86,8 @@
               "scope": { "const": "authenticatedPrincipal" },
               "grantsAuthority": { "const": false }
             }
-          }
+          },
+          "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } }
         }
       }
     }

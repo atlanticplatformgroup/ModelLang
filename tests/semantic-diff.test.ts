@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 4,
-      compilerVersion: "0.19.0",
-      irVersion: 11,
+      diffVersion: 5,
+      compilerVersion: "0.20.0",
+      irVersion: 12,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -123,5 +123,23 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     }));
     expect(report.summary.breaking).toBe(1);
     expect(report.summary.review).toBe(1);
+  });
+
+  it("tracks event declarations and action emission changes by stable identity", () => {
+    const source = (version: string, emit: boolean) => `model EventDiff version "${version}";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id @generated(uuid); }
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record;
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User) -> Record {
+  authorize true;
+  create Record { }
+  ${emit ? "emit RecordCreated;" : ""}
+}`;
+    const report = semanticDiff(compileText(source("1", false)), compileText(source("2", true)));
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "emittedEventsChanged",
+      area: "eventDelivery",
+      classification: "review",
+    }));
   });
 });

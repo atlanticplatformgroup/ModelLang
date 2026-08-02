@@ -5,5 +5,6 @@ export * from "./gateway.js";
 export * from "./http-client.js";
 export * from "./http-server.js";
 export * from "./workflows.js";
+export * from "./events.js";
 export * from "./ui.js";
 export * from "./capabilities.js";

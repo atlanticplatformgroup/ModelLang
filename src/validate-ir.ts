@@ -24,18 +24,23 @@ export function validateIR(ir: ModelIR): void {
 export function validateEvolutionIR(ir: ModelIR): void {
   const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
   const irVersion = Number(legacy.irVersion);
-  if (![9, 10, 11].includes(irVersion)) {
+  if (![9, 10, 11, 12].includes(irVersion)) {
     throw new ModelError(
       "E3002",
-      `Evolution input must use released canonical IR9, IR10, or IR11; received '${String(legacy.irVersion)}'.`,
+      `Evolution input must use released canonical IR9, IR10, IR11, or IR12; received '${String(legacy.irVersion)}'.`,
       internalSpan(),
       ir.model?.sourceFile,
     );
   }
   const normalized = {
     ...(ir as unknown as Record<string, unknown>),
-    irVersion: 11,
+    irVersion: 12,
     ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
+    ...(irVersion < 12 && (legacy as { events?: unknown }).events === undefined ? { events: [] } : {}),
+    actions: (ir as unknown as ModelIR).actions.map((action) => ({
+      ...action,
+      ...(irVersion < 12 && !("emittedEventIds" in action) ? { emittedEventIds: [] } : {}),
+    })),
   } as unknown as ModelIR;
   validateIR(normalized);
 }

@@ -9,12 +9,19 @@ flowchart LR
   invariant_inv_b70e8aa03e6d498f8b0bccf413636b19["Invariant: approval_fields_match_status"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
   invariant_inv_91184dc547c24978a48362a679eeb836["Invariant: approval_authority_matches_amount"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
   invariant_inv_f8c6cf86f9d64874ac4159766e522cb8["Invariant: approver_differs_from_requester"] -->|constrains| entity_ent_9bc680209327484c8e98f5f740bcc702
+  event_evt_10d694c9a0a274dc79c6168e47d25968["Event: RequestOpened"]
+  event_evt_10d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
+  event_evt_20d694c9a0a274dc79c6168e47d25968["Event: RequestSubmitted"]
+  event_evt_20d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
+  event_evt_30d694c9a0a274dc79c6168e47d25968["Event: RequestApproved"]
+  event_evt_30d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_act_1e35db0451b1461e941af6283d86dca2["Action: openRequest"]
   principal -->|authenticated caller| action_act_1e35db0451b1461e941af6283d86dca2
   action_act_1e35db0451b1461e941af6283d86dca2 -->|creates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_action_act_1e35db0451b1461e941af6283d86dca2["Authorize"] -->|guards| action_act_1e35db0451b1461e941af6283d86dca2
   require_action_act_1e35db0451b1461e941af6283d86dca2_positive_amount["Require: positive_amount"] -->|guards| action_act_1e35db0451b1461e941af6283d86dca2
   action_act_1e35db0451b1461e941af6283d86dca2 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
+  action_act_1e35db0451b1461e941af6283d86dca2 -->|emits atomically| event_evt_10d694c9a0a274dc79c6168e47d25968
   action_act_ed2374e822704c51a2925338253d05d2["Action: submitRequest"]
   principal -->|authenticated caller| action_act_ed2374e822704c51a2925338253d05d2
   action_act_ed2374e822704c51a2925338253d05d2 -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
@@ -22,6 +29,7 @@ flowchart LR
   require_action_act_ed2374e822704c51a2925338253d05d2_is_draft["Require: is_draft"] -->|guards| action_act_ed2374e822704c51a2925338253d05d2
   action_act_ed2374e822704c51a2925338253d05d2 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   action_act_ed2374e822704c51a2925338253d05d2 -->|locks update| entity_ent_9bc680209327484c8e98f5f740bcc702
+  action_act_ed2374e822704c51a2925338253d05d2 -->|emits atomically| event_evt_20d694c9a0a274dc79c6168e47d25968
   action_act_d39dbb883b5f4019b9027b85add3de47["Action: approveRequest"]
   principal -->|authenticated caller| action_act_d39dbb883b5f4019b9027b85add3de47
   action_act_d39dbb883b5f4019b9027b85add3de47 -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
@@ -29,6 +37,7 @@ flowchart LR
   require_action_act_d39dbb883b5f4019b9027b85add3de47_is_submitted["Require: is_submitted"] -->|guards| action_act_d39dbb883b5f4019b9027b85add3de47
   action_act_d39dbb883b5f4019b9027b85add3de47 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   action_act_d39dbb883b5f4019b9027b85add3de47 -->|locks update| entity_ent_9bc680209327484c8e98f5f740bcc702
+  action_act_d39dbb883b5f4019b9027b85add3de47 -->|emits atomically| event_evt_30d694c9a0a274dc79c6168e47d25968
   query_qry_4406b045404a48449282db804f6167a8["Query: myRequests"]
   principal -->|authenticated caller| query_qry_4406b045404a48449282db804f6167a8
   query_qry_4406b045404a48449282db804f6167a8 -->|reads| entity_ent_9bc680209327484c8e98f5f740bcc702

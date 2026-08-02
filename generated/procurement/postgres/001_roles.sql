@@ -26,3 +26,15 @@ ALTER ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT
 REVOKE modellang_owner FROM modellang_gateway;
 REVOKE modellang_gateway FROM modellang_app;
 GRANT modellang_app TO modellang_gateway;
+
+DO $modellang$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_dispatcher') THEN
+    CREATE ROLE modellang_dispatcher NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+  END IF;
+END
+$modellang$;
+
+ALTER ROLE modellang_dispatcher NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
+REVOKE modellang_owner, modellang_app, modellang_gateway FROM modellang_dispatcher;
+REVOKE modellang_dispatcher FROM modellang_owner, modellang_app, modellang_gateway;

@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 3,
-  "profile": "sml-transactional-core/3",
+  "manifestVersion": 4,
+  "profile": "sml-transactional-core/4",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.19.0",
-    "irVersion": 11,
+    "compilerVersion": "0.20.0",
+    "irVersion": 12,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.11.0",
-    "sourceHash": "sha256:1da8cdbda9f00f567d87c2757ebcad99692fecec78d7d2e853bd13a1d4b24418",
+    "version": "0.20.0",
+    "sourceHash": "sha256:295705d9572937a6f19897a1ec8da5453eee6dc8794a6802e70c22d982f6a4f1",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -32,9 +32,9 @@
       "name": "reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 25,
+        "line": 27,
         "column": 1,
-        "endLine": 41,
+        "endLine": 44,
         "endColumn": 2
       },
       "caller": {
@@ -84,9 +84,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/reservations.model",
-          "line": 31,
+          "line": 33,
           "column": 13,
-          "endLine": 31,
+          "endLine": 33,
           "endColumn": 17
         },
         "dependencies": []
@@ -118,9 +118,9 @@
           "sourceExpression": "(startsAt < endsAt)",
           "source": {
             "file": "examples/reservations.model",
-            "line": 32,
+            "line": 34,
             "column": 3,
-            "endLine": 32,
+            "endLine": 34,
             "endColumn": 45
           },
           "dependencies": [
@@ -220,6 +220,9 @@
         "durableReceipt": true,
         "correlation": true
       },
+      "emittedEventIds": [
+        "event:evt_40d694c9a0a274dc79c6168e47d25968"
+      ],
       "failureClasses": [
         "identityBinding",
         "authorization",
@@ -236,9 +239,9 @@
       "name": "reservationsForResource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 43,
+        "line": 46,
         "column": 1,
-        "endLine": 51,
+        "endLine": 54,
         "endColumn": 2
       },
       "caller": {
@@ -273,9 +276,9 @@
         "sourceExpression": "true",
         "source": {
           "file": "examples/reservations.model",
-          "line": 47,
+          "line": 50,
           "column": 13,
-          "endLine": 47,
+          "endLine": 50,
           "endColumn": 17
         },
         "dependencies": []
@@ -310,9 +313,9 @@
         "sourceExpression": "(reservation.resource == resource)",
         "source": {
           "file": "examples/reservations.model",
-          "line": 48,
+          "line": 51,
           "column": 9,
-          "endLine": 48,
+          "endLine": 51,
           "endColumn": 41
         },
         "dependencies": [

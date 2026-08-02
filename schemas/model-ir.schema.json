@@ -18,7 +18,7 @@
             "strategy": { "const": "explicitStableId" },
             "stableId": {
               "type": "string",
-              "pattern": "^(ent|fld|enm|emv|pol|pbr|act|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
+              "pattern": "^(ent|fld|enm|emv|evt|pol|pbr|act|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
             }
           },
           "additionalProperties": false
@@ -150,11 +150,12 @@
     },
     "action": {
       "type": "object",
-      "required": ["id", "name", "identity"],
+      "required": ["id", "name", "identity", "emittedEventIds"],
       "properties": {
         "id": { "type": "string", "pattern": "^action:" },
         "name": { "type": "string" },
         "identity": { "$ref": "#/$defs/identity" },
+        "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
         "idempotency": {
           "type": "object",
           "additionalProperties": false,
@@ -232,9 +233,9 @@
     }
   },
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "policies", "actions", "queries", "workflows", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "events", "policies", "actions", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 11 },
+    "irVersion": { "const": 12 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -267,6 +268,21 @@
     },
     "enums": { "type": "array", "items": { "$ref": "#/$defs/enum" } },
     "entities": { "type": "array", "items": { "$ref": "#/$defs/entity" } },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "identity", "payloadEntityId", "span", "naming"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^event:" },
+          "name": { "type": "string" },
+          "identity": { "$ref": "#/$defs/identity" },
+          "payloadEntityId": { "type": "string", "pattern": "^entity:" },
+          "span": { "type": "object" },
+          "naming": { "type": "object" }
+        }
+      }
+    },
     "policies": { "type": "array", "items": { "$ref": "#/$defs/policy" } },
     "actions": { "type": "array", "items": { "$ref": "#/$defs/action" } },
     "queries": { "type": "array", "items": { "$ref": "#/$defs/query" } },

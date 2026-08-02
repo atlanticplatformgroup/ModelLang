@@ -64,8 +64,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 3;
-  operationManifestVersion: 3;
+  uiManifestVersion: 4;
+  operationManifestVersion: 4;
   model: {
     id: string;
     name: string;
@@ -110,6 +110,7 @@ export interface UiManifest {
       idempotency: "required" | "unsupported";
       scope: "authenticatedPrincipal";
     };
+    emittedEventIds: string[];
   }[];
   queries: {
     operationId: string;
@@ -166,12 +167,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 3) {
-    throw new Error(`E6201 UI generation requires operation manifest version 3, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 4) {
+    throw new Error(`E6201 UI generation requires operation manifest version 4, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 3,
+    uiManifestVersion: 4,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -220,6 +221,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
           idempotency: operation.reliability.idempotency,
           scope: operation.reliability.scope,
         },
+        emittedEventIds: [...operation.emittedEventIds],
       })),
     queries: manifest.operations
       .filter((operation) => operation.kind === "query")

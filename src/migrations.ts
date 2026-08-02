@@ -9,6 +9,8 @@ import {
   generateEntityTableStatement,
   generateDecisionEvidenceInfrastructureStatements,
   generateCommandReceiptInfrastructureStatements,
+  generateEventOutboxInfrastructureStatements,
+  generateDispatcherRoleStatements,
   generateGatewayInfrastructureStatements,
   generateGatewayRoleStatements,
   generatePostgres,
@@ -34,6 +36,7 @@ export type AdditiveOperation =
   | { kind: "addEnumMember"; enumId: string; memberId: string; name: string }
   | { kind: "addEntity"; entityId: string; name: string; table: string }
   | { kind: "addPolicy"; policyId: string; name: string }
+  | { kind: "addEvent"; eventId: string; name: string }
   | { kind: "addField"; entityId: string; fieldId: string; name: string; table: string; column: string }
   | { kind: "addAction"; actionId: string; name: string }
   | { kind: "addQuery"; queryId: string; name: string }
@@ -95,6 +98,7 @@ export function requireExplicitIds(ir: ModelIR): void {
     for (const exclusion of entity.temporalExclusions) requireExplicit(ir, exclusion, `exclusion in '${entity.name}'`, "exclusion");
   }
   for (const action of ir.actions) requireExplicit(ir, action, "action", "action");
+  for (const event of (ir as ModelIR & { events?: ModelIR["events"] }).events ?? []) requireExplicit(ir, event, "event", "event");
   for (const policy of (ir as ModelIR & { policies?: IRPolicy[] }).policies ?? []) {
     requireExplicit(ir, policy, "policy", "policy");
     for (const branch of policy.branches) requireExplicit(ir, branch, `branch in policy '${policy.name}'`, "policyBranch");
@@ -160,8 +164,8 @@ function entityStructure(entity: IREntity): unknown {
 }
 
 function actionStructure(action: IRAction): unknown {
-  const { name: _name, identity: _identity, ...structure } = action;
-  return structure;
+  const { name: _name, identity: _identity, emittedEventIds, ...structure } = action;
+  return { ...structure, emittedEventIds: emittedEventIds ?? [] };
 }
 
 function policyStructure(policy: IRPolicy): unknown {
@@ -356,8 +360,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11].includes(Number(previous.irVersion)) || current.irVersion !== 11) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11 baseline and canonical IR11 current input.");
+  if (![9, 10, 11, 12].includes(Number(previous.irVersion)) || current.irVersion !== 12) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12 baseline and canonical IR12 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -549,6 +553,17 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
+  const previousEvents = (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [];
+  const eventDiff = additiveDiff(previousEvents, current.events, "Event", current);
+  for (const event of eventDiff.added) operations.push({ kind: "addEvent", eventId: event.id, name: event.name });
+  const previousEventsById = byId(previousEvents);
+  for (const currentEvent of eventDiff.existing) {
+    const previousEvent = previousEventsById.get(currentEvent.id)!;
+    if (previousEvent.payloadEntityId !== currentEvent.payloadEntityId) {
+      fail(current, "E2807", `Event payload changed for '${currentEvent.name}'; payload changes require reviewed migration.`);
+    }
+  }
+
   const actionDiff = additiveDiff(previous.actions, current.actions, "Action", current);
   for (const action of actionDiff.added) {
     operations.push({ kind: "addAction", actionId: action.id, name: action.name });
@@ -711,6 +726,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     "BEGIN;",
     "-- Bootstrap the 0.12 shared gateway role before assuming the non-login owner role.",
     generateGatewayRoleStatements(),
+    generateDispatcherRoleStatements(),
     ...(entityDiff.added.some((entity) => entity.temporalExclusions.length > 0)
       ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;"]
       : []),
@@ -721,6 +737,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     ...generateGatewayInfrastructureStatements(current),
     ...generateDecisionEvidenceInfrastructureStatements(current),
     ...generateCommandReceiptInfrastructureStatements(current),
+    ...generateEventOutboxInfrastructureStatements(current),
     "-- Redeploy the complete generated callable boundary and grants.",
     generated["003_actions.sql"]!.trim(),
     generated["003_decisions.sql"]!.trim(),

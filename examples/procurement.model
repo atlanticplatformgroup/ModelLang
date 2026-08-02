@@ -1,4 +1,4 @@
-model Procurement version "0.12.0";
+model Procurement version "0.20.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -54,6 +54,10 @@ entity PurchaseRequest @stableId("ent_9bc680209327484c8e98f5f740bcc702") {
     or approvedBy != requester;
 }
 
+event RequestOpened @stableId("evt_10d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest;
+event RequestSubmitted @stableId("evt_20d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest;
+event RequestApproved @stableId("evt_30d694c9a0a274dc79c6168e47d25968") payload PurchaseRequest;
+
 // Policy branches are closed, stable authorities. Exactly one must match.
 policy ApprovalAuthority @stableId("pol_a3a80ffeec774402be92cddaafd0f069")(
   actor: User,
@@ -85,6 +89,7 @@ action openRequest @stableId("act_1e35db0451b1461e941af6283d86dca2")(
     approvedBy = null;
     approvedByRoles = null;
   }
+  emit RequestOpened;
 }
 
 action submitRequest @stableId("act_ed2374e822704c51a2925338253d05d2")(
@@ -97,6 +102,7 @@ action submitRequest @stableId("act_ed2374e822704c51a2925338253d05d2")(
   update request {
     status = RequestStatus.SUBMITTED;
   }
+  emit RequestSubmitted;
 }
 
 action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
@@ -114,6 +120,7 @@ action approveRequest @stableId("act_d39dbb883b5f4019b9027b85add3de47")(
     approvedBy = actor;
     approvedByRoles = actor.roles;
   }
+  emit RequestApproved;
 }
 
 workflow PurchaseRequestLifecycle @stableId("wfl_96a1115ba9bf42f2a206374822eeaa87") for PurchaseRequest.status {
