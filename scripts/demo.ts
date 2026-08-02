@@ -8,7 +8,7 @@ import { ProcurementClient } from "../generated/procurement/typescript/client.js
 import { consumeObserveRequestApproval } from "../generated/procurement/typescript/consumers.js";
 import type { RequestApprovedEvent } from "../generated/procurement/typescript/events.js";
 import {
-  AuthorizationError, IdentityBindingError, PreconditionError,
+  AuthorizationError, IdentityBindingError,
 } from "../generated/procurement/typescript/errors.js";
 import {
   applyGeneratedSql, databaseUrl, loginUrl, poolFor, provisionDemoLogins, resetGeneratedSchemas,

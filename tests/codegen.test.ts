@@ -515,7 +515,7 @@ describe("backends", () => {
     expect(actions).not.toMatch(/"p_actor"/);
     expect(queries).not.toMatch(/"p_actor"/);
     expect(client).not.toMatch(/input\.actor|actor:/);
-    expect(types).not.toMatch(/\n  actor:/);
+    expect(types).not.toMatch(/\n {2}actor:/);
     expect(actions).toContain('"resolve_principal"()');
     expect(queries).toContain('"resolve_principal"()');
     expect(output["postgres/002_schema.sql"]).toContain("session_user");
@@ -569,7 +569,7 @@ describe("backends", () => {
     expect(sql).toContain("LIMIT 100");
     expect(sql).not.toMatch(/FOR (?:UPDATE|NO KEY UPDATE)/);
     expect(output["typescript/types.ts"]).toContain("export interface MyRequestsInput");
-    expect(output["typescript/types.ts"]).not.toMatch(/interface MyRequestsInput \{\n  actor:/);
+    expect(output["typescript/types.ts"]).not.toMatch(/interface MyRequestsInput \{\n {2}actor:/);
     expect(output["typescript/client.ts"]).toContain("async myRequests(input: MyRequestsInput): Promise<PurchaseRequest[]>");
   });
 

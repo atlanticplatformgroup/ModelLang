@@ -1999,7 +1999,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   it("rolls back durable decision evidence with the action transaction", async () => {
     const connection = new Client({ connectionString: loginUrl("ml_manager") });
     await connection.connect();
-    let target = "";
+    let target: string;
     const rollbackOptions = commandOptions("rollback");
     try {
       await connection.query("BEGIN");

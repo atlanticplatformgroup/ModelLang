@@ -645,6 +645,12 @@ The integration suite proves concurrency with transaction barriers and observed 
 
 ## Tests
 
+Run the complete local quality gate (strict TypeScript build, ESLint, unused file/dependency analysis, and all tests):
+
+```bash
+npm run health
+```
+
 Run compiler and backend tests without PostgreSQL:
 
 ```bash

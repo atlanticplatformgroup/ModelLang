@@ -2706,7 +2706,7 @@ COMMIT;
 `;
 }
 
-function generateEventConsumerUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+function generateEventConsumerUpgrade(ir: ModelIR, _plan: DecisionPlan): string {
   return `-- Idempotent ModelLang 0.20 -> 0.21 reliable typed event-consumer upgrade.
 -- No historical events are consumed and no inbox completion is fabricated.
 BEGIN;
