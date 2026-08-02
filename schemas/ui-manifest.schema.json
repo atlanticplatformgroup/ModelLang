@@ -166,8 +166,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 8 },
-    "operationManifestVersion": { "const": 8 },
+    "uiManifestVersion": { "const": 9 },
+    "operationManifestVersion": { "const": 9 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -318,6 +318,31 @@
           "filters": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
           "resultProjectionId": { "type": "string", "pattern": "^projection:" },
           "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "sorting": {
+            "type": "object",
+            "required": ["input", "defaultProfile", "profiles"],
+            "properties": {
+              "input": { "const": "sort" },
+              "defaultProfile": { "const": "default" },
+              "profiles": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "required": ["id", "name", "label", "fieldId", "direction"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^sortProfile:" },
+                    "name": { "type": "string" },
+                    "label": { "type": "string" },
+                    "fieldId": { "type": "string", "pattern": "^field:" },
+                    "direction": { "enum": ["asc", "desc"] }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "pagination": {
             "type": "object",
             "required": ["kind", "cursorInput", "queryRevision"],

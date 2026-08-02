@@ -6,13 +6,13 @@ import { ReservationsHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 8,
-  "operationManifestVersion": 8,
+  "uiManifestVersion": 9,
+  "operationManifestVersion": 9,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.33.0",
-    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9",
+    "version": "0.34.0",
+    "sourceHash": "sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd",
     "label": "Reservations"
   },
   "authentication": {
@@ -337,10 +337,37 @@ export const ReservationsUiManifest = {
       ],
       "resultProjectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
       "maxItems": 2,
+      "sorting": {
+        "input": "sort",
+        "defaultProfile": "default",
+        "profiles": [
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.default",
+            "name": "default",
+            "label": "Default",
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+            "direction": "asc"
+          },
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.latestFirst",
+            "name": "latestFirst",
+            "label": "Latest first",
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+            "direction": "desc"
+          },
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.endingSoonest",
+            "name": "endingSoonest",
+            "label": "Ending soonest",
+            "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+            "direction": "asc"
+          }
+        ]
+      },
       "pagination": {
         "kind": "cursor",
         "cursorInput": "cursor",
-        "queryRevision": "sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2"
+        "queryRevision": "sha256:1b519691bebee5f73a5cae02ecbafd601b422970b58ae2b9fbacbe2e94f7bad1"
       },
       "errors": [
         "identityBinding",

@@ -499,6 +499,23 @@ class Parser {
     if (!this.atWord("asc") && !this.atWord("desc")) this.fail("E1110", "Expected query order direction 'asc' or 'desc'.");
     const direction = this.take();
     const orderEnd = this.expect(";");
+    const sortProfiles: NonNullable<QueryDecl["sortProfiles"]> = [];
+    while (this.atWord("sort")) {
+      const sortStart = this.take();
+      const profileName = this.identifier("Expected sort profile name.");
+      this.expect(":");
+      const path = this.parsePath();
+      if (!this.atWord("asc") && !this.atWord("desc")) this.fail("E1110", "Expected query order direction 'asc' or 'desc'.");
+      const profileDirection = this.take();
+      const sortEnd = this.expect(";");
+      sortProfiles.push({
+        name: profileName.text,
+        nameSpan: profileName.span,
+        path: path.parts,
+        direction: profileDirection.text as "asc" | "desc",
+        span: this.span(sortStart, sortEnd),
+      });
+    }
     this.expectWord("limit");
     const limit = this.expect("number", "Expected an integer query limit.");
     const limitEnd = this.expect(";");
@@ -526,6 +543,7 @@ class Parser {
         direction: direction.text as "asc" | "desc",
         span: this.span(orderStart, orderEnd),
       },
+      ...(sortProfiles.length ? { sortProfiles } : {}),
       limit: Number(limit.value),
       limitSpan: this.span(limit, limitEnd),
       ...(pagination ? { pagination } : {}),

@@ -125,6 +125,9 @@ function generateTypes(ir: ModelIR): string {
       const parameter = query.parameters.find((candidate) => candidate.id === id)!;
       lines.push(`  ${parameter.name}${parameter.optional ? "?" : ""}: ${parameterType(ir, parameter.type)}${parameter.optional ? " | null" : ""};`);
     }
+    if (query.sortProfiles?.length) {
+      lines.push(`  sort?: ${["default", ...query.sortProfiles.map((profile) => profile.name)].map((name) => JSON.stringify(name)).join(" | ")};`);
+    }
     if (query.pagination) lines.push("  cursor?: string;");
     lines.push("}", "");
   }
@@ -275,8 +278,12 @@ function queryMethod(ir: ModelIR, query: IRQuery): string {
   });
   const schema = ir.model.naming.sqlSchema.replaceAll('"', '""');
   const fn = query.naming.sqlFunction.replaceAll('"', '""');
-  const placeholders = [...args.map((arg) => arg.placeholder), ...(query.pagination ? [`$${args.length + 1}`] : [])];
-  const values = [...args.map((arg) => clientParameterValue(arg.parameter)), ...(query.pagination ? ["input.cursor ?? null"] : [])];
+  const generatedInputs = [
+    ...(query.sortProfiles?.length ? ["input.sort ?? null"] : []),
+    ...(query.pagination ? ["input.cursor ?? null"] : []),
+  ];
+  const placeholders = [...args.map((arg) => arg.placeholder), ...generatedInputs.map((_value, index) => `$${args.length + index + 1}`)];
+  const values = [...args.map((arg) => clientParameterValue(arg.parameter)), ...generatedInputs];
   const returnType = query.pagination
     ? `CursorPage<${projection.naming.typescriptName}>`
     : `${projection.naming.typescriptName}[]`;

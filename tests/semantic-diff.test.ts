@@ -19,7 +19,7 @@ const ids = {
   query: "qry_11111111111111111111111111111111",
 };
 
-function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean }): string {
+function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean; sortProfile?: string }): string {
   return `model SemanticChange version "${options.version}";
 entity User @stableId("${ids.user}") {
   id: UUID @id @stableId("${ids.userId}");
@@ -49,6 +49,7 @@ query records @stableId("${ids.query}")(
   authorize true;
   where ${options.where ?? "row.owner == actor"};
   orderBy row.id asc;
+  ${options.sortProfile ?? ""}
   limit 10;
   ${options.pagination ? "paginate cursor;" : ""}
 }`;
@@ -93,6 +94,42 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(
       area: "structure",
       classification: "breaking",
       after: expect.stringContaining('"optional":true'),
+    }));
+  });
+
+  it("classifies authored sort-profile additions separately from changed published profiles", () => {
+    const baseline = compileText(model({ version: "1" }));
+    const added = compileText(model({ version: "2", sortProfile: "sort newest: row.value desc;" }));
+    expect(semanticDiff(baseline, added).changes).toContainEqual(expect.objectContaining({
+      kind: "querySortProfilesChanged",
+      classification: "additive",
+    }));
+    const changed = compileText(model({ version: "3", sortProfile: "sort newest: row.id asc;" }));
+    expect(semanticDiff(added, changed).changes).toContainEqual(expect.objectContaining({
+      kind: "querySortProfilesChanged",
+      classification: "breaking",
+    }));
+  });
+
+  it("ignores authored sort-profile source locations", () => {
+    const previous = compileText(model({ version: "1", sortProfile: "sort newest: row.value desc;" }), "previous.model");
+    const current = compileText(model({ version: "2", sortProfile: "\nsort newest: row.value desc;" }), "current.model");
+    expect(semanticDiff(previous, current).changes).not.toContainEqual(expect.objectContaining({
+      kind: "querySortProfilesChanged",
+    }));
+  });
+
+  it("treats authored sort-profile declaration order as non-semantic", () => {
+    const previous = compileText(model({
+      version: "1",
+      sortProfile: "sort newest: row.value desc;\nsort identityFirst: row.id asc;",
+    }));
+    const current = compileText(model({
+      version: "2",
+      sortProfile: "sort identityFirst: row.id asc;\nsort newest: row.value desc;",
+    }));
+    expect(semanticDiff(previous, current).changes).not.toContainEqual(expect.objectContaining({
+      kind: "querySortProfilesChanged",
     }));
   });
 
@@ -206,9 +243,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 15,
-      compilerVersion: "0.33.0",
-      irVersion: 22,
+      diffVersion: 16,
+      compilerVersion: "0.34.0",
+      irVersion: 23,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

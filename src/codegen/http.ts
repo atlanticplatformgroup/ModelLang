@@ -201,6 +201,9 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
                     ...operation.input.map((parameter) => [parameter.name, parameter.optional
                       ? nullable(valueSchema(manifest, parameter.type))
                       : valueSchema(manifest, parameter.type)] as const),
+                    ...(operation.kind === "query" && operation.sorting
+                      ? [[operation.sorting.input, { type: "string", enum: operation.sorting.profiles.map((profile) => profile.name) }] as const]
+                      : []),
                     ...(operation.kind === "query" && operation.output.cardinality === "page"
                       ? [[operation.output.pagination.cursorInput, { type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }] as const]
                       : []),
@@ -472,6 +475,7 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
     endpoint: "execution",
     input: operation.input,
     output: operation.output,
+    sorting: operation.kind === "query" ? operation.sorting : undefined,
     action: operation.kind === "action",
     idempotency: operation.kind === "action" ? operation.reliability.idempotency : "unsupported",
   })).concat(manifest.operations.filter((operation) => operation.kind === "action").map((operation) => ({
@@ -480,6 +484,7 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
     endpoint: "applicability",
     input: operation.input,
     output: operation.output,
+    sorting: undefined,
     action: true,
     idempotency: "unsupported",
   })));
@@ -554,6 +559,7 @@ interface OperationDefinition {
   route: string;
   endpoint: "execution" | "applicability";
   input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
+  sorting?: { input: "sort"; defaultProfile: "default"; profiles: readonly { name: string }[] };
   output:
     | { entityId: string; cardinality: "one" }
     | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -665,6 +671,7 @@ function validateInput(
   }
   const input = value as Record<string, unknown>;
   const allowed = new Set(definition.input.map((parameter) => parameter.name));
+  if (definition.sorting) allowed.add(definition.sorting.input);
   if (definition.output.cardinality === "page") allowed.add(definition.output.pagination.cursorInput);
   const unknown = Object.keys(input).find((name) => !allowed.has(name));
   if (unknown) {
@@ -679,6 +686,12 @@ function validateInput(
         "ML_VALIDATION",
         \`transport:parameter:\${parameter.name}\`,
       );
+    }
+  }
+  if (definition.sorting && Object.hasOwn(input, definition.sorting.input)) {
+    const sort = input[definition.sorting.input];
+    if (typeof sort !== "string" || !definition.sorting.profiles.some((profile) => profile.name === sort)) {
+      throw new ValidationError("Invalid authored sort profile", "ML_VALIDATION", \`sort-profile:\${definition.id}\`);
     }
   }
   if (definition.output.cardinality === "page" && Object.hasOwn(input, definition.output.pagination.cursorInput)) {
@@ -810,7 +823,7 @@ function validateDecision(definition: OperationDefinition, value: unknown): Appl
 }
 
 function normalizedRuleId(error: ModelOperationError): string | undefined {
-  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency|cursor):/.test(error.ruleId)
+  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency|cursor|sort-profile):/.test(error.ruleId)
     ? error.ruleId
     : undefined;
 }

@@ -1,0 +1,5 @@
+# ModelLang 0.34 unstable boundaries
+
+The following remain outside the stable read contract: arbitrary caller-selected fields or directions, compound authored sort keys, nullable sort fields, offset or page-number pagination, caller-controlled page size, cursor signing or encryption, frozen cross-request snapshots, collection or reverse traversal, inferred joins, runtime-selected projection paths or depth, aliases, computed fields, inline anonymous shapes, nested authorization, conditional disclosure, aggregates, grouping, full-text search, caching, field-level capability negotiation, MCP-specific result contracts, and generic CRUD.
+
+Authored sort profiles are a closed compile-time allowlist, not a general query-builder surface. Profile selection grants no authority and does not add a field to the disclosed projection. The default and every alternate profile retain the authored fixed limit and ascending identity tie-breaker. A cursor remains opaque continuation state bound to the exact caller, filters, and selected profile; each page is a new authenticated and policy-filtered read under its own database statement snapshot.

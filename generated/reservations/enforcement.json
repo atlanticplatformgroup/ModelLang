@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.33.0",
-    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9",
+    "version": "0.34.0",
+    "sourceHash": "sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -825,7 +825,7 @@
     },
     {
       "id": "order:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
+      "purpose": "Return rows in the default declared order with an ascending identity tie-breaker.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
@@ -833,7 +833,21 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 84,
+        "endLine": 86,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "sort-profiles:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "purpose": "Accept only the closed authored sort profiles default, latestFirst, endingSoonest; compile every ordering and keyset branch statically with an ascending identity tie-breaker.",
+      "layer": "PostgreSQL query sorting",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 74,
+        "column": 1,
+        "endLine": 86,
         "endColumn": 2
       }
     },
@@ -847,7 +861,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 84,
+        "endLine": 86,
         "endColumn": 2
       }
     },
@@ -861,7 +875,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 84,
+        "endLine": 86,
         "endColumn": 2
       }
     },
@@ -875,7 +889,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 84,
+        "endLine": 86,
         "endColumn": 2
       }
     },
@@ -889,7 +903,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 84,
+        "endLine": 86,
         "endColumn": 2
       }
     },

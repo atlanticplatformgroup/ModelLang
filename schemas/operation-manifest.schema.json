@@ -56,6 +56,28 @@
       },
       "additionalProperties": false
     },
+    "sortProfile": {
+      "type": "object",
+      "required": ["id", "name", "fieldId", "direction", "identityTieBreaker"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^sortProfile:" },
+        "name": { "type": "string" },
+        "fieldId": { "type": "string", "pattern": "^field:" },
+        "direction": { "enum": ["asc", "desc"] },
+        "identityTieBreaker": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "sorting": {
+      "type": "object",
+      "required": ["input", "defaultProfile", "profiles"],
+      "properties": {
+        "input": { "const": "sort" },
+        "defaultProfile": { "const": "default" },
+        "profiles": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/sortProfile" } }
+      },
+      "additionalProperties": false
+    },
     "caller": {
       "type": "object",
       "required": ["parameterId", "entityId", "source", "requestSupplied"],
@@ -138,6 +160,7 @@
         "kind": { "const": "query" },
         "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
         "caller": { "$ref": "#/$defs/caller" },
+        "sorting": { "$ref": "#/$defs/sorting" },
         "output": {
           "oneOf": [
             {
@@ -229,7 +252,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 8 },
+    "manifestVersion": { "const": 9 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

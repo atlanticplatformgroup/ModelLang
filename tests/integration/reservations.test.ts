@@ -24,11 +24,15 @@ function commandOptions(label = "reservation"): { idempotencyKey: string } {
   return { idempotencyKey: `${label}-${commandSequence}` };
 }
 
-async function allReservationsForResource(resourceId: string, startsAtOrAfter?: string | null): Promise<ReservationSummary[]> {
+async function allReservationsForResource(
+  resourceId: string,
+  startsAtOrAfter?: string | null,
+  sort?: "default" | "latestFirst" | "endingSoonest",
+): Promise<ReservationSummary[]> {
   const rows: ReservationSummary[] = [];
   let cursor: string | undefined;
   do {
-    const page = await firstClient.reservationsForResource({ resource: resourceId, startsAtOrAfter, cursor });
+    const page = await firstClient.reservationsForResource({ resource: resourceId, startsAtOrAfter, sort, cursor });
     rows.push(...page.items);
     cursor = page.nextCursor ?? undefined;
   } while (cursor);
@@ -138,11 +142,22 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     const filteredRows = await allReservationsForResource(resource, "2031-01-01T09:00:00.000Z");
     expect(filteredRows.some((reservation) => reservation.id === firstId)).toBe(true);
     expect(filteredRows.every((reservation) => Date.parse(reservation.startsAt) >= Date.parse("2031-01-01T09:00:00.000Z"))).toBe(true);
+    const latestRows = await allReservationsForResource(resource, undefined, "latestFirst");
+    expect(latestRows.every((reservation, index) => index === 0
+      || Date.parse(latestRows[index - 1]!.startsAt) >= Date.parse(reservation.startsAt))).toBe(true);
+    const endingRows = await allReservationsForResource(resource, undefined, "endingSoonest");
+    expect(endingRows.every((reservation, index) => index === 0
+      || Date.parse(endingRows[index - 1]!.endsAt) <= Date.parse(reservation.endsAt))).toBe(true);
     const explicitNull = await firstClient.reservationsForResource({ resource, startsAtOrAfter: null });
     expect(explicitNull.items).toEqual(firstPage.items);
     await expect(firstClient.reservationsForResource({ resource, cursor: "not_a_valid_cursor" }))
       .rejects.toBeInstanceOf(ValidationError);
     const decoded = JSON.parse(Buffer.from(firstPage.nextCursor!, "base64url").toString("utf8")) as Record<string, unknown>;
+    const malformedSortValue = { ...decoded, sort: "not-a-date" };
+    await expect(firstClient.reservationsForResource({
+      resource,
+      cursor: Buffer.from(JSON.stringify(malformedSortValue)).toString("base64url"),
+    })).rejects.toBeInstanceOf(ValidationError);
     const missingBinding: Record<string, unknown> = { ...decoded, extra: "replacement" };
     delete missingBinding.modelId;
     await expect(firstClient.reservationsForResource({
@@ -153,6 +168,11 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
     await expect(firstClient.reservationsForResource({
       resource,
       cursor: Buffer.from(JSON.stringify(staleSource)).toString("base64url"),
+    })).rejects.toBeInstanceOf(StaleError);
+    await expect(firstClient.reservationsForResource({
+      resource,
+      sort: "latestFirst",
+      cursor: firstPage.nextCursor!,
     })).rejects.toBeInstanceOf(StaleError);
     await expect(firstClient.reservationsForResource({ resource: otherResource, cursor: firstPage.nextCursor! }))
       .rejects.toBeInstanceOf(StaleError);

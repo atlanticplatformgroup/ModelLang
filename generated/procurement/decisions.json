@@ -3,12 +3,12 @@
   "planVersion": 2,
   "audience": "enforcement",
   "public": false,
-  "compilerVersion": "0.33.0",
-  "irVersion": 22,
+  "compilerVersion": "0.34.0",
+  "irVersion": 23,
   "model": {
     "id": "model:Procurement",
-    "version": "0.33.0",
-    "sourceHash": "sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd0aab8"
+    "version": "0.34.0",
+    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a"
   },
   "policies": [
     {

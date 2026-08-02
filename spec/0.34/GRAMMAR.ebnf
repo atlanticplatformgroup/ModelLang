@@ -1,0 +1,20 @@
+(* ModelLang 0.34 extends the complete ModelLang 0.33 grammar. *)
+
+query_decl =
+  "query", identifier, [ stable_id ], "(", [ query_parameter, { ",", query_parameter } ], ")",
+  "returns", identifier, "from", identifier, "as", identifier, "{",
+  "authorize", expression, ";",
+  "where", expression, ";",
+  "orderBy", direct_query_field, sort_direction, ";",
+  { sort_profile },
+  "limit", integer, ";",
+  [ "paginate", "cursor", ";" ],
+  "}" ;
+
+sort_profile = "sort", identifier, ":", direct_query_field, sort_direction, ";" ;
+direct_query_field = identifier, ".", identifier ;
+sort_direction = "asc" | "desc" ;
+
+(* `default` is reserved as the name of the required orderBy profile. *)
+(* At most 16 named profiles may be declared and all selected fields are required. *)
+(* Runtime field names, directions, expressions, limits, offsets, and SQL are not grammar. *)

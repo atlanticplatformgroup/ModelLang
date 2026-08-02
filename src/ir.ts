@@ -252,6 +252,14 @@ export interface IRQuery {
     direction: "asc" | "desc";
     identityTieBreaker: true;
   };
+  sortProfiles?: {
+    id: string;
+    name: string;
+    fieldId: string;
+    direction: "asc" | "desc";
+    identityTieBreaker: true;
+    span: IRSpan;
+  }[];
   limit: number;
   pagination?: {
     kind: "cursor";
@@ -300,7 +308,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 22;
+  irVersion: 23;
   model: {
     id: string;
     name: string;

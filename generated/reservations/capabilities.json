@@ -1,12 +1,12 @@
 {
   "$schema": "https://modellang.dev/schemas/capability-manifest.schema.json",
-  "capabilityManifestVersion": 7,
-  "operationManifestVersion": 8,
+  "capabilityManifestVersion": 8,
+  "operationManifestVersion": 9,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.33.0",
-    "sourceHash": "sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9"
+    "version": "0.34.0",
+    "sourceHash": "sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd"
   },
   "view": {
     "audience": "application",

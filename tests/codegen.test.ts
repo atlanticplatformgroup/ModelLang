@@ -45,7 +45,7 @@ describe("backends", () => {
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(8);
+    expect(manifest.manifestVersion).toBe(9);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -209,10 +209,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 14,
+      manifestVersion: 15,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 22 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 23 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -261,7 +261,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 22 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 23 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -292,8 +292,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 8,
-      operationManifestVersion: 8,
+      uiManifestVersion: 9,
+      operationManifestVersion: 9,
       authentication: { required: true, callerInput: false },
     });
 
@@ -521,7 +521,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   });
 
   it("skips optional money validation and entity loading only for null query inputs", () => {
-    const source = `model OptionalQueryInputs version "0.33.0";
+    const source = `model OptionalQueryInputs version "0.34.0";
       entity User { id: UUID @id; }
       entity Vendor { id: UUID @id; }
       entity Invoice { id: UUID @id; vendor: Vendor; amount: Money<USD>; }
@@ -673,15 +673,18 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   it("generates opaque keyset cursor pages bound to query and filter identity", async () => {
     const output = generateAll(await reservations());
     const sql = output["postgres/003_queries.sql"];
-    expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_cursor text DEFAULT NULL)');
+    expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.33.0'");
+    expect(sql).toContain("'modelVersion', '0.34.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
     expect(sql).toContain("'inputHash', v_input_hash");
     expect(sql).toContain("'caller', pg_catalog.to_jsonb(v_principal_id)");
-    expect(sql).toContain('v_row."starts_at" > v_cursor_sort');
+    expect(sql).toContain("v_sort_profile NOT IN ('default', 'latestFirst', 'endingSoonest')");
+    expect(sql).toContain('v_row."starts_at" > v_cursor_sort::timestamptz');
+    expect(sql).toContain('v_row."starts_at" < v_cursor_sort::timestamptz');
+    expect(sql).toContain("'sortProfile', pg_catalog.to_jsonb(v_sort_profile)");
     expect(sql).toContain('v_row."id" > v_cursor_identity');
     expect(sql).toContain("LIMIT 3");
     expect(sql).not.toMatch(/\bOFFSET\b/);
@@ -690,11 +693,12 @@ query active(caller actor: User) returns RecordSummary from Record as row {
 
     expect(output["typescript/types.ts"]).toContain("export interface CursorPage<T>");
     expect(output["typescript/types.ts"]).toContain("startsAtOrAfter?: string | null;");
+    expect(output["typescript/types.ts"]).toContain('sort?: "default" | "latestFirst" | "endingSoonest";');
     expect(output["typescript/types.ts"]).toContain("cursor?: string;");
     expect(output["typescript/client.ts"]).toContain("Promise<CursorPage<ReservationSummary>>");
 
     const operations = JSON.parse(output["operations.json"]!) as {
-      operations: { kind: string; name: string; errors: string[]; input: { name: string; optional?: true }[]; output: Record<string, unknown> }[];
+      operations: { kind: string; name: string; errors: string[]; input: { name: string; optional?: true }[]; sorting?: object; output: Record<string, unknown> }[];
     };
     const reservationQuery = operations.operations.find((operation) => operation.name === "reservationsForResource")!;
     expect(reservationQuery).toMatchObject({
@@ -703,6 +707,15 @@ query active(caller actor: User) returns RecordSummary from Record as row {
         expect.objectContaining({ name: "resource" }),
         expect.objectContaining({ name: "startsAtOrAfter", optional: true }),
       ],
+      sorting: {
+        input: "sort",
+        defaultProfile: "default",
+        profiles: [
+          expect.objectContaining({ name: "default", direction: "asc" }),
+          expect.objectContaining({ name: "latestFirst", direction: "desc" }),
+          expect.objectContaining({ name: "endingSoonest", direction: "asc" }),
+        ],
+      },
       output: {
         cardinality: "page",
         maxItems: 2,
@@ -720,6 +733,9 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const route = openapi.paths["/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69"]!.post;
     expect(route.requestBody.content["application/json"].schema.required).toEqual(["resource"]);
     expect(route.requestBody.content["application/json"].schema.properties).toHaveProperty("cursor");
+    expect(route.requestBody.content["application/json"].schema.properties.sort).toMatchObject({
+      enum: ["default", "latestFirst", "endingSoonest"],
+    });
     expect(route.requestBody.content["application/json"].schema.properties.startsAtOrAfter).toMatchObject({
       anyOf: expect.arrayContaining([{ type: "null" }]),
     });
@@ -729,10 +745,13 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     });
     const uiQuery = JSON.parse(output["ui.json"]!).queries[0];
     expect(uiQuery.pagination).toMatchObject({ kind: "cursor", cursorInput: "cursor" });
+    expect(uiQuery.sorting).toMatchObject({ input: "sort", defaultProfile: "default" });
     expect(uiQuery.filters).toEqual(expect.arrayContaining([
       expect.objectContaining({ name: "startsAtOrAfter", required: false, nullable: true }),
     ]));
-    expect(JSON.parse(output["semantic.json"]!).queries[0].output.cardinality).toBe("page");
+    const semanticQuery = JSON.parse(output["semantic.json"]!).queries[0];
+    expect(semanticQuery.output.cardinality).toBe("page");
+    expect(semanticQuery.sortProfiles).toHaveLength(2);
   });
 
   it("enforces enum sets and lowers membership and snapshot copies", async () => {
@@ -792,7 +811,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.33.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.34.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

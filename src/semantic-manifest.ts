@@ -43,8 +43,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 14;
-  profile: "sml-transactional-core/14";
+  manifestVersion: 15;
+  profile: "sml-transactional-core/15";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -53,7 +53,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 22;
+    irVersion: 23;
     generator: "semantic-manifest";
   };
   model: {
@@ -165,6 +165,7 @@ export interface SemanticQuery {
   readSet: SemanticReadSet;
   disclosureSet: { projectionId: string; projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] };
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
+  sortProfiles?: { id: string; name: string; fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true }[];
   failureClasses: ManifestErrorKind[];
 }
 
@@ -395,6 +396,7 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
   sourceReads.fieldIds = [...new Set([
     ...sourceReads.fieldIds,
     query.orderBy.fieldId,
+    ...(query.sortProfiles?.map((profile) => profile.fieldId) ?? []),
     ...disclosedFields.map((field) => field.sourceFieldId),
   ])].sort();
   return {
@@ -421,6 +423,9 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
       sourceFieldIds: disclosedFields.map((field) => field.sourceFieldId),
     },
     orderBy: query.orderBy,
+    ...(query.sortProfiles?.length ? {
+      sortProfiles: query.sortProfiles.map(({ span: _span, ...profile }) => profile),
+    } : {}),
     failureClasses: operation.errors,
   };
 }
@@ -470,7 +475,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 14,
+    manifestVersion: 15,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

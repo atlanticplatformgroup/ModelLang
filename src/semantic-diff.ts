@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 15;
+  diffVersion: 16;
   compilerVersion: string;
-  irVersion: 22;
+  irVersion: 23;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -494,6 +494,27 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
       persistenceRisk: false,
       explanation: "Query ordering or maximum result cardinality changed.",
     });
+    const previousProfiles = (pair.previous.sortProfiles ?? [])
+      .map(({ span: _span, ...profile }) => profile)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const currentProfiles = (pair.current.sortProfiles ?? [])
+      .map(({ span: _span, ...profile }) => profile)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    if (!same(previousProfiles, currentProfiles)) {
+      const additionsOnly = previousProfiles.every((profile) => currentProfiles.some((candidate) => same(profile, candidate)));
+      addChange(changes, {
+        kind: "querySortProfilesChanged",
+        area: "queryVisibility",
+        classification: additionsOnly ? "additive" : "breaking",
+        subject: subject("query", pair.current),
+        before: text(previousProfiles),
+        after: text(currentProfiles),
+        persistenceRisk: false,
+        explanation: additionsOnly
+          ? "The query added closed authored ordering choices without changing its default order."
+          : "A published authored sort profile was removed or its ordering semantics changed.",
+      });
+    }
     if (!same(pair.previous.pagination, pair.current.pagination)) addChange(changes, {
       kind: "queryPaginationChanged",
       area: "queryVisibility",
@@ -676,7 +697,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 15,
+    diffVersion: 16,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

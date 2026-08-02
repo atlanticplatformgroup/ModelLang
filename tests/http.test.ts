@@ -104,6 +104,34 @@ describe("generated HTTP boundary", () => {
       { expectedRevision: undefined },
     );
 
+    const authoredSort = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({
+        resource: "20000000-0000-4000-8000-000000000001",
+        sort: "latestFirst",
+      }),
+    }));
+    expect(authoredSort.status).toBe(200);
+    expect(execute).toHaveBeenLastCalledWith(
+      "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      { resource: "20000000-0000-4000-8000-000000000001", sort: "latestFirst" },
+      { expectedRevision: undefined },
+    );
+
+    const invalidSort = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({
+        resource: "20000000-0000-4000-8000-000000000001",
+        sort: "arbitraryField desc",
+      }),
+    }));
+    expect(invalidSort.status).toBe(400);
+    expect(await invalidSort.json()).toMatchObject({
+      ruleId: "sort-profile:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+    });
+
     const invalidFilter = await handler(new Request(route, {
       method: "POST",
       headers: { authorization: "Bearer valid", "content-type": "application/json" },

@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.33.0",
-    "sourceHash": "sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd0aab8",
+    "version": "0.34.0",
+    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1154,7 +1154,7 @@
     },
     {
       "id": "order:query:qry_4406b045404a48449282db804f6167a8",
-      "purpose": "Return rows in the declared order with an ascending identity tie-breaker.",
+      "purpose": "Return rows in the default declared order with an ascending identity tie-breaker.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_procurement.my_requests",

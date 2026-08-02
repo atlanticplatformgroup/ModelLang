@@ -1,6 +1,6 @@
 # Reservations enforcement map
 
-Source hash: `sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9`
+Source hash: `sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -71,7 +71,8 @@ Source hash: `sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed
 | `boundary:query:qry_94d8a56f4c2640fab58a4c2190c35c69.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource search_path=pg_catalog,pg_temp` | compiler-derived |
 | `authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:79:13 |
 | `where:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | ((reservation.resource == resource) and ((startsAtOrAfter == null) or (reservation.startsAt >= startsAtOrAfter))) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:80:9 |
-| `order:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
+| `order:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Return rows in the default declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
+| `sort-profiles:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Accept only the closed authored sort profiles default, latestFirst, endingSoonest; compile every ordering and keyset branch statically with an ascending identity tie-breaker. | PostgreSQL query sorting | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `limit:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Return at most 2 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Continue by the declared order and identity key; bind the opaque cursor to model/query identity, source, caller, filters, and ordering, and re-evaluate authorization and row policy. | PostgreSQL keyset pagination | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `read:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Read entity:ent_ba2d028e915841d1ab90adfa40d38404 root rows and authored to-one related entities entity:ent_7cb2307972954d83a6f344764faaae39 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |

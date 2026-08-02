@@ -33,6 +33,19 @@ describe("generated UI boundary", () => {
     ]));
   });
 
+  it("publishes only closed authored query sort profiles", () => {
+    const query = ReservationsUiManifest.queries.find((candidate) => candidate.name === "reservationsForResource")!;
+    expect(query.sorting).toMatchObject({
+      input: "sort",
+      defaultProfile: "default",
+      profiles: [
+        expect.objectContaining({ name: "default", direction: "asc" }),
+        expect.objectContaining({ name: "latestFirst", direction: "desc" }),
+        expect.objectContaining({ name: "endingSoonest", direction: "asc" }),
+      ],
+    });
+  });
+
   it("executes a descriptor's stable operation ID through the browser HTTP client", async () => {
     const fetch = vi.fn(async () => Response.json(purchaseRequest));
     const client = new ProcurementHttpClient({

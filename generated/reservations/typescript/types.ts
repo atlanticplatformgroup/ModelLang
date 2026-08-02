@@ -65,6 +65,7 @@ export interface ReserveInput {
 export interface ReservationsForResourceInput {
   resource: string;
   startsAtOrAfter?: string | null;
+  sort?: "default" | "latestFirst" | "endingSoonest";
   cursor?: string;
 }
 

@@ -65,8 +65,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 8;
-  operationManifestVersion: 8;
+  uiManifestVersion: 9;
+  operationManifestVersion: 9;
   model: {
     id: string;
     name: string;
@@ -135,6 +135,11 @@ export interface UiManifest {
     filters: UiInputField[];
     resultProjectionId: string;
     maxItems: number;
+    sorting?: {
+      input: "sort";
+      defaultProfile: "default";
+      profiles: { id: string; name: string; label: string; fieldId: string; direction: "asc" | "desc" }[];
+    };
     pagination?: {
       kind: "cursor";
       cursorInput: "cursor";
@@ -189,12 +194,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 8) {
-    throw new Error(`E6201 UI generation requires operation manifest version 8, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 9) {
+    throw new Error(`E6201 UI generation requires operation manifest version 9, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 8,
+    uiManifestVersion: 9,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -269,6 +274,19 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         filters: inputFields(operation),
         resultProjectionId: operation.output.projectionId,
         maxItems: operation.output.maxItems,
+        ...(operation.sorting ? {
+          sorting: {
+            input: operation.sorting.input,
+            defaultProfile: operation.sorting.defaultProfile,
+            profiles: operation.sorting.profiles.map((profile) => ({
+              id: profile.id,
+              name: profile.name,
+              label: uiLabel(profile.name),
+              fieldId: profile.fieldId,
+              direction: profile.direction,
+            })),
+          },
+        } : {}),
         ...(operation.output.cardinality === "page" ? {
           pagination: {
             kind: operation.output.pagination.kind,

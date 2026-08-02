@@ -1563,6 +1563,7 @@ function parameterSql(parameter: IRParameter): string {
 function functionSignature(ir: ModelIR, operation: IRAction | IRQuery): string {
   const callable = operation.parameters.filter((parameter) => operation.callableParameters.includes(parameter.id));
   const types = callable.map((parameter) => sqlType(parameter.type));
+  if ("sortProfiles" in operation && operation.sortProfiles?.length) types.push("text");
   if ("pagination" in operation && operation.pagination) types.push("text");
   return `${qname(ir.model.naming.sqlSchema, operation.naming.sqlFunction)}(${types.join(", ")})`;
 }
@@ -2074,6 +2075,34 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
   const sourceEntity = entityById(ir, query.sourceEntityId);
   const orderField = fieldById(ir, query.orderBy.fieldId).field;
   const idField = fieldById(ir, sourceEntity.idFieldId).field;
+  const sortOrders = [
+    { name: "default", field: orderField, direction: query.orderBy.direction },
+    ...(query.sortProfiles?.map((profile) => ({
+      name: profile.name,
+      field: fieldById(ir, profile.fieldId).field,
+      direction: profile.direction,
+    })) ?? []),
+  ];
+  const hasSortProfiles = sortOrders.length > 1;
+  const selectedSortValue = (alias: string) => hasSortProfiles
+    ? `CASE ${sortOrders.map((profile) => `WHEN v_sort_profile = '${profile.name.replaceAll("'", "''")}' THEN (${alias}.${quoteIdent(profile.field.naming.sqlColumn)})::text`).join(" ")} END`
+    : `${alias}.${quoteIdent(orderField.naming.sqlColumn)}`;
+  const selectedProfileText = (property: "fieldId" | "direction") => `(CASE ${sortOrders.map((profile) => {
+    const value = property === "fieldId" ? profile.field.id : profile.direction;
+    return `WHEN v_sort_profile = '${profile.name.replaceAll("'", "''")}' THEN '${value.replaceAll("'", "''")}'`;
+  }).join(" ")} END)`;
+  const orderSql = (alias: string, selectedText: boolean, reverse = false) => [
+    ...(hasSortProfiles ? sortOrders.map((profile) => {
+      const value = selectedText
+        ? `${alias}.${quoteIdent("sort_value")}::${sqlType(profile.field.type)}`
+        : `${alias}.${quoteIdent(profile.field.naming.sqlColumn)}`;
+      const direction = reverse
+        ? (profile.direction === "asc" ? "DESC" : "ASC")
+        : profile.direction.toUpperCase();
+      return `CASE WHEN v_sort_profile = '${profile.name.replaceAll("'", "''")}' THEN ${value} END ${direction}`;
+    }) : [`${alias}.${quoteIdent(selectedText ? "sort_value" : orderField.naming.sqlColumn)} ${reverse ? (query.orderBy.direction === "asc" ? "DESC" : "ASC") : query.orderBy.direction.toUpperCase()}`]),
+    `${alias}.${quoteIdent(selectedText ? "identity" : idField.naming.sqlColumn)} ${reverse ? "DESC" : "ASC"}`,
+  ].join(", ");
   const recordNames = new Map<string, string>([["queryRow", "v_row"]]);
   for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     recordNames.set(parameter.id, `v_${snakeCase(parameter.name)}`);
@@ -2082,10 +2111,13 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "  v_principal_id uuid;",
     "  v_result jsonb;",
   ];
+  if (hasSortProfiles) declarations.push("  v_sort_profile text;");
   if (query.pagination) {
     declarations.push(
       "  v_cursor_json jsonb;",
-      `  v_cursor_sort ${qname(schema, sourceEntity.naming.sqlTable)}.${quoteIdent(orderField.naming.sqlColumn)}%TYPE;`,
+      ...(hasSortProfiles
+        ? ["  v_cursor_sort text;"]
+        : [`  v_cursor_sort ${qname(schema, sourceEntity.naming.sqlTable)}.${quoteIdent(orderField.naming.sqlColumn)}%TYPE;`]),
       "  v_cursor_identity uuid;",
       "  v_input_hash text;",
     );
@@ -2099,6 +2131,15 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     `  FROM ${qname(internal, "resolve_principal")}() AS identity;`,
     "",
   ];
+  if (hasSortProfiles) {
+    body.push(
+      "  v_sort_profile := COALESCE(p_sort, 'default');",
+      `  IF v_sort_profile NOT IN (${sortOrders.map((profile) => `'${profile.name.replaceAll("'", "''")}'`).join(", ")}) THEN`,
+      `    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:sort-profile:${query.id}';`,
+      "  END IF;",
+      "",
+    );
+  }
   for (const parameter of callable.filter((candidate) => isMoneyType(candidate.type))) {
     body.push(...moneyParameterValidation(parameter));
   }
@@ -2141,6 +2182,14 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     ]);
     const directionOperator = query.orderBy.direction === "asc" ? ">" : "<";
     const reverseDirection = query.orderBy.direction === "asc" ? "DESC" : "ASC";
+    const cursorPredicate = hasSortProfiles
+      ? sortOrders.map((profile) => {
+          const value = `v_row.${quoteIdent(profile.field.naming.sqlColumn)}`;
+          const cursorValue = `v_cursor_sort::${sqlType(profile.field.type)}`;
+          const operator = profile.direction === "asc" ? ">" : "<";
+          return `(v_sort_profile = '${profile.name.replaceAll("'", "''")}' AND (${value} ${operator} ${cursorValue} OR (${value} = ${cursorValue} AND v_row.${quoteIdent(idField.naming.sqlColumn)} > v_cursor_identity)))`;
+        }).join(" OR ")
+      : `v_row.${quoteIdent(orderField.naming.sqlColumn)} ${directionOperator} v_cursor_sort OR (v_row.${quoteIdent(orderField.naming.sqlColumn)} = v_cursor_sort AND v_row.${quoteIdent(idField.naming.sqlColumn)} > v_cursor_identity)`;
     const cursorRule = `cursor:${query.id}`;
     const payload = (sortSql: string, identitySql: string) => `pg_catalog.jsonb_build_object(`
       + `'v', 1, `
@@ -2149,8 +2198,8 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       + `'sourceHash', '${ir.model.sourceHash.replaceAll("'", "''")}', `
       + `'queryId', '${query.id.replaceAll("'", "''")}', `
       + `'revision', '${query.pagination!.revision}', `
-      + `'orderFieldId', '${query.orderBy.fieldId.replaceAll("'", "''")}', `
-      + `'direction', '${query.orderBy.direction}', `
+      + `'orderFieldId', ${hasSortProfiles ? selectedProfileText("fieldId") : `'${query.orderBy.fieldId.replaceAll("'", "''")}'`}, `
+      + `'direction', ${hasSortProfiles ? selectedProfileText("direction") : `'${query.orderBy.direction}'`}, `
       + `'inputHash', v_input_hash, `
       + `'sort', (${sortSql})::text, `
       + `'identity', (${identitySql})::text)`;
@@ -2160,6 +2209,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       `  v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(`,
       `    'caller', pg_catalog.to_jsonb(v_principal_id),`,
       `    'inputs', pg_catalog.jsonb_build_object(${inputEntries.join(", ")})`,
+      ...(hasSortProfiles ? ["    , 'sortProfile', pg_catalog.to_jsonb(v_sort_profile)"] : []),
       `  ))::text, 'UTF8')), 'hex');`,
       "",
       "  IF p_cursor IS NOT NULL THEN",
@@ -2187,6 +2237,9 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "        RAISE EXCEPTION 'invalid cursor';",
       "      END IF;",
       "      v_cursor_sort := v_cursor_json ->> 'sort';",
+      ...(hasSortProfiles ? [
+        `      PERFORM CASE ${sortOrders.map((profile) => `WHEN v_sort_profile = '${profile.name.replaceAll("'", "''")}' THEN (v_cursor_sort::${sqlType(profile.field.type)})::text`).join(" ")} END;`,
+      ] : []),
       "      v_cursor_identity := (v_cursor_json ->> 'identity')::uuid;",
       "    EXCEPTION WHEN others THEN",
       `      RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:${cursorRule}';`,
@@ -2197,8 +2250,8 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM " + `'${ir.model.sourceHash.replaceAll("'", "''")}'`,
       "      OR v_cursor_json ->> 'queryId' IS DISTINCT FROM " + `'${query.id.replaceAll("'", "''")}'`,
       "      OR v_cursor_json ->> 'revision' IS DISTINCT FROM " + `'${query.pagination.revision}'`,
-      "      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM " + `'${query.orderBy.fieldId.replaceAll("'", "''")}'`,
-      "      OR v_cursor_json ->> 'direction' IS DISTINCT FROM " + `'${query.orderBy.direction}'`,
+      "      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM " + (hasSortProfiles ? selectedProfileText("fieldId") : `'${query.orderBy.fieldId.replaceAll("'", "''")}'`),
+      "      OR v_cursor_json ->> 'direction' IS DISTINCT FROM " + (hasSortProfiles ? selectedProfileText("direction") : `'${query.orderBy.direction}'`),
       "      OR v_cursor_json ->> 'inputHash' IS DISTINCT FROM v_input_hash THEN",
       `      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:${cursorRule}';`,
       "    END IF;",
@@ -2206,29 +2259,28 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "",
       "  WITH page_rows AS MATERIALIZED (",
       `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
-      `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
+      `           ${selectedSortValue("v_row")} AS ${quoteIdent("sort_value")},`,
       `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
       `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
       `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
       "      AND (p_cursor IS NULL",
-      `        OR v_row.${quoteIdent(orderField.naming.sqlColumn)} ${directionOperator} v_cursor_sort`,
-      `        OR (v_row.${quoteIdent(orderField.naming.sqlColumn)} = v_cursor_sort AND v_row.${quoteIdent(idField.naming.sqlColumn)} > v_cursor_identity))`,
-      `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
+      `        OR (${cursorPredicate}))`,
+      `    ORDER BY ${orderSql("v_row", false)}`,
       `    LIMIT ${query.limit + 1}`,
       "  ), visible_rows AS MATERIALIZED (",
       "    SELECT * FROM page_rows",
-      `    ORDER BY ${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC`,
+      `    ORDER BY ${hasSortProfiles ? orderSql("page_rows", true) : `${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC`}`,
       `    LIMIT ${query.limit}`,
       "  )",
       "  SELECT pg_catalog.jsonb_build_object(",
       "    'items', COALESCE((",
-      `      SELECT pg_catalog.jsonb_agg(${quoteIdent("item")} ORDER BY ${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC)`,
+      `      SELECT pg_catalog.jsonb_agg(${quoteIdent("item")} ORDER BY ${hasSortProfiles ? orderSql("visible_rows", true) : `${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC`})`,
       "      FROM visible_rows",
       "    ), '[]'::jsonb),",
       `    'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > ${query.limit} THEN (`,
       `      SELECT ${encodeCursor(quoteIdent("sort_value"), quoteIdent("identity"))}`,
       "      FROM visible_rows",
-      `      ORDER BY ${quoteIdent("sort_value")} ${reverseDirection}, ${quoteIdent("identity")} DESC`,
+      `      ORDER BY ${hasSortProfiles ? orderSql("visible_rows", true, true) : `${quoteIdent("sort_value")} ${reverseDirection}, ${quoteIdent("identity")} DESC`}`,
       "      LIMIT 1",
       "    ) ELSE NULL END",
       "  ) INTO v_result;",
@@ -2238,23 +2290,27 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
   } else {
     body.push(
       "  SELECT COALESCE(",
-      `    pg_catalog.jsonb_agg(v_query.${quoteIdent("item")} ORDER BY v_query.${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, v_query.${quoteIdent("identity")} ASC),`,
+      `    pg_catalog.jsonb_agg(v_query.${quoteIdent("item")} ORDER BY ${hasSortProfiles ? orderSql("v_query", true) : `v_query.${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, v_query.${quoteIdent("identity")} ASC`}),`,
       "    '[]'::jsonb",
       "  ) INTO v_result",
       "  FROM (",
       `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
-      `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
+      `           ${selectedSortValue("v_row")} AS ${quoteIdent("sort_value")},`,
       `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
       `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
       `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
-      `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
+      `    ORDER BY ${orderSql("v_row", false)}`,
       `    LIMIT ${query.limit}`,
       "  ) AS v_query;",
       "",
       "  RETURN v_result;",
     );
   }
-  const functionParameters = [...callable.map(parameterSql), ...(query.pagination ? ["p_cursor text DEFAULT NULL"] : [])];
+  const functionParameters = [
+    ...callable.map(parameterSql),
+    ...(hasSortProfiles ? ["p_sort text DEFAULT NULL"] : []),
+    ...(query.pagination ? ["p_cursor text DEFAULT NULL"] : []),
+  ];
   return `CREATE OR REPLACE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${functionParameters.join(", ")})
 RETURNS jsonb
 LANGUAGE plpgsql

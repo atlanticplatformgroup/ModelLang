@@ -5,6 +5,16 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.34.0
+
+- Added up to 16 closed authored `sort name: row.field asc|desc;` profiles per query while retaining the required `orderBy` as the reserved `default` profile.
+- Exposed an optional exact-enum `sort` input only on queries with alternate profiles; callers cannot choose arbitrary fields, directions, expressions, limits, offsets, or SQL.
+- Generated static PostgreSQL `CASE` ordering and keyset branches with an invariant ascending identity tie-breaker, and bound cursor payloads, fingerprints, and revisions to the selected profile.
+- Propagated stable profile identity, field, direction, and tie-breaker metadata through TypeScript, operation/OpenAPI/HTTP, UI, semantic, enforcement, provenance, and schema contracts without widening query authority or projection disclosure.
+- Classified profile additions as additive and profile removal or field/direction changes as breaking, with IR9–IR22 baselines normalized to no profiles.
+- Advanced canonical IR to IR23, operation manifest to v9, capability manifest to v8, UI manifest to v9, engineering semantic manifest/profile to v15, semantic diff to v16, and generator profile to `postgresql-http-ui-authored-sort-profiles/18`.
+- Updated Reservations with `latestFirst` and `endingSoonest` profiles plus unit, transport, golden, semantic-evolution, and live PostgreSQL coverage including cross-profile cursor staleness.
+
 ## 0.33.0
 
 - Added `?` on non-caller query parameters for authored optional filters; actions, policies, consumers, and caller parameters remain required.

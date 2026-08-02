@@ -208,6 +208,13 @@ export interface QueryDecl {
     direction: "asc" | "desc";
     span: Span;
   };
+  sortProfiles?: {
+    name: string;
+    nameSpan: Span;
+    path: string[];
+    direction: "asc" | "desc";
+    span: Span;
+  }[];
   limit: number;
   limitSpan: Span;
   pagination?: {

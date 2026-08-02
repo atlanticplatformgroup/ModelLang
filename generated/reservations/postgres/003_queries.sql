@@ -1,7 +1,7 @@
 -- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
-CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_cursor text DEFAULT NULL)
+CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -10,8 +10,9 @@ AS $modellang$
 DECLARE
   v_principal_id uuid;
   v_result jsonb;
+  v_sort_profile text;
   v_cursor_json jsonb;
-  v_cursor_sort "model_reservations"."reservation"."starts_at"%TYPE;
+  v_cursor_sort text;
   v_cursor_identity uuid;
   v_input_hash text;
   v_actor "model_reservations"."user"%ROWTYPE;
@@ -19,6 +20,11 @@ DECLARE
 BEGIN
   SELECT identity."principal_id" INTO v_principal_id
   FROM "model_reservations_internal"."resolve_principal"() AS identity;
+
+  v_sort_profile := COALESCE(p_sort, 'default');
+  IF v_sort_profile NOT IN ('default', 'latestFirst', 'endingSoonest') THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:sort-profile:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
+  END IF;
 
   SELECT * INTO v_actor
   FROM "model_reservations"."user"
@@ -43,6 +49,7 @@ BEGIN
   v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
     'caller', pg_catalog.to_jsonb(v_principal_id),
     'inputs', pg_catalog.jsonb_build_object('parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource', pg_catalog.to_jsonb("p_resource"), 'parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter', pg_catalog.to_jsonb("p_starts_at_or_after"))
+    , 'sortProfile', pg_catalog.to_jsonb(v_sort_profile)
   ))::text, 'UTF8')), 'hex');
 
   IF p_cursor IS NOT NULL THEN
@@ -70,18 +77,19 @@ BEGIN
         RAISE EXCEPTION 'invalid cursor';
       END IF;
       v_cursor_sort := v_cursor_json ->> 'sort';
+      PERFORM CASE WHEN v_sort_profile = 'default' THEN (v_cursor_sort::timestamptz)::text WHEN v_sort_profile = 'latestFirst' THEN (v_cursor_sort::timestamptz)::text WHEN v_sort_profile = 'endingSoonest' THEN (v_cursor_sort::timestamptz)::text END;
       v_cursor_identity := (v_cursor_json ->> 'identity')::uuid;
     EXCEPTION WHEN others THEN
       RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
     END;
 
     IF v_cursor_json ->> 'modelId' IS DISTINCT FROM 'model:Reservations'
-      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.33.0'
-      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9'
+      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.34.0'
+      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd'
       OR v_cursor_json ->> 'queryId' IS DISTINCT FROM 'query:qry_94d8a56f4c2640fab58a4c2190c35c69'
-      OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2'
-      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM 'field:fld_59e1f90fae57481f921c5a81dfd3a234'
-      OR v_cursor_json ->> 'direction' IS DISTINCT FROM 'asc'
+      OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:1b519691bebee5f73a5cae02ecbafd601b422970b58ae2b9fbacbe2e94f7bad1'
+      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM (CASE WHEN v_sort_profile = 'default' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'latestFirst' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'endingSoonest' THEN 'field:fld_fd818707952f4b388baea4c3132bce63' END)
+      OR v_cursor_json ->> 'direction' IS DISTINCT FROM (CASE WHEN v_sort_profile = 'default' THEN 'asc' WHEN v_sort_profile = 'latestFirst' THEN 'desc' WHEN v_sort_profile = 'endingSoonest' THEN 'asc' END)
       OR v_cursor_json ->> 'inputHash' IS DISTINCT FROM v_input_hash THEN
       RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
     END IF;
@@ -89,29 +97,28 @@ BEGIN
 
   WITH page_rows AS MATERIALIZED (
     SELECT jsonb_build_object('id', v_row."id", 'resource', (SELECT jsonb_build_object('id', "v_projection_1"."id", 'name', "v_projection_1"."name") FROM "model_reservations"."resource" AS "v_projection_1" WHERE "v_projection_1"."id" = v_row."resource_id"), 'startsAt', v_row."starts_at", 'endsAt', v_row."ends_at") AS "item",
-           v_row."starts_at" AS "sort_value",
+           CASE WHEN v_sort_profile = 'default' THEN (v_row."starts_at")::text WHEN v_sort_profile = 'latestFirst' THEN (v_row."starts_at")::text WHEN v_sort_profile = 'endingSoonest' THEN (v_row."ends_at")::text END AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_reservations"."reservation" AS v_row
     WHERE ((((v_row."resource_id" = v_resource."id") AND (("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")))) IS TRUE)
       AND (p_cursor IS NULL
-        OR v_row."starts_at" > v_cursor_sort
-        OR (v_row."starts_at" = v_cursor_sort AND v_row."id" > v_cursor_identity))
-    ORDER BY v_row."starts_at" ASC, v_row."id" ASC
+        OR ((v_sort_profile = 'default' AND (v_row."starts_at" > v_cursor_sort::timestamptz OR (v_row."starts_at" = v_cursor_sort::timestamptz AND v_row."id" > v_cursor_identity))) OR (v_sort_profile = 'latestFirst' AND (v_row."starts_at" < v_cursor_sort::timestamptz OR (v_row."starts_at" = v_cursor_sort::timestamptz AND v_row."id" > v_cursor_identity))) OR (v_sort_profile = 'endingSoonest' AND (v_row."ends_at" > v_cursor_sort::timestamptz OR (v_row."ends_at" = v_cursor_sort::timestamptz AND v_row."id" > v_cursor_identity)))))
+    ORDER BY CASE WHEN v_sort_profile = 'default' THEN v_row."starts_at" END ASC, CASE WHEN v_sort_profile = 'latestFirst' THEN v_row."starts_at" END DESC, CASE WHEN v_sort_profile = 'endingSoonest' THEN v_row."ends_at" END ASC, v_row."id" ASC
     LIMIT 3
   ), visible_rows AS MATERIALIZED (
     SELECT * FROM page_rows
-    ORDER BY "sort_value" ASC, "identity" ASC
+    ORDER BY CASE WHEN v_sort_profile = 'default' THEN page_rows."sort_value"::timestamptz END ASC, CASE WHEN v_sort_profile = 'latestFirst' THEN page_rows."sort_value"::timestamptz END DESC, CASE WHEN v_sort_profile = 'endingSoonest' THEN page_rows."sort_value"::timestamptz END ASC, page_rows."identity" ASC
     LIMIT 2
   )
   SELECT pg_catalog.jsonb_build_object(
     'items', COALESCE((
-      SELECT pg_catalog.jsonb_agg("item" ORDER BY "sort_value" ASC, "identity" ASC)
+      SELECT pg_catalog.jsonb_agg("item" ORDER BY CASE WHEN v_sort_profile = 'default' THEN visible_rows."sort_value"::timestamptz END ASC, CASE WHEN v_sort_profile = 'latestFirst' THEN visible_rows."sort_value"::timestamptz END DESC, CASE WHEN v_sort_profile = 'endingSoonest' THEN visible_rows."sort_value"::timestamptz END ASC, visible_rows."identity" ASC)
       FROM visible_rows
     ), '[]'::jsonb),
     'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > 2 THEN (
-      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.33.0', 'sourceHash', 'sha256:378ebe0315d1a0182c2ef1a61a6ce6f8f8260dd3e038d6fea2adf7c42ed3b4f9', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:68f1e7055d2a6057e2b4bd857a86346b8811473d543248ed05efdd904bd3dab2', 'orderFieldId', 'field:fld_59e1f90fae57481f921c5a81dfd3a234', 'direction', 'asc', 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
+      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.34.0', 'sourceHash', 'sha256:5218d851aea72bde1075c625c1acf089ebc886e4f281a01e53972d4aa386f2fd', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:1b519691bebee5f73a5cae02ecbafd601b422970b58ae2b9fbacbe2e94f7bad1', 'orderFieldId', (CASE WHEN v_sort_profile = 'default' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'latestFirst' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'endingSoonest' THEN 'field:fld_fd818707952f4b388baea4c3132bce63' END), 'direction', (CASE WHEN v_sort_profile = 'default' THEN 'asc' WHEN v_sort_profile = 'latestFirst' THEN 'desc' WHEN v_sort_profile = 'endingSoonest' THEN 'asc' END), 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
       FROM visible_rows
-      ORDER BY "sort_value" DESC, "identity" DESC
+      ORDER BY CASE WHEN v_sort_profile = 'default' THEN visible_rows."sort_value"::timestamptz END DESC, CASE WHEN v_sort_profile = 'latestFirst' THEN visible_rows."sort_value"::timestamptz END ASC, CASE WHEN v_sort_profile = 'endingSoonest' THEN visible_rows."sort_value"::timestamptz END DESC, visible_rows."identity" DESC
       LIMIT 1
     ) ELSE NULL END
   ) INTO v_result;
@@ -120,6 +127,6 @@ BEGIN
 END
 $modellang$;
 
-REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, timestamptz, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, timestamptz, text, text) FROM PUBLIC;
 
 RESET ROLE;

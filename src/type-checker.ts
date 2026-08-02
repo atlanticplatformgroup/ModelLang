@@ -230,7 +230,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 22,
+    irVersion: 23,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1082,6 +1082,9 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   if (query.pagination && seen.has("cursor")) {
     throw new ModelError("E2611", "Paginated queries reserve the generated input name 'cursor'.", seen.get("cursor")!, file);
   }
+  if (query.sortProfiles?.length && seen.has("sort")) {
+    throw new ModelError("E2613", "Queries with authored sort profiles reserve the generated input name 'sort'.", seen.get("sort")!, file);
+  }
   const sourceEntity = symbols.entities.get(query.sourceType.name);
   if (!sourceEntity) {
     throw new ModelError("E2601", `Query source '${query.sourceType.name}' must be an entity.`, query.sourceType.span, file);
@@ -1134,6 +1137,39 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   if (orderField.optional) {
     throw new ModelError("E2608", `Query order field '${sourceEntity.name}.${orderField.name}' must be required.`, query.orderBy.span, file);
   }
+  if ((query.sortProfiles?.length ?? 0) > 16) {
+    throw new ModelError("E2631", "A query may declare at most 16 authored sort profiles.", query.sortProfiles![16]!.span, file);
+  }
+  const sortNames = new Map<string, Span>();
+  const sortProfiles = query.sortProfiles?.map((profile) => {
+    if (profile.name === "default") {
+      throw new ModelError("E2632", "The sort profile name 'default' is reserved for the query's orderBy clause.", profile.nameSpan, file);
+    }
+    const previous = sortNames.get(profile.name);
+    if (previous) {
+      throw new ModelError("E2633", `Duplicate sort profile '${profile.name}'.`, profile.nameSpan, file, { message: "First declared here.", span: previous });
+    }
+    sortNames.set(profile.name, profile.nameSpan);
+    const [alias, fieldName, extraPart] = profile.path;
+    if (extraPart || profile.path.length !== 2 || alias !== query.rowAlias.name) {
+      throw new ModelError("E2634", `Sort profile '${profile.name}' must order by a direct field of row alias '${query.rowAlias.name}'.`, profile.span, file);
+    }
+    const field = symbols.fields.get(sourceEntity.name)!.get(fieldName!);
+    if (!field) {
+      throw new ModelError("E2635", `Unknown sort field '${sourceEntity.name}.${fieldName}'.`, profile.span, file);
+    }
+    if (field.optional) {
+      throw new ModelError("E2636", `Sort profile '${profile.name}' field '${sourceEntity.name}.${field.name}' must be required.`, profile.span, file);
+    }
+    return {
+      id: `sortProfile:${semanticId}.${profile.name}`,
+      name: profile.name,
+      fieldId: fieldId(sourceEntity, field),
+      direction: profile.direction,
+      identityTieBreaker: true as const,
+      span: irSpan(profile.span, file),
+    };
+  });
   if (!Number.isInteger(query.limit) || query.limit < 1 || query.limit > 1000) {
     throw new ModelError("E2609", "Query limit must be an integer from 1 through 1000.", query.limitSpan, file);
   }
@@ -1147,6 +1183,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
         authorization,
         rowPolicy,
         orderBy: { fieldId: fieldId(sourceEntity, orderField), direction: query.orderBy.direction },
+        sortProfiles: sortProfiles?.map(({ id, name, fieldId: profileFieldId, direction: profileDirection }) => ({ id, name, fieldId: profileFieldId, direction: profileDirection })) ?? [],
         limit: query.limit,
         pagination: "cursor-v1",
       })).digest("hex")}`
@@ -1181,6 +1218,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       direction: query.orderBy.direction,
       identityTieBreaker: true,
     },
+    ...(sortProfiles?.length ? { sortProfiles } : {}),
     limit: query.limit,
     ...(paginationRevision ? { pagination: { kind: "cursor" as const, cursorVersion: 1 as const, revision: paginationRevision } } : {}),
     span: irSpan(query.span, file),
@@ -1833,7 +1871,15 @@ function buildEnforcement(
     entries.push({ id: `boundary:${query.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
-    entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    entries.push({ id: `order:${query.id}`, purpose: "Return rows in the default declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    if (query.sortProfiles?.length) entries.push({
+      id: `sort-profiles:${query.id}`,
+      purpose: `Accept only the closed authored sort profiles default, ${query.sortProfiles.map((profile) => profile.name).join(", ")}; compile every ordering and keyset branch statically with an ascending identity tie-breaker.`,
+      layer: "PostgreSQL query sorting",
+      artifact: "postgres/003_queries.sql",
+      objectName: fn,
+      source: query.span,
+    });
     entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     if (query.pagination) entries.push({
       id: `cursor:${query.id}`,

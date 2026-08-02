@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd0aab8`
+Source hash: `sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -97,7 +97,7 @@ Source hash: `sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd
 | `boundary:query:qry_4406b045404a48449282db804f6167a8.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_procurement.my_requests search_path=pg_catalog,pg_temp` | compiler-derived |
 | `authorize:query:qry_4406b045404a48449282db804f6167a8` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:166:13 |
 | `where:query:qry_4406b045404a48449282db804f6167a8` | (request.requester == actor) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:167:9 |
-| `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
+| `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the default declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `limit:query:qry_4406b045404a48449282db804f6167a8` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `read:query:qry_4406b045404a48449282db804f6167a8` | Read entity:ent_9bc680209327484c8e98f5f740bcc702 root rows and authored to-one related entities entity:ent_66c16684f17e4b4ca79eb7d916cbf725 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `disclose:query:qry_4406b045404a48449282db804f6167a8` | Disclose only projection closure projection:prj_70d694c9a0a274dc79c6168e47d25968 -> projection:prj_76d694c9a0a274dc79c6168e47d25968 through the generated query boundary. | PostgreSQL projection encoder | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |

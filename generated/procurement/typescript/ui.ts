@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 8,
-  "operationManifestVersion": 8,
+  "uiManifestVersion": 9,
+  "operationManifestVersion": 9,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.33.0",
-    "sourceHash": "sha256:d406ba62d65874007910b2d33e7cfad4a8cd5146f33130f46dda875a0dd0aab8",
+    "version": "0.34.0",
+    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a",
     "label": "Procurement"
   },
   "authentication": {

@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 8;
+  manifestVersion: 9;
   model: {
     id: string;
     name: string;
@@ -68,6 +68,14 @@ export interface ManifestParameter {
   optional?: true;
 }
 
+export interface ManifestSortProfile {
+  id: string;
+  name: string;
+  fieldId: string;
+  direction: "asc" | "desc";
+  identityTieBreaker: true;
+}
+
 export function operationInputName(operation: Pick<ManifestOperation, "name">): string {
   return `${operation.name[0]!.toUpperCase()}${operation.name.slice(1)}Input`;
 }
@@ -111,6 +119,11 @@ export type ManifestOperation =
     })
   | (ManifestOperationBase & {
       kind: "query";
+      sorting?: {
+        input: "sort";
+        defaultProfile: "default";
+        profiles: ManifestSortProfile[];
+      };
       output:
         | { projectionId: string; cardinality: "many"; maxItems: number }
         | {
@@ -218,6 +231,7 @@ function queryErrors(query: IRQuery): ManifestErrorKind[] {
     if (!errors.includes("validation")) errors.push("validation");
     errors.push("stale");
   }
+  if (query.sortProfiles?.length && !errors.includes("validation")) errors.push("validation");
   return errors;
 }
 
@@ -267,7 +281,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 8,
+    manifestVersion: 9,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -354,6 +368,22 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         kind: "query",
         input: callableInput(query),
         caller: caller(query, ir),
+        ...(query.sortProfiles?.length ? {
+          sorting: {
+            input: "sort" as const,
+            defaultProfile: "default" as const,
+            profiles: [
+              {
+                id: `sortProfile:${query.id}.default`,
+                name: "default",
+                fieldId: query.orderBy.fieldId,
+                direction: query.orderBy.direction,
+                identityTieBreaker: true as const,
+              },
+              ...query.sortProfiles.map(({ span: _span, ...profile }) => profile),
+            ],
+          },
+        } : {}),
         output: query.pagination ? {
           projectionId: query.returnProjectionId,
           cardinality: "page",

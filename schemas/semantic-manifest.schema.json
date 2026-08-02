@@ -103,8 +103,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 14 },
-    "profile": { "const": "sml-transactional-core/14" },
+    "manifestVersion": { "const": 15 },
+    "profile": { "const": "sml-transactional-core/15" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -121,7 +121,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 22 },
+          "irVersion": { "const": 23 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -480,6 +480,22 @@
               "identityTieBreaker": { "const": true }
             },
             "additionalProperties": false
+          },
+          "sortProfiles": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["id", "name", "fieldId", "direction", "identityTieBreaker"],
+              "properties": {
+                "id": { "type": "string", "pattern": "^sortProfile:" },
+                "name": { "type": "string" },
+                "fieldId": { "type": "string", "pattern": "^field:" },
+                "direction": { "enum": ["asc", "desc"] },
+                "identityTieBreaker": { "const": true }
+              },
+              "additionalProperties": false
+            }
           },
           "failureClasses": { "$ref": "#/$defs/errors" }
         },
