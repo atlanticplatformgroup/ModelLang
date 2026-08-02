@@ -696,6 +696,7 @@ describe("backends", () => {
     expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalConsumers");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-observer.js"');
     expect(output["postgres/017_upgrade_0_27.sql"]).toContain("private terminal-failure observation upgrade");
+    expect(output["postgres/017_upgrade_0_27.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:27:");
     expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_acknowledger NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_acknowledgement"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_acknowledgement"');
@@ -710,6 +711,7 @@ describe("backends", () => {
     expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("database_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-acknowledgement.js"');
     expect(output["postgres/018_upgrade_0_28.sql"]).toContain("private terminal-failure acknowledgement upgrade");
+    expect(output["postgres/018_upgrade_0_28.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:28:");
     expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_claimant NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_claim"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_claim"');
@@ -723,6 +725,8 @@ describe("backends", () => {
     expect(output["typescript/failure-claim.ts"]).not.toContain("claimant_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-claim.js"');
     expect(output["postgres/019_upgrade_0_29.sql"]).toContain("private terminal-failure claim upgrade");
+    expect(output["postgres/002_schema.sql"]).toContain('INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 29)');
+    expect(output["postgres/019_upgrade_0_29.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:29:");
     expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("publication_failure_claim");
     expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("'claimed', claimed");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {

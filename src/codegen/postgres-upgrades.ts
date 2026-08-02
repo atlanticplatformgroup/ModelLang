@@ -29,3 +29,33 @@ BEGIN
 END
 $modellang_upgrade$;`;
 }
+
+export function generateRuntimeProfileGuard(ir: ModelIR, targetProfile: number): string {
+  const runtimeProfile = qname(ir.model.naming.internalSchema, "runtime_profile");
+  return `CREATE TABLE IF NOT EXISTS ${runtimeProfile} (
+  ${quoteIdent("singleton")} boolean PRIMARY KEY DEFAULT TRUE,
+  ${quoteIdent("profile_version")} integer NOT NULL,
+  CONSTRAINT ${quoteIdent("ck_runtime_profile_singleton")} CHECK (${quoteIdent("singleton")}),
+  CONSTRAINT ${quoteIdent("ck_runtime_profile_version")} CHECK (${quoteIdent("profile_version")} >= 0)
+);
+LOCK TABLE ${runtimeProfile} IN EXCLUSIVE MODE;
+DO $modellang_runtime_profile$
+DECLARE
+  v_profile_version integer;
+BEGIN
+  SELECT ${quoteIdent("profile_version")} INTO v_profile_version
+  FROM ${runtimeProfile} WHERE ${quoteIdent("singleton")} FOR UPDATE;
+  IF FOUND AND v_profile_version > ${targetProfile} THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_RUNTIME_PROFILE_DOWNGRADE:${targetProfile}:' || v_profile_version;
+  END IF;
+END
+$modellang_runtime_profile$;`;
+}
+
+export function generateRuntimeProfileAdvance(ir: ModelIR, targetProfile: number): string {
+  const runtimeProfile = qname(ir.model.naming.internalSchema, "runtime_profile");
+  return `INSERT INTO ${runtimeProfile} (${quoteIdent("singleton")}, ${quoteIdent("profile_version")})
+VALUES (TRUE, ${targetProfile})
+ON CONFLICT (${quoteIdent("singleton")}) DO UPDATE
+SET ${quoteIdent("profile_version")} = GREATEST(${runtimeProfile}.${quoteIdent("profile_version")}, EXCLUDED.${quoteIdent("profile_version")});`;
+}

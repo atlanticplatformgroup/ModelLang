@@ -1943,7 +1943,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
-  it("reapplies the 0.27 failure-observation upgrade without changing failure state or fabricating audit", async () => {
+  it("rejects the 0.27 failure-observation upgrade after the current runtime profile", async () => {
     const before = await admin.query<{ events: string; consumer_failures: string; observations: string; history: string }>(`
       SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
@@ -1954,8 +1954,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const upgrade = await readFile("generated/procurement/postgres/017_upgrade_0_27.sql", "utf8");
     await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
       .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
-    await admin.query(upgrade);
-    await admin.query(upgrade);
+    await expect(admin.query(upgrade))
+      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:27:29" });
     const after = await admin.query<typeof before.rows[number]>(`
       SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
@@ -1966,7 +1966,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
-  it("reapplies the 0.28 failure-acknowledgement upgrade without changing state or fabricating acknowledgement", async () => {
+  it("rejects the 0.28 failure-acknowledgement upgrade after the current runtime profile", async () => {
     const before = await admin.query<{
       events: string; consumer_failures: string; publication_acknowledgements: string;
       consumer_acknowledgements: string; observations: string; history: string;
@@ -1981,8 +1981,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const upgrade = await readFile("generated/procurement/postgres/018_upgrade_0_28.sql", "utf8");
     await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
       .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
-    await admin.query(upgrade);
-    await admin.query(upgrade);
+    await expect(admin.query(upgrade))
+      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:28:29" });
     const after = await admin.query<typeof before.rows[number]>(`SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,

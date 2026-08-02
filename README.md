@@ -420,6 +420,8 @@ The separate `semantic-diff` command is non-mutating and broader than migration 
 
 Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
 
+Private operational upgrades 0.27–0.29 additionally maintain an owner-controlled singleton `runtime_profile`. The profile advances monotonically; applying an older operational artifact after a newer one fails before any runtime function is replaced with `ML_RUNTIME_PROFILE_DOWNGRADE`. Databases created before the ledger was introduced bootstrap it when they apply one of these upgrades.
+
 Changes outside the automatic safe subset use a versioned JSON plan conforming to `schemas/reviewed-migration-plan.schema.json`. `reviewed-migration` requires exact source hashes, acknowledges every non-additive semantic change by stable ID, and supports typed literal/enum/copy-field backfills, scalar enum mappings, and explicitly accepted removals. The plan contains no raw SQL or callback surface. PostgreSQL execution takes offline locks, copies retained data into a deterministic staging schema with all current constraints, validates row counts and references, then replaces the old model schema and records the canonical plan hash in the same transaction. An invalid backfill rolls back before replacement. Version 1 rejects field-type and enum-set transformations, principal/schema replacement, and inferred rollback.
 
 For an existing 0.11 database that is not otherwise receiving a model migration, apply the generated 0.12 backend upgrade with the same administrative credential used for installation:
@@ -528,7 +530,7 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f generated/procurement/postgres/017_upgrade_0_27.sql
 ```
 
-The baseline-checked artifact installs the isolated observer role, immutable private observation audit, bounded keyset functions, indexes, typed server adapter, and least-privilege grants. It is transactional and idempotent and fabricates no observation, recovery, failure, claim, publication, consumer execution, or broker history.
+The baseline-checked artifact installs the isolated observer role, immutable private observation audit, bounded keyset functions, indexes, typed server adapter, and least-privilege grants. It is transactional and idempotent and fabricates no observation, recovery, failure, claim, publication, consumer execution, or broker history. It refuses to replace a runtime already advanced beyond profile 27.
 
 Existing installations can add the private 0.28 terminal-failure acknowledgement boundary without changing failure state:
 
@@ -537,7 +539,7 @@ psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f generated/procurement/postgres/018_upgrade_0_28.sql
 ```
 
-The baseline-checked artifact installs the isolated acknowledger role, immutable per-generation publication and consumer acknowledgement audit, acknowledgement functions, updated private observer projection, typed server adapter, and least-privilege grants. It is transactional and idempotent, preserves all existing state, and fabricates no acknowledgement history.
+The baseline-checked artifact installs the isolated acknowledger role, immutable per-generation publication and consumer acknowledgement audit, acknowledgement functions, updated private observer projection, typed server adapter, and least-privilege grants. It is transactional and idempotent, preserves all existing state, fabricates no acknowledgement history, and refuses to replace a runtime already advanced beyond profile 28.
 
 Existing installations can add the private 0.29 terminal-failure self-claim boundary without changing failure or acknowledgement state:
 

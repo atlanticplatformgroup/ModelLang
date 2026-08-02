@@ -1,4 +1,5 @@
 export interface PostgresRuntimeProfile {
+  readonly runtimeVersion: number;
   readonly applicability: boolean;
   readonly failureObservation: boolean;
   readonly failureAcknowledgement: boolean;
@@ -7,30 +8,35 @@ export interface PostgresRuntimeProfile {
 
 export const POSTGRES_RUNTIME_PROFILES = {
   legacy: {
+    runtimeVersion: 0,
     applicability: false,
     failureObservation: false,
     failureAcknowledgement: false,
     failureClaim: false,
   },
   applicability: {
+    runtimeVersion: 17,
     applicability: true,
     failureObservation: false,
     failureAcknowledgement: false,
     failureClaim: false,
   },
   failureObservation: {
+    runtimeVersion: 27,
     applicability: true,
     failureObservation: true,
     failureAcknowledgement: false,
     failureClaim: false,
   },
   failureAcknowledgement: {
+    runtimeVersion: 28,
     applicability: true,
     failureObservation: true,
     failureAcknowledgement: true,
     failureClaim: false,
   },
   current: {
+    runtimeVersion: 29,
     applicability: true,
     failureObservation: true,
     failureAcknowledgement: true,

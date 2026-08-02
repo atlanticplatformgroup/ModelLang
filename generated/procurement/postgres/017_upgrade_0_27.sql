@@ -31,6 +31,24 @@ BEGIN
   END IF;
 END
 $modellang_upgrade$;
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."runtime_profile" (
+  "singleton" boolean PRIMARY KEY DEFAULT TRUE,
+  "profile_version" integer NOT NULL,
+  CONSTRAINT "ck_runtime_profile_singleton" CHECK ("singleton"),
+  CONSTRAINT "ck_runtime_profile_version" CHECK ("profile_version" >= 0)
+);
+LOCK TABLE "model_procurement_internal"."runtime_profile" IN EXCLUSIVE MODE;
+DO $modellang_runtime_profile$
+DECLARE
+  v_profile_version integer;
+BEGIN
+  SELECT "profile_version" INTO v_profile_version
+  FROM "model_procurement_internal"."runtime_profile" WHERE "singleton" FOR UPDATE;
+  IF FOUND AND v_profile_version > 27 THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_RUNTIME_PROFILE_DOWNGRADE:27:' || v_profile_version;
+  END IF;
+END
+$modellang_runtime_profile$;
 CREATE TABLE IF NOT EXISTS "model_procurement_internal"."failure_observation_audit" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "database_principal" name NOT NULL,
@@ -150,6 +168,10 @@ BEGIN
   RETURN v_result;
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."observe_terminal_consumers"(timestamptz, timestamptz, text, uuid, integer) FROM PUBLIC;
+INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version")
+VALUES (TRUE, 27)
+ON CONFLICT ("singleton") DO UPDATE
+SET "profile_version" = GREATEST("model_procurement_internal"."runtime_profile"."profile_version", EXCLUDED."profile_version");
 RESET ROLE;
 
 -- Generated least-privilege application boundary.

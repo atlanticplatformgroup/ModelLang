@@ -14,7 +14,7 @@ import {
   POSTGRES_RUNTIME_PROFILES,
   type PostgresRuntimeProfile,
 } from "./postgres-runtime.js";
-import { generateUpgradeBaselineCheck } from "./postgres-upgrades.js";
+import { generateRuntimeProfileAdvance, generateRuntimeProfileGuard, generateUpgradeBaselineCheck } from "./postgres-upgrades.js";
 
 export {
   generateConsumerRoleStatements,
@@ -1526,6 +1526,14 @@ function generateSchema(ir: ModelIR): string {
     ...generateFailureClaimInfrastructureStatements(ir),
     ...generateFailureObserverInfrastructureStatements(ir),
     "",
+    `CREATE TABLE ${qname(internal, "runtime_profile")} (`,
+    `  ${quoteIdent("singleton")} boolean PRIMARY KEY DEFAULT TRUE,`,
+    `  ${quoteIdent("profile_version")} integer NOT NULL,`,
+    `  CONSTRAINT ${quoteIdent("ck_runtime_profile_singleton")} CHECK (${quoteIdent("singleton")}),`,
+    `  CONSTRAINT ${quoteIdent("ck_runtime_profile_version")} CHECK (${quoteIdent("profile_version")} >= 0)`,
+    ");",
+    `INSERT INTO ${qname(internal, "runtime_profile")} (${quoteIdent("singleton")}, ${quoteIdent("profile_version")}) VALUES (TRUE, ${POSTGRES_RUNTIME_PROFILES.current.runtimeVersion});`,
+    "",
     `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
     `  ${quoteIdent("model_id")} text NOT NULL,`,
@@ -2811,7 +2819,9 @@ BEGIN;
 ${generateFailureObserverRoleStatements()}
 SET LOCAL ROLE modellang_owner;
 ${generateUpgradeBaselineCheck(ir)}
+${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureObservation.runtimeVersion)}
 ${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureObservation).join("\n")}
+${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureObservation.runtimeVersion)}
 RESET ROLE;
 
 ${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureObservation).trim()}
@@ -2826,8 +2836,10 @@ BEGIN;
 ${generateFailureAcknowledgerRoleStatements()}
 SET LOCAL ROLE modellang_owner;
 ${generateUpgradeBaselineCheck(ir)}
+${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement.runtimeVersion)}
 ${generateFailureAcknowledgementInfrastructureStatements(ir).join("\n")}
 ${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement).join("\n")}
+${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement.runtimeVersion)}
 RESET ROLE;
 
 ${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement).trim()}
@@ -2842,8 +2854,10 @@ BEGIN;
 ${generateFailureClaimantRoleStatements()}
 SET LOCAL ROLE modellang_owner;
 ${generateUpgradeBaselineCheck(ir)}
+${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
 ${generateFailureClaimInfrastructureStatements(ir).join("\n")}
 ${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.current).join("\n")}
+${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
 RESET ROLE;
 
 ${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.current).trim()}

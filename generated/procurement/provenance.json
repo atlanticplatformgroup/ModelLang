@@ -64,7 +64,7 @@
     {
       "path": "postgres/002_schema.sql",
       "role": "projection",
-      "sha256": "sha256:2194673be70f663fb8f4b3e9dff894432ff9e9bfdca99864c3184d983a681b3b"
+      "sha256": "sha256:97233c27817aea8545d7f5536d9b4600ea02799d58d8e79623be302741869e4f"
     },
     {
       "path": "postgres/003_actions.sql",
@@ -154,17 +154,17 @@
     {
       "path": "postgres/017_upgrade_0_27.sql",
       "role": "projection",
-      "sha256": "sha256:a3c5843e2d8a32c417d95e50c3f68d294cad9a26334768af7fcf53b98f16f781"
+      "sha256": "sha256:285644cb9994414434adb65fc163bc0b0325d332f77ac66c4ecf7cb4e337e976"
     },
     {
       "path": "postgres/018_upgrade_0_28.sql",
       "role": "projection",
-      "sha256": "sha256:ab518093f4af333e23e4d2c9cc44ec8adfeef5242c95ba4356daf9d4870e359c"
+      "sha256": "sha256:076c36d750910a1a6d977c33cb6255dd0fca612164b76dcc8964068be5dc4ca3"
     },
     {
       "path": "postgres/019_upgrade_0_29.sql",
       "role": "projection",
-      "sha256": "sha256:a64be756b64c11547bf5210a98b26bf527ee2a00e89e2e23fce895f04eeb05f0"
+      "sha256": "sha256:737d334d03b5a945257d4d12cd7b0c08eecf435ee6764a57ea2afaa70c9bfd09"
     },
     {
       "path": "semantic.json",

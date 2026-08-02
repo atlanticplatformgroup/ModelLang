@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
+- Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
+
 ## 0.29.0
 
 - Added a separate non-login `modellang_failure_claimant` role with execute-only publication and consumer terminal-failure claim functions and no observation, acknowledgement, recovery, dispatch, consumer, application, query, or table authority.

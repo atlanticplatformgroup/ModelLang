@@ -1049,6 +1049,14 @@ BEGIN
 END $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."observe_terminal_consumers"(timestamptz, timestamptz, text, uuid, integer) FROM PUBLIC;
 
+CREATE TABLE "model_procurement_internal"."runtime_profile" (
+  "singleton" boolean PRIMARY KEY DEFAULT TRUE,
+  "profile_version" integer NOT NULL,
+  CONSTRAINT "ck_runtime_profile_singleton" CHECK ("singleton"),
+  CONSTRAINT "ck_runtime_profile_version" CHECK ("profile_version" >= 0)
+);
+INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 29);
+
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "model_id" text NOT NULL,
