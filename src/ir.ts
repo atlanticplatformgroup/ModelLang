@@ -198,7 +198,7 @@ export interface IRConsumer {
   preconditions: IRRule[];
   failurePolicy:
     | { mode: "unboundedRetry" }
-    | { mode: "deadLetterAfterMaxAttempts"; maxAttempts: number };
+    | { mode: "deadLetterAfterMaxAttempts"; maxAttempts: number; recovery: "none" | "manual" };
   effect: IREffect;
   emittedEventIds: string[];
   lockPlan: IRLock[];
@@ -271,7 +271,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 15;
+  irVersion: 16;
   model: {
     id: string;
     name: string;

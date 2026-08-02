@@ -330,6 +330,14 @@ class Parser {
       retry = { maxAttempts: Number(maximum.value), span: this.span(retryStart, retryEnd) };
       if (this.atWord("retry")) this.fail("E1140", "A consumer may declare at most one retry policy.");
     }
+    let recovery: ConsumerDecl["recovery"];
+    if (this.atWord("recovery")) {
+      const recoveryStart = this.take();
+      this.expectWord("manual");
+      const recoveryEnd = this.expect(";");
+      recovery = { mode: "manual", span: this.span(recoveryStart, recoveryEnd) };
+      if (this.atWord("recovery")) this.fail("E1141", "A consumer may declare at most one recovery policy.");
+    }
     const effect = this.parseEffect();
     const emits: ConsumerDecl["emits"] = [];
     while (this.atWord("emit")) {
@@ -351,6 +359,7 @@ class Parser {
       authorize,
       requires,
       retry,
+      recovery,
       effect,
       emits,
       span: this.span(start, end),

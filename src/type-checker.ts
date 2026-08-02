@@ -204,7 +204,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 15,
+    irVersion: 16,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -857,9 +857,18 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
           if (!Number.isInteger(consumer.retry.maxAttempts) || consumer.retry.maxAttempts < 1 || consumer.retry.maxAttempts > 1000) {
             throw new ModelError("E3401", "Consumer retry maxAttempts must be an integer from 1 through 1000.", consumer.retry.span, file);
           }
-          return { mode: "deadLetterAfterMaxAttempts" as const, maxAttempts: consumer.retry.maxAttempts };
+          return {
+            mode: "deadLetterAfterMaxAttempts" as const,
+            maxAttempts: consumer.retry.maxAttempts,
+            recovery: consumer.recovery?.mode ?? "none" as const,
+          };
         })()
-      : { mode: "unboundedRetry" as const },
+      : (() => {
+          if (consumer.recovery) {
+            throw new ModelError("E3501", "Manual consumer recovery requires a bounded retry maxAttempts policy.", consumer.recovery.span, file);
+          }
+          return { mode: "unboundedRetry" as const };
+        })(),
     effect: { kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
     emittedEventIds,
     lockPlan: consumer.effect.kind === "update"
@@ -1418,6 +1427,12 @@ function buildEnforcement(
     artifact: "postgres/001_roles.sql",
     objectName: "modellang_consumer NOLOGIN",
   }, {
+    id: "boundary:recovery_role",
+    purpose: "Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access.",
+    layer: "PostgreSQL role",
+    artifact: "postgres/001_roles.sql",
+    objectName: "modellang_recovery NOLOGIN",
+  }, {
     id: "boundary:dispatcher_role",
     purpose: "Confine event delivery leasing and acknowledgement to a dedicated non-login dispatcher role.",
     layer: "PostgreSQL role",
@@ -1568,6 +1583,14 @@ function buildEnforcement(
       layer: "PostgreSQL consumer failure state",
       artifact: "postgres/002_schema.sql",
       objectName: `${internalSchema}.consumer_failure`,
+      source: consumer.span,
+    });
+    if (consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts" && consumer.failurePolicy.recovery === "manual") entries.push({
+      id: `recovery-policy:${consumer.id}`,
+      purpose: "Permit only isolated, audited manual reopening of durable terminal failure without invoking the handler or mutating broker state.",
+      layer: "PostgreSQL consumer recovery",
+      artifact: "postgres/002_schema.sql",
+      objectName: `${internalSchema}.consumer_recovery_audit`,
       source: consumer.span,
     });
     for (const eventId of consumer.emittedEventIds) {

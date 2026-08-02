@@ -1,0 +1,9 @@
+program             = modelDeclaration, { declaration } ;
+consumerDeclaration = "consumer", identifier, [ stableId ], "on", identifier,
+                      "(", "payload", identifier, ":", type, ")", "->", type, "{",
+                      "authorize", expression, ";", { requirement }, [ retryPolicy ],
+                      [ recoveryPolicy ], effect, { "emit", identifier, ";" }, "}" ;
+retryPolicy         = "retry", "maxAttempts", integer, ";" ;
+recoveryPolicy      = "recovery", "manual", ";" ;
+
+(* Productions not replaced above are inherited from ModelLang 0.23. *)

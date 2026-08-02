@@ -43,9 +43,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 8;
+  diffVersion: 9;
   compilerVersion: string;
-  irVersion: 15;
+  irVersion: 16;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -68,6 +68,11 @@ function same(left: unknown, right: unknown): boolean {
 
 function text(value: unknown): string {
   return JSON.stringify(normalized(value));
+}
+
+function normalizedConsumerFailurePolicy(policy: IRConsumer["failurePolicy"] | undefined): IRConsumer["failurePolicy"] {
+  if (!policy || policy.mode === "unboundedRetry") return { mode: "unboundedRetry" };
+  return { ...policy, recovery: policy.recovery ?? "none" };
 }
 
 function subject(kind: string, value: { id: string; name: string }): SemanticChange["subject"] {
@@ -135,10 +140,12 @@ function compareConsumers(changes: SemanticChange[], previous: IRConsumer[], cur
       subject: subject("consumer", pair.current), before: text(pair.previous.emittedEventIds ?? []), after: text(pair.current.emittedEventIds),
       persistenceRisk: true, explanation: "The consumer's ordered downstream durable-event effect changed.",
     });
-    if (!same(pair.previous.failurePolicy ?? { mode: "unboundedRetry" }, pair.current.failurePolicy)) addChange(changes, {
+    const previousFailurePolicy = normalizedConsumerFailurePolicy(pair.previous.failurePolicy);
+    const currentFailurePolicy = normalizedConsumerFailurePolicy(pair.current.failurePolicy);
+    if (!same(previousFailurePolicy, currentFailurePolicy)) addChange(changes, {
       kind: "consumerFailurePolicyChanged", area: "executionReliability", classification: "review",
-      subject: subject("consumer", pair.current), before: text(pair.previous.failurePolicy ?? { mode: "unboundedRetry" }), after: text(pair.current.failurePolicy),
-      persistenceRisk: true, explanation: "The consumer's durable retry and terminal delivery disposition changed.",
+      subject: subject("consumer", pair.current), before: text(previousFailurePolicy), after: text(currentFailurePolicy),
+      persistenceRisk: true, explanation: "The consumer's durable retry, terminal disposition, or recovery policy changed.",
     });
   }
 }
@@ -577,7 +584,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 8,
+    diffVersion: 9,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

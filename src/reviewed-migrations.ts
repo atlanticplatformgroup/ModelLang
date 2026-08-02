@@ -10,6 +10,7 @@ import {
   generateEventOutboxInfrastructureStatements,
   generateEventInboxInfrastructureStatements,
   generateConsumerRoleStatements,
+  generateRecoveryRoleStatements,
   generateDispatcherRoleStatements,
   generateGatewayRoleStatements,
   generatePostgres,
@@ -367,7 +368,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11, 12, 13, 14, 15].includes(Number(previous.irVersion)) || current.irVersion !== 15) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11/IR12/IR13/IR14/IR15 baseline and canonical IR15 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16].includes(Number(previous.irVersion)) || current.irVersion !== 16) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9/IR10/IR11/IR12/IR13/IR14/IR15/IR16 baseline and canonical IR16 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -481,6 +482,7 @@ export function planReviewedMigration(
     generateGatewayRoleStatements(),
     generateDispatcherRoleStatements(),
     generateConsumerRoleStatements(),
+    generateRecoveryRoleStatements(),
     "SET LOCAL ROLE modellang_owner;",
     ...historyBootstrapStatements(previous, current),
     ...(lockTargets.length ? [`LOCK TABLE ${lockTargets.join(", ")} IN ACCESS EXCLUSIVE MODE;`] : []),

@@ -1,10 +1,10 @@
 {
-  "irVersion": 15,
+  "irVersion": 16,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.23.0",
-    "sourceHash": "sha256:80fbd2d1c323960f6c3521d8607e6669048353cd3f6055a75a43d8eea765dc17",
+    "version": "0.24.0",
+    "sourceHash": "sha256:391031742f2fcba36e9422fb648c8bc16ab7cb8b2ec934184e3150ada90ff9ee",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1954,7 +1954,8 @@
       ],
       "failurePolicy": {
         "mode": "deadLetterAfterMaxAttempts",
-        "maxAttempts": 3
+        "maxAttempts": 3,
+        "recovery": "manual"
       },
       "effect": {
         "kind": "update",
@@ -1996,7 +1997,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 139,
+        "endLine": 140,
         "endColumn": 2
       },
       "naming": {
@@ -2022,9 +2023,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 150,
+            "line": 151,
             "column": 3,
-            "endLine": 150,
+            "endLine": 151,
             "endColumn": 21
           },
           "naming": {
@@ -2049,9 +2050,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 152,
+          "line": 153,
           "column": 13,
-          "endLine": 152,
+          "endLine": 153,
           "endColumn": 17
         }
       },
@@ -2085,9 +2086,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 153,
+          "line": 154,
           "column": 9,
-          "endLine": 153,
+          "endLine": 154,
           "endColumn": 35
         }
       },
@@ -2099,9 +2100,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 150,
         "column": 1,
-        "endLine": 156,
+        "endLine": 157,
         "endColumn": 2
       },
       "naming": {
@@ -2135,9 +2136,9 @@
           "actionId": "action:act_ed2374e822704c51a2925338253d05d2",
           "span": {
             "file": "examples/procurement.model",
-            "line": 143,
+            "line": 144,
             "column": 3,
-            "endLine": 144,
+            "endLine": 145,
             "endColumn": 69
           }
         },
@@ -2153,18 +2154,18 @@
           "actionId": "action:act_d39dbb883b5f4019b9027b85add3de47",
           "span": {
             "file": "examples/procurement.model",
-            "line": 145,
+            "line": 146,
             "column": 3,
-            "endLine": 146,
+            "endLine": 147,
             "endColumn": 73
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 141,
+        "line": 142,
         "column": 1,
-        "endLine": 147,
+        "endLine": 148,
         "endColumn": 2
       },
       "naming": {
@@ -2189,6 +2190,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_consumer NOLOGIN"
+    },
+    {
+      "id": "boundary:recovery_role",
+      "purpose": "Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_recovery NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
@@ -3117,7 +3125,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 139,
+        "endLine": 140,
         "endColumn": 2
       }
     },
@@ -3131,7 +3139,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 139,
+        "endLine": 140,
         "endColumn": 2
       }
     },
@@ -3145,7 +3153,21 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 139,
+        "endLine": 140,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "recovery-policy:consumer:con_10d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Permit only isolated, audited manual reopening of durable terminal failure without invoking the handler or mutating broker state.",
+      "layer": "PostgreSQL consumer recovery",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_procurement_internal.consumer_recovery_audit",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 128,
+        "column": 1,
+        "endLine": 140,
         "endColumn": 2
       }
     },
@@ -3159,7 +3181,7 @@
         "file": "examples/procurement.model",
         "line": 128,
         "column": 1,
-        "endLine": 139,
+        "endLine": 140,
         "endColumn": 2
       }
     },
@@ -3171,9 +3193,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 151,
         "column": 3,
-        "endLine": 150,
+        "endLine": 151,
         "endColumn": 21
       }
     },
@@ -3192,9 +3214,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 152,
+        "line": 153,
         "column": 13,
-        "endLine": 152,
+        "endLine": 153,
         "endColumn": 17
       }
     },
@@ -3206,9 +3228,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 153,
+        "line": 154,
         "column": 9,
-        "endLine": 153,
+        "endLine": 154,
         "endColumn": 35
       }
     },
@@ -3220,9 +3242,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 150,
         "column": 1,
-        "endLine": 156,
+        "endLine": 157,
         "endColumn": 2
       }
     },
@@ -3234,9 +3256,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 150,
         "column": 1,
-        "endLine": 156,
+        "endLine": 157,
         "endColumn": 2
       }
     },
@@ -3248,9 +3270,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 150,
         "column": 1,
-        "endLine": 156,
+        "endLine": 157,
         "endColumn": 2
       }
     },
@@ -3262,9 +3284,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 141,
+        "line": 142,
         "column": 1,
-        "endLine": 147,
+        "endLine": 148,
         "endColumn": 2
       }
     },
@@ -3276,9 +3298,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 143,
+        "line": 144,
         "column": 3,
-        "endLine": 144,
+        "endLine": 145,
         "endColumn": 69
       }
     },
@@ -3290,9 +3312,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 145,
+        "line": 146,
         "column": 3,
-        "endLine": 146,
+        "endLine": 147,
         "endColumn": 73
       }
     },

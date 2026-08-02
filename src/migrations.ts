@@ -12,6 +12,7 @@ import {
   generateEventOutboxInfrastructureStatements,
   generateEventInboxInfrastructureStatements,
   generateConsumerRoleStatements,
+  generateRecoveryRoleStatements,
   generateDispatcherRoleStatements,
   generateGatewayInfrastructureStatements,
   generateGatewayRoleStatements,
@@ -173,8 +174,11 @@ function actionStructure(action: IRAction): unknown {
 }
 
 function consumerStructure(consumer: IRConsumer): unknown {
-  const { name: _name, identity: _identity, ...structure } = consumer;
-  return structure;
+  const { name: _name, identity: _identity, failurePolicy, ...structure } = consumer;
+  const normalizedFailurePolicy = failurePolicy?.mode === "deadLetterAfterMaxAttempts"
+    ? { ...failurePolicy, recovery: failurePolicy.recovery ?? "none" }
+    : failurePolicy ?? { mode: "unboundedRetry" };
+  return { ...structure, failurePolicy: normalizedFailurePolicy };
 }
 
 function policyStructure(policy: IRPolicy): unknown {
@@ -369,8 +373,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15].includes(Number(previous.irVersion)) || current.irVersion !== 15) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12/IR13/IR14/IR15 baseline and canonical IR15 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16].includes(Number(previous.irVersion)) || current.irVersion !== 16) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9/IR10/IR11/IR12/IR13/IR14/IR15/IR16 baseline and canonical IR16 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -748,6 +752,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     generateGatewayRoleStatements(),
     generateDispatcherRoleStatements(),
     generateConsumerRoleStatements(),
+    generateRecoveryRoleStatements(),
     ...(entityDiff.added.some((entity) => entity.temporalExclusions.length > 0)
       ? ["CREATE EXTENSION IF NOT EXISTS btree_gist;"]
       : []),

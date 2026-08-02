@@ -164,6 +164,7 @@ export interface ConsumerDecl {
   authorize: Expression;
   requires: RequireDecl[];
   retry?: { maxAttempts: number; span: Span };
+  recovery?: { mode: "manual"; span: Span };
   effect: Effect;
   emits: { eventName: string; span: Span }[];
   span: Span;

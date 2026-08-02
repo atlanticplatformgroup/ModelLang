@@ -5,6 +5,9 @@ import type { PurchaseRequest } from "./types.js";
 export interface ConsumerDatabaseClient {
   query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
 }
+export interface ConsumerRecoveryDatabaseClient {
+  query<Row = unknown>(text: string, values?: unknown[]): Promise<{ rows: Row[] }>;
+}
 
 export type ConsumerDeliveryFailure = {
   readonly status: "retry" | "deadLetter";
@@ -14,6 +17,9 @@ export type ConsumerDeliveryFailure = {
   readonly maxAttempts: number | null;
 };
 export type ConsumerDeliveryOutcome<Result> = { readonly status: "consumed"; readonly result: Result } | ConsumerDeliveryFailure;
+export type ConsumerRecoveryOutcome =
+  | { readonly status: "recovered"; readonly recovered: true; readonly recoveryGeneration: number; readonly priorFailureCount: number; readonly totalFailureCount: number }
+  | { readonly status: "alreadyConsumed"; readonly recovered: false };
 type ConsumerFailureRecord = ConsumerDeliveryFailure | { readonly status: "ready" | "ignoredCommitted"; readonly recorded?: boolean; readonly errorCode?: string; readonly failureCount?: number | null; readonly maxAttempts?: number | null };
 
 function privateFailureCode(error: unknown): string {
@@ -62,4 +68,10 @@ export async function deliverObserveRequestApproval(client: ConsumerDatabaseClie
     } catch { /* A terminal disposition is never inferred when durable recording fails. */ }
     return { status: "retry", recorded: false, errorCode, failureCount: null, maxAttempts: 3 };
   }
+}
+
+export async function recoverObserveRequestApproval(client: ConsumerRecoveryDatabaseClient, eventId: string, reasonCode: string): Promise<ConsumerRecoveryOutcome> {
+  const response = await client.query<{ result: ConsumerRecoveryOutcome }>("SELECT \"model_procurement_internal\".\"recover_consumer_failure\"($1, $2, $3) AS result", ["consumer:con_10d694c9a0a274dc79c6168e47d25968", eventId, reasonCode]);
+  if (response.rows.length !== 1) throw new Error("ML_CONSUMER_RECOVERY_PROTOCOL");
+  return response.rows[0]!.result;
 }

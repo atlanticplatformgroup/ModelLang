@@ -1,4 +1,4 @@
-model Reservations version "0.23.0";
+model Reservations version "0.24.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");
@@ -51,6 +51,7 @@ consumer indexReservation @stableId("con_20d694c9a0a274dc79c6168e47d25968") on R
   authorize true;
   require valid_interval: reservation.startsAt < reservation.endsAt;
   retry maxAttempts 3;
+  recovery manual;
 
   update reservation {
     indexed = true;

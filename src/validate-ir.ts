@@ -24,17 +24,17 @@ export function validateIR(ir: ModelIR): void {
 export function validateEvolutionIR(ir: ModelIR): void {
   const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
   const irVersion = Number(legacy.irVersion);
-  if (![9, 10, 11, 12, 13, 14, 15].includes(irVersion)) {
+  if (![9, 10, 11, 12, 13, 14, 15, 16].includes(irVersion)) {
     throw new ModelError(
       "E3002",
-      `Evolution input must use released canonical IR9, IR10, IR11, IR12, IR13, IR14, or IR15; received '${String(legacy.irVersion)}'.`,
+      `Evolution input must use released canonical IR9, IR10, IR11, IR12, IR13, IR14, IR15, or IR16; received '${String(legacy.irVersion)}'.`,
       internalSpan(),
       ir.model?.sourceFile,
     );
   }
   const normalized = {
     ...(ir as unknown as Record<string, unknown>),
-    irVersion: 15,
+    irVersion: 16,
     ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
     ...(irVersion < 12 && (legacy as { events?: unknown }).events === undefined ? { events: [] } : {}),
     ...(irVersion < 13 ? { consumers: [] } : {}),
@@ -46,11 +46,18 @@ export function validateEvolutionIR(ir: ModelIR): void {
       ...action,
       ...(irVersion < 12 && !("emittedEventIds" in action) ? { emittedEventIds: [] } : {}),
     })),
-    consumers: ((ir as unknown as { consumers?: ModelIR["consumers"] }).consumers ?? []).map((consumer) => ({
-      ...consumer,
-      ...(irVersion < 14 && !("emittedEventIds" in consumer) ? { emittedEventIds: [] } : {}),
-      ...(irVersion < 15 && !("failurePolicy" in consumer) ? { failurePolicy: { mode: "unboundedRetry" as const } } : {}),
-    })),
+    consumers: ((ir as unknown as { consumers?: ModelIR["consumers"] }).consumers ?? []).map((consumer) => {
+      const failurePolicy = irVersion < 15 && !("failurePolicy" in consumer)
+        ? { mode: "unboundedRetry" as const }
+        : consumer.failurePolicy.mode === "deadLetterAfterMaxAttempts"
+          ? { ...consumer.failurePolicy, recovery: consumer.failurePolicy.recovery ?? "none" as const }
+          : consumer.failurePolicy;
+      return {
+        ...consumer,
+        ...(irVersion < 14 && !("emittedEventIds" in consumer) ? { emittedEventIds: [] } : {}),
+        failurePolicy,
+      };
+    }),
   } as unknown as ModelIR;
   validateIR(normalized);
 }

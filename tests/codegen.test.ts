@@ -181,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 7,
+      manifestVersion: 8,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 15 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 16 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -224,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 15 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 16 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -630,7 +630,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.23.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.24.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -676,13 +676,16 @@ describe("backends", () => {
     expect(semantic.consumers).toEqual([expect.objectContaining({
       name: "observeRequestApproval",
       emittedEventIds: ["event:evt_50d694c9a0a274dc79c6168e47d25968"],
-      failurePolicy: { mode: "deadLetterAfterMaxAttempts", maxAttempts: 3 },
+      failurePolicy: { mode: "deadLetterAfterMaxAttempts", maxAttempts: 3, recovery: "manual" },
     })]);
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json"]) {
       expect(output[publicArtifact]).not.toContain("observeRequestApproval");
       expect(output[publicArtifact]).not.toContain("event_inbox");
+      expect(output[publicArtifact]).not.toContain("consumer_recovery");
+      expect(output[publicArtifact]).not.toContain("recoveryGeneration");
     }
     expect(output["postgres/001_roles.sql"]).toContain("modellang_consumer NOLOGIN");
+    expect(output["postgres/001_roles.sql"]).toContain("modellang_recovery NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_inbox"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_audit"');
     expect(output["postgres/003_consumers.sql"]).toContain('ON CONFLICT ("consumer_id", "source_event_id") DO NOTHING');
@@ -698,13 +701,17 @@ describe("backends", () => {
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."consume_observe_request_approval"');
     expect(output["typescript/consumers.ts"]).toContain("consumeObserveRequestApproval");
     expect(output["typescript/consumers.ts"]).toContain("deliverObserveRequestApproval");
+    expect(output["typescript/consumers.ts"]).toContain("recoverObserveRequestApproval");
     expect(output["typescript/consumers.ts"]).toContain('status: "retry" | "deadLetter"');
     expect(output["typescript/consumers.ts"]).toContain("record_consumer_failure");
     expect(output["postgres/011_upgrade_0_21.sql"]).toContain("reliable typed event-consumer upgrade");
     expect(output["postgres/012_upgrade_0_22.sql"]).toContain("transactional event-chain upgrade");
     expect(output["postgres/013_upgrade_0_23.sql"]).toContain("durable consumer-failure disposition upgrade");
+    expect(output["postgres/014_upgrade_0_24.sql"]).toContain("private audited consumer-recovery upgrade");
     expect(output["postgres/002_schema.sql"]).toContain('"disposition" text NOT NULL DEFAULT \'retry\'');
     expect(output["postgres/002_schema.sql"]).toContain('"consumer_failure_state"');
+    expect(output["postgres/002_schema.sql"]).toContain('"consumer_recovery_audit"');
+    expect(output["postgres/002_schema.sql"]).toContain('"recover_consumer_failure"');
     expect(output["model.mmd"]).toContain("consumer_con_10d694c9a0a274dc79c6168e47d25968 -->|emits atomically| event_evt_50d694c9a0a274dc79c6168e47d25968");
 
     const eventManifest = JSON.parse(output["events.json"]!) as { delivery: { envelopeVersion: number }; events: { name: string; emittedByConsumerIds: string[] }[] };

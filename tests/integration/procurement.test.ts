@@ -11,7 +11,7 @@ import {
   type ProcurementAuthenticator,
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
-import { consumeObserveRequestApproval, deliverObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
+import { consumeObserveRequestApproval, deliverObserveRequestApproval, recoverObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
 import type { RequestApprovedEvent } from "../../generated/procurement/typescript/events.js";
 import {
   createProcurementUiExecutor,
@@ -37,6 +37,7 @@ const clients = {
 let admin: Pool;
 let gateway: Pool;
 let consumer: Pool;
+let recovery: Pool;
 
 function usd(amount: string): { currency: "USD"; amount: string } {
   return { currency: "USD", amount };
@@ -98,7 +99,8 @@ beforeAll(async () => {
   const unbound = poolFor("ml_unbound");
   gateway = new Pool({ connectionString: loginUrl("ml_gateway"), max: 1 });
   consumer = poolFor("ml_consumer");
-  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer);
+  recovery = poolFor("ml_recovery");
+  pools.push(employeeOne, employeeTwo, manager, finance, unbound, gateway, consumer, recovery);
   clients.employeeOne = new ProcurementClient(employeeOne);
   clients.employeeTwo = new ProcurementClient(employeeTwo);
   clients.manager = new ProcurementClient(manager);
@@ -199,7 +201,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.23.0",
+      model_version: "0.24.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -359,7 +361,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.23.0', $1,
+        VALUES ('model:Procurement', '0.24.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -492,6 +494,105 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(state.rows[0]).toEqual({ observed: false, failures: "3", disposition: "deadLetter", inboxes: "0", audits: "0", downstream: "0" });
     await expect(consumer.query("SELECT * FROM model_procurement_internal.consumer_failure"))
       .rejects.toMatchObject({ code: "42501" });
+  });
+
+  it("reopens terminal failure through isolated audited manual recovery", async () => {
+    const request = await submittedRequest("88");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const invalid = { ...envelope, payload: { ...envelope.payload, status: "SUBMITTED" as const } };
+    for (const deliveryAttempt of [1, 2, 3]) {
+      await deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt });
+    }
+
+    await expect(consumer.query(
+      "SELECT model_procurement_internal.recover_consumer_failure($1, $2, $3)",
+      ["consumer:con_10d694c9a0a274dc79c6168e47d25968", envelope.id, "OPERATOR_REVIEWED"],
+    )).rejects.toMatchObject({ code: "42501" });
+    await expect(recovery.query("SELECT * FROM model_procurement_internal.consumer_recovery_audit"))
+      .rejects.toMatchObject({ code: "42501" });
+    await expect(recovery.query(
+      "SELECT model_procurement_internal.consume_observe_request_approval($1::jsonb)",
+      [envelope],
+    )).rejects.toMatchObject({ code: "42501" });
+
+    await expect(recoverObserveRequestApproval(recovery, envelope.id, "OPERATOR_REVIEWED")).resolves.toEqual({
+      status: "recovered",
+      recovered: true,
+      recoveryGeneration: 1,
+      priorFailureCount: 3,
+      totalFailureCount: 3,
+    });
+    await expect(deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt: 4 })).resolves.toMatchObject({
+      status: "retry",
+      failureCount: 1,
+    });
+    await expect(deliverObserveRequestApproval(consumer, { ...envelope, deliveryAttempt: 5 })).resolves.toMatchObject({
+      status: "consumed",
+      result: { id: request, approvalObserved: true },
+    });
+    await expect(recoverObserveRequestApproval(recovery, envelope.id, "POST_SUCCESS_CHECK")).resolves.toEqual({
+      status: "alreadyConsumed",
+      recovered: false,
+    });
+
+    const state = await admin.query<{
+      disposition: string; cycle_failures: string; total_failures: string; generation: string;
+      audits: string; reason: string; operator: string; downstream: string;
+    }>(`
+      SELECT failure.disposition, failure.failure_count::text AS cycle_failures,
+        failure.total_failure_count::text AS total_failures, failure.recovery_generation::text AS generation,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_recovery_audit
+         WHERE consumer_id = failure.consumer_id AND source_event_id = failure.source_event_id) AS audits,
+        (SELECT reason_code FROM model_procurement_internal.consumer_recovery_audit
+         WHERE consumer_id = failure.consumer_id AND source_event_id = failure.source_event_id) AS reason,
+        (SELECT database_principal::text FROM model_procurement_internal.consumer_recovery_audit
+         WHERE consumer_id = failure.consumer_id AND source_event_id = failure.source_event_id) AS operator,
+        (SELECT count(*)::text FROM model_procurement_internal.event_outbox
+         WHERE target_id = $1 AND event_id = 'event:evt_50d694c9a0a274dc79c6168e47d25968') AS downstream
+      FROM model_procurement_internal.consumer_failure AS failure
+      WHERE failure.consumer_id = 'consumer:con_10d694c9a0a274dc79c6168e47d25968'
+        AND failure.source_event_id = $2::text
+    `, [request, envelope.id]);
+    expect(state.rows[0]).toEqual({
+      disposition: "resolved",
+      cycle_failures: "1",
+      total_failures: "4",
+      generation: "1",
+      audits: "1",
+      reason: "OPERATOR_REVIEWED",
+      operator: "ml_recovery",
+      downstream: "1",
+    });
+  });
+
+  it("rolls back recovery state and audit together", async () => {
+    const request = await submittedRequest("89");
+    await clients.manager.approveRequest({ request });
+    const envelope = await requestApprovedEnvelope(request);
+    const invalid = { ...envelope, payload: { ...envelope.payload, status: "SUBMITTED" as const } };
+    for (const deliveryAttempt of [1, 2, 3]) {
+      await deliverObserveRequestApproval(consumer, { ...invalid, deliveryAttempt });
+    }
+    const connection = new Client({ connectionString: loginUrl("ml_recovery") });
+    await connection.connect();
+    try {
+      await connection.query("BEGIN");
+      await recoverObserveRequestApproval(connection, envelope.id, "ROLLBACK_TEST");
+      await connection.query("ROLLBACK");
+    } finally {
+      await connection.end();
+    }
+    const state = await admin.query<{ disposition: string; failures: string; generation: string; audits: string }>(`
+      SELECT failure.disposition, failure.failure_count::text AS failures,
+        failure.recovery_generation::text AS generation,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_recovery_audit
+         WHERE consumer_id = failure.consumer_id AND source_event_id = failure.source_event_id) AS audits
+      FROM model_procurement_internal.consumer_failure AS failure
+      WHERE failure.consumer_id = 'consumer:con_10d694c9a0a274dc79c6168e47d25968'
+        AND failure.source_event_id = $1::text
+    `, [envelope.id]);
+    expect(state.rows[0]).toEqual({ disposition: "deadLetter", failures: "3", generation: "0", audits: "0" });
   });
 
   it("resolves durable retry state atomically when a later delivery succeeds", async () => {
@@ -999,6 +1100,29 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       SELECT
         (SELECT count(*)::text FROM model_procurement.purchase_request) AS requests,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS failures,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the transactional 0.24 recovery upgrade without fabricating recovery state", async () => {
+    const before = await admin.query<{ failures: string; recoveries: string; inboxes: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS failures,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_recovery_audit) AS recoveries,
+        (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
+    `);
+    const upgrade = await readFile("generated/procurement/postgres/014_upgrade_0_24.sql", "utf8");
+    await expect(admin.query(upgrade.replace(/sha256:[a-f0-9]{64}/, `sha256:${"0".repeat(64)}`)))
+      .rejects.toMatchObject({ code: "55000", message: expect.stringContaining("ML_MIGRATION_BASELINE:") });
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<{ failures: string; recoveries: string; inboxes: string; history: string }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS failures,
+        (SELECT count(*)::text FROM model_procurement_internal.consumer_recovery_audit) AS recoveries,
         (SELECT count(*)::text FROM model_procurement_internal.event_inbox) AS inboxes,
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);

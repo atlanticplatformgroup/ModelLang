@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.24.0
+
+- Added optional `recovery manual;` on bounded consumers and preserved `none` or `manual` recovery policy in canonical IR16.
+- Added an isolated `modellang_recovery` non-login role with execute-only access; application, gateway, dispatcher, consumer, owner, model-principal, and caller identities grant no recovery authority.
+- Added atomic single-event terminal reopening with shared consumer/event serialization, current-cycle reset, monotonic total failure count, recovery generation, and fail-closed committed-inbox dominance.
+- Added immutable private recovery audit containing stable consumer/event identity, prior counts and bounded error, generation, bounded reason code, authenticated database principal, and occurrence time.
+- Added typed server-only `recover...` adapters while keeping failure/recovery state, operator identities, reason codes, generations, and outcomes out of operation, capability, UI, HTTP, event, and agent-facing contracts.
+- Kept broker polling, acknowledgement, message selection/retrieval, requeue, movement, destinations, and retry timing host-owned; recovery invokes no handler and grants no handler authority.
+- Advanced engineering semantic manifest to v8, semantic diff to v9, and generator profile to `/8`; existing-consumer recovery-policy changes require reviewed acknowledgement.
+- Added IR9–IR15 evolution normalization and baseline-checked idempotent `014_upgrade_0_24.sql` without fabricated recovery, audit, execution, inbox completion, or broker state.
+- Updated Procurement and Reservations with opted-in recovery plus compiler, schema, privacy, cycle, count, audit, rollback, migration, and live PostgreSQL coverage.
+
 ## 0.23.0
 
 - Added optional consumer-local `retry maxAttempts N;` declarations with validated limits from 1 through 1000, preserved in canonical IR15 as bounded or unbounded failure policy.

@@ -243,7 +243,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(15);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(16);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -337,6 +337,36 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
+  it("normalizes IR15 recovery omission and rejects a real recovery-policy change", () => {
+    const source = (version: string, recovery: boolean) => `model RecoveryEvolution version "${version}";
+entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
+  id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+}
+entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
+  id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+  observed: Boolean = false @stableId("fld_cccccccccccccccccccccccccccccccc");
+}
+event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record;
+action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Record {
+  authorize true;
+  create Record { id = id; }
+  emit RecordCreated;
+}
+consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") on RecordCreated(payload record: Record) -> Record {
+  authorize true;
+  retry maxAttempts 3;
+  ${recovery ? "recovery manual;" : ""}
+  update record { observed = true; }
+}`;
+    const previous = compileText(source("1", false));
+    const ir15 = structuredClone(previous) as unknown as { irVersion: number; consumers: { failurePolicy: { recovery?: string } }[] };
+    ir15.irVersion = 15;
+    delete ir15.consumers[0]!.failurePolicy.recovery;
+    expect(() => validateEvolutionIR(ir15 as unknown as typeof previous)).not.toThrow();
+    expect(planMigration(ir15 as unknown as typeof previous, compileText(source("2", false))).operations).toEqual([]);
+    expect(error(() => planMigration(previous, compileText(source("2", true)))).code).toBe("E2807");
+  });
+
   it("plans a new stable consumer as an additive guarded boundary", () => {
     const source = (version: string, consumer: boolean) => `model ConsumerEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -366,10 +396,10 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR14 artifacts as previous baselines for an IR15 migration", () => {
+  it("accepts released IR9 through IR15 artifacts as previous baselines for an IR16 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11, 12, 13, 14]) {
+    for (const irVersion of [9, 10, 11, 12, 13, 14, 15]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
       if (irVersion === 9) delete legacy.policies;
@@ -383,6 +413,11 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
       }
       if (irVersion < 15 && legacy.consumers) {
         for (const consumer of legacy.consumers as Record<string, unknown>[]) delete consumer.failurePolicy;
+      }
+      if (irVersion === 15 && legacy.consumers) {
+        for (const consumer of legacy.consumers as { failurePolicy?: Record<string, unknown> }[]) {
+          if (consumer.failurePolicy?.mode === "deadLetterAfterMaxAttempts") delete consumer.failurePolicy.recovery;
+        }
       }
       expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
       const plan = planMigration(legacy as unknown as typeof previous, current);

@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.23](./spec/0.23/LANGUAGE.md). It retains the complete 0.22 boundary and adds declarative bounded consumer failure policy, private durable failure accounting, and broker-neutral retry/dead-letter dispositions without claiming broker control or exactly-once network delivery.
+The current normative specification is [ModelLang 0.24](./spec/0.24/LANGUAGE.md). It retains the complete 0.23 boundary and adds opt-in isolated manual recovery from durable terminal consumer failure with exact private operator audit, without invoking handlers or controlling broker state.
+
+- [Private audited consumer-recovery semantics](./spec/0.24/CONSUMER_RECOVERY.md)
+- [0.24 grammar additions](./spec/0.24/GRAMMAR.ebnf)
+- [0.24 conformance requirements](./spec/0.24/CONFORMANCE.md)
+- [0.24 unstable recovery boundaries](./spec/0.24/UNSTABLE.md)
 
 - [Durable consumer-failure semantics](./spec/0.23/CONSUMER_FAILURES.md)
 - [0.23 grammar additions](./spec/0.23/GRAMMAR.ebnf)

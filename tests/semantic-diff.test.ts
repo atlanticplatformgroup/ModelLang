@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 8,
-      compilerVersion: "0.23.0",
-      irVersion: 15,
+      diffVersion: 9,
+      compilerVersion: "0.24.0",
+      irVersion: 16,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -186,6 +186,14 @@ ${authorization === null ? "" : `consumer observe @stableId("con_aaaaaaaaaaaaaaa
     expect(semanticDiff(added, compileText(source("3", "true", false, "retry maxAttempts 3;"))).changes).toContainEqual(expect.objectContaining({
       kind: "consumerFailurePolicyChanged",
       area: "executionReliability",
+      classification: "review",
+    }));
+    const bounded = compileText(source("3", "true", false, "retry maxAttempts 3;"));
+    const recoverable = compileText(source("4", "true", false, "retry maxAttempts 3; recovery manual;"));
+    expect(semanticDiff(bounded, recoverable).changes).toContainEqual(expect.objectContaining({
+      kind: "consumerFailurePolicyChanged",
+      before: expect.stringContaining('"recovery":"none"'),
+      after: expect.stringContaining('"recovery":"manual"'),
       classification: "review",
     }));
   });

@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.23.0",
-    "sourceHash": "sha256:c586f8489334a72fbd59eecbd99b85856cd9729a81610b778a9d41dcaa94f122",
+    "version": "0.24.0",
+    "sourceHash": "sha256:d6a54d5d7494d5f46b3b2297830b9a8e759d38f8c3c4092e16e0a5b0ff85d0ae",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -24,6 +24,13 @@
       "layer": "PostgreSQL role",
       "artifact": "postgres/001_roles.sql",
       "objectName": "modellang_consumer NOLOGIN"
+    },
+    {
+      "id": "boundary:recovery_role",
+      "purpose": "Confine opted-in terminal consumer recovery to a dedicated non-login role with execute-only access.",
+      "layer": "PostgreSQL role",
+      "artifact": "postgres/001_roles.sql",
+      "objectName": "modellang_recovery NOLOGIN"
     },
     {
       "id": "boundary:dispatcher_role",
@@ -637,7 +644,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 59,
+        "endLine": 60,
         "endColumn": 2
       }
     },
@@ -651,7 +658,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 59,
+        "endLine": 60,
         "endColumn": 2
       }
     },
@@ -665,7 +672,21 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 59,
+        "endLine": 60,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "recovery-policy:consumer:con_20d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Permit only isolated, audited manual reopening of durable terminal failure without invoking the handler or mutating broker state.",
+      "layer": "PostgreSQL consumer recovery",
+      "artifact": "postgres/002_schema.sql",
+      "objectName": "model_reservations_internal.consumer_recovery_audit",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 48,
+        "column": 1,
+        "endLine": 60,
         "endColumn": 2
       }
     },
@@ -679,7 +700,7 @@
         "file": "examples/reservations.model",
         "line": 48,
         "column": 1,
-        "endLine": 59,
+        "endLine": 60,
         "endColumn": 2
       }
     },
@@ -691,9 +712,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 62,
+        "line": 63,
         "column": 3,
-        "endLine": 62,
+        "endLine": 63,
         "endColumn": 21
       }
     },
@@ -712,9 +733,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 65,
+        "line": 66,
         "column": 13,
-        "endLine": 65,
+        "endLine": 66,
         "endColumn": 17
       }
     },
@@ -726,9 +747,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 66,
+        "line": 67,
         "column": 9,
-        "endLine": 66,
+        "endLine": 67,
         "endColumn": 41
       }
     },
@@ -740,9 +761,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 61,
+        "line": 62,
         "column": 1,
-        "endLine": 69,
+        "endLine": 70,
         "endColumn": 2
       }
     },
@@ -754,9 +775,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 61,
+        "line": 62,
         "column": 1,
-        "endLine": 69,
+        "endLine": 70,
         "endColumn": 2
       }
     },
@@ -768,9 +789,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 61,
+        "line": 62,
         "column": 1,
-        "endLine": 69,
+        "endLine": 70,
         "endColumn": 2
       }
     },
