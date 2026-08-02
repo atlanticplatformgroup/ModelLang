@@ -1,0 +1,7 @@
+program             = modelDeclaration, { declaration } ;
+consumerDeclaration = "consumer", identifier, [ stableId ], "on", identifier,
+                      "(", "payload", identifier, ":", type, ")", "->", type, "{",
+                      "authorize", expression, ";", { requirement }, effect,
+                      { "emit", identifier, ";" }, "}" ;
+
+(* Productions not replaced above are inherited from ModelLang 0.21. *)

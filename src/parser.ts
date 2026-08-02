@@ -322,6 +322,13 @@ class Parser {
       requires.push({ name: requireName.text, expression, span: this.span(requireStart, end) });
     }
     const effect = this.parseEffect();
+    const emits: ConsumerDecl["emits"] = [];
+    while (this.atWord("emit")) {
+      const emitStart = this.take();
+      const eventName = this.identifier("Expected event name after 'emit'.");
+      const emitEnd = this.expect(";");
+      emits.push({ eventName: eventName.text, span: this.span(emitStart, emitEnd) });
+    }
     const end = this.expect("}");
     return {
       kind: "consumer",
@@ -335,6 +342,7 @@ class Parser {
       authorize,
       requires,
       effect,
+      emits,
       span: this.span(start, end),
     };
   }

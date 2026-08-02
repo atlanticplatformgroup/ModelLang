@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.21](./spec/0.21/LANGUAGE.md). It retains the complete 0.20 boundary and adds stable typed event consumers, exact local/imported source contracts, transactional inbox deduplication, committed-result replay, and execute-only broker-neutral handling.
+The current normative specification is [ModelLang 0.22](./spec/0.22/LANGUAGE.md). It retains the complete 0.21 boundary and adds ordered local event emission from consumers, atomic event-chain commits, inherited correlation, source-event causation, stable producer provenance, replay suppression, and compile-time cycle rejection.
+
+- [Transactional event-chain semantics](./spec/0.22/EVENT_CHAINS.md)
+- [0.22 grammar additions](./spec/0.22/GRAMMAR.ebnf)
+- [0.22 conformance requirements](./spec/0.22/CONFORMANCE.md)
+- [0.22 unstable event-chain boundaries](./spec/0.22/UNSTABLE.md)
 
 - [Reliable typed event-consumer semantics](./spec/0.21/EVENT_CONSUMERS.md)
 - [0.21 grammar additions](./spec/0.21/GRAMMAR.ebnf)

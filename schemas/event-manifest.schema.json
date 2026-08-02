@@ -6,7 +6,7 @@
   "required": ["$schema", "eventManifestVersion", "model", "delivery", "events"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/event-manifest.schema.json" },
-    "eventManifestVersion": { "const": 2 },
+    "eventManifestVersion": { "const": 3 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -20,12 +20,13 @@
     },
     "delivery": {
       "type": "object",
-      "required": ["semantics", "storage", "ordering", "acknowledgement"],
+      "required": ["semantics", "storage", "ordering", "acknowledgement", "envelopeVersion"],
       "properties": {
         "semantics": { "const": "atLeastOnce" },
         "storage": { "const": "privateTransactionalOutbox" },
-        "ordering": { "const": "occurredAtThenActionOrdinal" },
-        "acknowledgement": { "const": "leaseToken" }
+        "ordering": { "const": "occurredAtThenProducerOrdinal" },
+        "acknowledgement": { "const": "leaseToken" },
+        "envelopeVersion": { "const": 2 }
       },
       "additionalProperties": false
     },
@@ -33,7 +34,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "payloadEntityId", "source", "emittedByActionIds"],
+        "required": ["id", "name", "payloadEntityId", "source", "emittedByActionIds", "emittedByConsumerIds"],
         "properties": {
           "id": { "type": "string", "pattern": "^event:" },
           "name": { "type": "string" },
@@ -59,7 +60,8 @@
               }
             ]
           },
-          "emittedByActionIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^action:" } }
+          "emittedByActionIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^action:" } },
+          "emittedByConsumerIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^consumer:" } }
         },
         "additionalProperties": false
       }

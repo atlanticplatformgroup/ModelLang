@@ -197,6 +197,7 @@ export interface IRConsumer {
   authorization: IRRule;
   preconditions: IRRule[];
   effect: IREffect;
+  emittedEventIds: string[];
   lockPlan: IRLock[];
   delivery: {
     transport: "atLeastOnce";
@@ -267,7 +268,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 13;
+  irVersion: 14;
   model: {
     id: string;
     name: string;

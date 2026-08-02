@@ -1,17 +1,18 @@
 {
   "$schema": "https://modellang.dev/schemas/event-manifest.schema.json",
-  "eventManifestVersion": 2,
+  "eventManifestVersion": 3,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.21.0",
-    "sourceHash": "sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca"
+    "version": "0.22.0",
+    "sourceHash": "sha256:4734c3fc4c4486ee33c643c1d76fd68984d2883c1555f1469a54a97b3368e046"
   },
   "delivery": {
     "semantics": "atLeastOnce",
     "storage": "privateTransactionalOutbox",
-    "ordering": "occurredAtThenActionOrdinal",
-    "acknowledgement": "leaseToken"
+    "ordering": "occurredAtThenProducerOrdinal",
+    "acknowledgement": "leaseToken",
+    "envelopeVersion": 2
   },
   "events": [
     {
@@ -23,6 +24,19 @@
       },
       "emittedByActionIds": [
         "action:act_508ad810a19d4b79a5009871de5cd26b"
+      ],
+      "emittedByConsumerIds": []
+    },
+    {
+      "id": "event:evt_60d694c9a0a274dc79c6168e47d25968",
+      "name": "ReservationIndexed",
+      "payloadEntityId": "entity:ent_ba2d028e915841d1ab90adfa40d38404",
+      "source": {
+        "kind": "local"
+      },
+      "emittedByActionIds": [],
+      "emittedByConsumerIds": [
+        "consumer:con_20d694c9a0a274dc79c6168e47d25968"
       ]
     }
   ]

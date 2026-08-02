@@ -36,6 +36,9 @@ export function generateMermaid(ir: ModelIR): string {
     lines.push(`  ${safe(consumer.id)}["Consumer: ${consumer.name}"]`);
     lines.push(`  ${safe(consumer.sourceEventId)} -->|consumed through inbox| ${safe(consumer.id)}`);
     lines.push(`  ${safe(consumer.id)} -->|${consumer.effect.kind}| ${safe(consumer.effect.entityId)}`);
+    for (const eventId of consumer.emittedEventIds) {
+      lines.push(`  ${safe(consumer.id)} -->|emits atomically| ${safe(eventId)}`);
+    }
   }
   for (const query of ir.queries) {
     lines.push(`  ${safe(query.id)}["Query: ${query.name}"]`);

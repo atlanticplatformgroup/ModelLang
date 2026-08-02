@@ -164,6 +164,7 @@ export interface ConsumerDecl {
   authorize: Expression;
   requires: RequireDecl[];
   effect: Effect;
+  emits: { eventName: string; span: Span }[];
   span: Span;
 }
 

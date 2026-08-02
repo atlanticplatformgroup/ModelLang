@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.21.0",
-    "sourceHash": "sha256:acfcc04418f2754a0d7f0bb1af546e8d082e2cf2ee8f00c86b4bf7f330d4c5ca",
+    "version": "0.22.0",
+    "sourceHash": "sha256:4734c3fc4c4486ee33c643c1d76fd68984d2883c1555f1469a54a97b3368e046",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -502,9 +502,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 29,
+        "line": 30,
         "column": 3,
-        "endLine": 29,
+        "endLine": 30,
         "endColumn": 21
       }
     },
@@ -523,9 +523,9 @@
       "objectName": "model_reservations.decide_act_508ad810a19d4b79a5009871de5cd26b",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 1,
-        "endLine": 45,
+        "endLine": 46,
         "endColumn": 2
       }
     },
@@ -537,9 +537,9 @@
       "objectName": "model_reservations_internal.command_receipt",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 1,
-        "endLine": 45,
+        "endLine": 46,
         "endColumn": 2
       }
     },
@@ -551,9 +551,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 1,
-        "endLine": 45,
+        "endLine": 46,
         "endColumn": 2
       }
     },
@@ -565,9 +565,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 34,
+        "line": 35,
         "column": 13,
-        "endLine": 34,
+        "endLine": 35,
         "endColumn": 17
       }
     },
@@ -579,9 +579,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 35,
+        "line": 36,
         "column": 3,
-        "endLine": 35,
+        "endLine": 36,
         "endColumn": 45
       }
     },
@@ -593,9 +593,9 @@
       "objectName": "model_reservations.reserve",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 1,
-        "endLine": 45,
+        "endLine": 46,
         "endColumn": 2
       }
     },
@@ -607,9 +607,9 @@
       "objectName": "model_reservations_internal.event_outbox",
       "source": {
         "file": "examples/reservations.model",
-        "line": 28,
+        "line": 29,
         "column": 1,
-        "endLine": 45,
+        "endLine": 46,
         "endColumn": 2
       }
     },
@@ -629,15 +629,15 @@
     },
     {
       "id": "consumer:con_20d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Consume event:evt_40d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication and one local committed effect.",
+      "purpose": "Consume event:evt_40d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication, one local committed effect, and atomic downstream event emission.",
       "layer": "PostgreSQL consumer function",
       "artifact": "postgres/003_consumers.sql",
       "objectName": "model_reservations_internal.consume_index_reservation",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 48,
         "column": 1,
-        "endLine": 56,
+        "endLine": 58,
         "endColumn": 2
       }
     },
@@ -649,9 +649,23 @@
       "objectName": "model_reservations_internal.event_inbox",
       "source": {
         "file": "examples/reservations.model",
-        "line": 47,
+        "line": 48,
         "column": 1,
-        "endLine": 56,
+        "endLine": 58,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:consumer:con_20d694c9a0a274dc79c6168e47d25968.event:evt_60d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append ReservationIndexed with the committed post-effect entity payload, inherited correlation, and source-event causation.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_consumers.sql",
+      "objectName": "model_reservations_internal.event_outbox",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 48,
+        "column": 1,
+        "endLine": 58,
         "endColumn": 2
       }
     },
@@ -663,9 +677,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 59,
+        "line": 61,
         "column": 3,
-        "endLine": 59,
+        "endLine": 61,
         "endColumn": 21
       }
     },
@@ -684,9 +698,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 62,
+        "line": 64,
         "column": 13,
-        "endLine": 62,
+        "endLine": 64,
         "endColumn": 17
       }
     },
@@ -698,9 +712,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 63,
+        "line": 65,
         "column": 9,
-        "endLine": 63,
+        "endLine": 65,
         "endColumn": 41
       }
     },
@@ -712,9 +726,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 58,
+        "line": 60,
         "column": 1,
-        "endLine": 66,
+        "endLine": 68,
         "endColumn": 2
       }
     },
@@ -726,9 +740,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 58,
+        "line": 60,
         "column": 1,
-        "endLine": 66,
+        "endLine": 68,
         "endColumn": 2
       }
     },
@@ -740,9 +754,9 @@
       "objectName": "model_reservations.reservations_for_resource",
       "source": {
         "file": "examples/reservations.model",
-        "line": 58,
+        "line": 60,
         "column": 1,
-        "endLine": 66,
+        "endLine": 68,
         "endColumn": 2
       }
     },

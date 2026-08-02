@@ -91,9 +91,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 6,
-      compilerVersion: "0.21.0",
-      irVersion: 13,
+      diffVersion: 7,
+      compilerVersion: "0.22.0",
+      irVersion: 14,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -144,7 +144,7 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
   });
 
   it("tracks consumer additions and fails review-sensitive handler changes closed", () => {
-    const source = (version: string, authorization: string | null) => `model ConsumerDiff version "${version}";
+    const source = (version: string, authorization: string | null, emit = false) => `model ConsumerDiff version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
   id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
 }
@@ -153,6 +153,7 @@ entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") {
   observed: Boolean = false @stableId("fld_cccccccccccccccccccccccccccccccc");
 }
 event RecordCreated @stableId("evt_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") payload Record;
+event RecordObserved @stableId("evt_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") payload Record;
 action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User, id: UUID) -> Record {
   authorize true;
   create Record { id = id; }
@@ -161,6 +162,7 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 ${authorization === null ? "" : `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") on RecordCreated(payload record: Record) -> Record {
   authorize ${authorization};
   update record { observed = true; }
+  ${emit ? "emit RecordObserved;" : ""}
 }`}`;
     const without = compileText(source("1", null));
     const added = compileText(source("2", "true"));
@@ -174,6 +176,11 @@ ${authorization === null ? "" : `consumer observe @stableId("con_aaaaaaaaaaaaaaa
       kind: "consumerAuthorizationChanged",
       area: "authorization",
       classification: "restrictive",
+    }));
+    expect(semanticDiff(added, compileText(source("3", "true", true))).changes).toContainEqual(expect.objectContaining({
+      kind: "consumerEmittedEventsChanged",
+      area: "eventDelivery",
+      classification: "review",
     }));
   });
 });

@@ -43,9 +43,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 6;
+  diffVersion: 7;
   compilerVersion: string;
-  irVersion: 13;
+  irVersion: 14;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -129,6 +129,11 @@ function compareConsumers(changes: SemanticChange[], previous: IRConsumer[], cur
       kind: "consumerEffectChanged", area: "effect", classification: "review",
       subject: subject("consumer", pair.current), before: text(pair.previous.effect), after: text(pair.current.effect),
       persistenceRisk: true, explanation: "The local committed effect performed for a consumed event changed.",
+    });
+    if (!same(pair.previous.emittedEventIds ?? [], pair.current.emittedEventIds)) addChange(changes, {
+      kind: "consumerEmittedEventsChanged", area: "eventDelivery", classification: "review",
+      subject: subject("consumer", pair.current), before: text(pair.previous.emittedEventIds ?? []), after: text(pair.current.emittedEventIds),
+      persistenceRisk: true, explanation: "The consumer's ordered downstream durable-event effect changed.",
     });
   }
 }
@@ -567,7 +572,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 6,
+    diffVersion: 7,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

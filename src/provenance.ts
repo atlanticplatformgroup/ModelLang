@@ -16,7 +16,7 @@ export interface ArtifactProvenance {
     version: string;
     sourceHash: string;
   };
-  irVersion: 13;
+  irVersion: 14;
   artifacts: {
     path: string;
     role: "canonical" | "contract" | "projection" | "assurance";

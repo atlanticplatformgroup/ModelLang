@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 5 },
-    "profile": { "const": "sml-transactional-core/5" },
+    "manifestVersion": { "const": 6 },
+    "profile": { "const": "sml-transactional-core/6" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-        "irVersion": { "const": 13 },
+          "irVersion": { "const": 14 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -270,7 +270,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["id", "name", "source", "sourceEventId", "acceptedPayloadEntityId", "output", "authorization", "preconditions", "readSet", "lockPlan", "effect", "delivery", "privacy"],
+        "required": ["id", "name", "source", "sourceEventId", "acceptedPayloadEntityId", "output", "authorization", "preconditions", "readSet", "lockPlan", "effect", "emittedEventIds", "delivery", "privacy"],
         "properties": {
           "id": { "type": "string", "pattern": "^consumer:" },
           "name": { "type": "string" },
@@ -288,6 +288,7 @@
           "readSet": { "$ref": "#/$defs/readSet" },
           "lockPlan": { "type": "array" },
           "effect": { "type": "object" },
+          "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
           "delivery": {
             "type": "object",
             "required": ["transport", "deduplication", "duplicateResult", "identity"],

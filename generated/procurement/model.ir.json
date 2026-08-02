@@ -1,10 +1,10 @@
 {
-  "irVersion": 13,
+  "irVersion": 14,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.21.0",
-    "sourceHash": "sha256:4e220226a36b53f1f7b4c07832805b191a425c721c61b5a77b2e767d4d5638ec",
+    "version": "0.22.0",
+    "sourceHash": "sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -973,6 +973,28 @@
       "naming": {
         "typescriptName": "RequestApproved"
       }
+    },
+    {
+      "id": "event:evt_50d694c9a0a274dc79c6168e47d25968",
+      "name": "ApprovalObserved",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "evt_50d694c9a0a274dc79c6168e47d25968"
+      },
+      "payloadEntityId": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+      "source": {
+        "kind": "local"
+      },
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 61,
+        "column": 1,
+        "endLine": 61,
+        "endColumn": 98
+      },
+      "naming": {
+        "typescriptName": "ApprovalObserved"
+      }
     }
   ],
   "policies": [
@@ -991,9 +1013,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 64,
+            "line": 65,
             "column": 3,
-            "endLine": 64,
+            "endLine": 65,
             "endColumn": 14
           },
           "naming": {
@@ -1008,9 +1030,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 65,
+            "line": 66,
             "column": 3,
-            "endLine": 65,
+            "endLine": 66,
             "endColumn": 27
           },
           "naming": {
@@ -1084,9 +1106,9 @@
           "sourceExpression": "((request.amount <= USD 10000) and (Role.MANAGER in actor.roles))",
           "span": {
             "file": "examples/procurement.model",
-            "line": 67,
+            "line": 68,
             "column": 3,
-            "endLine": 68,
+            "endLine": 69,
             "endColumn": 65
           }
         },
@@ -1154,18 +1176,18 @@
           "sourceExpression": "((request.amount > USD 10000) and (Role.FINANCE in actor.roles))",
           "span": {
             "file": "examples/procurement.model",
-            "line": 69,
+            "line": 70,
             "column": 3,
-            "endLine": 70,
+            "endLine": 71,
             "endColumn": 64
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 63,
+        "line": 64,
         "column": 1,
-        "endLine": 71,
+        "endLine": 72,
         "endColumn": 2
       }
     }
@@ -1187,9 +1209,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 76,
+            "line": 77,
             "column": 3,
-            "endLine": 76,
+            "endLine": 77,
             "endColumn": 21
           },
           "naming": {
@@ -1204,9 +1226,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 77,
+            "line": 78,
             "column": 3,
-            "endLine": 77,
+            "endLine": 78,
             "endColumn": 21
           },
           "naming": {
@@ -1310,9 +1332,9 @@
         "sourceExpression": "(((Role.EMPLOYEE in actor.roles) or (Role.MANAGER in actor.roles)) or (Role.FINANCE in actor.roles))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 80,
+          "line": 81,
           "column": 5,
-          "endLine": 82,
+          "endLine": 83,
           "endColumn": 35
         }
       },
@@ -1345,9 +1367,9 @@
           "sourceExpression": "(amount > USD 0)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 83,
+            "line": 84,
             "column": 3,
-            "endLine": 83,
+            "endLine": 84,
             "endColumn": 43
           }
         }
@@ -1433,9 +1455,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       },
       "naming": {
@@ -1459,9 +1481,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 97,
+            "line": 98,
             "column": 3,
-            "endLine": 97,
+            "endLine": 98,
             "endColumn": 21
           },
           "naming": {
@@ -1476,9 +1498,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 98,
+            "line": 99,
             "column": 3,
-            "endLine": 98,
+            "endLine": 99,
             "endColumn": 27
           },
           "naming": {
@@ -1522,9 +1544,9 @@
         "sourceExpression": "(actor == request.requester)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 100,
+          "line": 101,
           "column": 13,
-          "endLine": 100,
+          "endLine": 101,
           "endColumn": 39
         }
       },
@@ -1558,9 +1580,9 @@
           "sourceExpression": "(request.status == RequestStatus.DRAFT)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 101,
+            "line": 102,
             "column": 3,
-            "endLine": 101,
+            "endLine": 102,
             "endColumn": 59
           }
         }
@@ -1607,9 +1629,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 97,
         "column": 1,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 2
       },
       "naming": {
@@ -1633,9 +1655,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 110,
+            "line": 111,
             "column": 3,
-            "endLine": 110,
+            "endLine": 111,
             "endColumn": 21
           },
           "naming": {
@@ -1650,9 +1672,9 @@
           "caller": false,
           "span": {
             "file": "examples/procurement.model",
-            "line": 111,
+            "line": 112,
             "column": 3,
-            "endLine": 111,
+            "endLine": 112,
             "endColumn": 27
           },
           "naming": {
@@ -1726,9 +1748,9 @@
         "sourceExpression": "((actor != request.requester) and ApprovalAuthority(actor, request))",
         "span": {
           "file": "examples/procurement.model",
-          "line": 114,
+          "line": 115,
           "column": 5,
-          "endLine": 115,
+          "endLine": 116,
           "endColumn": 42
         }
       },
@@ -1762,9 +1784,9 @@
           "sourceExpression": "(request.status == RequestStatus.SUBMITTED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 117,
+            "line": 118,
             "column": 3,
-            "endLine": 117,
+            "endLine": 118,
             "endColumn": 67
           }
         }
@@ -1836,9 +1858,9 @@
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 1,
-        "endLine": 125,
+        "endLine": 126,
         "endColumn": 2
       },
       "naming": {
@@ -1863,9 +1885,9 @@
         "caller": false,
         "span": {
           "file": "examples/procurement.model",
-          "line": 128,
+          "line": 129,
           "column": 3,
-          "endLine": 128,
+          "endLine": 129,
           "endColumn": 35
         },
         "naming": {
@@ -1887,9 +1909,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 130,
+          "line": 131,
           "column": 13,
-          "endLine": 130,
+          "endLine": 131,
           "endColumn": 17
         }
       },
@@ -1923,9 +1945,9 @@
           "sourceExpression": "(request.status == RequestStatus.APPROVED)",
           "span": {
             "file": "examples/procurement.model",
-            "line": 131,
+            "line": 132,
             "column": 3,
-            "endLine": 131,
+            "endLine": 132,
             "endColumn": 65
           }
         }
@@ -1947,6 +1969,9 @@
           }
         ]
       },
+      "emittedEventIds": [
+        "event:evt_50d694c9a0a274dc79c6168e47d25968"
+      ],
       "lockPlan": [
         {
           "id": "lock:consumer:con_10d694c9a0a274dc79c6168e47d25968.request",
@@ -1965,9 +1990,9 @@
       },
       "span": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 128,
         "column": 1,
-        "endLine": 136,
+        "endLine": 138,
         "endColumn": 2
       },
       "naming": {
@@ -1993,9 +2018,9 @@
           "binding": "session_user",
           "span": {
             "file": "examples/procurement.model",
-            "line": 147,
+            "line": 149,
             "column": 3,
-            "endLine": 147,
+            "endLine": 149,
             "endColumn": 21
           },
           "naming": {
@@ -2020,9 +2045,9 @@
         "sourceExpression": "true",
         "span": {
           "file": "examples/procurement.model",
-          "line": 149,
+          "line": 151,
           "column": 13,
-          "endLine": 149,
+          "endLine": 151,
           "endColumn": 17
         }
       },
@@ -2056,9 +2081,9 @@
         "sourceExpression": "(request.requester == actor)",
         "span": {
           "file": "examples/procurement.model",
-          "line": 150,
+          "line": 152,
           "column": 9,
-          "endLine": 150,
+          "endLine": 152,
           "endColumn": 35
         }
       },
@@ -2070,9 +2095,9 @@
       "limit": 100,
       "span": {
         "file": "examples/procurement.model",
-        "line": 146,
+        "line": 148,
         "column": 1,
-        "endLine": 153,
+        "endLine": 155,
         "endColumn": 2
       },
       "naming": {
@@ -2106,9 +2131,9 @@
           "actionId": "action:act_ed2374e822704c51a2925338253d05d2",
           "span": {
             "file": "examples/procurement.model",
-            "line": 140,
+            "line": 142,
             "column": 3,
-            "endLine": 141,
+            "endLine": 143,
             "endColumn": 69
           }
         },
@@ -2124,18 +2149,18 @@
           "actionId": "action:act_d39dbb883b5f4019b9027b85add3de47",
           "span": {
             "file": "examples/procurement.model",
-            "line": 142,
+            "line": 144,
             "column": 3,
-            "endLine": 143,
+            "endLine": 145,
             "endColumn": 73
           }
         }
       ],
       "span": {
         "file": "examples/procurement.model",
-        "line": 138,
+        "line": 140,
         "column": 1,
-        "endLine": 144,
+        "endLine": 146,
         "endColumn": 2
       },
       "naming": {
@@ -2218,9 +2243,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 63,
+        "line": 64,
         "column": 1,
-        "endLine": 71,
+        "endLine": 72,
         "endColumn": 2
       }
     },
@@ -2232,9 +2257,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 67,
+        "line": 68,
         "column": 3,
-        "endLine": 68,
+        "endLine": 69,
         "endColumn": 65
       }
     },
@@ -2246,9 +2271,9 @@
       "objectName": "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       "source": {
         "file": "examples/procurement.model",
-        "line": 69,
+        "line": 70,
         "column": 3,
-        "endLine": 70,
+        "endLine": 71,
         "endColumn": 64
       }
     },
@@ -2708,9 +2733,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 76,
+        "line": 77,
         "column": 3,
-        "endLine": 76,
+        "endLine": 77,
         "endColumn": 21
       }
     },
@@ -2722,9 +2747,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 77,
+        "line": 78,
         "column": 3,
-        "endLine": 77,
+        "endLine": 78,
         "endColumn": 21
       }
     },
@@ -2743,9 +2768,9 @@
       "objectName": "model_procurement.decide_act_1e35db0451b1461e941af6283d86dca2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       }
     },
@@ -2757,9 +2782,9 @@
       "objectName": "model_procurement_internal.command_receipt",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       }
     },
@@ -2771,9 +2796,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       }
     },
@@ -2785,9 +2810,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 80,
+        "line": 81,
         "column": 5,
-        "endLine": 82,
+        "endLine": 83,
         "endColumn": 35
       }
     },
@@ -2799,9 +2824,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 83,
+        "line": 84,
         "column": 3,
-        "endLine": 83,
+        "endLine": 84,
         "endColumn": 43
       }
     },
@@ -2813,9 +2838,9 @@
       "objectName": "model_procurement.open_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       }
     },
@@ -2827,9 +2852,9 @@
       "objectName": "model_procurement_internal.event_outbox",
       "source": {
         "file": "examples/procurement.model",
-        "line": 75,
+        "line": 76,
         "column": 1,
-        "endLine": 94,
+        "endLine": 95,
         "endColumn": 2
       }
     },
@@ -2848,9 +2873,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 97,
+        "line": 98,
         "column": 3,
-        "endLine": 97,
+        "endLine": 98,
         "endColumn": 21
       }
     },
@@ -2869,9 +2894,9 @@
       "objectName": "model_procurement.decide_act_ed2374e822704c51a2925338253d05d2",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 97,
         "column": 1,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 2
       }
     },
@@ -2883,9 +2908,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 97,
         "column": 1,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 2
       }
     },
@@ -2897,9 +2922,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 100,
+        "line": 101,
         "column": 13,
-        "endLine": 100,
+        "endLine": 101,
         "endColumn": 39
       }
     },
@@ -2911,9 +2936,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 101,
+        "line": 102,
         "column": 3,
-        "endLine": 101,
+        "endLine": 102,
         "endColumn": 59
       }
     },
@@ -2925,9 +2950,9 @@
       "objectName": "model_procurement.submit_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 97,
         "column": 1,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 2
       }
     },
@@ -2939,9 +2964,9 @@
       "objectName": "model_procurement_internal.event_outbox",
       "source": {
         "file": "examples/procurement.model",
-        "line": 96,
+        "line": 97,
         "column": 1,
-        "endLine": 107,
+        "endLine": 108,
         "endColumn": 2
       }
     },
@@ -2967,9 +2992,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 110,
+        "line": 111,
         "column": 3,
-        "endLine": 110,
+        "endLine": 111,
         "endColumn": 21
       }
     },
@@ -2988,9 +3013,9 @@
       "objectName": "model_procurement.decide_act_d39dbb883b5f4019b9027b85add3de47",
       "source": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 1,
-        "endLine": 125,
+        "endLine": 126,
         "endColumn": 2
       }
     },
@@ -3002,9 +3027,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 1,
-        "endLine": 125,
+        "endLine": 126,
         "endColumn": 2
       }
     },
@@ -3016,9 +3041,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 114,
+        "line": 115,
         "column": 5,
-        "endLine": 115,
+        "endLine": 116,
         "endColumn": 42
       }
     },
@@ -3030,9 +3055,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 117,
+        "line": 118,
         "column": 3,
-        "endLine": 117,
+        "endLine": 118,
         "endColumn": 67
       }
     },
@@ -3044,9 +3069,9 @@
       "objectName": "model_procurement.approve_request",
       "source": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 1,
-        "endLine": 125,
+        "endLine": 126,
         "endColumn": 2
       }
     },
@@ -3058,9 +3083,9 @@
       "objectName": "model_procurement_internal.event_outbox",
       "source": {
         "file": "examples/procurement.model",
-        "line": 109,
+        "line": 110,
         "column": 1,
-        "endLine": 125,
+        "endLine": 126,
         "endColumn": 2
       }
     },
@@ -3080,15 +3105,15 @@
     },
     {
       "id": "consumer:con_10d694c9a0a274dc79c6168e47d25968",
-      "purpose": "Consume event:evt_30d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication and one local committed effect.",
+      "purpose": "Consume event:evt_30d694c9a0a274dc79c6168e47d25968 with transactional inbox deduplication, one local committed effect, and atomic downstream event emission.",
       "layer": "PostgreSQL consumer function",
       "artifact": "postgres/003_consumers.sql",
       "objectName": "model_procurement_internal.consume_observe_request_approval",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 128,
         "column": 1,
-        "endLine": 136,
+        "endLine": 138,
         "endColumn": 2
       }
     },
@@ -3100,9 +3125,23 @@
       "objectName": "model_procurement_internal.event_inbox",
       "source": {
         "file": "examples/procurement.model",
-        "line": 127,
+        "line": 128,
         "column": 1,
-        "endLine": 136,
+        "endLine": 138,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "emit:consumer:con_10d694c9a0a274dc79c6168e47d25968.event:evt_50d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Append ApprovalObserved with the committed post-effect entity payload, inherited correlation, and source-event causation.",
+      "layer": "PostgreSQL transactional outbox",
+      "artifact": "postgres/003_consumers.sql",
+      "objectName": "model_procurement_internal.event_outbox",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 128,
+        "column": 1,
+        "endLine": 138,
         "endColumn": 2
       }
     },
@@ -3114,9 +3153,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 147,
+        "line": 149,
         "column": 3,
-        "endLine": 147,
+        "endLine": 149,
         "endColumn": 21
       }
     },
@@ -3135,9 +3174,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 149,
+        "line": 151,
         "column": 13,
-        "endLine": 149,
+        "endLine": 151,
         "endColumn": 17
       }
     },
@@ -3149,9 +3188,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 150,
+        "line": 152,
         "column": 9,
-        "endLine": 150,
+        "endLine": 152,
         "endColumn": 35
       }
     },
@@ -3163,9 +3202,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 146,
+        "line": 148,
         "column": 1,
-        "endLine": 153,
+        "endLine": 155,
         "endColumn": 2
       }
     },
@@ -3177,9 +3216,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 146,
+        "line": 148,
         "column": 1,
-        "endLine": 153,
+        "endLine": 155,
         "endColumn": 2
       }
     },
@@ -3191,9 +3230,9 @@
       "objectName": "model_procurement.my_requests",
       "source": {
         "file": "examples/procurement.model",
-        "line": 146,
+        "line": 148,
         "column": 1,
-        "endLine": 153,
+        "endLine": 155,
         "endColumn": 2
       }
     },
@@ -3205,9 +3244,9 @@
       "objectName": "trg_purchase_request_status_workflow_insert",
       "source": {
         "file": "examples/procurement.model",
-        "line": 138,
+        "line": 140,
         "column": 1,
-        "endLine": 144,
+        "endLine": 146,
         "endColumn": 2
       }
     },
@@ -3219,9 +3258,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 140,
+        "line": 142,
         "column": 3,
-        "endLine": 141,
+        "endLine": 143,
         "endColumn": 69
       }
     },
@@ -3233,9 +3272,9 @@
       "objectName": "trg_purchase_request_status_workflow_update",
       "source": {
         "file": "examples/procurement.model",
-        "line": 142,
+        "line": 144,
         "column": 3,
-        "endLine": 143,
+        "endLine": 145,
         "endColumn": 73
       }
     },

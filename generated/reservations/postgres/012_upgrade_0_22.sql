@@ -1,18 +1,6 @@
--- Idempotent ModelLang 0.11 -> 0.12 PostgreSQL gateway-boundary upgrade.
--- Run as the same administrative role used for generated installation and migrations.
+-- Idempotent ModelLang 0.21 -> 0.22 transactional event-chain upgrade.
+-- Existing producer events remain valid; no historical downstream events are synthesized.
 BEGIN;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_gateway') THEN
-    CREATE ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-  END IF;
-END
-$modellang$;
-
-ALTER ROLE modellang_gateway NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-REVOKE modellang_owner FROM modellang_gateway;
-REVOKE modellang_gateway FROM modellang_app;
-GRANT modellang_app TO modellang_gateway;
 DO $modellang$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'modellang_dispatcher') THEN
@@ -35,7 +23,6 @@ $modellang$;
 ALTER ROLE modellang_consumer NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
 REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher FROM modellang_consumer;
 REVOKE modellang_consumer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher;
-
 SET LOCAL ROLE modellang_owner;
 DO $modellang_upgrade$
 DECLARE
@@ -55,180 +42,6 @@ BEGIN
   END IF;
 END
 $modellang_upgrade$;
-
-CREATE TABLE IF NOT EXISTS "model_reservations_internal"."gateway_principal_binding" (
-  "issuer" text NOT NULL,
-  "subject" text NOT NULL,
-  "principal_id" uuid NOT NULL REFERENCES "model_reservations"."user" ("id"),
-  PRIMARY KEY ("issuer", "subject"),
-  CONSTRAINT "ck_gateway_principal_binding_identity" CHECK (
-    pg_catalog.char_length("issuer") BETWEEN 1 AND 512
-    AND pg_catalog.char_length("subject") BETWEEN 1 AND 512
-  )
-);
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_issuer" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "identity_subject" text;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass
-      AND conname = 'ck_action_audit_gateway_identity'
-  ) THEN
-    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_gateway_identity"
-      CHECK (("identity_issuer" IS NULL) = ("identity_subject" IS NULL));
-  END IF;
-END
-$modellang$;
-CREATE OR REPLACE FUNCTION "model_reservations_internal"."bind_gateway_identity"(p_issuer text, p_subject text)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_auth_members AS membership
-    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
-    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
-    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
-  ) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_GATEWAY_REQUIRED';
-  END IF;
-  IF p_issuer IS NULL OR pg_catalog.char_length(p_issuer) NOT BETWEEN 1 AND 512
-     OR p_subject IS NULL OR pg_catalog.char_length(p_subject) NOT BETWEEN 1 AND 512 THEN
-    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:boundary:gateway_identity';
-  END IF;
-  PERFORM 1 FROM "model_reservations_internal"."gateway_principal_binding" AS binding
-  WHERE binding."issuer" = p_issuer AND binding."subject" = p_subject
-  FOR SHARE;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
-  PERFORM pg_catalog.set_config('modellang.gateway_issuer', p_issuer, true);
-  PERFORM pg_catalog.set_config('modellang.gateway_subject', p_subject, true);
-END
-$modellang$;
-REVOKE ALL ON FUNCTION "model_reservations_internal"."bind_gateway_identity"(text, text) FROM PUBLIC;
-CREATE OR REPLACE FUNCTION "model_reservations_internal"."resolve_principal"()
-RETURNS TABLE ("principal_id" uuid, "identity_issuer" text, "identity_subject" text)
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-DECLARE
-  v_issuer text;
-  v_subject text;
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_auth_members AS membership
-    JOIN pg_catalog.pg_roles AS gateway_role ON gateway_role.oid = membership.roleid
-    JOIN pg_catalog.pg_roles AS identity_role ON identity_role.oid = membership.member
-    WHERE gateway_role.rolname = 'modellang_gateway' AND identity_role.rolname = session_user
-  ) THEN
-    v_issuer := pg_catalog.current_setting('modellang.gateway_issuer', true);
-    v_subject := pg_catalog.current_setting('modellang.gateway_subject', true);
-    IF v_issuer IS NULL OR v_issuer = '' OR v_subject IS NULL OR v_subject = '' THEN
-      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-    END IF;
-    RETURN QUERY
-      SELECT binding."principal_id", binding."issuer", binding."subject"
-      FROM "model_reservations_internal"."gateway_principal_binding" AS binding
-      WHERE binding."issuer" = v_issuer AND binding."subject" = v_subject
-      FOR SHARE;
-  ELSE
-    RETURN QUERY
-      SELECT binding."principal_id", NULL::text, NULL::text
-      FROM "model_reservations_internal"."principal_binding" AS binding
-      WHERE binding."database_principal" = session_user
-      FOR SHARE;
-  END IF;
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_IDENTITY_UNBOUND';
-  END IF;
-END
-$modellang$;
-REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal"() FROM PUBLIC;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authorization_rule_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_outcome" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "policy_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "authority_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "decision_evidence" jsonb;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass
-      AND conname = 'ck_action_audit_decision_evidence'
-  ) THEN
-    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_decision_evidence" CHECK (
-      ("decision_evidence" IS NULL
-       AND "model_id" IS NULL AND "model_version" IS NULL
-       AND "source_hash" IS NULL AND "authorization_rule_id" IS NULL
-       AND "decision_outcome" IS NULL AND "policy_id" IS NULL AND "authority_id" IS NULL)
-      OR
-      ("decision_evidence" IS NOT NULL
-       AND "model_id" IS NOT NULL AND "model_version" IS NOT NULL
-       AND "source_hash" ~ '^sha256:[0-9a-f]{64}$'
-       AND "authorization_rule_id" IS NOT NULL AND "decision_outcome" = 'executed'
-       AND (("policy_id" IS NULL) = ("authority_id" IS NULL)))
-    );
-  END IF;
-END
-$modellang$;
-CREATE TABLE IF NOT EXISTS "model_reservations_internal"."command_receipt" (
-  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  "model_id" text NOT NULL,
-  "model_version" text NOT NULL,
-  "source_hash" text NOT NULL,
-  "action_id" text NOT NULL,
-  "principal_id" uuid NOT NULL,
-  "idempotency_key" text NOT NULL,
-  "request_hash" text NOT NULL,
-  "correlation_id" text NOT NULL,
-  "causation_id" text,
-  "status" text NOT NULL DEFAULT 'executing',
-  "response" jsonb,
-  "target_id" uuid,
-  "action_audit_id" bigint UNIQUE REFERENCES "model_reservations_internal"."action_audit" ("id"),
-  "created_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
-  "completed_at" timestamptz,
-  CONSTRAINT "uq_command_receipt_identity" UNIQUE ("principal_id", "action_id", "idempotency_key"),
-  CONSTRAINT "ck_command_receipt_hashes" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$' AND "request_hash" ~ '^sha256:[0-9a-f]{64}$'),
-  CONSTRAINT "ck_command_receipt_ids" CHECK ("idempotency_key" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND "correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),
-  CONSTRAINT "ck_command_receipt_completion" CHECK (
-    ("status" = 'executing' AND "response" IS NULL AND "target_id" IS NULL AND "action_audit_id" IS NULL AND "completed_at" IS NULL)
-    OR ("status" = 'executed' AND "response" IS NOT NULL AND "target_id" IS NOT NULL AND "action_audit_id" IS NOT NULL AND "completed_at" IS NOT NULL)
-  )
-);
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "correlation_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "causation_id" text;
-ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "command_receipt_id" bigint;
-CREATE UNIQUE INDEX IF NOT EXISTS "uq_action_audit_command_receipt" ON "model_reservations_internal"."action_audit" ("command_receipt_id") WHERE "command_receipt_id" IS NOT NULL;
-DO $modellang$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass AND conname = 'fk_action_audit_command_receipt'
-  ) THEN
-    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "fk_action_audit_command_receipt" FOREIGN KEY ("command_receipt_id") REFERENCES "model_reservations_internal"."command_receipt" ("id");
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_catalog.pg_constraint
-    WHERE conrelid = '"model_reservations_internal"."action_audit"'::regclass AND conname = 'ck_action_audit_command_metadata'
-  ) THEN
-    ALTER TABLE "model_reservations_internal"."action_audit" ADD CONSTRAINT "ck_action_audit_command_metadata" CHECK (
-      ("correlation_id" IS NULL AND "causation_id" IS NULL AND "command_receipt_id" IS NULL)
-      OR ("correlation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND ("causation_id" IS NULL OR "causation_id" ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'))
-    );
-  END IF;
-END
-$modellang$;
 CREATE TABLE IF NOT EXISTS "model_reservations_internal"."consumer_audit" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   "consumer_id" text NOT NULL,
@@ -434,7 +247,6 @@ END $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."release_event"(uuid, uuid) FROM PUBLIC;
 RESET ROLE;
 
--- Existing guarded callables must resolve both direct and gateway identities.
 -- Generated guarded action functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
@@ -752,65 +564,6 @@ $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) FROM PUBLIC;
 
 RESET ROLE;
--- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
-SET ROLE modellang_owner;
-
-CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, pg_temp
-AS $modellang$
-DECLARE
-  v_principal_id uuid;
-  v_result jsonb;
-  v_actor "model_reservations"."user"%ROWTYPE;
-  v_resource "model_reservations"."resource"%ROWTYPE;
-BEGIN
-  SELECT identity."principal_id" INTO v_principal_id
-  FROM "model_reservations_internal"."resolve_principal"() AS identity;
-
-  SELECT * INTO v_actor
-  FROM "model_reservations"."user"
-  WHERE "id" = v_principal_id;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
-  END IF;
-
-  SELECT * INTO v_resource
-  FROM "model_reservations"."resource"
-  WHERE "id" = "p_resource";
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
-  END IF;
-
-  IF NOT ((TRUE) IS TRUE) THEN
-    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
-  END IF;
-
-  SELECT COALESCE(
-    pg_catalog.jsonb_agg(v_query."item" ORDER BY v_query."sort_value" ASC, v_query."identity" ASC),
-    '[]'::jsonb
-  ) INTO v_result
-  FROM (
-    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'resource', v_row."resource_id", 'reservedBy', v_row."reserved_by_id", 'startsAt', v_row."starts_at", 'endsAt', v_row."ends_at", 'indexed', v_row."indexed") AS "item",
-           v_row."starts_at" AS "sort_value",
-           v_row."id" AS "identity"
-    FROM "model_reservations"."reservation" AS v_row
-    WHERE (((v_row."resource_id" = v_resource."id")) IS TRUE)
-    ORDER BY v_row."starts_at" ASC, v_row."id" ASC
-    LIMIT 100
-  ) AS v_query;
-
-  RETURN v_result;
-END
-$modellang$;
-
-REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
-
-RESET ROLE;
 -- Generated least-privilege application boundary.
 REVOKE CREATE ON SCHEMA "model_reservations" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;
 REVOKE ALL ON SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;
@@ -825,6 +578,8 @@ REVOKE ALL ON TABLE "model_reservations"."reservation" FROM PUBLIC, modellang_ap
 
 REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_reservations"."decide_act_508ad810a19d4b79a5009871de5cd26b"(uuid, timestamptz, timestamptz, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_reservations"."decide_act_508ad810a19d4b79a5009871de5cd26b"(uuid, timestamptz, timestamptz, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher;

@@ -181,10 +181,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 5,
+      manifestVersion: 6,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 13 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 14 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -224,7 +224,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 13 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 14 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -629,7 +629,7 @@ describe("backends", () => {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.21.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.22.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -653,14 +653,14 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(contract), JSON.stringify(validate.errors)).toBe(true);
     expect(contract).toMatchObject({
-      eventManifestVersion: 2,
+      eventManifestVersion: 3,
       delivery: { semantics: "atLeastOnce", storage: "privateTransactionalOutbox", acknowledgement: "leaseToken" },
     });
-    expect(contract.events).toHaveLength(3);
+    expect(contract.events).toHaveLength(4);
     expect(output["postgres/001_roles.sql"]).toContain("modellang_dispatcher NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."event_outbox"');
     expect(output["postgres/002_schema.sql"]).toContain("FOR UPDATE SKIP LOCKED LIMIT p_limit");
-    expect(output["postgres/002_schema.sql"]).toContain('row_value."action_audit_id", row_value."ordinal", row_value."id"');
+    expect(output["postgres/002_schema.sql"]).toContain('COALESCE(row_value."action_audit_id", row_value."consumer_audit_id"), row_value."ordinal", row_value."id"');
     expect(output["postgres/003_actions.sql"]).toContain('INSERT INTO "model_procurement_internal"."event_outbox"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."claim_events"');
     expect(output["postgres/010_upgrade_0_20.sql"]).toContain("transactional domain-event upgrade");
@@ -671,8 +671,11 @@ describe("backends", () => {
 
   it("generates private transactional inbox consumers without widening public discovery", async () => {
     const output = generateAll(await procurement());
-    const semantic = JSON.parse(output["semantic.json"]!) as { consumers: { name: string }[] };
-    expect(semantic.consumers).toEqual([expect.objectContaining({ name: "observeRequestApproval" })]);
+    const semantic = JSON.parse(output["semantic.json"]!) as { consumers: { name: string; emittedEventIds: string[] }[] };
+    expect(semantic.consumers).toEqual([expect.objectContaining({
+      name: "observeRequestApproval",
+      emittedEventIds: ["event:evt_50d694c9a0a274dc79c6168e47d25968"],
+    })]);
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json"]) {
       expect(output[publicArtifact]).not.toContain("observeRequestApproval");
       expect(output[publicArtifact]).not.toContain("event_inbox");
@@ -682,11 +685,24 @@ describe("backends", () => {
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_audit"');
     expect(output["postgres/003_consumers.sql"]).toContain('ON CONFLICT ("consumer_id", "source_event_id") DO NOTHING');
     expect(output["postgres/003_consumers.sql"]).toContain("p_envelope - 'deliveryAttempt'");
+    expect(output["postgres/003_consumers.sql"]).toContain("p_envelope := p_envelope || pg_catalog.jsonb_build_object('consumerId', NULL)");
     expect(output["postgres/003_consumers.sql"]).toContain("ML_EVENT_CONFLICT");
+    expect(output["postgres/003_consumers.sql"]).toContain("v_source_event_id::text, v_consumer_audit_id, 0");
+    expect(output["postgres/003_consumers.sql"]).toContain("'consumer:con_10d694c9a0a274dc79c6168e47d25968'");
+    expect(output["postgres/002_schema.sql"]).toContain('"consumer_id" text');
+    expect(output["postgres/002_schema.sql"]).toContain('CONSTRAINT "ck_event_outbox_producer"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."consume_observe_request_approval"');
     expect(output["typescript/consumers.ts"]).toContain("consumeObserveRequestApproval");
     expect(output["typescript/consumers.ts"]).toContain("record_consumer_failure");
     expect(output["postgres/011_upgrade_0_21.sql"]).toContain("reliable typed event-consumer upgrade");
+    expect(output["postgres/012_upgrade_0_22.sql"]).toContain("transactional event-chain upgrade");
+    expect(output["model.mmd"]).toContain("consumer_con_10d694c9a0a274dc79c6168e47d25968 -->|emits atomically| event_evt_50d694c9a0a274dc79c6168e47d25968");
+
+    const eventManifest = JSON.parse(output["events.json"]!) as { delivery: { envelopeVersion: number }; events: { name: string; emittedByConsumerIds: string[] }[] };
+    expect(eventManifest.delivery.envelopeVersion).toBe(2);
+    expect(eventManifest.events.find((event) => event.name === "ApprovalObserved")?.emittedByConsumerIds)
+      .toEqual(["consumer:con_10d694c9a0a274dc79c6168e47d25968"]);
+    expect(output["typescript/events.ts"]).toContain('{ readonly actionId: null; readonly consumerId: string }');
 
     const sourceHash = `sha256:${"c".repeat(64)}`;
     const imported = generateAll(compileText(`model ImportedConsumer version "1";

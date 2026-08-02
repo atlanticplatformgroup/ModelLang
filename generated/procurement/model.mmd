@@ -15,6 +15,8 @@ flowchart LR
   event_evt_20d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
   event_evt_30d694c9a0a274dc79c6168e47d25968["Event: RequestApproved"]
   event_evt_30d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
+  event_evt_50d694c9a0a274dc79c6168e47d25968["Event: ApprovalObserved"]
+  event_evt_50d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_act_1e35db0451b1461e941af6283d86dca2["Action: openRequest"]
   principal -->|authenticated caller| action_act_1e35db0451b1461e941af6283d86dca2
   action_act_1e35db0451b1461e941af6283d86dca2 -->|creates| entity_ent_9bc680209327484c8e98f5f740bcc702
@@ -41,6 +43,7 @@ flowchart LR
   consumer_con_10d694c9a0a274dc79c6168e47d25968["Consumer: observeRequestApproval"]
   event_evt_30d694c9a0a274dc79c6168e47d25968 -->|consumed through inbox| consumer_con_10d694c9a0a274dc79c6168e47d25968
   consumer_con_10d694c9a0a274dc79c6168e47d25968 -->|update| entity_ent_9bc680209327484c8e98f5f740bcc702
+  consumer_con_10d694c9a0a274dc79c6168e47d25968 -->|emits atomically| event_evt_50d694c9a0a274dc79c6168e47d25968
   query_qry_4406b045404a48449282db804f6167a8["Query: myRequests"]
   principal -->|authenticated caller| query_qry_4406b045404a48449282db804f6167a8
   query_qry_4406b045404a48449282db804f6167a8 -->|reads| entity_ent_9bc680209327484c8e98f5f740bcc702

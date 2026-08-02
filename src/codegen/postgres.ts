@@ -18,6 +18,7 @@ export interface PostgresOutput {
   "009_upgrade_0_19.sql": string;
   "010_upgrade_0_20.sql": string;
   "011_upgrade_0_21.sql": string;
+  "012_upgrade_0_22.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -647,6 +648,7 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
   const outbox = qname(internal, "event_outbox");
   const audit = qname(internal, "action_audit");
   const receipts = qname(internal, "command_receipt");
+  const consumerAudit = qname(internal, "consumer_audit");
   const dispatcherCheck = [
     "  IF NOT EXISTS (",
     "    SELECT 1 FROM pg_catalog.pg_auth_members AS membership",
@@ -666,13 +668,15 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     `  ${quoteIdent("event_id")} text NOT NULL,`,
     `  ${quoteIdent("event_name")} text NOT NULL,`,
     `  ${quoteIdent("payload_entity_id")} text NOT NULL,`,
-    `  ${quoteIdent("action_id")} text NOT NULL,`,
-    `  ${quoteIdent("principal_id")} uuid NOT NULL,`,
+    `  ${quoteIdent("action_id")} text,`,
+    `  ${quoteIdent("consumer_id")} text,`,
+    `  ${quoteIdent("principal_id")} uuid,`,
     `  ${quoteIdent("target_id")} uuid NOT NULL,`,
     `  ${quoteIdent("payload")} jsonb NOT NULL,`,
     `  ${quoteIdent("correlation_id")} text NOT NULL,`,
     `  ${quoteIdent("causation_id")} text,`,
-    `  ${quoteIdent("action_audit_id")} bigint NOT NULL REFERENCES ${audit} (${quoteIdent("id")}),`,
+    `  ${quoteIdent("action_audit_id")} bigint REFERENCES ${audit} (${quoteIdent("id")}),`,
+    `  ${quoteIdent("consumer_audit_id")} bigint CONSTRAINT ${quoteIdent("fk_event_outbox_consumer_audit")} REFERENCES ${consumerAudit} (${quoteIdent("id")}),`,
     `  ${quoteIdent("command_receipt_id")} bigint REFERENCES ${receipts} (${quoteIdent("id")}),`,
     `  ${quoteIdent("ordinal")} integer NOT NULL,`,
     `  ${quoteIdent("occurred_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),`,
@@ -681,11 +685,35 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     `  ${quoteIdent("leased_until")} timestamptz,`,
     `  ${quoteIdent("published_at")} timestamptz,`,
     `  CONSTRAINT ${quoteIdent("uq_event_outbox_action_ordinal")} UNIQUE (${quoteIdent("action_audit_id")}, ${quoteIdent("ordinal")}),`,
+    `  CONSTRAINT ${quoteIdent("uq_event_outbox_consumer_ordinal")} UNIQUE (${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")}),`,
+    `  CONSTRAINT ${quoteIdent("ck_event_outbox_producer")} CHECK ((` +
+      `${quoteIdent("action_id")} IS NOT NULL AND ${quoteIdent("action_id")} ~ '^action:.+$' AND ${quoteIdent("consumer_id")} IS NULL AND ${quoteIdent("action_audit_id")} IS NOT NULL AND ${quoteIdent("consumer_audit_id")} IS NULL AND ${quoteIdent("principal_id")} IS NOT NULL) OR (` +
+      `${quoteIdent("action_id")} IS NULL AND ${quoteIdent("consumer_id")} IS NOT NULL AND ${quoteIdent("consumer_id")} ~ '^consumer:.+$' AND ${quoteIdent("action_audit_id")} IS NULL AND ${quoteIdent("consumer_audit_id")} IS NOT NULL AND ${quoteIdent("principal_id")} IS NULL AND ${quoteIdent("command_receipt_id")} IS NULL)),`,
     `  CONSTRAINT ${quoteIdent("ck_event_outbox_hash")} CHECK (${quoteIdent("source_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
     `  CONSTRAINT ${quoteIdent("ck_event_outbox_metadata")} CHECK (${quoteIdent("correlation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$' AND (${quoteIdent("causation_id")} IS NULL OR ${quoteIdent("causation_id")} ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$')),`,
     `  CONSTRAINT ${quoteIdent("ck_event_outbox_delivery")} CHECK (${quoteIdent("delivery_attempts")} >= 0 AND ((${quoteIdent("lease_token")} IS NULL) = (${quoteIdent("leased_until")} IS NULL)) AND (${quoteIdent("published_at")} IS NULL OR (${quoteIdent("lease_token")} IS NULL AND ${quoteIdent("leased_until")} IS NULL)))`,
     ");",
-    `CREATE INDEX IF NOT EXISTS ${quoteIdent("ix_event_outbox_delivery")} ON ${outbox} (${quoteIdent("occurred_at")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("id")}) WHERE ${quoteIdent("published_at")} IS NULL;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("consumer_id")} text;`,
+    `ALTER TABLE ${outbox} ADD COLUMN IF NOT EXISTS ${quoteIdent("consumer_audit_id")} bigint;`,
+    `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("action_id")} DROP NOT NULL;`,
+    `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("principal_id")} DROP NOT NULL;`,
+    `ALTER TABLE ${outbox} ALTER COLUMN ${quoteIdent("action_audit_id")} DROP NOT NULL;`,
+    "DO $modellang$",
+    "BEGIN",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${outbox}'::regclass AND conname = 'fk_event_outbox_consumer_audit') THEN`,
+    `    ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("fk_event_outbox_consumer_audit")} FOREIGN KEY (${quoteIdent("consumer_audit_id")}) REFERENCES ${consumerAudit} (${quoteIdent("id")});`,
+    "  END IF;",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${outbox}'::regclass AND conname = 'uq_event_outbox_consumer_ordinal') THEN`,
+    `    ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("uq_event_outbox_consumer_ordinal")} UNIQUE (${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")});`,
+    "  END IF;",
+    `  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint WHERE conrelid = '${outbox}'::regclass AND conname = 'ck_event_outbox_producer') THEN`,
+    `    ALTER TABLE ${outbox} ADD CONSTRAINT ${quoteIdent("ck_event_outbox_producer")} CHECK ((` +
+      `${quoteIdent("action_id")} IS NOT NULL AND ${quoteIdent("action_id")} ~ '^action:.+$' AND ${quoteIdent("consumer_id")} IS NULL AND ${quoteIdent("action_audit_id")} IS NOT NULL AND ${quoteIdent("consumer_audit_id")} IS NULL AND ${quoteIdent("principal_id")} IS NOT NULL) OR (` +
+      `${quoteIdent("action_id")} IS NULL AND ${quoteIdent("consumer_id")} IS NOT NULL AND ${quoteIdent("consumer_id")} ~ '^consumer:.+$' AND ${quoteIdent("action_audit_id")} IS NULL AND ${quoteIdent("consumer_audit_id")} IS NOT NULL AND ${quoteIdent("principal_id")} IS NULL AND ${quoteIdent("command_receipt_id")} IS NULL));`,
+    "  END IF;",
+    "END",
+    "$modellang$;",
+    `CREATE INDEX IF NOT EXISTS ${quoteIdent("ix_event_outbox_delivery_v2")} ON ${outbox} (${quoteIdent("occurred_at")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("id")}) WHERE ${quoteIdent("published_at")} IS NULL;`,
     `CREATE OR REPLACE FUNCTION ${qname(internal, "claim_events")}(p_limit integer, p_lease_seconds integer)`,
     "RETURNS SETOF jsonb",
     "LANGUAGE plpgsql",
@@ -703,7 +731,7 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     "  WITH candidates AS (",
     `    SELECT row_value.${quoteIdent("id")} FROM ${outbox} AS row_value`,
     `    WHERE row_value.${quoteIdent("published_at")} IS NULL AND (row_value.${quoteIdent("leased_until")} IS NULL OR row_value.${quoteIdent("leased_until")} <= pg_catalog.clock_timestamp())`,
-    `    ORDER BY row_value.${quoteIdent("occurred_at")}, row_value.${quoteIdent("action_audit_id")}, row_value.${quoteIdent("ordinal")}, row_value.${quoteIdent("id")}`,
+    `    ORDER BY row_value.${quoteIdent("occurred_at")}, (row_value.${quoteIdent("consumer_id")} IS NOT NULL), COALESCE(row_value.${quoteIdent("action_audit_id")}, row_value.${quoteIdent("consumer_audit_id")}), row_value.${quoteIdent("ordinal")}, row_value.${quoteIdent("id")}`,
     "    FOR UPDATE SKIP LOCKED LIMIT p_limit",
     "  ), leased AS (",
     `    UPDATE ${outbox} AS row_value SET ${quoteIdent("lease_token")} = v_lease_token,`,
@@ -712,10 +740,10 @@ export function generateEventOutboxInfrastructureStatements(ir: ModelIR): string
     `    FROM candidates WHERE row_value.${quoteIdent("id")} = candidates.${quoteIdent("id")} RETURNING row_value.*`,
     "  )",
     `  SELECT pg_catalog.jsonb_build_object('id', ${quoteIdent("id")}, 'eventId', ${quoteIdent("event_id")}, 'eventName', ${quoteIdent("event_name")},`,
-    `    'modelId', ${quoteIdent("model_id")}, 'modelVersion', ${quoteIdent("model_version")}, 'sourceHash', ${quoteIdent("source_hash")}, 'actionId', ${quoteIdent("action_id")},`,
+    `    'modelId', ${quoteIdent("model_id")}, 'modelVersion', ${quoteIdent("model_version")}, 'sourceHash', ${quoteIdent("source_hash")}, 'actionId', ${quoteIdent("action_id")}, 'consumerId', ${quoteIdent("consumer_id")},`,
     `    'targetId', ${quoteIdent("target_id")}, 'payload', ${quoteIdent("payload")}, 'correlationId', ${quoteIdent("correlation_id")},`,
     `    'causationId', ${quoteIdent("causation_id")}, 'occurredAt', ${quoteIdent("occurred_at")}, 'ordinal', ${quoteIdent("ordinal")}, 'deliveryAttempt', ${quoteIdent("delivery_attempts")}, 'leaseToken', ${quoteIdent("lease_token")})`,
-    `  FROM leased ORDER BY ${quoteIdent("occurred_at")}, ${quoteIdent("action_audit_id")}, ${quoteIdent("ordinal")}, ${quoteIdent("id")};`,
+    `  FROM leased ORDER BY ${quoteIdent("occurred_at")}, (${quoteIdent("consumer_id")} IS NOT NULL), COALESCE(${quoteIdent("action_audit_id")}, ${quoteIdent("consumer_audit_id")}), ${quoteIdent("ordinal")}, ${quoteIdent("id")};`,
     "END",
     "$modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "claim_events")}(integer, integer) FROM PUBLIC;`,
@@ -880,8 +908,8 @@ function generateSchema(ir: ModelIR): string {
     ...generateGatewayInfrastructureStatements(ir),
     ...generateDecisionEvidenceInfrastructureStatements(ir),
     ...generateCommandReceiptInfrastructureStatements(ir),
-    ...generateEventOutboxInfrastructureStatements(ir),
     ...generateEventInboxInfrastructureStatements(ir),
+    ...generateEventOutboxInfrastructureStatements(ir),
     "",
     `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -1543,7 +1571,8 @@ function consumerEvidenceSql(ir: ModelIR, consumer: IRConsumer): string {
     + `'consumerId', '${consumer.id.replaceAll("'", "''")}', 'sourceEventId', v_source_event_id, `
     + `'sourceContract', pg_catalog.jsonb_build_object('eventId', '${consumer.sourceEventId.replaceAll("'", "''")}', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), `
     + `'authorization', pg_catalog.jsonb_build_object('ruleId', '${consumer.authorization.id.replaceAll("'", "''")}', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), `
-    + `'requirements', pg_catalog.jsonb_build_array(${requirements.join(", ")}))`;
+    + `'requirements', pg_catalog.jsonb_build_array(${requirements.join(", ")}), `
+    + `'emittedEventIds', pg_catalog.to_jsonb(ARRAY[${consumer.emittedEventIds.map((id) => `'${id.replaceAll("'", "''")}'`).join(", ")}]::text[]))`;
 }
 
 function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
@@ -1557,8 +1586,12 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     : event.source;
   const recordNames = new Map([[consumer.payloadParameter.id, "v_payload"]]);
   const context: ExpressionContext = { ir, consumer, recordNames };
-  const envelopeKeys = [
+  const legacyEnvelopeKeys = [
     "actionId", "causationId", "correlationId", "deliveryAttempt", "eventId", "eventName", "id", "modelId",
+    "modelVersion", "occurredAt", "ordinal", "payload", "sourceHash", "targetId",
+  ].map((key) => `'${key}'`).join(", ");
+  const envelopeKeys = [
+    "actionId", "causationId", "consumerId", "correlationId", "deliveryAttempt", "eventId", "eventName", "id", "modelId",
     "modelVersion", "occurredAt", "ordinal", "payload", "sourceHash", "targetId",
   ].map((key) => `'${key}'`).join(", ");
   const declarations = [
@@ -1591,7 +1624,9 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
     "  END IF;",
     "  SELECT pg_catalog.array_agg(key_name ORDER BY key_name) INTO v_envelope_keys FROM pg_catalog.jsonb_object_keys(p_envelope) AS key_name;",
-    `  IF v_envelope_keys IS DISTINCT FROM ARRAY[${envelopeKeys}]::text[] THEN`,
+    `  IF v_envelope_keys IS NOT DISTINCT FROM ARRAY[${legacyEnvelopeKeys}]::text[] THEN`,
+    "    p_envelope := p_envelope || pg_catalog.jsonb_build_object('consumerId', NULL);",
+    `  ELSIF v_envelope_keys IS DISTINCT FROM ARRAY[${envelopeKeys}]::text[] THEN`,
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
     "  END IF;",
     "  IF pg_catalog.jsonb_typeof(p_envelope->'id') IS DISTINCT FROM 'string'",
@@ -1600,7 +1635,8 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     "     OR pg_catalog.jsonb_typeof(p_envelope->'modelId') IS DISTINCT FROM 'string'",
     "     OR pg_catalog.jsonb_typeof(p_envelope->'modelVersion') IS DISTINCT FROM 'string'",
     "     OR pg_catalog.jsonb_typeof(p_envelope->'sourceHash') IS DISTINCT FROM 'string'",
-    "     OR pg_catalog.jsonb_typeof(p_envelope->'actionId') IS DISTINCT FROM 'string'",
+    "     OR (p_envelope->'actionId' <> 'null'::jsonb AND pg_catalog.jsonb_typeof(p_envelope->'actionId') IS DISTINCT FROM 'string')",
+    "     OR (p_envelope->'consumerId' <> 'null'::jsonb AND pg_catalog.jsonb_typeof(p_envelope->'consumerId') IS DISTINCT FROM 'string')",
     "     OR pg_catalog.jsonb_typeof(p_envelope->'targetId') IS DISTINCT FROM 'string'",
     "     OR pg_catalog.jsonb_typeof(p_envelope->'payload') IS DISTINCT FROM 'object'",
     "     OR pg_catalog.jsonb_typeof(p_envelope->'correlationId') IS DISTINCT FROM 'string'",
@@ -1629,7 +1665,8 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     `     OR v_source_model_id IS DISTINCT FROM '${source.modelId.replaceAll("'", "''")}'`,
     `     OR v_source_model_version IS DISTINCT FROM '${source.modelVersion.replaceAll("'", "''")}'`,
     `     OR v_source_hash IS DISTINCT FROM '${source.sourceHash.replaceAll("'", "''")}'`,
-    "     OR p_envelope->>'actionId' !~ '^action:.+$'",
+    "     OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)",
+    "              OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)",
     "     OR (p_envelope->>'ordinal')::integer < 0",
     "     OR v_delivery_attempt < 1",
     "     OR v_correlation_id !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$'",
@@ -1705,6 +1742,17 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     `  v_response := ${rowJson(returnEntity, "v_result")};`,
     `  INSERT INTO ${qname(internal, "consumer_audit")} (${quoteIdent("consumer_id")}, ${quoteIdent("source_event_id")}, ${quoteIdent("source_event_type")}, ${quoteIdent("source_model_id")}, ${quoteIdent("source_model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("target_id")}, ${quoteIdent("authorization_rule_id")}, ${quoteIdent("policy_id")}, ${quoteIdent("authority_id")}, ${quoteIdent("decision_evidence")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")})`,
     `  VALUES ('${consumer.id.replaceAll("'", "''")}', v_source_event_id, '${event.id.replaceAll("'", "''")}', v_source_model_id, v_source_model_version, v_source_hash, v_result.${quoteIdent("id")}, '${consumer.authorization.id.replaceAll("'", "''")}', v_authority_policy_id, v_authority_id, ${consumerEvidenceSql(ir, consumer)}, v_correlation_id, v_causation_id) RETURNING ${quoteIdent("id")} INTO v_consumer_audit_id;`,
+  );
+  consumer.emittedEventIds.forEach((emittedEventId, ordinal) => {
+    const emittedEvent = ir.events.find((candidate) => candidate.id === emittedEventId);
+    if (!emittedEvent) throw new Error(`E4014 Missing consumer-emitted event ${emittedEventId}`);
+    body.push(
+      `  INSERT INTO ${qname(internal, "event_outbox")} (${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("event_id")}, ${quoteIdent("event_name")}, ${quoteIdent("payload_entity_id")}, ${quoteIdent("consumer_id")}, ${quoteIdent("target_id")}, ${quoteIdent("payload")}, ${quoteIdent("correlation_id")}, ${quoteIdent("causation_id")}, ${quoteIdent("consumer_audit_id")}, ${quoteIdent("ordinal")})`,
+      `  VALUES ('${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${emittedEvent.id.replaceAll("'", "''")}', '${emittedEvent.name.replaceAll("'", "''")}', '${emittedEvent.payloadEntityId.replaceAll("'", "''")}', '${consumer.id.replaceAll("'", "''")}', v_result.${quoteIdent("id")}, v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, ${ordinal});`,
+      "",
+    );
+  });
+  body.push(
     `  UPDATE ${qname(internal, "event_inbox")} SET ${quoteIdent("status")} = 'executed', ${quoteIdent("target_id")} = v_result.${quoteIdent("id")}, ${quoteIdent("response")} = v_response, ${quoteIdent("consumer_audit_id")} = v_consumer_audit_id, ${quoteIdent("completed_at")} = pg_catalog.transaction_timestamp() WHERE ${quoteIdent("id")} = v_inbox_id;`,
     "  RETURN v_response;",
   );
@@ -1901,8 +1949,8 @@ $modellang_upgrade$;
 ${generateGatewayInfrastructureStatements(ir, false).join("\n")}
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
 ${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 -- Existing guarded callables must resolve both direct and gateway identities.
@@ -1946,8 +1994,8 @@ $modellang_upgrade$;
 ${generateSnapshotResolverStatements(ir).join("\n")}
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
 ${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -1989,8 +2037,8 @@ END
 $modellang_upgrade$;
 ${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
 ${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -2031,8 +2079,8 @@ BEGIN
 END
 $modellang_upgrade$;
 ${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -2071,8 +2119,8 @@ BEGIN
   END IF;
 END
 $modellang_upgrade$;
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
 ${generateActions(ir, plan).trim()}
@@ -2111,8 +2159,49 @@ BEGIN
 END
 $modellang_upgrade$;
 ${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
 RESET ROLE;
 
+${generateConsumers(ir).trim()}
+${generateGrants(ir).trim()}
+COMMIT;
+`;
+}
+
+function generateEventChainUpgrade(ir: ModelIR, plan: DecisionPlan): string {
+  const internal = ir.model.naming.internalSchema;
+  const modelId = ir.model.id.replaceAll("'", "''");
+  const version = ir.model.version.replaceAll("'", "''");
+  const sourceHash = ir.model.sourceHash.replaceAll("'", "''");
+  return `-- Idempotent ModelLang 0.21 -> 0.22 transactional event-chain upgrade.
+-- Existing producer events remain valid; no historical downstream events are synthesized.
+BEGIN;
+${generateDispatcherRoleStatements()}
+${generateConsumerRoleStatements()}
+SET LOCAL ROLE modellang_owner;
+DO $modellang_upgrade$
+DECLARE
+  v_model_id text;
+  v_version text;
+  v_source_hash text;
+BEGIN
+  SELECT ${quoteIdent("model_id")}, ${quoteIdent("version")}, ${quoteIdent("source_hash")}
+  INTO v_model_id, v_version, v_source_hash
+  FROM ${qname(internal, "schema_migrations")}
+  ORDER BY ${quoteIdent("id")} DESC LIMIT 1;
+  IF NOT FOUND
+     OR v_model_id IS DISTINCT FROM '${modelId}'
+     OR v_version IS DISTINCT FROM '${version}'
+     OR v_source_hash IS DISTINCT FROM '${sourceHash}' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:${sourceHash}';
+  END IF;
+END
+$modellang_upgrade$;
+${generateEventInboxInfrastructureStatements(ir).join("\n")}
+${generateEventOutboxInfrastructureStatements(ir).join("\n")}
+RESET ROLE;
+
+${generateActions(ir, plan).trim()}
 ${generateConsumers(ir).trim()}
 ${generateGrants(ir).trim()}
 COMMIT;
@@ -2135,5 +2224,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "009_upgrade_0_19.sql": generateReliableCommandUpgrade(ir, plan),
     "010_upgrade_0_20.sql": generateDomainEventUpgrade(ir, plan),
     "011_upgrade_0_21.sql": generateEventConsumerUpgrade(ir, plan),
+    "012_upgrade_0_22.sql": generateEventChainUpgrade(ir, plan),
   };
 }

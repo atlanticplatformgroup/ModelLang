@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.22.0
+
+- Added ordered local `emit Event;` clauses to stable typed consumers, preserved in canonical IR14 with compile-time payload, locality, uniqueness, and acyclic event-graph checks.
+- Made consumer effect, exact evidence, downstream outbox insertion, inbox completion, and stored result one PostgreSQL transaction; duplicate replay returns before emission and cannot append a second downstream event.
+- Added event-envelope v2 producer provenance: exactly one stable action or consumer ID, inherited correlation, and consumed source-event UUID causation. Legacy action envelopes are normalized before fingerprinting.
+- Generalized the private outbox for action and consumer producers without exposing event instances, consumer evidence, inboxes, payloads, correlations, or leases through public application or agent-facing contracts.
+- Advanced event manifest to v3, engineering semantic manifest to v6, semantic diff to v7, and generator profile to `/6`; operation manifest v4, capability manifest v3, UI manifest v4, decision plan v2, and stable HTTP routes remain unchanged.
+- Added IR9–IR13 evolution normalization, reviewed consumer-emission changes, and baseline-checked idempotent `012_upgrade_0_22.sql` without historical emission or fabricated provenance.
+- Updated Procurement and Reservations with one-step acyclic event chains plus golden, compiler, schema, replay, correlation/causation, rollback, migration, and live PostgreSQL coverage.
+
 ## 0.21.0
 
 - Added stable typed `consumer ... on Event(payload value: Entity)` declarations plus exact imported event-source contracts, preserved in canonical IR13 with authorization, requirements, locks, effects, and duplicate-handling identity.

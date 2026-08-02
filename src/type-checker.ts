@@ -199,11 +199,12 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const policies = [...symbols.policies.values()].map((policy) => lowerPolicy(policy, symbols, file));
   const actions: IRAction[] = [...symbols.actions.values()].map((action) => lowerAction(action, symbols, principalName, file));
   const consumers: IRConsumer[] = [...symbols.consumers.values()].map((consumer) => lowerConsumer(consumer, symbols, file));
+  validateConsumerEventGraph(consumers, symbols, file);
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 13,
+    irVersion: 14,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -821,6 +822,20 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
       }
     }
   }
+  const emitted = new Set<string>();
+  const emittedEventIds = consumer.emits.map((emission) => {
+    const emittedEvent = symbols.events.get(emission.eventName);
+    if (!emittedEvent) throw new ModelError("E3301", `Consumer '${consumer.name}' emits unknown event '${emission.eventName}'.`, emission.span, file);
+    if (emittedEvent.importedFrom) throw new ModelError("E3302", `Consumer '${consumer.name}' cannot emit imported event contract '${emittedEvent.name}'.`, emission.span, file);
+    const emittedPayload = symbols.entities.get(emittedEvent.payloadType.name);
+    if (!emittedPayload || entityId(emittedPayload) !== entityId(effectEntity)) {
+      throw new ModelError("E3303", `Event '${emittedEvent.name}' payload must match consumer '${consumer.name}' return entity '${returnEntity.name}'.`, emission.span, file);
+    }
+    const id = eventId(emittedEvent);
+    if (emitted.has(id)) throw new ModelError("E3304", `Consumer '${consumer.name}' may emit event '${emittedEvent.name}' at most once.`, emission.span, file);
+    emitted.add(id);
+    return id;
+  });
   return {
     id: semanticId,
     name: consumer.name,
@@ -838,6 +853,7 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
     },
     preconditions,
     effect: { kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
+    emittedEventIds,
     lockPlan: consumer.effect.kind === "update"
       ? [{ id: `lock:${semanticId}.${payloadParameter.name}`, source: payloadParameter.id, parameterId: payloadParameter.id, entityId: entityId(effectEntity), mode: "update", order: 0 }]
       : [],
@@ -850,6 +866,34 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
     span: irSpan(consumer.span, file),
     naming: { sqlFunction: `consume_${snakeCase(consumer.name)}`, typescriptMethod: consumer.name },
   };
+}
+
+function validateConsumerEventGraph(consumers: IRConsumer[], symbols: Symbols, file: string): void {
+  const edges = new Map<string, { eventId: string; consumer: IRConsumer }[]>();
+  for (const consumer of consumers) {
+    const outgoing = edges.get(consumer.sourceEventId) ?? [];
+    for (const eventId of consumer.emittedEventIds) outgoing.push({ eventId, consumer });
+    edges.set(consumer.sourceEventId, outgoing);
+  }
+  const active = new Set<string>();
+  const complete = new Set<string>();
+  const visit = (currentEventId: string, path: string[]): void => {
+    if (complete.has(currentEventId)) return;
+    active.add(currentEventId);
+    for (const edge of edges.get(currentEventId) ?? []) {
+      if (active.has(edge.eventId)) {
+        const cycle = [...path, edge.eventId]
+          .map((id) => [...symbols.events.values()].find((event) => eventId(event) === id)?.name ?? id)
+          .join(" -> ");
+        const declaration = symbols.consumers.get(edge.consumer.name)!;
+        throw new ModelError("E3305", `Consumer event emissions must be acyclic; detected ${cycle}.`, declaration.span, file);
+      }
+      visit(edge.eventId, [...path, edge.eventId]);
+    }
+    active.delete(currentEventId);
+    complete.add(currentEventId);
+  };
+  for (const event of symbols.events.values()) visit(eventId(event), [event.name]);
 }
 
 function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, file: string): IRQuery {
@@ -1494,7 +1538,7 @@ function buildEnforcement(
   for (const consumer of consumers) {
     entries.push({
       id: consumer.id,
-      purpose: `Consume ${consumer.sourceEventId} with transactional inbox deduplication and one local committed effect.`,
+      purpose: `Consume ${consumer.sourceEventId} with transactional inbox deduplication, one local committed effect, and atomic downstream event emission.`,
       layer: "PostgreSQL consumer function",
       artifact: "postgres/003_consumers.sql",
       objectName: `${internalSchema}.${consumer.naming.sqlFunction}`,
@@ -1508,6 +1552,17 @@ function buildEnforcement(
       objectName: `${internalSchema}.event_inbox`,
       source: consumer.span,
     });
+    for (const eventId of consumer.emittedEventIds) {
+      const event = events.find((candidate) => candidate.id === eventId)!;
+      entries.push({
+        id: `emit:${consumer.id}.${event.id}`,
+        purpose: `Append ${event.name} with the committed post-effect entity payload, inherited correlation, and source-event causation.`,
+        layer: "PostgreSQL transactional outbox",
+        artifact: "postgres/003_consumers.sql",
+        objectName: `${internalSchema}.event_outbox`,
+        source: consumer.span,
+      });
+    }
   }
   for (const query of queries) {
     const fn = `${schema}.${query.naming.sqlFunction}`;

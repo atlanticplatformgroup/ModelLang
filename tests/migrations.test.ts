@@ -243,7 +243,7 @@ query bookings(caller actor: User) from Booking as booking {
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(13);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(14);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -366,16 +366,20 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR12 artifacts as previous baselines for an IR13 migration", () => {
+  it("accepts released IR9 through IR13 artifacts as previous baselines for an IR14 migration", () => {
     const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
     const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11, 12]) {
+    for (const irVersion of [9, 10, 11, 12, 13]) {
       const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
       legacy.irVersion = irVersion;
       if (irVersion === 9) delete legacy.policies;
       if (irVersion < 12) {
         delete legacy.events;
         for (const action of legacy.actions as Record<string, unknown>[]) delete action.emittedEventIds;
+      }
+      if (irVersion < 13) delete legacy.consumers;
+      else if (irVersion === 13) {
+        for (const consumer of legacy.consumers as Record<string, unknown>[]) delete consumer.emittedEventIds;
       }
       expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
       const plan = planMigration(legacy as unknown as typeof previous, current);

@@ -43,7 +43,7 @@ describe("lexer and parser", () => {
 });
 
 describe("semantic analysis", () => {
-  it("lowers typed event consumers into canonical IR13 delivery semantics", () => {
+  it("lowers typed event consumers into canonical IR14 delivery semantics", () => {
     const ir = compileText(minimal(`event ItemChanged payload Item;
       consumer observeItem on ItemChanged(payload item: Item) -> Item {
         authorize true;
@@ -54,7 +54,7 @@ describe("semantic analysis", () => {
         authorize true;
         update item { optionalFlag = false; }
       }`));
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.consumers).toEqual([expect.objectContaining({
       id: "consumer:observeItem",
       sourceEventId: "event:ItemChanged",
@@ -181,7 +181,7 @@ describe("semantic analysis", () => {
         require still_allowed: MayManage(actor, item);
         update item { value = 2; }
       }`, "policy.model");
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.policies).toEqual([
       expect.objectContaining({
         id: "policy:MayManage",
@@ -243,7 +243,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -363,7 +363,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -433,7 +433,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -466,7 +466,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -570,7 +570,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -649,7 +649,7 @@ workflow TaskLifecycle for Task.state {
 describe("ModelLang 0.9 workflows", () => {
   it("lowers initial state, action-backed transitions, and enforcement targets into the current IR", () => {
     const ir = compileText(workflowModel, "workflow.model");
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.workflows).toEqual([
       expect.objectContaining({
         id: "workflow:TaskLifecycle",
@@ -747,7 +747,7 @@ action make(caller actor: User) -> Record {
 
   it("preserves stable typed events and ordered action emissions in the current IR", () => {
     const ir = compileText(eventModel(), "events.model");
-    expect(ir.irVersion).toBe(13);
+    expect(ir.irVersion).toBe(14);
     expect(ir.events).toEqual([expect.objectContaining({
       id: "event:evt_11111111111111111111111111111111",
       name: "RecordChanged",
@@ -762,5 +762,48 @@ action make(caller actor: User) -> Record {
 
   it("rejects an event payload that differs from the action result", () => {
     expect(failure(eventModel("User")).code).toBe("E3103");
+  });
+});
+
+describe("ModelLang 0.22 transactional event chains", () => {
+  const chainModel = (firstEmissions: string, secondConsumer = "") => `model Chains version "1";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id; observed: Boolean = false; }
+event RecordCreated @stableId("evt_11111111111111111111111111111111") payload Record;
+event RecordObserved @stableId("evt_22222222222222222222222222222222") payload Record;
+action touch(caller actor: User, record: Record) -> Record {
+  authorize true;
+  update record { observed = false; }
+  emit RecordCreated;
+}
+consumer observe @stableId("con_11111111111111111111111111111111") on RecordCreated(payload record: Record) -> Record {
+  authorize true;
+  update record { observed = true; }
+  ${firstEmissions}
+}
+${secondConsumer}`;
+
+  it("preserves ordered consumer emissions in IR14", () => {
+    const ir = compileText(chainModel("emit RecordObserved;"), "chains.model");
+    expect(ir.irVersion).toBe(14);
+    expect(ir.consumers[0]!.emittedEventIds).toEqual([
+      "event:evt_22222222222222222222222222222222",
+    ]);
+  });
+
+  it.each([
+    ["an unknown event", "emit Missing;", "E3301"],
+    ["a duplicate event", "emit RecordObserved; emit RecordObserved;", "E3304"],
+  ])("rejects %s", (_label, emissions, code) => {
+    expect(failure(chainModel(emissions))).toMatchObject({ code });
+  });
+
+  it("rejects consumer event cycles", () => {
+    const second = `consumer reset @stableId("con_22222222222222222222222222222222") on RecordObserved(payload record: Record) -> Record {
+  authorize true;
+  update record { observed = false; }
+  emit RecordCreated;
+}`;
+    expect(failure(chainModel("emit RecordObserved;", second))).toMatchObject({ code: "E3305" });
   });
 });

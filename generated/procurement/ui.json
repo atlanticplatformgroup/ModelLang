@@ -5,8 +5,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.21.0",
-    "sourceHash": "sha256:4e220226a36b53f1f7b4c07832805b191a425c721c61b5a77b2e767d4d5638ec",
+    "version": "0.22.0",
+    "sourceHash": "sha256:1f330af30c55b227b596bb2cdf066b95bae23191197df5cec3f2dd2ad146c972",
     "label": "Procurement"
   },
   "authentication": {
