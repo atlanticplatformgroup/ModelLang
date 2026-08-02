@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 13;
+  diffVersion: 14;
   compilerVersion: string;
-  irVersion: 20;
+  irVersion: 21;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -494,6 +494,16 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
       persistenceRisk: false,
       explanation: "Query ordering or maximum result cardinality changed.",
     });
+    if (!same(pair.previous.pagination, pair.current.pagination)) addChange(changes, {
+      kind: "queryPaginationChanged",
+      area: "queryVisibility",
+      classification: "breaking",
+      subject: subject("query", pair.current),
+      before: pair.previous.pagination ? text(pair.previous.pagination) : "unpaginated",
+      after: pair.current.pagination ? text(pair.current.pagination) : "unpaginated",
+      persistenceRisk: false,
+      explanation: "Cursor pagination changes the query input and closed result envelope contract.",
+    });
   }
 }
 
@@ -666,7 +676,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 13,
+    diffVersion: 14,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

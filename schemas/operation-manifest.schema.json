@@ -78,6 +78,7 @@
           "invariant",
           "conflict",
           "idempotency",
+          "stale",
           "notFound",
           "validation"
         ]
@@ -137,14 +138,39 @@
         "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
         "caller": { "$ref": "#/$defs/caller" },
         "output": {
-          "type": "object",
-          "required": ["projectionId", "cardinality", "maxItems"],
-          "properties": {
-            "projectionId": { "type": "string", "pattern": "^projection:" },
-            "cardinality": { "const": "many" },
-            "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
-          },
-          "additionalProperties": false
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["projectionId", "cardinality", "maxItems"],
+              "properties": {
+                "projectionId": { "type": "string", "pattern": "^projection:" },
+                "cardinality": { "const": "many" },
+                "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["projectionId", "cardinality", "maxItems", "pagination"],
+              "properties": {
+                "projectionId": { "type": "string", "pattern": "^projection:" },
+                "cardinality": { "const": "page" },
+                "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                "pagination": {
+                  "type": "object",
+                  "required": ["kind", "cursorVersion", "queryRevision", "cursorInput"],
+                  "properties": {
+                    "kind": { "const": "cursor" },
+                    "cursorVersion": { "const": 1 },
+                    "queryRevision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                    "cursorInput": { "const": "cursor" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
         },
         "errors": { "$ref": "#/$defs/errors" }
       },
@@ -202,7 +228,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 6 },
+    "manifestVersion": { "const": 7 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

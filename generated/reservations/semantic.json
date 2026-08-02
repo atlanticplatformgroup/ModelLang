@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 12,
-  "profile": "sml-transactional-core/12",
+  "manifestVersion": 13,
+  "profile": "sml-transactional-core/13",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.31.0",
-    "irVersion": 20,
+    "compilerVersion": "0.32.0",
+    "irVersion": 21,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.31.0",
-    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8",
+    "version": "0.32.0",
+    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {
@@ -545,7 +545,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 82,
+        "endLine": 83,
         "endColumn": 2
       },
       "caller": {
@@ -565,8 +565,14 @@
       ],
       "output": {
         "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
-        "cardinality": "many",
-        "maxItems": 100
+        "cardinality": "page",
+        "maxItems": 2,
+        "pagination": {
+          "kind": "cursor",
+          "cursorVersion": 1,
+          "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2",
+          "cursorInput": "cursor"
+        }
       },
       "authorization": {
         "id": "authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
@@ -677,7 +683,9 @@
       },
       "failureClasses": [
         "identityBinding",
-        "authorization"
+        "authorization",
+        "validation",
+        "stale"
       ]
     }
   ]

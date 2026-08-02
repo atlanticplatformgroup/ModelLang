@@ -10,6 +10,10 @@ import {
   ModelOperationError,
   ValidationError,
 } from "../generated/procurement/typescript/errors.js";
+import {
+  createReservationsHttpHandler,
+  type ReservationsOperationExecutor,
+} from "../generated/reservations/typescript/http-server.js";
 
 const openRoute = "https://example.test/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
 const purchaseRequest = {
@@ -45,6 +49,66 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
 }
 
 describe("generated HTTP boundary", () => {
+  it("validates closed cursor-page inputs and outputs", async () => {
+    const route = "https://example.test/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69";
+    const cursor = "eyJ2IjoxfQ";
+    const page = {
+      items: [{
+        id: "00000000-0000-4000-8000-000000000020",
+        resource: {
+          id: "20000000-0000-4000-8000-000000000001",
+          name: "Conference Room A",
+        },
+        startsAt: "2031-01-10T10:00:00Z",
+        endsAt: "2031-01-10T11:00:00Z",
+      }],
+      nextCursor: cursor,
+    };
+    const execute = vi.fn(async () => page);
+    const executor = {
+      execute,
+      assess: async () => ({
+        operationId: "action:act_508ad810a19d4b79a5009871de5cd26b",
+        status: "denied",
+        applicable: false,
+        authority: "none",
+        explanation: { kind: "authorization", ruleId: "authorize:action:act_508ad810a19d4b79a5009871de5cd26b" },
+      }),
+    } satisfies ReservationsOperationExecutor;
+    const handler = createReservationsHttpHandler(async () => executor);
+    const response = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({ resource: "20000000-0000-4000-8000-000000000001", cursor }),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(page);
+    expect(execute).toHaveBeenCalledWith(
+      "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      { resource: "20000000-0000-4000-8000-000000000001", cursor },
+      { expectedRevision: undefined },
+    );
+
+    const malformed = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({ resource: "20000000-0000-4000-8000-000000000001", cursor: "not base64url!" }),
+    }));
+    expect(malformed.status).toBe(400);
+    expect(await malformed.json()).toMatchObject({ ruleId: "cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69" });
+
+    const invalidOutput = createReservationsHttpHandler(async () => ({
+      ...executor,
+      execute: async () => page.items,
+    }));
+    const invalid = await invalidOutput(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({ resource: "20000000-0000-4000-8000-000000000001" }),
+    }));
+    expect(invalid.status).toBe(500);
+  });
+
   it("recursively validates closed nested query projections", async () => {
     const queryRoute = "https://example.test/operations/queries/qry_4406b045404a48449282db804f6167a8";
     const validResult = [{

@@ -15,11 +15,14 @@ function resultType(manifest: OperationManifest, operation: OperationManifest["o
   }
   const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
   if (!projection) throw new Error(`E6206 Missing UI result projection '${operation.output.projectionId}'.`);
-  return `${projection.name}[]`;
+  return operation.output.cardinality === "page" ? `CursorPage<${projection.name}>` : `${projection.name}[]`;
 }
 
-function resultImportType(manifest: OperationManifest, operation: OperationManifest["operations"][number]): string {
-  return resultType(manifest, operation).replace(/\[\]$/, "");
+function resultImportTypes(manifest: OperationManifest, operation: OperationManifest["operations"][number]): string[] {
+  if (operation.kind === "action") return [resultType(manifest, operation)];
+  const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
+  if (!projection) throw new Error(`E6206 Missing UI result projection '${operation.output.projectionId}'.`);
+  return [projection.name, ...(operation.output.cardinality === "page" ? ["CursorPage"] : [])];
 }
 
 export function generateUi(manifest: OperationManifest, uiManifest: UiManifest): UiOutput {
@@ -29,7 +32,7 @@ export function generateUi(manifest: OperationManifest, uiManifest: UiManifest):
     return enumeration.name;
   });
   const imports = [...new Set([
-    ...manifest.operations.map((operation) => resultImportType(manifest, operation)),
+    ...manifest.operations.flatMap((operation) => resultImportTypes(manifest, operation)),
     ...manifest.operations.map(operationInputName),
     ...workflowEnums,
     "ApplicabilityDecision",

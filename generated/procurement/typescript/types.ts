@@ -17,6 +17,10 @@ export interface ExecutionOptions {
   readonly causationId?: string;
 }
 export interface ApplicabilityOptions { readonly expectedRevision?: string; }
+export interface CursorPage<T> {
+  readonly items: T[];
+  readonly nextCursor: string | null;
+}
 
 export interface Money<C extends string> {
   readonly currency: C;

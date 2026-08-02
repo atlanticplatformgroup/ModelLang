@@ -66,6 +66,10 @@ function generateTypes(ir: ModelIR): string {
     "  readonly causationId?: string;",
     "}",
     "export interface ApplicabilityOptions { readonly expectedRevision?: string; }",
+    "export interface CursorPage<T> {",
+    "  readonly items: T[];",
+    "  readonly nextCursor: string | null;",
+    "}",
     "",
   ];
   if (ir.entities.some((entity) => entity.fields.some((field) => isMoneyType(field.type)))
@@ -121,6 +125,7 @@ function generateTypes(ir: ModelIR): string {
       const parameter = query.parameters.find((candidate) => candidate.id === id)!;
       lines.push(`  ${parameter.name}: ${parameterType(ir, parameter.type)};`);
     }
+    if (query.pagination) lines.push("  cursor?: string;");
     lines.push("}", "");
   }
   return `${lines.join("\n")}\n`;
@@ -266,11 +271,16 @@ function queryMethod(ir: ModelIR, query: IRQuery): string {
   });
   const schema = ir.model.naming.sqlSchema.replaceAll('"', '""');
   const fn = query.naming.sqlFunction.replaceAll('"', '""');
-  return `  async ${query.name}(input: ${operationInputName(query)}): Promise<${projection.naming.typescriptName}[]> {
+  const placeholders = [...args.map((arg) => arg.placeholder), ...(query.pagination ? [`$${args.length + 1}`] : [])];
+  const values = [...args.map((arg) => clientParameterValue(arg.parameter)), ...(query.pagination ? ["input.cursor ?? null"] : [])];
+  const returnType = query.pagination
+    ? `CursorPage<${projection.naming.typescriptName}>`
+    : `${projection.naming.typescriptName}[]`;
+  return `  async ${query.name}(input: ${operationInputName(query)}): Promise<${returnType}> {
     try {
-      const result = await this.adapter.query<{ value: ${projection.naming.typescriptName}[] }>(
-        'SELECT "${schema}"."${fn}"(${args.map((arg) => arg.placeholder).join(", ")}) AS value',
-        [${args.map((arg) => clientParameterValue(arg.parameter)).join(", ")}],
+      const result = await this.adapter.query<{ value: ${returnType} }>(
+        'SELECT "${schema}"."${fn}"(${placeholders.join(", ")}) AS value',
+        [${values.join(", ")}],
       );
       return result.rows[0]!.value;
     } catch (error) {
@@ -288,6 +298,7 @@ function generateClient(ir: ModelIR, plan: DecisionPlan): string {
     "ApplicabilityDecision",
     "ApplicabilityOptions",
     "ExecutionOptions",
+    ...(ir.queries.some((query) => query.pagination) ? ["CursorPage"] : []),
   ])];
   const hasMoneyInputs = [...ir.actions, ...ir.queries].some((operation) =>
     operation.callableParameters.some((id) => isMoneyType(operation.parameters.find((parameter) => parameter.id === id)!.type)));

@@ -279,7 +279,17 @@
         "name": { "type": "string" },
         "identity": { "$ref": "#/$defs/identity" },
         "sourceEntityId": { "type": "string", "pattern": "^entity:" },
-        "returnProjectionId": { "type": "string", "pattern": "^projection:" }
+        "returnProjectionId": { "type": "string", "pattern": "^projection:" },
+        "pagination": {
+          "type": "object",
+          "required": ["kind", "cursorVersion", "revision"],
+          "properties": {
+            "kind": { "const": "cursor" },
+            "cursorVersion": { "const": 1 },
+            "revision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+          },
+          "additionalProperties": false
+        }
       }
     },
     "workflowTransition": {
@@ -315,7 +325,7 @@
   "type": "object",
   "required": ["irVersion", "model", "principal", "enums", "entities", "projections", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
   "properties": {
-    "irVersion": { "const": 20 },
+    "irVersion": { "const": 21 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],

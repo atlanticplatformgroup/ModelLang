@@ -495,6 +495,13 @@ class Parser {
     this.expectWord("limit");
     const limit = this.expect("number", "Expected an integer query limit.");
     const limitEnd = this.expect(";");
+    let pagination: QueryDecl["pagination"];
+    if (this.atWord("paginate")) {
+      const paginationStart = this.take();
+      this.expectWord("cursor");
+      const paginationEnd = this.expect(";");
+      pagination = { kind: "cursor", span: this.span(paginationStart, paginationEnd) };
+    }
     const end = this.expect("}");
     return {
       kind: "query",
@@ -514,6 +521,7 @@ class Parser {
       },
       limit: Number(limit.value),
       limitSpan: this.span(limit, limitEnd),
+      ...(pagination ? { pagination } : {}),
       span: this.span(start, end),
     };
   }

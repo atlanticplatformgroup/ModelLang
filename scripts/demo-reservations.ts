@@ -57,11 +57,15 @@ async function main(): Promise<void> {
     }, { idempotencyKey: "demo-reserve-conflict" }).catch((error: unknown) => error);
     if (!(conflict instanceof ConflictError)) throw new Error("Overlapping reservation unexpectedly succeeded");
     line(6, "Attempt overlapping reservation from 10:30 to 11:30", "REJECTED as designed");
-    const visible = await first.reservationsForResource({ resource });
-    if (visible.length !== 2 || visible.some((reservation) => reservation.resource.id !== resource)) {
+    const firstPage = await first.reservationsForResource({ resource });
+    const secondPage = firstPage.nextCursor
+      ? await first.reservationsForResource({ resource, cursor: firstPage.nextCursor })
+      : { items: [], nextCursor: null };
+    const visible = [...firstPage.items, ...secondPage.items];
+    if (visible.length !== 2 || secondPage.nextCursor !== null || visible.some((reservation) => reservation.resource.id !== resource)) {
       throw new Error("Resource-scoped query returned an unexpected result");
     }
-    line(7, "Read Conference Room A through declared resource query", "PASS");
+    line(7, "Read Conference Room A through cursor pages", "PASS");
     line(8, "Temporal/read rules -> PostgreSQL enforcement mapping");
     process.stdout.write(`\n${enforcementText(ir)}\n`);
   } finally {

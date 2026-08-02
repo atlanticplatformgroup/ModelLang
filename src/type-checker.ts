@@ -230,7 +230,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 20,
+    irVersion: 21,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1075,6 +1075,9 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   if (seen.has(query.rowAlias.name)) {
     throw new ModelError("E2605", `Query row alias '${query.rowAlias.name}' conflicts with a parameter.`, query.rowAlias.span, file);
   }
+  if (query.pagination && seen.has("cursor")) {
+    throw new ModelError("E2611", "Paginated queries reserve the generated input name 'cursor'.", seen.get("cursor")!, file);
+  }
   const sourceEntity = symbols.entities.get(query.sourceType.name);
   if (!sourceEntity) {
     throw new ModelError("E2601", `Query source '${query.sourceType.name}' must be an entity.`, query.sourceType.span, file);
@@ -1131,6 +1134,20 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     throw new ModelError("E2609", "Query limit must be an integer from 1 through 1000.", query.limitSpan, file);
   }
 
+  const paginationRevision = query.pagination
+    ? `sha256:${createHash("sha256").update(JSON.stringify({
+        id: semanticId,
+        parameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => ({ id: parameter.id, type: parameter.type })),
+        sourceEntityId: entityId(sourceEntity),
+        returnProjectionId: projectionId(projection),
+        authorization,
+        rowPolicy,
+        orderBy: { fieldId: fieldId(sourceEntity, orderField), direction: query.orderBy.direction },
+        limit: query.limit,
+        pagination: "cursor-v1",
+      })).digest("hex")}`
+    : undefined;
+
   return {
     id: semanticId,
     name: query.name,
@@ -1161,6 +1178,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       identityTieBreaker: true,
     },
     limit: query.limit,
+    ...(paginationRevision ? { pagination: { kind: "cursor" as const, cursorVersion: 1 as const, revision: paginationRevision } } : {}),
     span: irSpan(query.span, file),
     naming: { sqlFunction: snakeCase(query.name), typescriptMethod: query.name },
   };
@@ -1803,6 +1821,14 @@ function buildEnforcement(
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
     entries.push({ id: `order:${query.id}`, purpose: "Return rows in the declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     entries.push({ id: `limit:${query.id}`, purpose: `Return at most ${query.limit} rows.`, layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
+    if (query.pagination) entries.push({
+      id: `cursor:${query.id}`,
+      purpose: "Continue by the declared order and identity key; bind the opaque cursor to model/query identity, source, caller, filters, and ordering, and re-evaluate authorization and row policy.",
+      layer: "PostgreSQL keyset pagination",
+      artifact: "postgres/003_queries.sql",
+      objectName: fn,
+      source: query.span,
+    });
     const closure: IRProjection[] = [];
     const visited = new Set<string>();
     const visit = (projectionId: string): void => {

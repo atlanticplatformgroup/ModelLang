@@ -36,7 +36,13 @@ interface OperationDefinition {
   input: readonly { name: string; type: RuntimeValueType }[];
   output:
     | { entityId: string; cardinality: "one" }
-    | { projectionId: string; cardinality: "many"; maxItems: number };
+    | { projectionId: string; cardinality: "many"; maxItems: number }
+    | {
+        projectionId: string;
+        cardinality: "page";
+        maxItems: number;
+        pagination: { kind: "cursor"; cursorVersion: 1; queryRevision: string; cursorInput: "cursor" };
+      };
   action: boolean;
   idempotency: "required" | "unsupported";
 }
@@ -95,8 +101,14 @@ const operationDefinitions = [
     ],
     "output": {
       "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
-      "cardinality": "many",
-      "maxItems": 100
+      "cardinality": "page",
+      "maxItems": 2,
+      "pagination": {
+        "kind": "cursor",
+        "cursorVersion": 1,
+        "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2",
+        "cursorInput": "cursor"
+      }
     },
     "action": false,
     "idempotency": "unsupported"
@@ -394,6 +406,7 @@ function validateInput(
   }
   const input = value as Record<string, unknown>;
   const allowed = new Set(definition.input.map((parameter) => parameter.name));
+  if (definition.output.cardinality === "page") allowed.add(definition.output.pagination.cursorInput);
   const unknown = Object.keys(input).find((name) => !allowed.has(name));
   if (unknown) {
     throw new ValidationError(`Unknown operation input property '${unknown}'`, "ML_VALIDATION", "transport:request_body");
@@ -405,6 +418,12 @@ function validateInput(
         "ML_VALIDATION",
         `transport:parameter:${parameter.name}`,
       );
+    }
+  }
+  if (definition.output.cardinality === "page" && Object.hasOwn(input, definition.output.pagination.cursorInput)) {
+    const cursor = input[definition.output.pagination.cursorInput];
+    if (typeof cursor !== "string" || cursor.length < 1 || cursor.length > 4096 || !/^[A-Za-z0-9_-]+$/.test(cursor)) {
+      throw new ValidationError("Invalid continuation cursor", "ML_VALIDATION", `cursor:${definition.id}`);
     }
   }
   return input;
@@ -440,11 +459,22 @@ function validateOutput(definition: OperationDefinition, value: unknown): void {
   let valid: boolean;
   if (definition.output.cardinality === "one") {
     valid = validEntity(value, definition.output.entityId);
-  } else {
+  } else if (definition.output.cardinality === "many") {
     const output = definition.output;
     valid = Array.isArray(value)
       && value.length <= output.maxItems
       && value.every((projection) => validProjection(projection, output.projectionId));
+  } else {
+    const output = definition.output;
+    const page = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
+    valid = !!page
+      && Object.keys(page).length === 2
+      && Object.hasOwn(page, "items")
+      && Object.hasOwn(page, "nextCursor")
+      && Array.isArray(page.items)
+      && page.items.length <= output.maxItems
+      && page.items.every((projection) => validProjection(projection, output.projectionId))
+      && (page.nextCursor === null || (typeof page.nextCursor === "string" && page.nextCursor.length >= 1 && page.nextCursor.length <= 4096 && /^[A-Za-z0-9_-]+$/.test(page.nextCursor)));
   }
   if (!valid) throw new Error(`Operation executor returned an invalid result for '${definition.id}'`);
 }
@@ -519,7 +549,7 @@ function validateDecision(definition: OperationDefinition, value: unknown): Appl
 }
 
 function normalizedRuleId(error: ModelOperationError): string | undefined {
-  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency):/.test(error.ruleId)
+  return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency|cursor):/.test(error.ruleId)
     ? error.ruleId
     : undefined;
 }
@@ -546,7 +576,7 @@ function problem(error: unknown): { status: number; body: Record<string, unknown
   } else if (error instanceof TransitionError) {
     status = 409; kind = "transition"; title = "The workflow transition is not legal."; code = "ML_WORKFLOW";
   } else if (error instanceof StaleError) {
-    status = 409; kind = "stale"; title = "The expected revision is stale."; code = "ML_STALE";
+    status = 409; kind = "stale"; title = "The expected revision or continuation cursor is stale."; code = "ML_STALE";
   } else if (error instanceof IdempotencyConflictError) {
     status = 409; kind = "idempotency-conflict"; title = "The idempotency key conflicts with an earlier command."; code = "ML_IDEMPOTENCY_CONFLICT";
   } else if (error instanceof ConflictError) {

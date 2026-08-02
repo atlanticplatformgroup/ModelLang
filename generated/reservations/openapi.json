@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.31.0",
-    "description": "Generated from ModelLang operation manifest v6 (sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8)."
+    "version": "0.32.0",
+    "description": "Generated from ModelLang operation manifest v7 (sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -204,6 +204,12 @@
                   "resource": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[A-Za-z0-9_-]+$"
                   }
                 }
               }
@@ -216,10 +222,33 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "maxItems": 100,
-                  "items": {
-                    "$ref": "#/components/schemas/ReservationSummary"
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 2,
+                      "items": {
+                        "$ref": "#/components/schemas/ReservationSummary"
+                      }
+                    },
+                    "nextCursor": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 4096,
+                          "pattern": "^[A-Za-z0-9_-]+$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
                   }
                 }
               }
@@ -257,6 +286,16 @@
           },
           "405": {
             "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The continuation cursor is stale",
             "content": {
               "application/problem+json": {
                 "schema": {

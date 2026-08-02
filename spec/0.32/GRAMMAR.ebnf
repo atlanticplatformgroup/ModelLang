@@ -1,0 +1,11 @@
+(* ModelLang 0.32 extends the complete ModelLang 0.31 grammar. *)
+
+query_body =
+  "authorize", expression, ";",
+  "where", expression, ";",
+  "orderBy", path, ( "asc" | "desc" ), ";",
+  "limit", integer, ";",
+  [ "paginate", "cursor", ";" ] ;
+
+(* The authored limit remains the fixed page bound. *)
+(* No offset, page number, runtime limit, or runtime ordering syntax exists. *)

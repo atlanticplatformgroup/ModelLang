@@ -1,12 +1,12 @@
 {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 6,
-  "operationManifestVersion": 6,
+  "uiManifestVersion": 7,
+  "operationManifestVersion": 7,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.31.0",
-    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8",
+    "version": "0.32.0",
+    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
     "label": "Reservations"
   },
   "authentication": {
@@ -316,10 +316,17 @@
         }
       ],
       "resultProjectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
-      "maxItems": 100,
+      "maxItems": 2,
+      "pagination": {
+        "kind": "cursor",
+        "cursorInput": "cursor",
+        "queryRevision": "sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2"
+      },
       "errors": [
         "identityBinding",
-        "authorization"
+        "authorization",
+        "validation",
+        "stale"
       ]
     }
   ],

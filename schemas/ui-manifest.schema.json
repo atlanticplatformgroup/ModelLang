@@ -66,6 +66,7 @@
           "invariant",
           "conflict",
           "idempotency",
+          "stale",
           "notFound",
           "validation"
         ]
@@ -164,8 +165,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 6 },
-    "operationManifestVersion": { "const": 6 },
+    "uiManifestVersion": { "const": 7 },
+    "operationManifestVersion": { "const": 7 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -316,6 +317,16 @@
           "filters": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
           "resultProjectionId": { "type": "string", "pattern": "^projection:" },
           "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "pagination": {
+            "type": "object",
+            "required": ["kind", "cursorInput", "queryRevision"],
+            "properties": {
+              "kind": { "const": "cursor" },
+              "cursorInput": { "const": "cursor" },
+              "queryRevision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
+          },
           "errors": { "$ref": "#/$defs/errors" }
         },
         "additionalProperties": false

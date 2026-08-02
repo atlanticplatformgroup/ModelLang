@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.31.0",
-    "sourceHash": "sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8",
+    "version": "0.32.0",
+    "sourceHash": "sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -819,13 +819,13 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 82,
+        "endLine": 83,
         "endColumn": 2
       }
     },
     {
       "id": "limit:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "purpose": "Return at most 100 rows.",
+      "purpose": "Return at most 2 rows.",
       "layer": "PostgreSQL query function",
       "artifact": "postgres/003_queries.sql",
       "objectName": "model_reservations.reservations_for_resource",
@@ -833,7 +833,21 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 82,
+        "endLine": 83,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "purpose": "Continue by the declared order and identity key; bind the opaque cursor to model/query identity, source, caller, filters, and ordering, and re-evaluate authorization and row policy.",
+      "layer": "PostgreSQL keyset pagination",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_reservations.reservations_for_resource",
+      "source": {
+        "file": "examples/reservations.model",
+        "line": 74,
+        "column": 1,
+        "endLine": 83,
         "endColumn": 2
       }
     },
@@ -847,7 +861,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 82,
+        "endLine": 83,
         "endColumn": 2
       }
     },
@@ -861,7 +875,7 @@
         "file": "examples/reservations.model",
         "line": 74,
         "column": 1,
-        "endLine": 82,
+        "endLine": 83,
         "endColumn": 2
       }
     },

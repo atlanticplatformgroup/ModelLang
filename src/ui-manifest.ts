@@ -64,8 +64,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 6;
-  operationManifestVersion: 6;
+  uiManifestVersion: 7;
+  operationManifestVersion: 7;
   model: {
     id: string;
     name: string;
@@ -134,6 +134,11 @@ export interface UiManifest {
     filters: UiInputField[];
     resultProjectionId: string;
     maxItems: number;
+    pagination?: {
+      kind: "cursor";
+      cursorInput: "cursor";
+      queryRevision: string;
+    };
     errors: ManifestErrorKind[];
   }[];
   workflows: UiWorkflow[];
@@ -182,12 +187,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 6) {
-    throw new Error(`E6201 UI generation requires operation manifest version 6, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 7) {
+    throw new Error(`E6201 UI generation requires operation manifest version 7, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 6,
+    uiManifestVersion: 7,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -262,6 +267,13 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         filters: inputFields(operation),
         resultProjectionId: operation.output.projectionId,
         maxItems: operation.output.maxItems,
+        ...(operation.output.cardinality === "page" ? {
+          pagination: {
+            kind: operation.output.pagination.kind,
+            cursorInput: operation.output.pagination.cursorInput,
+            queryRevision: operation.output.pagination.queryRevision,
+          },
+        } : {}),
         errors: operation.errors,
       })),
     workflows: manifest.workflows.map((workflow) => {

@@ -209,6 +209,10 @@ export interface QueryDecl {
   };
   limit: number;
   limitSpan: Span;
+  pagination?: {
+    kind: "cursor";
+    span: Span;
+  };
   span: Span;
 }
 

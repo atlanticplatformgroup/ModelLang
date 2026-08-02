@@ -17,6 +17,10 @@ export interface ExecutionOptions {
   readonly causationId?: string;
 }
 export interface ApplicabilityOptions { readonly expectedRevision?: string; }
+export interface CursorPage<T> {
+  readonly items: T[];
+  readonly nextCursor: string | null;
+}
 
 export interface User {
   id: string;
@@ -60,5 +64,6 @@ export interface ReserveInput {
 
 export interface ReservationsForResourceInput {
   resource: string;
+  cursor?: string;
 }
 

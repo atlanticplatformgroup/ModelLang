@@ -19,7 +19,7 @@ const ids = {
   query: "qry_11111111111111111111111111111111",
 };
 
-function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean }): string {
+function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean }): string {
   return `model SemanticChange version "${options.version}";
 entity User @stableId("${ids.user}") {
   id: UUID @id @stableId("${ids.userId}");
@@ -50,10 +50,24 @@ query records @stableId("${ids.query}")(
   where ${options.where ?? "row.owner == actor"};
   orderBy row.id asc;
   limit 10;
+  ${options.pagination ? "paginate cursor;" : ""}
 }`;
 }
 
 describe("semantic change analysis", () => {
+  it("classifies adding a cursor page envelope as a breaking query contract change", () => {
+    const report = semanticDiff(
+      compileText(model({ version: "1" }), "previous.model"),
+      compileText(model({ version: "2", pagination: true }), "current.model"),
+    );
+    expect(report.changes).toContainEqual(expect.objectContaining({
+      kind: "queryPaginationChanged",
+      area: "queryVisibility",
+      classification: "breaking",
+      before: "unpaginated",
+    }));
+  });
+
   it("classifies projection member and legacy entity-output changes as breaking disclosure changes", () => {
     const source = (version: string, includeValue: boolean) => `model ProjectionEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
@@ -164,9 +178,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 13,
-      compilerVersion: "0.31.0",
-      irVersion: 20,
+      diffVersion: 14,
+      compilerVersion: "0.32.0",
+      irVersion: 21,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

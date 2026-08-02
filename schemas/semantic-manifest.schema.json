@@ -90,7 +90,7 @@
       "items": {
         "enum": [
           "identityBinding", "authorization", "precondition", "transition", "invariant",
-          "conflict", "idempotency", "notFound", "validation"
+          "conflict", "idempotency", "stale", "notFound", "validation"
         ]
       }
     }
@@ -102,8 +102,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 12 },
-    "profile": { "const": "sml-transactional-core/12" },
+    "manifestVersion": { "const": 13 },
+    "profile": { "const": "sml-transactional-core/13" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -120,7 +120,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 20 },
+          "irVersion": { "const": 21 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -422,14 +422,39 @@
           "caller": { "$ref": "#/$defs/caller" },
           "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
           "output": {
-            "type": "object",
-            "required": ["projectionId", "cardinality", "maxItems"],
-            "properties": {
-              "projectionId": { "type": "string", "pattern": "^projection:" },
-              "cardinality": { "const": "many" },
-              "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
-            },
-            "additionalProperties": false
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["projectionId", "cardinality", "maxItems"],
+                "properties": {
+                  "projectionId": { "type": "string", "pattern": "^projection:" },
+                  "cardinality": { "const": "many" },
+                  "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["projectionId", "cardinality", "maxItems", "pagination"],
+                "properties": {
+                  "projectionId": { "type": "string", "pattern": "^projection:" },
+                  "cardinality": { "const": "page" },
+                  "maxItems": { "type": "integer", "minimum": 1, "maximum": 1000 },
+                  "pagination": {
+                    "type": "object",
+                    "required": ["kind", "cursorVersion", "queryRevision", "cursorInput"],
+                    "properties": {
+                      "kind": { "const": "cursor" },
+                      "cursorVersion": { "const": 1 },
+                      "queryRevision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                      "cursorInput": { "const": "cursor" }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           },
           "authorization": { "$ref": "#/$defs/rule" },
           "rowPolicy": { "$ref": "#/$defs/rule" },

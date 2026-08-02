@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.31](./spec/0.31/LANGUAGE.md). It retains the complete 0.30 language and adds bounded, acyclic to-one traversal between named projections without adding runtime-selected joins or moving authorization and row policy out of the root query.
+The current normative specification is [ModelLang 0.32](./spec/0.32/LANGUAGE.md). It retains the complete 0.31 language and adds opt-in fixed-limit keyset cursor pagination without offsets, caller-controlled limits or ordering, or cursor-derived authority.
+
+- [Cursor pagination semantics](./spec/0.32/CURSOR_PAGINATION.md)
+- [0.32 grammar additions](./spec/0.32/GRAMMAR.ebnf)
+- [0.32 conformance requirements](./spec/0.32/CONFORMANCE.md)
+- [0.32 unstable pagination boundaries](./spec/0.32/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

@@ -1562,7 +1562,9 @@ function parameterSql(parameter: IRParameter): string {
 
 function functionSignature(ir: ModelIR, operation: IRAction | IRQuery): string {
   const callable = operation.parameters.filter((parameter) => operation.callableParameters.includes(parameter.id));
-  return `${qname(ir.model.naming.sqlSchema, operation.naming.sqlFunction)}(${callable.map((parameter) => sqlType(parameter.type)).join(", ")})`;
+  const types = callable.map((parameter) => sqlType(parameter.type));
+  if ("pagination" in operation && operation.pagination) types.push("text");
+  return `${qname(ir.model.naming.sqlSchema, operation.naming.sqlFunction)}(${types.join(", ")})`;
 }
 
 function decisionFunctionSignature(ir: ModelIR, action: IRAction): string {
@@ -2079,6 +2081,14 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "  v_principal_id uuid;",
     "  v_result jsonb;",
   ];
+  if (query.pagination) {
+    declarations.push(
+      "  v_cursor_json jsonb;",
+      `  v_cursor_sort ${qname(schema, sourceEntity.naming.sqlTable)}.${quoteIdent(orderField.naming.sqlColumn)}%TYPE;`,
+      "  v_cursor_identity uuid;",
+      "  v_input_hash text;",
+    );
+  }
   for (const parameter of query.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     const entity = entityById(ir, parameter.type);
     declarations.push(`  ${recordNames.get(parameter.id)} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`);
@@ -2112,23 +2122,129 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     `    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:${query.authorization.id}';`,
     "  END IF;",
     "",
-    "  SELECT COALESCE(",
-    `    pg_catalog.jsonb_agg(v_query.${quoteIdent("item")} ORDER BY v_query.${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, v_query.${quoteIdent("identity")} ASC),`,
-    "    '[]'::jsonb",
-    "  ) INTO v_result",
-    "  FROM (",
-    `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
-    `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
-    `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
-    `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
-    `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
-    `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
-    `    LIMIT ${query.limit}`,
-    "  ) AS v_query;",
-    "",
-    "  RETURN v_result;",
   );
-  return `CREATE OR REPLACE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${callable.map(parameterSql).join(", ")})
+  if (query.pagination) {
+    const inputEntries = callable.flatMap((parameter) => [
+      `'${parameter.id.replaceAll("'", "''")}'`,
+      revisionInputSql(parameter, quoteIdent(parameter.naming.sqlParameter)),
+    ]);
+    const directionOperator = query.orderBy.direction === "asc" ? ">" : "<";
+    const reverseDirection = query.orderBy.direction === "asc" ? "DESC" : "ASC";
+    const cursorRule = `cursor:${query.id}`;
+    const payload = (sortSql: string, identitySql: string) => `pg_catalog.jsonb_build_object(`
+      + `'v', 1, `
+      + `'modelId', '${ir.model.id.replaceAll("'", "''")}', `
+      + `'modelVersion', '${ir.model.version.replaceAll("'", "''")}', `
+      + `'sourceHash', '${ir.model.sourceHash.replaceAll("'", "''")}', `
+      + `'queryId', '${query.id.replaceAll("'", "''")}', `
+      + `'revision', '${query.pagination!.revision}', `
+      + `'orderFieldId', '${query.orderBy.fieldId.replaceAll("'", "''")}', `
+      + `'direction', '${query.orderBy.direction}', `
+      + `'inputHash', v_input_hash, `
+      + `'sort', (${sortSql})::text, `
+      + `'identity', (${identitySql})::text)`;
+    const encodeCursor = (sortSql: string, identitySql: string) => `pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(`
+      + `pg_catalog.encode(pg_catalog.convert_to((${payload(sortSql, identitySql)})::text, 'UTF8'), 'base64'), E'\\n', ''), '+/', '-_'), '=')`;
+    body.push(
+      `  v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(`,
+      `    'caller', pg_catalog.to_jsonb(v_principal_id),`,
+      `    'inputs', pg_catalog.jsonb_build_object(${inputEntries.join(", ")})`,
+      `  ))::text, 'UTF8')), 'hex');`,
+      "",
+      "  IF p_cursor IS NOT NULL THEN",
+      "    BEGIN",
+      "      IF pg_catalog.length(p_cursor) < 1 OR pg_catalog.length(p_cursor) > 4096 OR p_cursor !~ '^[A-Za-z0-9_-]+$' THEN",
+      `        RAISE EXCEPTION 'invalid cursor';`,
+      "      END IF;",
+      "      v_cursor_json := pg_catalog.convert_from(",
+      "        pg_catalog.decode(pg_catalog.translate(p_cursor, '-_', '+/') || pg_catalog.repeat('=', (4 - pg_catalog.length(p_cursor) % 4) % 4), 'base64'),",
+      "        'UTF8'",
+      "      )::jsonb;",
+      "      IF pg_catalog.jsonb_typeof(v_cursor_json) IS DISTINCT FROM 'object'",
+      "        OR (SELECT pg_catalog.count(*) FROM pg_catalog.jsonb_object_keys(v_cursor_json)) <> 11",
+      "        OR (v_cursor_json -> 'v') IS DISTINCT FROM '1'::jsonb",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'modelId') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'modelVersion') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'sourceHash') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'queryId') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'revision') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'orderFieldId') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'direction') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'inputHash') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'sort') IS DISTINCT FROM 'string'",
+      "        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'identity') IS DISTINCT FROM 'string' THEN",
+      "        RAISE EXCEPTION 'invalid cursor';",
+      "      END IF;",
+      "      v_cursor_sort := v_cursor_json ->> 'sort';",
+      "      v_cursor_identity := (v_cursor_json ->> 'identity')::uuid;",
+      "    EXCEPTION WHEN others THEN",
+      `      RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:${cursorRule}';`,
+      "    END;",
+      "",
+      "    IF v_cursor_json ->> 'modelId' IS DISTINCT FROM " + `'${ir.model.id.replaceAll("'", "''")}'`,
+      "      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM " + `'${ir.model.version.replaceAll("'", "''")}'`,
+      "      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM " + `'${ir.model.sourceHash.replaceAll("'", "''")}'`,
+      "      OR v_cursor_json ->> 'queryId' IS DISTINCT FROM " + `'${query.id.replaceAll("'", "''")}'`,
+      "      OR v_cursor_json ->> 'revision' IS DISTINCT FROM " + `'${query.pagination.revision}'`,
+      "      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM " + `'${query.orderBy.fieldId.replaceAll("'", "''")}'`,
+      "      OR v_cursor_json ->> 'direction' IS DISTINCT FROM " + `'${query.orderBy.direction}'`,
+      "      OR v_cursor_json ->> 'inputHash' IS DISTINCT FROM v_input_hash THEN",
+      `      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:${cursorRule}';`,
+      "    END IF;",
+      "  END IF;",
+      "",
+      "  WITH page_rows AS MATERIALIZED (",
+      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
+      `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
+      `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
+      `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
+      `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
+      "      AND (p_cursor IS NULL",
+      `        OR v_row.${quoteIdent(orderField.naming.sqlColumn)} ${directionOperator} v_cursor_sort`,
+      `        OR (v_row.${quoteIdent(orderField.naming.sqlColumn)} = v_cursor_sort AND v_row.${quoteIdent(idField.naming.sqlColumn)} > v_cursor_identity))`,
+      `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
+      `    LIMIT ${query.limit + 1}`,
+      "  ), visible_rows AS MATERIALIZED (",
+      "    SELECT * FROM page_rows",
+      `    ORDER BY ${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC`,
+      `    LIMIT ${query.limit}`,
+      "  )",
+      "  SELECT pg_catalog.jsonb_build_object(",
+      "    'items', COALESCE((",
+      `      SELECT pg_catalog.jsonb_agg(${quoteIdent("item")} ORDER BY ${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, ${quoteIdent("identity")} ASC)`,
+      "      FROM visible_rows",
+      "    ), '[]'::jsonb),",
+      `    'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > ${query.limit} THEN (`,
+      `      SELECT ${encodeCursor(quoteIdent("sort_value"), quoteIdent("identity"))}`,
+      "      FROM visible_rows",
+      `      ORDER BY ${quoteIdent("sort_value")} ${reverseDirection}, ${quoteIdent("identity")} DESC`,
+      "      LIMIT 1",
+      "    ) ELSE NULL END",
+      "  ) INTO v_result;",
+      "",
+      "  RETURN v_result;",
+    );
+  } else {
+    body.push(
+      "  SELECT COALESCE(",
+      `    pg_catalog.jsonb_agg(v_query.${quoteIdent("item")} ORDER BY v_query.${quoteIdent("sort_value")} ${query.orderBy.direction.toUpperCase()}, v_query.${quoteIdent("identity")} ASC),`,
+      "    '[]'::jsonb",
+      "  ) INTO v_result",
+      "  FROM (",
+      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
+      `           v_row.${quoteIdent(orderField.naming.sqlColumn)} AS ${quoteIdent("sort_value")},`,
+      `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
+      `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
+      `    WHERE ((${lowerExpression(query.rowPolicy.expression, context)}) IS TRUE)`,
+      `    ORDER BY v_row.${quoteIdent(orderField.naming.sqlColumn)} ${query.orderBy.direction.toUpperCase()}, v_row.${quoteIdent(idField.naming.sqlColumn)} ASC`,
+      `    LIMIT ${query.limit}`,
+      "  ) AS v_query;",
+      "",
+      "  RETURN v_result;",
+    );
+  }
+  const functionParameters = [...callable.map(parameterSql), ...(query.pagination ? ["p_cursor text DEFAULT NULL"] : [])];
+  return `CREATE OR REPLACE FUNCTION ${qname(schema, query.naming.sqlFunction)}(${functionParameters.join(", ")})
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

@@ -3,8 +3,9 @@ import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ReservationsClient } from "../../generated/reservations/typescript/client.js";
 import {
-  AuthorizationError, ConflictError, PreconditionError,
+  AuthorizationError, ConflictError, PreconditionError, StaleError, ValidationError,
 } from "../../generated/reservations/typescript/errors.js";
+import type { ReservationSummary } from "../../generated/reservations/typescript/types.js";
 import {
   databaseUrl, installReservationsDatabase, loginUrl, poolFor,
 } from "../../scripts/database.js";
@@ -21,6 +22,17 @@ let commandSequence = 0;
 function commandOptions(label = "reservation"): { idempotencyKey: string } {
   commandSequence += 1;
   return { idempotencyKey: `${label}-${commandSequence}` };
+}
+
+async function allReservationsForResource(resourceId: string): Promise<ReservationSummary[]> {
+  const rows: ReservationSummary[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await firstClient.reservationsForResource({ resource: resourceId, cursor });
+    rows.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return rows;
 }
 
 beforeAll(async () => {
@@ -113,13 +125,34 @@ describe.sequential("ModelLang reservation and query boundaries", () => {
       endsAt: "2031-01-01T10:00:00.000Z",
     }, commandOptions())).id;
 
-    const firstRows = await firstClient.reservationsForResource({ resource });
-    const secondRows = await firstClient.reservationsForResource({ resource: otherResource });
+    const firstPage = await firstClient.reservationsForResource({ resource });
+    expect(firstPage.items).toHaveLength(2);
+    expect(firstPage.nextCursor).toMatch(/^[A-Za-z0-9_-]+$/);
+    const firstRows = await allReservationsForResource(resource);
+    const secondRows = await allReservationsForResource(otherResource);
     expect(firstRows.some((reservation) => reservation.id === firstId)).toBe(true);
     expect(secondRows.some((reservation) => reservation.id === secondId)).toBe(true);
     expect(firstRows.every((reservation) => reservation.resource.id === resource && reservation.resource.name === "Conference Room A")).toBe(true);
     expect(secondRows.every((reservation) => reservation.resource.id === otherResource && reservation.resource.name === "Conference Room B")).toBe(true);
     expect(firstRows.some((reservation) => reservation.id === secondId)).toBe(false);
+    await expect(firstClient.reservationsForResource({ resource, cursor: "not_a_valid_cursor" }))
+      .rejects.toBeInstanceOf(ValidationError);
+    const decoded = JSON.parse(Buffer.from(firstPage.nextCursor!, "base64url").toString("utf8")) as Record<string, unknown>;
+    const missingBinding: Record<string, unknown> = { ...decoded, extra: "replacement" };
+    delete missingBinding.modelId;
+    await expect(firstClient.reservationsForResource({
+      resource,
+      cursor: Buffer.from(JSON.stringify(missingBinding)).toString("base64url"),
+    })).rejects.toBeInstanceOf(ValidationError);
+    const staleSource = { ...decoded, sourceHash: `sha256:${"0".repeat(64)}` };
+    await expect(firstClient.reservationsForResource({
+      resource,
+      cursor: Buffer.from(JSON.stringify(staleSource)).toString("base64url"),
+    })).rejects.toBeInstanceOf(StaleError);
+    await expect(firstClient.reservationsForResource({ resource: otherResource, cursor: firstPage.nextCursor! }))
+      .rejects.toBeInstanceOf(StaleError);
+    await expect(secondClient.reservationsForResource({ resource, cursor: firstPage.nextCursor! }))
+      .rejects.toBeInstanceOf(StaleError);
     await expect(firstClient.reservationsForResource({
       resource: "20000000-0000-4000-8000-000000000099",
     })).rejects.toBeInstanceOf(AuthorizationError);

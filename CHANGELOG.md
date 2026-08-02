@@ -5,6 +5,17 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.32.0
+
+- Added opt-in `paginate cursor;` after a query's fixed authored limit while preserving array results and callable ABIs for unpaginated queries.
+- Added closed `{ items, nextCursor }` page contracts and an optional generated cursor input; callers cannot select limits, offsets, page numbers, order fields, or directions.
+- Generated PostgreSQL keyset continuation over the required order field plus ascending identity, reading at most `limit + 1`, returning at most `limit`, and emitting no `OFFSET`.
+- Bound opaque deterministic cursor v1 to model ID/version/source hash, query stable ID/revision, ordering, authenticated principal, callable filter inputs, and the final returned key.
+- Added explicit `ML_VALIDATION:cursor:<query-id>` malformed failures and `ML_STALE:cursor:<query-id>` binding failures while re-evaluating identity, authorization, and row policy on every page.
+- Advanced canonical IR to IR21, operation manifest to v7, capability manifest to v6, UI manifest to v7, engineering semantic manifest/profile to v13, semantic diff to v14, and generator profile to `postgresql-http-ui-cursor-pagination/16`.
+- Propagated cursor pages through closed OpenAPI schemas, database/HTTP/browser/UI TypeScript clients, HTTP input/output validation, UI descriptors, semantic closure, migration signatures, provenance, and breaking-change analysis.
+- Updated Reservations as the canonical two-item page fixture with live PostgreSQL coverage for complete traversal, malformed cursors, filter-bound staleness, and principal-bound staleness; added normative 0.32 documentation and deterministic golden artifacts.
+
 ## 0.31.0
 
 - Added explicit `referenceField: NestedProjection` members for bounded to-one relationship traversal while preserving direct entity-reference UUID encoding when no nested projection is named.

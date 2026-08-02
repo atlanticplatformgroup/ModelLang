@@ -72,9 +72,9 @@ BEGIN
   ORDER BY "id" DESC LIMIT 1;
   IF NOT FOUND
      OR v_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_version IS DISTINCT FROM '0.31.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8' THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8';
+     OR v_version IS DISTINCT FROM '0.32.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea';
   END IF;
 END
 $modellang_upgrade$;
@@ -773,7 +773,7 @@ BEGIN
 
   v_request_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object('actionId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'inputs', pg_catalog.jsonb_build_object('parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource', pg_catalog.to_jsonb("p_resource"), 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt', pg_catalog.to_jsonb("p_starts_at"), 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt', pg_catalog.to_jsonb("p_ends_at")), 'expectedRevision', v_expected_revision, 'correlationId', v_correlation_id, 'causationId', v_causation_id))::text, 'UTF8')), 'hex');
   INSERT INTO "model_reservations_internal"."command_receipt" ("model_id", "model_version", "source_hash", "action_id", "principal_id", "idempotency_key", "request_hash", "correlation_id", "causation_id")
-  VALUES ('model:Reservations', '0.31.0', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8', 'action:act_508ad810a19d4b79a5009871de5cd26b', v_principal_id, v_idempotency_key, v_request_hash, v_correlation_id, v_causation_id)
+  VALUES ('model:Reservations', '0.32.0', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'action:act_508ad810a19d4b79a5009871de5cd26b', v_principal_id, v_idempotency_key, v_request_hash, v_correlation_id, v_causation_id)
   ON CONFLICT ("principal_id", "action_id", "idempotency_key") DO NOTHING
   RETURNING "id" INTO v_receipt_id;
 
@@ -782,7 +782,7 @@ BEGIN
     INTO v_receipt_id, v_receipt_source_hash, v_receipt_request_hash, v_receipt_status, v_receipt_response
     FROM "model_reservations_internal"."command_receipt"
     WHERE "principal_id" = v_principal_id AND "action_id" = 'action:act_508ad810a19d4b79a5009871de5cd26b' AND "idempotency_key" = v_idempotency_key;
-    IF v_receipt_source_hash IS DISTINCT FROM 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8' OR v_receipt_request_hash IS DISTINCT FROM v_request_hash THEN
+    IF v_receipt_source_hash IS DISTINCT FROM 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea' OR v_receipt_request_hash IS DISTINCT FROM v_request_hash THEN
       RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_IDEMPOTENCY_CONFLICT:idempotency:action:act_508ad810a19d4b79a5009871de5cd26b';
     END IF;
     IF v_receipt_status IS DISTINCT FROM 'executed' OR v_receipt_response IS NULL THEN
@@ -825,7 +825,7 @@ BEGIN
   FROM "model_reservations"."user" AS row_value
   WHERE row_value."id" = v_principal_id;
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8', 'operationId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource', 'value', pg_catalog.to_jsonb("p_resource"), 'rowVersion', pg_catalog.to_jsonb(v_resource_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt', 'value', pg_catalog.to_jsonb("p_starts_at")), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt', 'value', pg_catalog.to_jsonb("p_ends_at"))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'operationId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.resource', 'value', pg_catalog.to_jsonb("p_resource"), 'rowVersion', pg_catalog.to_jsonb(v_resource_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.startsAt', 'value', pg_catalog.to_jsonb("p_starts_at")), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_508ad810a19d4b79a5009871de5cd26b.endsAt', 'value', pg_catalog.to_jsonb("p_ends_at"))))::text);
 
   IF NOT ((TRUE) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_508ad810a19d4b79a5009871de5cd26b';
@@ -845,11 +845,11 @@ BEGIN
 
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at", 'indexed', v_result."indexed");
   INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id", "command_receipt_id")
-  VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Reservations', '0.31.0', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Reservations', 'version', '0.31.0', 'sourceHash', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8'), 'actionId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
+  VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Reservations', '0.32.0', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Reservations', 'version', '0.32.0', 'sourceHash', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea'), 'actionId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
   RETURNING "id" INTO v_action_audit_id;
 
   INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "action_id", "principal_id", "target_id", "payload", "correlation_id", "causation_id", "action_audit_id", "command_receipt_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Reservations', '0.31.0', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'ReservationCreated', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'action:act_508ad810a19d4b79a5009871de5cd26b', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
+  VALUES ('model:Reservations', '0.32.0', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'ReservationCreated', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'action:act_508ad810a19d4b79a5009871de5cd26b', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
 
   UPDATE "model_reservations_internal"."command_receipt"
   SET "status" = 'executed', "response" = v_response, "target_id" = v_result."id",
@@ -944,8 +944,8 @@ BEGIN
   IF p_envelope->>'eventId' IS DISTINCT FROM 'event:evt_40d694c9a0a274dc79c6168e47d25968'
      OR p_envelope->>'eventName' IS DISTINCT FROM 'ReservationCreated'
      OR v_source_model_id IS DISTINCT FROM 'model:Reservations'
-     OR v_source_model_version IS DISTINCT FROM '0.31.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8'
+     OR v_source_model_version IS DISTINCT FROM '0.32.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea'
      OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)
               OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)
      OR (p_envelope->>'ordinal')::integer < 0
@@ -1025,7 +1025,7 @@ BEGIN
   INSERT INTO "model_reservations_internal"."consumer_audit" ("consumer_id", "source_event_id", "source_event_type", "source_model_id", "source_model_version", "source_hash", "target_id", "authorization_rule_id", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id")
   VALUES ('consumer:con_20d694c9a0a274dc79c6168e47d25968', v_source_event_id, 'event:evt_40d694c9a0a274dc79c6168e47d25968', v_source_model_id, v_source_model_version, v_source_hash, v_result."id", 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'consumed', 'consumerId', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', 'sourceEventId', v_source_event_id, 'sourceContract', pg_catalog.jsonb_build_object('eventId', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:consumer:con_20d694c9a0a274dc79c6168e47d25968', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:consumer:con_20d694c9a0a274dc79c6168e47d25968.valid_interval', 'outcome', 'passed')), 'emittedEventIds', pg_catalog.to_jsonb(ARRAY['event:evt_60d694c9a0a274dc79c6168e47d25968']::text[]), 'failurePolicy', pg_catalog.jsonb_build_object('mode', 'deadLetterAfterMaxAttempts', 'maxAttempts', 3, 'recovery', 'manual')), v_correlation_id, v_causation_id) RETURNING "id" INTO v_consumer_audit_id;
   INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Reservations', '0.31.0', 'sha256:edd0853738422912f59ce22c26dc289f6c714e82b74844e415cb92ef39d16cb8', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5, 'manual');
+  VALUES ('model:Reservations', '0.32.0', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'event:evt_60d694c9a0a274dc79c6168e47d25968', 'ReservationIndexed', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'consumer:con_20d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5, 'manual');
 
   UPDATE "model_reservations_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = 3, "terminal_at" = (NULL::timestamptz), "resolved_at" = pg_catalog.clock_timestamp()
   WHERE "consumer_id" = 'consumer:con_20d694c9a0a274dc79c6168e47d25968' AND "source_event_id" = v_source_event_id::text;
@@ -1040,7 +1040,7 @@ RESET ROLE;
 -- Generated guarded query functions. Caller identity is resolved from direct login or transaction-bound gateway context.
 SET ROLE modellang_owner;
 
-CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid)
+CREATE OR REPLACE FUNCTION "model_reservations"."reservations_for_resource"("p_resource" uuid, p_cursor text DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1049,6 +1049,10 @@ AS $modellang$
 DECLARE
   v_principal_id uuid;
   v_result jsonb;
+  v_cursor_json jsonb;
+  v_cursor_sort "model_reservations"."reservation"."starts_at"%TYPE;
+  v_cursor_identity uuid;
+  v_input_hash text;
   v_actor "model_reservations"."user"%ROWTYPE;
   v_resource "model_reservations"."resource"%ROWTYPE;
 BEGIN
@@ -1075,25 +1079,87 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
   END IF;
 
-  SELECT COALESCE(
-    pg_catalog.jsonb_agg(v_query."item" ORDER BY v_query."sort_value" ASC, v_query."identity" ASC),
-    '[]'::jsonb
-  ) INTO v_result
-  FROM (
+  v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(
+    'caller', pg_catalog.to_jsonb(v_principal_id),
+    'inputs', pg_catalog.jsonb_build_object('parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource', pg_catalog.to_jsonb("p_resource"))
+  ))::text, 'UTF8')), 'hex');
+
+  IF p_cursor IS NOT NULL THEN
+    BEGIN
+      IF pg_catalog.length(p_cursor) < 1 OR pg_catalog.length(p_cursor) > 4096 OR p_cursor !~ '^[A-Za-z0-9_-]+$' THEN
+        RAISE EXCEPTION 'invalid cursor';
+      END IF;
+      v_cursor_json := pg_catalog.convert_from(
+        pg_catalog.decode(pg_catalog.translate(p_cursor, '-_', '+/') || pg_catalog.repeat('=', (4 - pg_catalog.length(p_cursor) % 4) % 4), 'base64'),
+        'UTF8'
+      )::jsonb;
+      IF pg_catalog.jsonb_typeof(v_cursor_json) IS DISTINCT FROM 'object'
+        OR (SELECT pg_catalog.count(*) FROM pg_catalog.jsonb_object_keys(v_cursor_json)) <> 11
+        OR (v_cursor_json -> 'v') IS DISTINCT FROM '1'::jsonb
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'modelId') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'modelVersion') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'sourceHash') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'queryId') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'revision') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'orderFieldId') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'direction') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'inputHash') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'sort') IS DISTINCT FROM 'string'
+        OR pg_catalog.jsonb_typeof(v_cursor_json -> 'identity') IS DISTINCT FROM 'string' THEN
+        RAISE EXCEPTION 'invalid cursor';
+      END IF;
+      v_cursor_sort := v_cursor_json ->> 'sort';
+      v_cursor_identity := (v_cursor_json ->> 'identity')::uuid;
+    EXCEPTION WHEN others THEN
+      RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_VALIDATION:cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
+    END;
+
+    IF v_cursor_json ->> 'modelId' IS DISTINCT FROM 'model:Reservations'
+      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.32.0'
+      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea'
+      OR v_cursor_json ->> 'queryId' IS DISTINCT FROM 'query:qry_94d8a56f4c2640fab58a4c2190c35c69'
+      OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2'
+      OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM 'field:fld_59e1f90fae57481f921c5a81dfd3a234'
+      OR v_cursor_json ->> 'direction' IS DISTINCT FROM 'asc'
+      OR v_cursor_json ->> 'inputHash' IS DISTINCT FROM v_input_hash THEN
+      RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_STALE:cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69';
+    END IF;
+  END IF;
+
+  WITH page_rows AS MATERIALIZED (
     SELECT jsonb_build_object('id', v_row."id", 'resource', (SELECT jsonb_build_object('id', "v_projection_1"."id", 'name', "v_projection_1"."name") FROM "model_reservations"."resource" AS "v_projection_1" WHERE "v_projection_1"."id" = v_row."resource_id"), 'startsAt', v_row."starts_at", 'endsAt', v_row."ends_at") AS "item",
            v_row."starts_at" AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_reservations"."reservation" AS v_row
     WHERE (((v_row."resource_id" = v_resource."id")) IS TRUE)
+      AND (p_cursor IS NULL
+        OR v_row."starts_at" > v_cursor_sort
+        OR (v_row."starts_at" = v_cursor_sort AND v_row."id" > v_cursor_identity))
     ORDER BY v_row."starts_at" ASC, v_row."id" ASC
-    LIMIT 100
-  ) AS v_query;
+    LIMIT 3
+  ), visible_rows AS MATERIALIZED (
+    SELECT * FROM page_rows
+    ORDER BY "sort_value" ASC, "identity" ASC
+    LIMIT 2
+  )
+  SELECT pg_catalog.jsonb_build_object(
+    'items', COALESCE((
+      SELECT pg_catalog.jsonb_agg("item" ORDER BY "sort_value" ASC, "identity" ASC)
+      FROM visible_rows
+    ), '[]'::jsonb),
+    'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > 2 THEN (
+      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.32.0', 'sourceHash', 'sha256:e243751bc4fee67af88f8e21ab8d17c0bde7094fbe1dcba38937a735a1a483ea', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:2ffa9d79ab03bcc20551480edf7b6c3541cd2ed70c69b934677a63673d59fad2', 'orderFieldId', 'field:fld_59e1f90fae57481f921c5a81dfd3a234', 'direction', 'asc', 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
+      FROM visible_rows
+      ORDER BY "sort_value" DESC, "identity" DESC
+      LIMIT 1
+    ) ELSE NULL END
+  ) INTO v_result;
 
   RETURN v_result;
 END
 $modellang$;
 
-REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, text) FROM PUBLIC;
 
 RESET ROLE;
 -- Generated least-privilege application boundary.
@@ -1112,8 +1178,8 @@ REVOKE ALL ON TABLE "model_reservations"."reservation" FROM PUBLIC, modellang_ap
 
 REVOKE ALL ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION "model_reservations"."reserve"(uuid, timestamptz, timestamptz) TO modellang_app;
-REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "model_reservations"."reservations_for_resource"(uuid) TO modellang_app;
+REVOKE ALL ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "model_reservations"."reservations_for_resource"(uuid, text) TO modellang_app;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_recovery, modellang_publication_recovery;
 GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consume_index_reservation"(jsonb) TO modellang_consumer;
 REVOKE ALL ON ALL TABLES IN SCHEMA "model_reservations_internal" FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;

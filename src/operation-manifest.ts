@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 6;
+  manifestVersion: 7;
   model: {
     id: string;
     name: string;
@@ -79,6 +79,7 @@ export type ManifestErrorKind =
   | "invariant"
   | "conflict"
   | "idempotency"
+  | "stale"
   | "notFound"
   | "validation";
 
@@ -109,7 +110,19 @@ export type ManifestOperation =
     })
   | (ManifestOperationBase & {
       kind: "query";
-      output: { projectionId: string; cardinality: "many"; maxItems: number };
+      output:
+        | { projectionId: string; cardinality: "many"; maxItems: number }
+        | {
+            projectionId: string;
+            cardinality: "page";
+            maxItems: number;
+            pagination: {
+              kind: "cursor";
+              cursorVersion: 1;
+              queryRevision: string;
+              cursorInput: "cursor";
+            };
+          };
     });
 
 export interface ManifestWorkflowTarget {
@@ -195,6 +208,10 @@ function queryErrors(query: IRQuery): ManifestErrorKind[] {
   if (query.parameters.some((parameter) => query.callableParameters.includes(parameter.id) && isMoneyType(parameter.type))) {
     errors.push("validation");
   }
+  if (query.pagination) {
+    if (!errors.includes("validation")) errors.push("validation");
+    errors.push("stale");
+  }
   return errors;
 }
 
@@ -244,7 +261,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 6,
+    manifestVersion: 7,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -331,7 +348,17 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
         kind: "query",
         input: callableInput(query),
         caller: caller(query, ir),
-        output: { projectionId: query.returnProjectionId, cardinality: "many", maxItems: query.limit },
+        output: query.pagination ? {
+          projectionId: query.returnProjectionId,
+          cardinality: "page",
+          maxItems: query.limit,
+          pagination: {
+            kind: "cursor",
+            cursorVersion: query.pagination.cursorVersion,
+            queryRevision: query.pagination.revision,
+            cursorInput: "cursor",
+          },
+        } : { projectionId: query.returnProjectionId, cardinality: "many", maxItems: query.limit },
         errors: queryErrors(query),
       })),
     ],

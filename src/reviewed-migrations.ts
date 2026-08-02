@@ -246,9 +246,10 @@ function qname(schema: string, name: string): string {
 }
 
 function callableSignature(operation: ModelIR["actions"][number] | ModelIR["queries"][number]): string {
-  return operation.callableParameters
+  const types = operation.callableParameters
     .map((id) => sqlType(operation.parameters.find((parameter) => parameter.id === id)!.type))
-    .join(", ");
+  if ("pagination" in operation && operation.pagination) types.push("text");
+  return types.join(", ");
 }
 
 function enumById(ir: ModelIR, id: string): IREnum {
@@ -368,7 +369,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].includes(Number(previous.irVersion)) || current.irVersion !== 20) fail(current, "E2901", "Reviewed migration planning requires a released canonical IR9 through IR20 baseline and canonical IR20 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21].includes(Number(previous.irVersion)) || current.irVersion !== 21) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9 through IR21 baseline and canonical IR21 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);

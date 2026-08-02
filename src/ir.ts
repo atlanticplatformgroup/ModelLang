@@ -252,6 +252,11 @@ export interface IRQuery {
     identityTieBreaker: true;
   };
   limit: number;
+  pagination?: {
+    kind: "cursor";
+    cursorVersion: 1;
+    revision: string;
+  };
   span: IRSpan;
   naming: { sqlFunction: string; typescriptMethod: string };
 }
@@ -294,7 +299,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 20;
+  irVersion: 21;
   model: {
     id: string;
     name: string;

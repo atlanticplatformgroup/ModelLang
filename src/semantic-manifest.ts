@@ -43,8 +43,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 12;
-  profile: "sml-transactional-core/12";
+  manifestVersion: 13;
+  profile: "sml-transactional-core/13";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -53,7 +53,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 20;
+    irVersion: 21;
     generator: "semantic-manifest";
   };
   model: {
@@ -152,7 +152,14 @@ export interface SemanticQuery {
   source: IRSpan;
   caller: { parameterId: string; entityId: string; source: "authenticatedContext" };
   input: ManifestParameter[];
-  output: { projectionId: string; cardinality: "many"; maxItems: number };
+  output:
+    | { projectionId: string; cardinality: "many"; maxItems: number }
+    | {
+        projectionId: string;
+        cardinality: "page";
+        maxItems: number;
+        pagination: { kind: "cursor"; cursorVersion: 1; queryRevision: string; cursorInput: "cursor" };
+      };
   authorization: SemanticRule;
   rowPolicy: SemanticRule;
   readSet: SemanticReadSet;
@@ -359,7 +366,7 @@ function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction)
 
 function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): SemanticQuery {
   const operation = operationInput(manifest, query.id);
-  if (operation.output.cardinality !== "many" || operation.output.maxItems === undefined) {
+  if ((operation.output.cardinality !== "many" && operation.output.cardinality !== "page") || operation.output.maxItems === undefined) {
     throw new Error(`E6304 Query '${query.id}' has a non-collection output.`);
   }
   const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId);
@@ -396,7 +403,14 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
     source: query.span,
     caller: caller(query, ir),
     input: operation.input,
-    output: { projectionId: operation.output.projectionId, cardinality: "many", maxItems: operation.output.maxItems },
+    output: operation.output.cardinality === "page"
+      ? {
+          projectionId: operation.output.projectionId,
+          cardinality: "page",
+          maxItems: operation.output.maxItems,
+          pagination: { ...operation.output.pagination },
+        }
+      : { projectionId: operation.output.projectionId, cardinality: "many", maxItems: operation.output.maxItems },
     authorization: semanticRule(query.authorization),
     rowPolicy: semanticRule(query.rowPolicy),
     readSet: sourceReads,
@@ -456,7 +470,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 12,
+    manifestVersion: 13,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
