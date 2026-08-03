@@ -274,6 +274,10 @@ export interface IRQuery {
     cursorVersion: 1;
     revision: string;
   };
+  readEvidence?: {
+    mode: "transactionalAudit";
+    revision: string;
+  };
   span: IRSpan;
   naming: { sqlFunction: string; typescriptMethod: string };
 }
@@ -316,7 +320,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 24;
+  irVersion: 25;
   model: {
     id: string;
     name: string;

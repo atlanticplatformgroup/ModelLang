@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d`
+Source hash: `sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -100,6 +100,7 @@ Source hash: `sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c
 | `disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968` | Disclose projection field path projectionField:pfd_73d694c9a0a274dc79c6168e47d25968 only when ((request.status != RequestStatus.DRAFT)) is exactly true; otherwise preserve the key with JSON null. | PostgreSQL projection redaction | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:168:3 |
 | `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the default declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `limit:query:qry_4406b045404a48449282db804f6167a8` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
+| `read-evidence:query:qry_4406b045404a48449282db804f6167a8` | Append private transactional evidence for each successful committed query invocation, binding authenticated identity and query revision to canonical request and exact response hashes without copying inputs, cursors, or result payloads. | PostgreSQL private query audit | `postgres/003_queries.sql`: `model_procurement_internal.query_audit` | examples/procurement.model:163:1 |
 | `read:query:qry_4406b045404a48449282db804f6167a8` | Read entity:ent_9bc680209327484c8e98f5f740bcc702 root rows and authored to-one related entities entity:ent_66c16684f17e4b4ca79eb7d916cbf725 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `disclose:query:qry_4406b045404a48449282db804f6167a8` | Disclose only projection closure projection:prj_70d694c9a0a274dc79c6168e47d25968 -> projection:prj_76d694c9a0a274dc79c6168e47d25968 through the generated query boundary. | PostgreSQL projection encoder | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87` | Require new entity:ent_9bc680209327484c8e98f5f740bcc702 rows to begin in the declared initial state. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_insert` | examples/procurement.model:142:1 |

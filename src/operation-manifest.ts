@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 10;
+  manifestVersion: 11;
   model: {
     id: string;
     name: string;
@@ -129,6 +129,15 @@ export type ManifestOperation =
         redaction: "null";
         default: "redacted";
         fields: { projectionFieldPath: string[]; ruleId?: string }[];
+      };
+      readEvidence?: {
+        mode: "transactionalAudit";
+        scope: "successfulCommittedExecution";
+        storage: "private";
+        requestBinding: "canonicalSha256";
+        responseBinding: "canonicalSha256";
+        payloadRetention: "none";
+        revision: string;
       };
       output:
         | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -306,7 +315,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 10,
+    manifestVersion: 11,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -411,6 +420,17 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
           },
         } : {}),
         ...(queryDisclosure(ir, query) ? { disclosure: queryDisclosure(ir, query) } : {}),
+        ...(query.readEvidence ? {
+          readEvidence: {
+            mode: query.readEvidence.mode,
+            scope: "successfulCommittedExecution" as const,
+            storage: "private" as const,
+            requestBinding: "canonicalSha256" as const,
+            responseBinding: "canonicalSha256" as const,
+            payloadRetention: "none" as const,
+            revision: query.readEvidence.revision,
+          },
+        } : {}),
         output: query.pagination ? {
           projectionId: query.returnProjectionId,
           cardinality: "page",

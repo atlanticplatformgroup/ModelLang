@@ -537,6 +537,13 @@ class Parser {
       const paginationEnd = this.expect(";");
       pagination = { kind: "cursor", span: this.span(paginationStart, paginationEnd) };
     }
+    let readAudit: QueryDecl["readAudit"];
+    if (this.atWord("audit")) {
+      const auditStart = this.take();
+      this.expectWord("reads");
+      const auditEnd = this.expect(";");
+      readAudit = { span: this.span(auditStart, auditEnd) };
+    }
     const end = this.expect("}");
     return {
       kind: "query",
@@ -559,6 +566,7 @@ class Parser {
       limit: Number(limit.value),
       limitSpan: this.span(limit, limitEnd),
       ...(pagination ? { pagination } : {}),
+      ...(readAudit ? { readAudit } : {}),
       span: this.span(start, end),
     };
   }

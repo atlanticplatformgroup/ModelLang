@@ -166,8 +166,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 10 },
-    "operationManifestVersion": { "const": 10 },
+    "uiManifestVersion": { "const": 11 },
+    "operationManifestVersion": { "const": 11 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -363,6 +363,20 @@
                   "additionalProperties": false
                 }
               }
+            },
+            "additionalProperties": false
+          },
+          "readEvidence": {
+            "type": "object",
+            "required": ["mode", "scope", "storage", "requestBinding", "responseBinding", "payloadRetention", "revision"],
+            "properties": {
+              "mode": { "const": "transactionalAudit" },
+              "scope": { "const": "successfulCommittedExecution" },
+              "storage": { "const": "private" },
+              "requestBinding": { "const": "canonicalSha256" },
+              "responseBinding": { "const": "canonicalSha256" },
+              "payloadRetention": { "const": "none" },
+              "revision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
             },
             "additionalProperties": false
           },

@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.35.0",
-    "description": "Generated from ModelLang operation manifest v10 (sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d)."
+    "version": "0.36.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -508,6 +508,15 @@
           }
         ],
         "x-modellang-operation-id": "query:qry_4406b045404a48449282db804f6167a8",
+        "x-modellang-read-evidence": {
+          "mode": "transactionalAudit",
+          "scope": "successfulCommittedExecution",
+          "storage": "private",
+          "requestBinding": "canonicalSha256",
+          "responseBinding": "canonicalSha256",
+          "payloadRetention": "none",
+          "revision": "sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7"
+        },
         "requestBody": {
           "required": true,
           "content": {

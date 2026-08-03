@@ -227,6 +227,7 @@ export interface QueryDecl {
     kind: "cursor";
     span: Span;
   };
+  readAudit?: { span: Span };
   span: Span;
 }
 

@@ -13,8 +13,8 @@ function actionEventIds(operations: OperationManifest, operationId: string): str
 
 export interface CapabilityManifest {
   $schema: "https://modellang.dev/schemas/capability-manifest.schema.json";
-  capabilityManifestVersion: 9;
-  operationManifestVersion: 10;
+  capabilityManifestVersion: 10;
+  operationManifestVersion: 11;
   model: { id: string; name: string; version: string; sourceHash: string };
   view: {
     audience: "application";
@@ -54,7 +54,7 @@ export function generateCapabilityManifest(
 ): CapabilityManifest {
   return {
     $schema: "https://modellang.dev/schemas/capability-manifest.schema.json",
-    capabilityManifestVersion: 9,
+    capabilityManifestVersion: 10,
     operationManifestVersion: operations.manifestVersion,
     model: { ...operations.model },
     view: {

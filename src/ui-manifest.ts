@@ -65,8 +65,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 10;
-  operationManifestVersion: 10;
+  uiManifestVersion: 11;
+  operationManifestVersion: 11;
   model: {
     id: string;
     name: string;
@@ -146,6 +146,15 @@ export interface UiManifest {
       default: "redacted";
       fields: { projectionFieldPath: string[]; ruleId?: string }[];
     };
+    readEvidence?: {
+      mode: "transactionalAudit";
+      scope: "successfulCommittedExecution";
+      storage: "private";
+      requestBinding: "canonicalSha256";
+      responseBinding: "canonicalSha256";
+      payloadRetention: "none";
+      revision: string;
+    };
     pagination?: {
       kind: "cursor";
       cursorInput: "cursor";
@@ -200,12 +209,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 10) {
-    throw new Error(`E6201 UI generation requires operation manifest version 10, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 11) {
+    throw new Error(`E6201 UI generation requires operation manifest version 11, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 10,
+    uiManifestVersion: 11,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -304,6 +313,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
             })),
           },
         } : {}),
+        ...(operation.readEvidence ? { readEvidence: { ...operation.readEvidence } } : {}),
         ...(operation.output.cardinality === "page" ? {
           pagination: {
             kind: operation.output.pagination.kind,

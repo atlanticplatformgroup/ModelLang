@@ -10,9 +10,12 @@ AS $modellang$
 DECLARE
   v_principal_id uuid;
   v_result jsonb;
+  v_identity_issuer text;
+  v_identity_subject text;
   v_actor "model_procurement"."user"%ROWTYPE;
 BEGIN
-  SELECT identity."principal_id" INTO v_principal_id
+  SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
+  INTO v_principal_id, v_identity_issuer, v_identity_subject
   FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   SELECT * INTO v_actor
@@ -40,6 +43,9 @@ BEGIN
     ORDER BY v_row."id" ASC, v_row."id" ASC
     LIMIT 100
   ) AS v_query;
+
+  INSERT INTO "model_procurement_internal"."query_audit" ("query_id", "database_principal", "principal_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "query_revision", "request_hash", "response_hash", "result_count", "sort_profile", "continued")
+  VALUES ('query:qry_4406b045404a48449282db804f6167a8', session_user, v_principal_id, v_identity_issuer, v_identity_subject, 'model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7', 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object('queryId', 'query:qry_4406b045404a48449282db804f6167a8', 'revision', 'sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7', 'inputs', pg_catalog.jsonb_build_object(), 'sortProfile', pg_catalog.to_jsonb('default'::text)))::text, 'UTF8')), 'hex'), 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((v_result)::text, 'UTF8')), 'hex'), pg_catalog.jsonb_array_length(v_result), 'default', FALSE);
 
   RETURN v_result;
 END

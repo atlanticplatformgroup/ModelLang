@@ -1,0 +1,17 @@
+(* ModelLang 0.36 extends the complete ModelLang 0.35 grammar. *)
+
+query_decl =
+  "query", identifier, [ stable_id ], "(", [ query_parameter, { ",", query_parameter } ], ")",
+  "returns", identifier, "from", identifier, "as", identifier, "{",
+  "authorize", expression, ";",
+  "where", expression, ";",
+  { disclosure_rule },
+  "orderBy", direct_query_field, sort_direction, ";",
+  { sort_profile },
+  "limit", integer, ";",
+  [ "paginate", "cursor", ";" ],
+  [ "audit", "reads", ";" ],
+  "}" ;
+
+(* Read auditing is opt-in and follows pagination when pagination is present. *)
+(* It adds no callable input and does not alter the result grammar. *)

@@ -72,9 +72,9 @@ BEGIN
   ORDER BY "id" DESC LIMIT 1;
   IF NOT FOUND
      OR v_model_id IS DISTINCT FROM 'model:Procurement'
-     OR v_version IS DISTINCT FROM '0.35.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d' THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d';
+     OR v_version IS DISTINCT FROM '0.36.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc' THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = 'ML_MIGRATION_BASELINE:sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc';
   END IF;
 END
 $modellang_upgrade$;
@@ -775,7 +775,7 @@ BEGIN
 
   v_request_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object('actionId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'inputs', pg_catalog.jsonb_build_object('parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount', pg_catalog.to_jsonb(("p_amount")::numeric(20, 2))), 'expectedRevision', v_expected_revision, 'correlationId', v_correlation_id, 'causationId', v_causation_id))::text, 'UTF8')), 'hex');
   INSERT INTO "model_procurement_internal"."command_receipt" ("model_id", "model_version", "source_hash", "action_id", "principal_id", "idempotency_key", "request_hash", "correlation_id", "causation_id")
-  VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'action:act_1e35db0451b1461e941af6283d86dca2', v_principal_id, v_idempotency_key, v_request_hash, v_correlation_id, v_causation_id)
+  VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'action:act_1e35db0451b1461e941af6283d86dca2', v_principal_id, v_idempotency_key, v_request_hash, v_correlation_id, v_causation_id)
   ON CONFLICT ("principal_id", "action_id", "idempotency_key") DO NOTHING
   RETURNING "id" INTO v_receipt_id;
 
@@ -784,7 +784,7 @@ BEGIN
     INTO v_receipt_id, v_receipt_source_hash, v_receipt_request_hash, v_receipt_status, v_receipt_response
     FROM "model_procurement_internal"."command_receipt"
     WHERE "principal_id" = v_principal_id AND "action_id" = 'action:act_1e35db0451b1461e941af6283d86dca2' AND "idempotency_key" = v_idempotency_key;
-    IF v_receipt_source_hash IS DISTINCT FROM 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d' OR v_receipt_request_hash IS DISTINCT FROM v_request_hash THEN
+    IF v_receipt_source_hash IS DISTINCT FROM 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc' OR v_receipt_request_hash IS DISTINCT FROM v_request_hash THEN
       RAISE EXCEPTION USING ERRCODE = '40001', MESSAGE = 'ML_IDEMPOTENCY_CONFLICT:idempotency:action:act_1e35db0451b1461e941af6283d86dca2';
     END IF;
     IF v_receipt_status IS DISTINCT FROM 'executed' OR v_receipt_response IS NULL THEN
@@ -810,7 +810,7 @@ BEGIN
   FROM "model_procurement"."user" AS row_value
   WHERE row_value."id" = v_principal_id;
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'operationId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount', 'value', pg_catalog.to_jsonb(("p_amount")::numeric(20, 2)))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'operationId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_1e35db0451b1461e941af6283d86dca2.amount', 'value', pg_catalog.to_jsonb(("p_amount")::numeric(20, 2)))))::text);
 
   IF NOT ((((('EMPLOYEE' = ANY(v_actor."roles")) OR ('MANAGER' = ANY(v_actor."roles"))) OR ('FINANCE' = ANY(v_actor."roles")))) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_1e35db0451b1461e941af6283d86dca2';
@@ -830,11 +830,11 @@ BEGIN
 
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles", 'approvalObserved', v_result."approval_observed");
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id", "command_receipt_id")
-  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.35.0', 'sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d'), 'actionId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
+  VALUES ('action:act_1e35db0451b1461e941af6283d86dca2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.36.0', 'sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc'), 'actionId', 'action:act_1e35db0451b1461e941af6283d86dca2', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_1e35db0451b1461e941af6283d86dca2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
   RETURNING "id" INTO v_action_audit_id;
 
   INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "action_id", "principal_id", "target_id", "payload", "correlation_id", "causation_id", "action_audit_id", "command_receipt_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'event:evt_10d694c9a0a274dc79c6168e47d25968', 'RequestOpened', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_1e35db0451b1461e941af6283d86dca2', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
+  VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'event:evt_10d694c9a0a274dc79c6168e47d25968', 'RequestOpened', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_1e35db0451b1461e941af6283d86dca2', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
 
   UPDATE "model_procurement_internal"."command_receipt"
   SET "status" = 'executed', "response" = v_response, "target_id" = v_result."id",
@@ -936,7 +936,7 @@ BEGIN
   FROM "model_procurement"."purchase_request" AS row_value
   WHERE row_value."id" = "p_request";
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'operationId', 'action:act_ed2374e822704c51a2925338253d05d2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'operationId', 'action:act_ed2374e822704c51a2925338253d05d2', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_ed2374e822704c51a2925338253d05d2.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
 
   IF NOT (((v_actor."id" = v_request."requester_id")) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_ed2374e822704c51a2925338253d05d2';
@@ -957,11 +957,11 @@ BEGIN
 
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles", 'approvalObserved', v_result."approval_observed");
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id", "command_receipt_id")
-  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.35.0', 'sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d'), 'actionId', 'action:act_ed2374e822704c51a2925338253d05d2', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_ed2374e822704c51a2925338253d05d2.is_draft', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
+  VALUES ('action:act_ed2374e822704c51a2925338253d05d2', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.36.0', 'sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc'), 'actionId', 'action:act_ed2374e822704c51a2925338253d05d2', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_ed2374e822704c51a2925338253d05d2', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_ed2374e822704c51a2925338253d05d2.is_draft', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
   RETURNING "id" INTO v_action_audit_id;
 
   INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "action_id", "principal_id", "target_id", "payload", "correlation_id", "causation_id", "action_audit_id", "command_receipt_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'event:evt_20d694c9a0a274dc79c6168e47d25968', 'RequestSubmitted', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_ed2374e822704c51a2925338253d05d2', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
+  VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'event:evt_20d694c9a0a274dc79c6168e47d25968', 'RequestSubmitted', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_ed2374e822704c51a2925338253d05d2', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
 
   RETURN v_response;
 END
@@ -1058,7 +1058,7 @@ BEGIN
   FROM "model_procurement"."purchase_request" AS row_value
   WHERE row_value."id" = "p_request";
 
-  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'operationId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
+  v_revision := 'rev:1:' || pg_catalog.md5(pg_catalog.jsonb_build_object('sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'operationId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'components', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.actor', 'value', pg_catalog.to_jsonb(v_principal_id), 'rowVersion', pg_catalog.to_jsonb(v_actor_xmin)), pg_catalog.jsonb_build_object('parameterId', 'parameter:action:act_d39dbb883b5f4019b9027b85add3de47.request', 'value', pg_catalog.to_jsonb("p_request"), 'rowVersion', pg_catalog.to_jsonb(v_request_xmin))))::text);
 
   IF NOT ((((v_actor."id" <> v_request."requester_id") AND (((CASE WHEN ((((v_request."amount" <= 10000) AND ('MANAGER' = ANY(v_actor."roles")))) IS TRUE) THEN 1 ELSE 0 END) + (CASE WHEN ((((v_request."amount" > 10000) AND ('FINANCE' = ANY(v_actor."roles")))) IS TRUE) THEN 1 ELSE 0 END)) = 1))) IS TRUE) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'ML_AUTHORIZATION:authorize:action:act_d39dbb883b5f4019b9027b85add3de47';
@@ -1084,11 +1084,11 @@ BEGIN
 
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'requester', v_result."requester_id", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_result."amount"::numeric(20, 2))::text), 'status', v_result."status", 'approvedBy', v_result."approved_by_id", 'approvedByRoles', v_result."approved_by_roles", 'approvalObserved', v_result."approval_observed");
   INSERT INTO "model_procurement_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id", "command_receipt_id")
-  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.35.0', 'sourceHash', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d'), 'actionId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
+  VALUES ('action:act_d39dbb883b5f4019b9027b85add3de47', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Procurement', 'version', '0.36.0', 'sourceHash', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc'), 'actionId', 'action:act_d39dbb883b5f4019b9027b85add3de47', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_d39dbb883b5f4019b9027b85add3de47', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
   RETURNING "id" INTO v_action_audit_id;
 
   INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "action_id", "principal_id", "target_id", "payload", "correlation_id", "causation_id", "action_audit_id", "command_receipt_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'event:evt_30d694c9a0a274dc79c6168e47d25968', 'RequestApproved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_d39dbb883b5f4019b9027b85add3de47', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
+  VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'event:evt_30d694c9a0a274dc79c6168e47d25968', 'RequestApproved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'action:act_d39dbb883b5f4019b9027b85add3de47', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');
 
   RETURN v_response;
 END
@@ -1178,8 +1178,8 @@ BEGIN
   IF p_envelope->>'eventId' IS DISTINCT FROM 'event:evt_30d694c9a0a274dc79c6168e47d25968'
      OR p_envelope->>'eventName' IS DISTINCT FROM 'RequestApproved'
      OR v_source_model_id IS DISTINCT FROM 'model:Procurement'
-     OR v_source_model_version IS DISTINCT FROM '0.35.0'
-     OR v_source_hash IS DISTINCT FROM 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d'
+     OR v_source_model_version IS DISTINCT FROM '0.36.0'
+     OR v_source_hash IS DISTINCT FROM 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc'
      OR NOT ((((p_envelope->>'actionId') IS NOT NULL AND (p_envelope->>'actionId' ~ '^action:.+$') AND p_envelope->'consumerId' = 'null'::jsonb)
               OR (p_envelope->'actionId' = 'null'::jsonb AND (p_envelope->>'consumerId') IS NOT NULL AND (p_envelope->>'consumerId' ~ '^consumer:.+$'))) IS TRUE)
      OR (p_envelope->>'ordinal')::integer < 0
@@ -1265,7 +1265,7 @@ BEGIN
   INSERT INTO "model_procurement_internal"."consumer_audit" ("consumer_id", "source_event_id", "source_event_type", "source_model_id", "source_model_version", "source_hash", "target_id", "authorization_rule_id", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id")
   VALUES ('consumer:con_10d694c9a0a274dc79c6168e47d25968', v_source_event_id, 'event:evt_30d694c9a0a274dc79c6168e47d25968', v_source_model_id, v_source_model_version, v_source_hash, v_result."id", 'authorize:consumer:con_10d694c9a0a274dc79c6168e47d25968', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 1, 'outcome', 'consumed', 'consumerId', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', 'sourceEventId', v_source_event_id, 'sourceContract', pg_catalog.jsonb_build_object('eventId', 'event:evt_30d694c9a0a274dc79c6168e47d25968', 'modelId', v_source_model_id, 'modelVersion', v_source_model_version, 'sourceHash', v_source_hash), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:consumer:con_10d694c9a0a274dc79c6168e47d25968', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:consumer:con_10d694c9a0a274dc79c6168e47d25968.is_approved', 'outcome', 'passed')), 'emittedEventIds', pg_catalog.to_jsonb(ARRAY['event:evt_50d694c9a0a274dc79c6168e47d25968']::text[]), 'failurePolicy', pg_catalog.jsonb_build_object('mode', 'deadLetterAfterMaxAttempts', 'maxAttempts', 3, 'recovery', 'manual')), v_correlation_id, v_causation_id) RETURNING "id" INTO v_consumer_audit_id;
   INSERT INTO "model_procurement_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "consumer_id", "target_id", "payload", "correlation_id", "causation_id", "consumer_audit_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
-  VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5, 'manual');
+  VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved', 'entity:ent_9bc680209327484c8e98f5f740bcc702', 'consumer:con_10d694c9a0a274dc79c6168e47d25968', v_result."id", v_response, v_correlation_id, v_source_event_id::text, v_consumer_audit_id, 0, 5, 'manual');
 
   UPDATE "model_procurement_internal"."consumer_failure" SET "disposition" = 'resolved', "max_attempts" = 3, "terminal_at" = (NULL::timestamptz), "resolved_at" = pg_catalog.clock_timestamp()
   WHERE "consumer_id" = 'consumer:con_10d694c9a0a274dc79c6168e47d25968' AND "source_event_id" = v_source_event_id::text;
@@ -1289,9 +1289,12 @@ AS $modellang$
 DECLARE
   v_principal_id uuid;
   v_result jsonb;
+  v_identity_issuer text;
+  v_identity_subject text;
   v_actor "model_procurement"."user"%ROWTYPE;
 BEGIN
-  SELECT identity."principal_id" INTO v_principal_id
+  SELECT identity."principal_id", identity."identity_issuer", identity."identity_subject"
+  INTO v_principal_id, v_identity_issuer, v_identity_subject
   FROM "model_procurement_internal"."resolve_principal"() AS identity;
 
   SELECT * INTO v_actor
@@ -1319,6 +1322,9 @@ BEGIN
     ORDER BY v_row."id" ASC, v_row."id" ASC
     LIMIT 100
   ) AS v_query;
+
+  INSERT INTO "model_procurement_internal"."query_audit" ("query_id", "database_principal", "principal_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "query_revision", "request_hash", "response_hash", "result_count", "sort_profile", "continued")
+  VALUES ('query:qry_4406b045404a48449282db804f6167a8', session_user, v_principal_id, v_identity_issuer, v_identity_subject, 'model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7', 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object('queryId', 'query:qry_4406b045404a48449282db804f6167a8', 'revision', 'sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7', 'inputs', pg_catalog.jsonb_build_object(), 'sortProfile', pg_catalog.to_jsonb('default'::text)))::text, 'UTF8')), 'hex'), 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((v_result)::text, 'UTF8')), 'hex'), pg_catalog.jsonb_array_length(v_result), 'default', FALSE);
 
   RETURN v_result;
 END

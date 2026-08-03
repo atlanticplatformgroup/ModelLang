@@ -45,7 +45,7 @@ describe("backends", () => {
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(10);
+    expect(manifest.manifestVersion).toBe(11);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -98,7 +98,7 @@ describe("backends", () => {
 
     const openapi = JSON.parse(output["openapi.json"]!) as {
       openapi: string;
-      paths: Record<string, { post: { summary: string; parameters: { $ref: string }[]; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } } } }>;
+      paths: Record<string, { post: { summary: string; parameters: { $ref: string }[]; requestBody: { content: { "application/json": { schema: { additionalProperties: boolean; properties: Record<string, unknown> } } } }; "x-modellang-read-evidence"?: object } }>;
       components: {
         parameters: Record<string, { name: string; required: boolean }>;
         schemas: Record<string, { properties?: Record<string, unknown> }>;
@@ -115,6 +115,11 @@ describe("backends", () => {
       { $ref: "#/components/parameters/CorrelationId" },
       { $ref: "#/components/parameters/CausationId" },
     ]));
+    expect(openapi.paths["/operations/queries/qry_4406b045404a48449282db804f6167a8"]?.post["x-modellang-read-evidence"]).toMatchObject({
+      mode: "transactionalAudit",
+      storage: "private",
+      payloadRetention: "none",
+    });
     expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: true });
     expect(openapi.components.parameters.CorrelationId).toMatchObject({ name: "X-Correlation-ID", required: false });
     expect(openapi.components.parameters.CausationId).toMatchObject({ name: "X-Causation-ID", required: false });
@@ -203,16 +208,16 @@ describe("backends", () => {
         workflowTransitionIds: string[];
       }[];
       projections: { id: string; fields: { name: string; nestedProjectionId?: string; redactable?: true }[] }[];
-      queries: { disclosures?: { id: string; projectionFieldPath: string[] }[]; disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
+      queries: { disclosures?: { id: string; projectionFieldPath: string[] }[]; readEvidence?: { mode: string; storage: string; payloadRetention: string; revision: string }; disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
     };
     const semanticSchema = JSON.parse(await readFile("schemas/semantic-manifest.schema.json", "utf8")) as object;
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 16,
+      manifestVersion: 17,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 24 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 25 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -258,6 +263,12 @@ describe("backends", () => {
         projectionFieldPath: ["projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"],
       }),
     ]);
+    expect(semantic.queries[0]!.readEvidence).toMatchObject({
+      mode: "transactionalAudit",
+      storage: "private",
+      payloadRetention: "none",
+      revision: expect.stringMatching(/^sha256:/),
+    });
 
     const provenance = JSON.parse(output["provenance.json"]!) as {
       compilerVersion: string;
@@ -267,7 +278,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 24 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 25 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -298,8 +309,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 10,
-      operationManifestVersion: 10,
+      uiManifestVersion: 11,
+      operationManifestVersion: 11,
       authentication: { required: true, callerInput: false },
     });
 
@@ -527,7 +538,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   });
 
   it("skips optional money validation and entity loading only for null query inputs", () => {
-    const source = `model OptionalQueryInputs version "0.35.0";
+    const source = `model OptionalQueryInputs version "0.36.0";
       entity User { id: UUID @id; }
       entity Vendor { id: UUID @id; }
       entity Invoice { id: UUID @id; vendor: Vendor; amount: Money<USD>; }
@@ -679,7 +690,11 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(sql).toContain("ELSE NULL END");
     const operations = JSON.parse(output["operations.json"]!) as {
       projections: { name: string; fields: { name: string; nullable: boolean; redactable?: true }[] }[];
-      operations: { name: string; disclosure?: { redaction: string; default: string; fields: { projectionFieldPath: string[]; ruleId?: string }[] } }[];
+      operations: {
+        name: string;
+        disclosure?: { redaction: string; default: string; fields: { projectionFieldPath: string[]; ruleId?: string }[] };
+        readEvidence?: { mode: string; scope: string; storage: string; requestBinding: string; responseBinding: string; payloadRetention: string; revision: string };
+      }[];
     };
     expect(operations.projections.find((projection) => projection.name === "RequestSummary")?.fields)
       .toContainEqual(expect.objectContaining({ name: "amount", nullable: true, redactable: true }));
@@ -691,6 +706,20 @@ query active(caller actor: User) returns RecordSummary from Record as row {
         ruleId: expect.stringMatching(/^disclose:query:/),
       })],
     });
+    expect(operations.operations.find((operation) => operation.name === "myRequests")?.readEvidence).toEqual({
+      mode: "transactionalAudit",
+      scope: "successfulCommittedExecution",
+      storage: "private",
+      requestBinding: "canonicalSha256",
+      responseBinding: "canonicalSha256",
+      payloadRetention: "none",
+      revision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+    });
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."query_audit"');
+    expect(sql).toContain('INSERT INTO "model_procurement_internal"."query_audit"');
+    expect(sql).toContain("pg_catalog.sha256(pg_catalog.convert_to");
+    expect(output["postgres/002_schema.sql"]).not.toMatch(/request_payload|response_payload|raw_input|raw_cursor/);
+    expect(generateAll(await reservations())["postgres/003_queries.sql"]).not.toContain('INSERT INTO "model_reservations_internal"."query_audit"');
   });
 
   it("redacts absent rules and statically lowers nested disclosure paths", () => {
@@ -730,7 +759,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.35.0'");
+    expect(sql).toContain("'modelVersion', '0.36.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -809,6 +838,33 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(semanticQuery.sortProfiles).toHaveLength(2);
   });
 
+  it("binds audited page evidence to filters, sorting, and continuation without retaining payloads", async () => {
+    const source = await readFile("examples/reservations.model", "utf8");
+    const audited = compileText(
+      source.replace("  paginate cursor;", "  paginate cursor;\n  audit reads;"),
+      "audited-reservations.model",
+    );
+    const output = generateAll(audited);
+    const sql = output["postgres/003_queries.sql"]!;
+
+    expect(sql).toContain('INSERT INTO "model_reservations_internal"."query_audit"');
+    expect(sql).toContain("'inputs', pg_catalog.jsonb_build_object(");
+    expect(sql).toContain("'cursor', pg_catalog.to_jsonb(p_cursor)");
+    expect(sql).toContain("'sortProfile', pg_catalog.to_jsonb(v_sort_profile)");
+    expect(sql).toContain("pg_catalog.jsonb_array_length(v_result -> 'items')");
+    expect(sql).toContain("v_sort_profile, p_cursor IS NOT NULL");
+
+    const operations = JSON.parse(output["operations.json"]!) as {
+      operations: {
+        name: string;
+        readEvidence?: { revision: string };
+        output: { pagination?: { queryRevision: string } };
+      }[];
+    };
+    const operation = operations.operations.find((candidate) => candidate.name === "reservationsForResource")!;
+    expect(operation.readEvidence?.revision).toBe(operation.output.pagination?.queryRevision);
+  });
+
   it("enforces enum sets and lowers membership and snapshot copies", async () => {
     const output = generateAll(await procurement());
     const schema = output["postgres/002_schema.sql"];
@@ -866,7 +922,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.35.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.36.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
@@ -961,8 +1017,10 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/failure-claim.ts"]).not.toContain("claimant_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-claim.js"');
     expect(output["postgres/019_upgrade_0_29.sql"]).toContain("private terminal-failure claim upgrade");
-    expect(output["postgres/002_schema.sql"]).toContain('INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 29)');
+    expect(output["postgres/002_schema.sql"]).toContain('INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 36)');
     expect(output["postgres/019_upgrade_0_29.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:29:");
+    expect(output["postgres/020_upgrade_0_36.sql"]).toContain("private transactional read-evidence upgrade");
+    expect(output["postgres/020_upgrade_0_36.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:36:");
     expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("publication_failure_claim");
     expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("'claimed', claimed");
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {

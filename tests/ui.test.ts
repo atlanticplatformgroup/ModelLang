@@ -62,6 +62,13 @@ describe("generated UI boundary", () => {
         ruleId: expect.stringMatching(/^disclose:query:/),
       })],
     });
+    expect(query.readEvidence).toMatchObject({
+      mode: "transactionalAudit",
+      scope: "successfulCommittedExecution",
+      storage: "private",
+      payloadRetention: "none",
+      revision: expect.stringMatching(/^sha256:/),
+    });
   });
 
   it("executes a descriptor's stable operation ID through the browser HTTP client", async () => {

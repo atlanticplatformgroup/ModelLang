@@ -230,7 +230,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 24,
+    irVersion: 25,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1231,7 +1231,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     throw new ModelError("E2609", "Query limit must be an integer from 1 through 1000.", query.limitSpan, file);
   }
 
-  const paginationRevision = query.pagination
+  const queryRevision = query.pagination || query.readAudit
     ? `sha256:${createHash("sha256").update(JSON.stringify({
         id: semanticId,
         parameters: parameters.filter((parameter) => !parameter.caller).map((parameter) => ({ id: parameter.id, type: parameter.type, optional: parameter.optional === true })),
@@ -1243,7 +1243,8 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
         orderBy: { fieldId: fieldId(sourceEntity, orderField), direction: query.orderBy.direction },
         sortProfiles: sortProfiles?.map(({ id, name, fieldId: profileFieldId, direction: profileDirection }) => ({ id, name, fieldId: profileFieldId, direction: profileDirection })) ?? [],
         limit: query.limit,
-        pagination: "cursor-v1",
+        ...(query.pagination ? { pagination: "cursor-v1" } : {}),
+        ...(query.readAudit ? { readEvidence: "transactional-audit-v1" } : {}),
       })).digest("hex")}`
     : undefined;
 
@@ -1279,7 +1280,8 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
     },
     ...(sortProfiles?.length ? { sortProfiles } : {}),
     limit: query.limit,
-    ...(paginationRevision ? { pagination: { kind: "cursor" as const, cursorVersion: 1 as const, revision: paginationRevision } } : {}),
+    ...(query.pagination ? { pagination: { kind: "cursor" as const, cursorVersion: 1 as const, revision: queryRevision! } } : {}),
+    ...(query.readAudit ? { readEvidence: { mode: "transactionalAudit" as const, revision: queryRevision! } } : {}),
     span: irSpan(query.span, file),
     naming: { sqlFunction: snakeCase(query.name), typescriptMethod: query.name },
   };
@@ -1954,6 +1956,14 @@ function buildEnforcement(
       layer: "PostgreSQL keyset pagination",
       artifact: "postgres/003_queries.sql",
       objectName: fn,
+      source: query.span,
+    });
+    if (query.readEvidence) entries.push({
+      id: `read-evidence:${query.id}`,
+      purpose: "Append private transactional evidence for each successful committed query invocation, binding authenticated identity and query revision to canonical request and exact response hashes without copying inputs, cursors, or result payloads.",
+      layer: "PostgreSQL private query audit",
+      artifact: "postgres/003_queries.sql",
+      objectName: `${internalSchema}.query_audit`,
       source: query.span,
     });
     const closure: IRProjection[] = [];

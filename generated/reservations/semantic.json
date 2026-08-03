@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 16,
-  "profile": "sml-transactional-core/16",
+  "manifestVersion": 17,
+  "profile": "sml-transactional-core/17",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.35.0",
-    "irVersion": 24,
+    "compilerVersion": "0.36.0",
+    "irVersion": 25,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.35.0",
-    "sourceHash": "sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731",
+    "version": "0.36.0",
+    "sourceHash": "sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {

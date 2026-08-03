@@ -2,8 +2,20 @@
 
 ## Unreleased
 
-- Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
+- Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 36, upgrades 17–20 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
+
+## 0.36.0
+
+- Added terminal `audit reads;` for queries that require private transactional evidence without changing callable inputs or array/page result shapes.
+- Bound each successful committed invocation to model/query identity and revision, direct or gateway identity, canonical request SHA-256, exact response SHA-256, result count, selected sort profile, continuation state, and transaction time.
+- Stored no raw input, filter, cursor, response, row, or disclosed field value; the internal `query_audit` table remains inaccessible to application and generated operational roles.
+- Defined exact transaction semantics: evidence is inserted after result construction, failures and denials append nothing, commit makes it durable, and caller rollback removes it.
+- Added static read-evidence metadata to operation, OpenAPI, UI, engineering semantic, enforcement, provenance, and schema contracts while leaving public capabilities and response validation closed.
+- Classified adding or removing read evidence as breaking with persistence risk and included audit mode in query/cursor revision identity.
+- Added idempotent, baseline-checked `020_upgrade_0_36.sql`, advanced the private runtime profile to 36, and made older operational upgrades refuse downgrade redeployment.
+- Advanced canonical IR to IR25, operation manifest to v11, capability manifest to v10, UI manifest to v11, engineering semantic manifest/profile to v17, semantic diff to v18, and generator profile to `postgresql-http-ui-transactional-read-evidence/20`.
+- Opted Procurement `myRequests` into auditing with unit, schema, golden, privacy, exact-hash, rollback, gateway-attribution, upgrade, and live PostgreSQL coverage.
 
 ## 0.35.0
 

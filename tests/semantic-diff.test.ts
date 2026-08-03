@@ -19,7 +19,7 @@ const ids = {
   query: "qry_11111111111111111111111111111111",
 };
 
-function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean; sortProfile?: string; redactable?: boolean; disclosure?: string }): string {
+function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean; sortProfile?: string; redactable?: boolean; disclosure?: string; readAudit?: boolean }): string {
   return `model SemanticChange version "${options.version}";
 entity User @stableId("${ids.user}") {
   id: UUID @id @stableId("${ids.userId}");
@@ -53,10 +53,37 @@ query records @stableId("${ids.query}")(
   ${options.sortProfile ?? ""}
   limit 10;
   ${options.pagination ? "paginate cursor;" : ""}
+  ${options.readAudit ? "audit reads;" : ""}
 }`;
 }
 
 describe("semantic change analysis", () => {
+  it("treats adding or removing committed read evidence as a breaking operational contract change", () => {
+    const added = semanticDiff(
+      compileText(model({ version: "1" }), "previous.model"),
+      compileText(model({ version: "2", readAudit: true }), "current.model"),
+    );
+    expect(added.changes).toContainEqual(expect.objectContaining({
+      kind: "queryReadEvidenceChanged",
+      area: "executionReliability",
+      classification: "breaking",
+      before: "none",
+      after: "transactionalAudit",
+      persistenceRisk: true,
+    }));
+
+    const removed = semanticDiff(
+      compileText(model({ version: "2", readAudit: true }), "previous.model"),
+      compileText(model({ version: "3" }), "current.model"),
+    );
+    expect(removed.changes).toContainEqual(expect.objectContaining({
+      kind: "queryReadEvidenceChanged",
+      classification: "breaking",
+      before: "transactionalAudit",
+      after: "none",
+    }));
+  });
+
   it("classifies adding a cursor page envelope as a breaking query contract change", () => {
     const report = semanticDiff(
       compileText(model({ version: "1" }), "previous.model"),
@@ -271,9 +298,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 17,
-      compilerVersion: "0.35.0",
-      irVersion: 24,
+      diffVersion: 18,
+      compilerVersion: "0.36.0",
+      irVersion: 25,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.35](./spec/0.35/LANGUAGE.md). It retains the complete 0.34 language and adds fail-closed conditional field disclosure over explicit projection paths.
+The current normative specification is [ModelLang 0.36](./spec/0.36/LANGUAGE.md). It retains the complete 0.35 language and adds opt-in private transactional read evidence for successful committed queries.
 
-- [Conditional field-disclosure semantics](./spec/0.35/CONDITIONAL_FIELD_DISCLOSURE.md)
-- [0.35 grammar additions](./spec/0.35/GRAMMAR.ebnf)
-- [0.35 conformance requirements](./spec/0.35/CONFORMANCE.md)
-- [0.35 unstable read boundaries](./spec/0.35/UNSTABLE.md)
+- [Transactional read-evidence semantics](./spec/0.36/TRANSACTIONAL_READ_EVIDENCE.md)
+- [0.36 grammar additions](./spec/0.36/GRAMMAR.ebnf)
+- [0.36 conformance requirements](./spec/0.36/CONFORMANCE.md)
+- [0.36 unstable read boundaries](./spec/0.36/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

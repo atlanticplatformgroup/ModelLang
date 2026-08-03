@@ -183,6 +183,9 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
           tags: [operation.kind === "action" ? "Actions" : "Queries"],
           security: [{ bearerAuth: [] }],
           "x-modellang-operation-id": operation.id,
+          ...(operation.kind === "query" && operation.readEvidence
+            ? { "x-modellang-read-evidence": operation.readEvidence }
+            : {}),
           ...(operation.kind === "action" ? {
             parameters: [
               { $ref: "#/components/parameters/ExpectedRevision" },

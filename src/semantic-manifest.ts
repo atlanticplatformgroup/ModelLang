@@ -43,8 +43,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 16;
-  profile: "sml-transactional-core/16";
+  manifestVersion: 17;
+  profile: "sml-transactional-core/17";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -53,7 +53,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 24;
+    irVersion: 25;
     generator: "semantic-manifest";
   };
   model: {
@@ -163,6 +163,15 @@ export interface SemanticQuery {
   authorization: SemanticRule;
   rowPolicy: SemanticRule;
   disclosures?: (SemanticRule & { projectionFieldPath: string[] })[];
+  readEvidence?: {
+    mode: "transactionalAudit";
+    scope: "successfulCommittedExecution";
+    storage: "private";
+    requestBinding: "canonicalSha256";
+    responseBinding: "canonicalSha256";
+    payloadRetention: "none";
+    revision: string;
+  };
   readSet: SemanticReadSet;
   disclosureSet: { projectionId: string; projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] };
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
@@ -246,10 +255,20 @@ function semanticRule(rule: IRRule): SemanticRule {
 function operationInput(
   manifest: OperationManifest,
   id: string,
-): { input: ManifestParameter[]; output: ManifestOperation["output"]; errors: ManifestErrorKind[] } {
+): {
+  input: ManifestParameter[];
+  output: ManifestOperation["output"];
+  errors: ManifestErrorKind[];
+  readEvidence?: Extract<ManifestOperation, { kind: "query" }>["readEvidence"];
+} {
   const operation = manifest.operations.find((candidate) => candidate.id === id);
   if (!operation) throw new Error(`E6301 Missing operation manifest entry '${id}'.`);
-  return { input: operation.input, output: operation.output, errors: operation.errors };
+  return {
+    input: operation.input,
+    output: operation.output,
+    errors: operation.errors,
+    ...(operation.kind === "query" && operation.readEvidence ? { readEvidence: operation.readEvidence } : {}),
+  };
 }
 
 function readSet(ir: ModelIR, rules: IRRule[], expressions: IRExpression[] = []): SemanticReadSet {
@@ -427,6 +446,7 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
         dependencies: expressionDependencies(rule.expression),
       })),
     } : {}),
+    ...(operation.readEvidence ? { readEvidence: { ...operation.readEvidence } } : {}),
     readSet: sourceReads,
     disclosureSet: {
       projectionId: projection.id,
@@ -490,7 +510,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 16,
+    manifestVersion: 17,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

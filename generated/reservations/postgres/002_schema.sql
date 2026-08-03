@@ -1,4 +1,4 @@
--- source sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731
+-- source sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;
@@ -186,6 +186,31 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_reservations_internal"."resolve_principal_snapshot"() FROM PUBLIC;
+CREATE TABLE IF NOT EXISTS "model_reservations_internal"."query_audit" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "query_id" text NOT NULL,
+  "database_principal" name NOT NULL,
+  "principal_id" uuid NOT NULL,
+  "identity_issuer" text,
+  "identity_subject" text,
+  "model_id" text NOT NULL,
+  "model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "query_revision" text NOT NULL,
+  "request_hash" text NOT NULL,
+  "response_hash" text NOT NULL,
+  "result_count" integer NOT NULL,
+  "sort_profile" text NOT NULL,
+  "continued" boolean NOT NULL,
+  "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  CONSTRAINT "ck_query_audit_identity" CHECK (("identity_issuer" IS NULL) = ("identity_subject" IS NULL)),
+  CONSTRAINT "ck_query_audit_source_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_revision" CHECK ("query_revision" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_request_hash" CHECK ("request_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_response_hash" CHECK ("response_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_result_count" CHECK ("result_count" >= 0)
+);
+CREATE INDEX IF NOT EXISTS "ix_query_audit_query_principal_time" ON "model_reservations_internal"."query_audit" ("query_id", "principal_id", "occurred_at", "id");
 ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
 ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
 ALTER TABLE "model_reservations_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
@@ -1020,7 +1045,7 @@ CREATE TABLE "model_reservations_internal"."runtime_profile" (
   CONSTRAINT "ck_runtime_profile_singleton" CHECK ("singleton"),
   CONSTRAINT "ck_runtime_profile_version" CHECK ("profile_version" >= 0)
 );
-INSERT INTO "model_reservations_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 29);
+INSERT INTO "model_reservations_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 36);
 
 CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -1037,6 +1062,6 @@ CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Reservations', '0.35.0', 'sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731', 'installation');
+VALUES ('model:Reservations', '0.36.0', 'sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7', 'installation');
 RESET ROLE;
 

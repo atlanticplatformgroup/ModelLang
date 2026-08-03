@@ -1,4 +1,4 @@
--- source sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d
+-- source sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -221,6 +221,31 @@ BEGIN
 END
 $modellang$;
 REVOKE ALL ON FUNCTION "model_procurement_internal"."resolve_principal_snapshot"() FROM PUBLIC;
+CREATE TABLE IF NOT EXISTS "model_procurement_internal"."query_audit" (
+  "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  "query_id" text NOT NULL,
+  "database_principal" name NOT NULL,
+  "principal_id" uuid NOT NULL,
+  "identity_issuer" text,
+  "identity_subject" text,
+  "model_id" text NOT NULL,
+  "model_version" text NOT NULL,
+  "source_hash" text NOT NULL,
+  "query_revision" text NOT NULL,
+  "request_hash" text NOT NULL,
+  "response_hash" text NOT NULL,
+  "result_count" integer NOT NULL,
+  "sort_profile" text NOT NULL,
+  "continued" boolean NOT NULL,
+  "occurred_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),
+  CONSTRAINT "ck_query_audit_identity" CHECK (("identity_issuer" IS NULL) = ("identity_subject" IS NULL)),
+  CONSTRAINT "ck_query_audit_source_hash" CHECK ("source_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_revision" CHECK ("query_revision" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_request_hash" CHECK ("request_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_response_hash" CHECK ("response_hash" ~ '^sha256:[0-9a-f]{64}$'),
+  CONSTRAINT "ck_query_audit_result_count" CHECK ("result_count" >= 0)
+);
+CREATE INDEX IF NOT EXISTS "ix_query_audit_query_principal_time" ON "model_procurement_internal"."query_audit" ("query_id", "principal_id", "occurred_at", "id");
 ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_id" text;
 ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "model_version" text;
 ALTER TABLE "model_procurement_internal"."action_audit" ADD COLUMN IF NOT EXISTS "source_hash" text;
@@ -1055,7 +1080,7 @@ CREATE TABLE "model_procurement_internal"."runtime_profile" (
   CONSTRAINT "ck_runtime_profile_singleton" CHECK ("singleton"),
   CONSTRAINT "ck_runtime_profile_version" CHECK ("profile_version" >= 0)
 );
-INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 29);
+INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 36);
 
 CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "id" bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -1072,6 +1097,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.35.0', 'sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d', 'installation');
+VALUES ('model:Procurement', '0.36.0', 'sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc', 'installation');
 RESET ROLE;
 

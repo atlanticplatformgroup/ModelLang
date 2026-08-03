@@ -6,13 +6,13 @@ import { ReservationsHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 10,
-  "operationManifestVersion": 10,
+  "uiManifestVersion": 11,
+  "operationManifestVersion": 11,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.35.0",
-    "sourceHash": "sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731",
+    "version": "0.36.0",
+    "sourceHash": "sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7",
     "label": "Reservations"
   },
   "authentication": {

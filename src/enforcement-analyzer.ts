@@ -78,6 +78,7 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   if (query.sortProfiles?.length) requireEntry(ir, `sort-profiles:${query.id}`, query.span);
   requireEntry(ir, `limit:${query.id}`, query.span);
   if (query.pagination) requireEntry(ir, `cursor:${query.id}`, query.span);
+  if (query.readEvidence) requireEntry(ir, `read-evidence:${query.id}`, query.span);
   requireEntry(ir, `read:${query.id}`, query.span);
   requireEntry(ir, `disclose:${query.id}`, query.span);
   const projection = ir.projections.find((candidate) => candidate.id === query.returnProjectionId);

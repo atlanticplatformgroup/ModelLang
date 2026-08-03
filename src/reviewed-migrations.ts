@@ -369,7 +369,7 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].includes(Number(previous.irVersion)) || current.irVersion !== 24) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9 through IR24 baseline and canonical IR24 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].includes(Number(previous.irVersion)) || current.irVersion !== 25) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9 through IR25 baseline and canonical IR25 current input.");
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);

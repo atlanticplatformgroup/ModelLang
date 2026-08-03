@@ -104,8 +104,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 16 },
-    "profile": { "const": "sml-transactional-core/16" },
+    "manifestVersion": { "const": 17 },
+    "profile": { "const": "sml-transactional-core/17" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -122,7 +122,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 24 },
+          "irVersion": { "const": 25 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -480,6 +480,20 @@
                 }
               ]
             }
+          },
+          "readEvidence": {
+            "type": "object",
+            "required": ["mode", "scope", "storage", "requestBinding", "responseBinding", "payloadRetention", "revision"],
+            "properties": {
+              "mode": { "const": "transactionalAudit" },
+              "scope": { "const": "successfulCommittedExecution" },
+              "storage": { "const": "private" },
+              "requestBinding": { "const": "canonicalSha256" },
+              "responseBinding": { "const": "canonicalSha256" },
+              "payloadRetention": { "const": "none" },
+              "revision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+            },
+            "additionalProperties": false
           },
           "readSet": { "$ref": "#/$defs/readSet" },
           "disclosureSet": {

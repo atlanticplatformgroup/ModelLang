@@ -11,7 +11,7 @@
     "$schema": { "const": "https://modellang.dev/schemas/artifact-provenance.schema.json" },
     "provenanceVersion": { "const": 1 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-conditional-field-disclosure/19" },
+    "generatorProfile": { "const": "postgresql-http-ui-transactional-read-evidence/20" },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -23,7 +23,7 @@
       },
       "additionalProperties": false
     },
-    "irVersion": { "const": 24 },
+    "irVersion": { "const": 25 },
     "artifacts": {
       "type": "array",
       "items": {

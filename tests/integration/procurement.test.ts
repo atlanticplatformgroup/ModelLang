@@ -282,7 +282,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.35.0",
+      model_version: "0.36.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -305,6 +305,86 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       requester: "00000000-0000-4000-8000-000000000003",
     });
     expect((await clients.manager.myRequests({})).some((request) => request.id === managerRequest.id)).toBe(true);
+  });
+
+  it("records private hash-bound evidence only for committed successful opted-in reads", async () => {
+    const queryId = "query:qry_4406b045404a48449282db804f6167a8";
+    const descriptor = ProcurementUiManifest.queries.find((query) => query.name === "myRequests")!;
+    const before = await admin.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM model_procurement_internal.query_audit WHERE query_id = $1",
+      [queryId],
+    );
+    const result = await clients.employeeOne.myRequests({});
+    const evidence = await admin.query<{
+      query_id: string;
+      database_principal: string;
+      principal_id: string;
+      identity_issuer: string | null;
+      identity_subject: string | null;
+      model_id: string;
+      model_version: string;
+      source_hash: string;
+      query_revision: string;
+      request_hash: string;
+      response_hash: string;
+      result_count: number;
+      sort_profile: string;
+      continued: boolean;
+    }>(`
+      SELECT query_id, database_principal, principal_id, identity_issuer, identity_subject,
+             model_id, model_version, source_hash, query_revision, request_hash,
+             response_hash, result_count, sort_profile, continued
+      FROM model_procurement_internal.query_audit
+      WHERE query_id = $1
+      ORDER BY id DESC
+      LIMIT 1
+    `, [queryId]);
+    expect(Number(before.rows[0]!.count) + 1).toBeGreaterThan(0);
+    expect(evidence.rows[0]).toMatchObject({
+      query_id: queryId,
+      database_principal: "ml_employee_one",
+      principal_id: "00000000-0000-4000-8000-000000000001",
+      identity_issuer: null,
+      identity_subject: null,
+      model_id: "model:Procurement",
+      model_version: "0.36.0",
+      source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      query_revision: descriptor.readEvidence!.revision,
+      request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      response_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      result_count: result.length,
+      sort_profile: "default",
+      continued: false,
+    });
+    const hashes = await admin.query<{ request_hash: string; response_hash: string }>(`
+      SELECT
+        'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(($1::jsonb)::text, 'UTF8')), 'hex') AS request_hash,
+        'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(($2::jsonb)::text, 'UTF8')), 'hex') AS response_hash
+    `, [JSON.stringify({ queryId, revision: descriptor.readEvidence!.revision, inputs: {}, sortProfile: "default" }), JSON.stringify(result)]);
+    expect(evidence.rows[0]).toMatchObject(hashes.rows[0]!);
+
+    const direct = new Client({ connectionString: loginUrl("ml_employee_one") });
+    await direct.connect();
+    try {
+      await expect(direct.query("SELECT * FROM model_procurement_internal.query_audit")).rejects.toMatchObject({ code: "42501" });
+      await direct.query("BEGIN");
+      await direct.query("SELECT model_procurement.my_requests()");
+      await direct.query("ROLLBACK");
+    } finally {
+      await direct.end();
+    }
+    const afterRollback = await admin.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM model_procurement_internal.query_audit WHERE query_id = $1",
+      [queryId],
+    );
+    expect(afterRollback.rows[0]!.count).toBe(String(Number(before.rows[0]!.count) + 1));
+
+    await expect(clients.unbound.myRequests({})).rejects.toBeInstanceOf(IdentityBindingError);
+    const afterDenied = await admin.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM model_procurement_internal.query_audit WHERE query_id = $1",
+      [queryId],
+    );
+    expect(afterDenied.rows[0]!.count).toBe(afterRollback.rows[0]!.count);
   });
 
   it("replays reliable commands exactly once and keeps receipts private and linked", async () => {
@@ -1136,7 +1216,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.35.0', $1,
+        VALUES ('model:Procurement', '0.36.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1942,7 +2022,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     `);
     const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/017_upgrade_0_27.sql");
     await expect(admin.query(upgrade))
-      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:27:29" });
+      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:27:36" });
     const after = await admin.query<typeof before.rows[number]>(`
       SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
@@ -1967,7 +2047,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     `);
     const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/018_upgrade_0_28.sql");
     await expect(admin.query(upgrade))
-      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:28:29" });
+      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:28:36" });
     const after = await admin.query<typeof before.rows[number]>(`SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
@@ -1979,7 +2059,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(after.rows).toEqual(before.rows);
   });
 
-  it("reapplies the 0.29 failure-claim upgrade without changing state or fabricating claims", async () => {
+  it("rejects the 0.29 failure-claim upgrade after the current runtime profile", async () => {
     const before = await admin.query<{
       events: string; consumer_failures: string; publication_acknowledgements: string;
       consumer_acknowledgements: string; publication_claims: string; consumer_claims: string;
@@ -1995,8 +2075,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/019_upgrade_0_29.sql");
-    await admin.query(upgrade);
-    await admin.query(upgrade);
+    await expect(admin.query(upgrade))
+      .rejects.toMatchObject({ code: "55000", message: "ML_RUNTIME_PROFILE_DOWNGRADE:29:36" });
     const after = await admin.query<typeof before.rows[number]>(`SELECT
         (SELECT count(*)::text FROM model_procurement_internal.event_outbox) AS events,
         (SELECT count(*)::text FROM model_procurement_internal.consumer_failure) AS consumer_failures,
@@ -2008,6 +2088,26 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history
     `);
     expect(after.rows).toEqual(before.rows);
+  });
+
+  it("reapplies the 0.36 read-evidence upgrade without fabricating or deleting evidence", async () => {
+    const before = await admin.query<{ evidence: string; history: string; runtime: number }>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.query_audit) AS evidence,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history,
+        (SELECT profile_version FROM model_procurement_internal.runtime_profile WHERE singleton) AS runtime
+    `);
+    const upgrade = await loadBaselineCheckedUpgrade("generated/procurement/postgres/020_upgrade_0_36.sql");
+    await admin.query(upgrade);
+    await admin.query(upgrade);
+    const after = await admin.query<typeof before.rows[number]>(`
+      SELECT
+        (SELECT count(*)::text FROM model_procurement_internal.query_audit) AS evidence,
+        (SELECT count(*)::text FROM model_procurement_internal.schema_migrations) AS history,
+        (SELECT profile_version FROM model_procurement_internal.runtime_profile WHERE singleton) AS runtime
+    `);
+    expect(after.rows).toEqual(before.rows);
+    expect(after.rows[0]!.runtime).toBe(36);
   });
 
   it("rolls back durable decision evidence with the action transaction", async () => {
@@ -2052,6 +2152,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         `SELECT * FROM model_procurement_internal.principal_binding`,
         `SELECT * FROM model_procurement_internal.gateway_principal_binding`,
         `SELECT * FROM model_procurement_internal.action_audit`,
+        `SELECT * FROM model_procurement_internal.query_audit`,
         `SELECT * FROM model_procurement_internal.schema_migrations`,
         `SET ROLE modellang_owner`,
       ]) {
@@ -2359,6 +2460,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     ]) as [{ id: string; requester: string }, { id: string; requester: string }];
     expect(employeeRequest.requester).toBe("00000000-0000-4000-8000-000000000001");
     expect(managerRequest.requester).toBe("00000000-0000-4000-8000-000000000003");
+    await employee.execute("query:qry_4406b045404a48449282db804f6167a8", {});
     await expect(unbound.execute("query:qry_4406b045404a48449282db804f6167a8", {}))
       .rejects.toBeInstanceOf(IdentityBindingError);
 
@@ -2400,6 +2502,18 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         identity_subject: "manager",
       }),
     ]));
+    const readAudit = await admin.query<{ database_principal: string; identity_issuer: string; identity_subject: string }>(`
+      SELECT database_principal, identity_issuer, identity_subject
+      FROM model_procurement_internal.query_audit
+      WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+        AND principal_id = '00000000-0000-4000-8000-000000000001'
+      ORDER BY id DESC LIMIT 1
+    `);
+    expect(readAudit.rows[0]).toEqual({
+      database_principal: "ml_gateway",
+      identity_issuer: "https://auth.example.test",
+      identity_subject: "employee-one",
+    });
   });
 
   it("ignores forged gateway settings from direct-login application roles", async () => {

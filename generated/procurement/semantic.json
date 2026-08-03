@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 16,
-  "profile": "sml-transactional-core/16",
+  "manifestVersion": 17,
+  "profile": "sml-transactional-core/17",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.35.0",
-    "irVersion": 24,
+    "compilerVersion": "0.36.0",
+    "irVersion": 25,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.35.0",
-    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d",
+    "version": "0.36.0",
+    "sourceHash": "sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc",
     "sourceFile": "examples/procurement.model"
   },
   "principal": {
@@ -1377,7 +1377,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
         "endColumn": 2
       },
       "caller": {
@@ -1506,6 +1506,15 @@
           ]
         }
       ],
+      "readEvidence": {
+        "mode": "transactionalAudit",
+        "scope": "successfulCommittedExecution",
+        "storage": "private",
+        "requestBinding": "canonicalSha256",
+        "responseBinding": "canonicalSha256",
+        "payloadRetention": "none",
+        "revision": "sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7"
+      },
       "readSet": {
         "entityIds": [
           "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",

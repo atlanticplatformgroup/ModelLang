@@ -4,6 +4,7 @@ export interface PostgresRuntimeProfile {
   readonly failureObservation: boolean;
   readonly failureAcknowledgement: boolean;
   readonly failureClaim: boolean;
+  readonly readEvidence: boolean;
 }
 
 export const POSTGRES_RUNTIME_PROFILES = {
@@ -13,6 +14,7 @@ export const POSTGRES_RUNTIME_PROFILES = {
     failureObservation: false,
     failureAcknowledgement: false,
     failureClaim: false,
+    readEvidence: false,
   },
   applicability: {
     runtimeVersion: 17,
@@ -20,6 +22,7 @@ export const POSTGRES_RUNTIME_PROFILES = {
     failureObservation: false,
     failureAcknowledgement: false,
     failureClaim: false,
+    readEvidence: false,
   },
   failureObservation: {
     runtimeVersion: 27,
@@ -27,6 +30,7 @@ export const POSTGRES_RUNTIME_PROFILES = {
     failureObservation: true,
     failureAcknowledgement: false,
     failureClaim: false,
+    readEvidence: false,
   },
   failureAcknowledgement: {
     runtimeVersion: 28,
@@ -34,13 +38,23 @@ export const POSTGRES_RUNTIME_PROFILES = {
     failureObservation: true,
     failureAcknowledgement: true,
     failureClaim: false,
+    readEvidence: false,
   },
-  current: {
+  failureClaim: {
     runtimeVersion: 29,
     applicability: true,
     failureObservation: true,
     failureAcknowledgement: true,
     failureClaim: true,
+    readEvidence: false,
+  },
+  current: {
+    runtimeVersion: 36,
+    applicability: true,
+    failureObservation: true,
+    failureAcknowledgement: true,
+    failureClaim: true,
+    readEvidence: true,
   },
 } as const satisfies Record<string, PostgresRuntimeProfile>;
 

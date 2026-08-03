@@ -100,6 +100,20 @@
       },
       "additionalProperties": false
     },
+    "readEvidence": {
+      "type": "object",
+      "required": ["mode", "scope", "storage", "requestBinding", "responseBinding", "payloadRetention", "revision"],
+      "properties": {
+        "mode": { "const": "transactionalAudit" },
+        "scope": { "const": "successfulCommittedExecution" },
+        "storage": { "const": "private" },
+        "requestBinding": { "const": "canonicalSha256" },
+        "responseBinding": { "const": "canonicalSha256" },
+        "payloadRetention": { "const": "none" },
+        "revision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
     "caller": {
       "type": "object",
       "required": ["parameterId", "entityId", "source", "requestSupplied"],
@@ -184,6 +198,7 @@
         "caller": { "$ref": "#/$defs/caller" },
         "sorting": { "$ref": "#/$defs/sorting" },
         "disclosure": { "$ref": "#/$defs/disclosure" },
+        "readEvidence": { "$ref": "#/$defs/readEvidence" },
         "output": {
           "oneOf": [
             {
@@ -275,7 +290,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 10 },
+    "manifestVersion": { "const": 11 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

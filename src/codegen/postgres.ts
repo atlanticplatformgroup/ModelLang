@@ -50,6 +50,7 @@ export interface PostgresOutput {
   "017_upgrade_0_27.sql": string;
   "018_upgrade_0_28.sql": string;
   "019_upgrade_0_29.sql": string;
+  "020_upgrade_0_36.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -543,6 +544,38 @@ export function generateGatewayInfrastructureStatements(ir: ModelIR, includeSnap
     "$modellang$;",
     `REVOKE ALL ON FUNCTION ${qname(internal, "resolve_principal")}() FROM PUBLIC;`,
     ...(includeSnapshotResolver ? generateSnapshotResolverStatements(ir) : []),
+  ];
+}
+
+function generateQueryAuditInfrastructureStatements(ir: ModelIR): string[] {
+  const internal = ir.model.naming.internalSchema;
+  const audit = qname(internal, "query_audit");
+  return [
+    `CREATE TABLE IF NOT EXISTS ${audit} (`,
+    `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
+    `  ${quoteIdent("query_id")} text NOT NULL,`,
+    `  ${quoteIdent("database_principal")} name NOT NULL,`,
+    `  ${quoteIdent("principal_id")} uuid NOT NULL,`,
+    `  ${quoteIdent("identity_issuer")} text,`,
+    `  ${quoteIdent("identity_subject")} text,`,
+    `  ${quoteIdent("model_id")} text NOT NULL,`,
+    `  ${quoteIdent("model_version")} text NOT NULL,`,
+    `  ${quoteIdent("source_hash")} text NOT NULL,`,
+    `  ${quoteIdent("query_revision")} text NOT NULL,`,
+    `  ${quoteIdent("request_hash")} text NOT NULL,`,
+    `  ${quoteIdent("response_hash")} text NOT NULL,`,
+    `  ${quoteIdent("result_count")} integer NOT NULL,`,
+    `  ${quoteIdent("sort_profile")} text NOT NULL,`,
+    `  ${quoteIdent("continued")} boolean NOT NULL,`,
+    `  ${quoteIdent("occurred_at")} timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp(),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_identity")} CHECK ((${quoteIdent("identity_issuer")} IS NULL) = (${quoteIdent("identity_subject")} IS NULL)),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_source_hash")} CHECK (${quoteIdent("source_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_revision")} CHECK (${quoteIdent("query_revision")} ~ '^sha256:[0-9a-f]{64}$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_request_hash")} CHECK (${quoteIdent("request_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_response_hash")} CHECK (${quoteIdent("response_hash")} ~ '^sha256:[0-9a-f]{64}$'),`,
+    `  CONSTRAINT ${quoteIdent("ck_query_audit_result_count")} CHECK (${quoteIdent("result_count")} >= 0)`,
+    `);`,
+    `CREATE INDEX IF NOT EXISTS ${quoteIdent("ix_query_audit_query_principal_time")} ON ${audit} (${quoteIdent("query_id")}, ${quoteIdent("principal_id")}, ${quoteIdent("occurred_at")}, ${quoteIdent("id")});`,
   ];
 }
 
@@ -1518,6 +1551,7 @@ function generateSchema(ir: ModelIR): string {
     ");",
     "",
     ...generateGatewayInfrastructureStatements(ir),
+    ...generateQueryAuditInfrastructureStatements(ir),
     ...generateDecisionEvidenceInfrastructureStatements(ir),
     ...generateCommandReceiptInfrastructureStatements(ir),
     ...generateEventInboxInfrastructureStatements(ir),
@@ -2100,6 +2134,10 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     })) ?? []),
   ];
   const hasSortProfiles = sortOrders.length > 1;
+  const canonicalInputEntries = callable.flatMap((parameter) => [
+    `'${parameter.id.replaceAll("'", "''")}'`,
+    revisionInputSql(parameter, quoteIdent(parameter.naming.sqlParameter)),
+  ]);
   const selectedSortValue = (alias: string) => hasSortProfiles
     ? `CASE ${sortOrders.map((profile) => `WHEN v_sort_profile = '${profile.name.replaceAll("'", "''")}' THEN (${alias}.${quoteIdent(profile.field.naming.sqlColumn)})::text`).join(" ")} END`
     : `${alias}.${quoteIdent(orderField.naming.sqlColumn)}`;
@@ -2127,6 +2165,10 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "  v_principal_id uuid;",
     "  v_result jsonb;",
   ];
+  if (query.readEvidence) declarations.push(
+    "  v_identity_issuer text;",
+    "  v_identity_subject text;",
+  );
   if (hasSortProfiles) declarations.push("  v_sort_profile text;");
   if (query.pagination) {
     declarations.push(
@@ -2143,7 +2185,8 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     declarations.push(`  ${recordNames.get(parameter.id)} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`);
   }
   const body: string[] = [
-    `  SELECT identity.${quoteIdent("principal_id")} INTO v_principal_id`,
+    `  SELECT identity.${quoteIdent("principal_id")}${query.readEvidence ? `, identity.${quoteIdent("identity_issuer")}, identity.${quoteIdent("identity_subject")}` : ""}`,
+    `  INTO v_principal_id${query.readEvidence ? ", v_identity_issuer, v_identity_subject" : ""}`,
     `  FROM ${qname(internal, "resolve_principal")}() AS identity;`,
     "",
   ];
@@ -2192,10 +2235,6 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     "",
   );
   if (query.pagination) {
-    const inputEntries = callable.flatMap((parameter) => [
-      `'${parameter.id.replaceAll("'", "''")}'`,
-      revisionInputSql(parameter, quoteIdent(parameter.naming.sqlParameter)),
-    ]);
     const directionOperator = query.orderBy.direction === "asc" ? ">" : "<";
     const reverseDirection = query.orderBy.direction === "asc" ? "DESC" : "ASC";
     const cursorPredicate = hasSortProfiles
@@ -2224,7 +2263,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
     body.push(
       `  v_input_hash := 'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((pg_catalog.jsonb_build_object(`,
       `    'caller', pg_catalog.to_jsonb(v_principal_id),`,
-      `    'inputs', pg_catalog.jsonb_build_object(${inputEntries.join(", ")})`,
+      `    'inputs', pg_catalog.jsonb_build_object(${canonicalInputEntries.join(", ")})`,
       ...(hasSortProfiles ? ["    , 'sortProfile', pg_catalog.to_jsonb(v_sort_profile)"] : []),
       `  ))::text, 'UTF8')), 'hex');`,
       "",
@@ -2301,7 +2340,6 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "    ) ELSE NULL END",
       "  ) INTO v_result;",
       "",
-      "  RETURN v_result;",
     );
   } else {
     body.push(
@@ -2319,9 +2357,26 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       `    LIMIT ${query.limit}`,
       "  ) AS v_query;",
       "",
-      "  RETURN v_result;",
     );
   }
+  if (query.readEvidence) {
+    const requestPayload = `pg_catalog.jsonb_build_object(`
+      + `'queryId', '${query.id.replaceAll("'", "''")}', `
+      + `'revision', '${query.readEvidence.revision}', `
+      + `'inputs', pg_catalog.jsonb_build_object(${canonicalInputEntries.join(", ")}), `
+      + `'sortProfile', pg_catalog.to_jsonb(${hasSortProfiles ? "v_sort_profile" : "'default'::text"})`
+      + `${query.pagination ? `, 'cursor', pg_catalog.to_jsonb(p_cursor)` : ""})`;
+    const sha256 = (value: string) => `'sha256:' || pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to((${value})::text, 'UTF8')), 'hex')`;
+    const resultCount = query.pagination
+      ? `pg_catalog.jsonb_array_length(v_result -> 'items')`
+      : "pg_catalog.jsonb_array_length(v_result)";
+    body.push(
+      `  INSERT INTO ${qname(internal, "query_audit")} (${quoteIdent("query_id")}, ${quoteIdent("database_principal")}, ${quoteIdent("principal_id")}, ${quoteIdent("identity_issuer")}, ${quoteIdent("identity_subject")}, ${quoteIdent("model_id")}, ${quoteIdent("model_version")}, ${quoteIdent("source_hash")}, ${quoteIdent("query_revision")}, ${quoteIdent("request_hash")}, ${quoteIdent("response_hash")}, ${quoteIdent("result_count")}, ${quoteIdent("sort_profile")}, ${quoteIdent("continued")})`,
+      `  VALUES ('${query.id.replaceAll("'", "''")}', session_user, v_principal_id, v_identity_issuer, v_identity_subject, '${ir.model.id.replaceAll("'", "''")}', '${ir.model.version.replaceAll("'", "''")}', '${ir.model.sourceHash.replaceAll("'", "''")}', '${query.readEvidence.revision}', ${sha256(requestPayload)}, ${sha256("v_result")}, ${resultCount}, ${hasSortProfiles ? "v_sort_profile" : "'default'"}, ${query.pagination ? "p_cursor IS NOT NULL" : "FALSE"});`,
+      "",
+    );
+  }
+  body.push("  RETURN v_result;");
   const functionParameters = [
     ...callable.map(parameterSql),
     ...(hasSortProfiles ? ["p_sort text DEFAULT NULL"] : []),
@@ -3081,12 +3136,29 @@ BEGIN;
 ${generateFailureClaimantRoleStatements()}
 SET LOCAL ROLE modellang_owner;
 ${generateUpgradeBaselineCheck(ir)}
-${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
+${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureClaim.runtimeVersion)}
 ${generateFailureClaimInfrastructureStatements(ir).join("\n")}
-${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.current).join("\n")}
+${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureClaim).join("\n")}
+${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureClaim.runtimeVersion)}
+RESET ROLE;
+
+${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureClaim).trim()}
+COMMIT;
+`;
+}
+
+function generateReadEvidenceUpgrade(ir: ModelIR): string {
+  return `-- Idempotent ModelLang 0.35 -> 0.36 private transactional read-evidence upgrade.
+-- No historical reads or evidence are fabricated; only newly committed opted-in query executions append evidence.
+BEGIN;
+SET LOCAL ROLE modellang_owner;
+${generateUpgradeBaselineCheck(ir)}
+${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
+${generateQueryAuditInfrastructureStatements(ir).join("\n")}
 ${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
 RESET ROLE;
 
+${generateQueries(ir).trim()}
 ${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.current).trim()}
 COMMIT;
 `;
@@ -3116,5 +3188,6 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "017_upgrade_0_27.sql": generateFailureObservationUpgrade(ir),
     "018_upgrade_0_28.sql": generateFailureAcknowledgementUpgrade(ir),
     "019_upgrade_0_29.sql": generateFailureClaimUpgrade(ir),
+    "020_upgrade_0_36.sql": generateReadEvidenceUpgrade(ir),
   };
 }

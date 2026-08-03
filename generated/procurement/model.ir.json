@@ -1,10 +1,10 @@
 {
-  "irVersion": 24,
+  "irVersion": 25,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.35.0",
-    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d",
+    "version": "0.36.0",
+    "sourceHash": "sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -2316,11 +2316,15 @@
         "identityTieBreaker": true
       },
       "limit": 100,
+      "readEvidence": {
+        "mode": "transactionalAudit",
+        "revision": "sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7"
+      },
       "span": {
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
         "endColumn": 2
       },
       "naming": {
@@ -3560,7 +3564,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
         "endColumn": 2
       }
     },
@@ -3574,7 +3578,21 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "read-evidence:query:qry_4406b045404a48449282db804f6167a8",
+      "purpose": "Append private transactional evidence for each successful committed query invocation, binding authenticated identity and query revision to canonical request and exact response hashes without copying inputs, cursors, or result payloads.",
+      "layer": "PostgreSQL private query audit",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement_internal.query_audit",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 163,
+        "column": 1,
+        "endLine": 172,
         "endColumn": 2
       }
     },
@@ -3588,7 +3606,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
         "endColumn": 2
       }
     },
@@ -3602,7 +3620,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 171,
+        "endLine": 172,
         "endColumn": 2
       }
     },

@@ -24,8 +24,8 @@ export type EventProducer =
 export type DomainEventEnvelope<EventId extends string, EventName extends string, ModelId extends string, ModelVersion extends string, SourceHash extends string, Payload> =
   DomainEventEnvelopeBase<EventId, EventName, ModelId, ModelVersion, SourceHash, Payload> & EventProducer;
 
-export type ReservationCreatedEvent = DomainEventEnvelope<"event:evt_40d694c9a0a274dc79c6168e47d25968", "ReservationCreated", "model:Reservations", "0.35.0", "sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731", Reservation>;
+export type ReservationCreatedEvent = DomainEventEnvelope<"event:evt_40d694c9a0a274dc79c6168e47d25968", "ReservationCreated", "model:Reservations", "0.36.0", "sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7", Reservation>;
 
-export type ReservationIndexedEvent = DomainEventEnvelope<"event:evt_60d694c9a0a274dc79c6168e47d25968", "ReservationIndexed", "model:Reservations", "0.35.0", "sha256:6d8b3036790991d23261b443130f4e8264af2816d5eb8c15f9f0a57ca4256731", Reservation>;
+export type ReservationIndexedEvent = DomainEventEnvelope<"event:evt_60d694c9a0a274dc79c6168e47d25968", "ReservationIndexed", "model:Reservations", "0.36.0", "sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7", Reservation>;
 
 export type ReservationsDomainEvent = ReservationCreatedEvent | ReservationIndexedEvent;

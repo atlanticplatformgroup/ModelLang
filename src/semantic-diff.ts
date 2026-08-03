@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 17;
+  diffVersion: 18;
   compilerVersion: string;
-  irVersion: 24;
+  irVersion: 25;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -514,6 +514,18 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
         explanation: "Conditional field disclosure changed without changing row authorization; null remains the fail-closed redaction value.",
       });
     }
+    const previousReadEvidence = pair.previous.readEvidence?.mode ?? "none";
+    const currentReadEvidence = pair.current.readEvidence?.mode ?? "none";
+    if (previousReadEvidence !== currentReadEvidence) addChange(changes, {
+      kind: "queryReadEvidenceChanged",
+      area: "executionReliability",
+      classification: "breaking",
+      subject: subject("query", pair.current),
+      before: previousReadEvidence,
+      after: currentReadEvidence,
+      persistenceRisk: true,
+      explanation: "Changing transactional read evidence changes the query's committed private-audit guarantee and operational retention obligations.",
+    });
     const previousResult = { orderBy: pair.previous.orderBy, limit: pair.previous.limit };
     const currentResult = { orderBy: pair.current.orderBy, limit: pair.current.limit };
     if (!same(previousResult, currentResult)) addChange(changes, {
@@ -739,7 +751,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 17,
+    diffVersion: 18,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {
