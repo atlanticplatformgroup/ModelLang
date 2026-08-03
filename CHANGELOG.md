@@ -5,6 +5,14 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 36, upgrades 17–20 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.38.0
+
+- Added deterministic `agent-tools.json` catalog v1 for every declared action and query, with stable identities, standalone closed JSON input/output schemas, exact authenticated HTTP bindings, failure classes, read-only annotations, and query bounds.
+- Added filtered action applicability rule IDs and outcomes, reliability, and emitted-event metadata without publishing expressions, current state, extensions, runtime internals, or authority grants.
+- Declared the catalog MCP-tool adaptable while explicitly declining direct MCP protocol and SML-Agent conformance; runtime authorization and precondition enforcement remain authoritative on every invocation.
+- Added target capability `agents.staticToolCatalog`, advanced target capability profile to v2 and `target:postgresql-http-ui-agent-catalog/2`, and recorded the catalog as a hashed contract artifact in provenance v2.
+- Advanced compiler and examples to 0.38.0 and generator profile to `postgresql-http-ui-agent-tool-catalog/22`; IR26, operation manifest v11, capability manifest v10, and private PostgreSQL runtime profile 36 remain unchanged.
+
 ## 0.37.0
 
 - Added typed, stable `extension` declarations for externally implemented behavior, including ownership, implementation location, entity reads/writes, external calls, emitted events, reliability, authorization context, test obligations, rationale, and promotion criteria.

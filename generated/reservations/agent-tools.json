@@ -1,0 +1,312 @@
+{
+  "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
+  "catalogVersion": 1,
+  "compilerVersion": "0.38.0",
+  "operationManifestVersion": 11,
+  "capabilityManifestVersion": 10,
+  "model": {
+    "id": "model:Reservations",
+    "name": "Reservations",
+    "version": "0.38.0",
+    "sourceHash": "sha256:5f0b992c074ed9f55c60da8288ce0df2f4f193401085ca0eb8058957c7979a7b"
+  },
+  "view": {
+    "audience": "agent",
+    "static": true,
+    "authorizationFiltered": false,
+    "containsExpressions": false,
+    "containsCurrentState": false,
+    "containsExtensions": false,
+    "grantsAuthority": false,
+    "runtimeAuthorizationRequired": true
+  },
+  "adapter": {
+    "compatibility": "mcpTool",
+    "directProtocolConformance": false
+  },
+  "authentication": {
+    "required": true,
+    "source": "authenticatedContext",
+    "callerInput": false
+  },
+  "tools": [
+    {
+      "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
+      "name": "reserve",
+      "description": "Execute the reserve domain action. Runtime authorization and preconditions remain authoritative.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource",
+          "startsAt",
+          "endsAt"
+        ],
+        "properties": {
+          "resource": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "createdAt",
+          "resource",
+          "reservedBy",
+          "startsAt",
+          "endsAt",
+          "indexed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resource": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "indexed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "execution": {
+        "protocol": "http",
+        "method": "POST",
+        "path": "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b",
+        "authenticated": true,
+        "runtimeAuthorizationRequired": true
+      },
+      "errors": [
+        "identityBinding",
+        "authorization",
+        "idempotency",
+        "precondition",
+        "invariant",
+        "conflict"
+      ],
+      "annotations": {
+        "readOnly": false
+      },
+      "kind": "action",
+      "applicability": {
+        "protocol": "http",
+        "method": "POST",
+        "path": "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b/applicability",
+        "outcomes": [
+          "applicable",
+          "denied",
+          "notApplicable",
+          "stale"
+        ],
+        "authorizationRuleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+        "preconditionRuleIds": [
+          "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
+        ],
+        "revisionRuleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+        "grantsAuthority": false
+      },
+      "reliability": {
+        "idempotency": "required",
+        "scope": "authenticatedPrincipal",
+        "replay": "storedResult",
+        "fingerprint": "canonicalSha256"
+      },
+      "emittedEventIds": [
+        "event:evt_40d694c9a0a274dc79c6168e47d25968"
+      ]
+    },
+    {
+      "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "name": "reservationsForResource",
+      "description": "Read the bounded reservationsForResource projection. Runtime authorization and row policy remain authoritative.",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource"
+        ],
+        "properties": {
+          "resource": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "startsAtOrAfter": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sort": {
+            "type": "string",
+            "enum": [
+              "default",
+              "latestFirst",
+              "endingSoonest"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          }
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "resource",
+                "startsAt",
+                "endsAt"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "resource": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "startsAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "endsAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096,
+                "pattern": "^[A-Za-z0-9_-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "execution": {
+        "protocol": "http",
+        "method": "POST",
+        "path": "/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "authenticated": true,
+        "runtimeAuthorizationRequired": true
+      },
+      "errors": [
+        "identityBinding",
+        "authorization",
+        "validation",
+        "stale"
+      ],
+      "annotations": {
+        "readOnly": true
+      },
+      "kind": "query",
+      "bounds": {
+        "cardinality": "page",
+        "maxItems": 2
+      },
+      "sorting": {
+        "input": "sort",
+        "defaultProfile": "default",
+        "profiles": [
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.default",
+            "name": "default",
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+            "direction": "asc",
+            "identityTieBreaker": true
+          },
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.latestFirst",
+            "name": "latestFirst",
+            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+            "direction": "desc",
+            "identityTieBreaker": true
+          },
+          {
+            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.endingSoonest",
+            "name": "endingSoonest",
+            "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+            "direction": "asc",
+            "identityTieBreaker": true
+          }
+        ]
+      }
+    }
+  ]
+}

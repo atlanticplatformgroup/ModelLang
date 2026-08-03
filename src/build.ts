@@ -18,6 +18,7 @@ import { generateCapabilityManifest } from "./capability-manifest.js";
 import { generateEventManifest } from "./event-manifest.js";
 import { generateExtensionLedger } from "./extension-ledger.js";
 import { generateTargetCapabilityReport } from "./target-capabilities.js";
+import { generateAgentToolCatalog } from "./agent-tool-catalog.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -35,6 +36,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "operations.json": stableJson(operationManifest),
     "decisions.json": stableJson(decisionPlan),
     "capabilities.json": stableJson(capabilityManifest),
+    "agent-tools.json": stableJson(generateAgentToolCatalog(operationManifest, capabilityManifest)),
     "ui.json": stableJson(uiManifest),
     "semantic.json": stableJson(semanticManifest),
     "events.json": stableJson(eventManifest),

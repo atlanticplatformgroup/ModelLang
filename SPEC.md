@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.37](./spec/0.37/LANGUAGE.md). It retains the complete 0.36 language and adds target capability profiles plus a typed, non-executable extension ledger.
+The current normative specification is [ModelLang 0.38](./spec/0.38/LANGUAGE.md). It retains the complete 0.37 language and adds a static, filtered agent tool catalog.
 
-- [Target capabilities and extension-ledger semantics](./spec/0.37/TARGET_CAPABILITIES_AND_EXTENSIONS.md)
-- [0.37 grammar additions](./spec/0.37/GRAMMAR.ebnf)
-- [0.37 conformance requirements](./spec/0.37/CONFORMANCE.md)
-- [0.37 unstable extension and target boundaries](./spec/0.37/UNSTABLE.md)
+- [Agent tool catalog semantics](./spec/0.38/AGENT_TOOL_CATALOG.md)
+- [0.38 grammar](./spec/0.38/GRAMMAR.ebnf)
+- [0.38 conformance requirements](./spec/0.38/CONFORMANCE.md)
+- [0.38 unstable agent boundaries](./spec/0.38/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

@@ -285,14 +285,22 @@ describe("backends", () => {
       summary: { declared: 1, externallyImplemented: 1, generatedImplementations: 0 },
     });
 
-    const target = JSON.parse(output["target-capabilities.json"]!) as { conformance: string; authority: string; gaps: { extensionId: string }[] };
+    const target = JSON.parse(output["target-capabilities.json"]!) as { profileVersion: number; targetProfile: string; conformance: string; authority: string; capabilities: { id: string; support: string }[]; gaps: { extensionId: string }[] };
     const targetSchema = JSON.parse(await readFile("schemas/target-capability-profile.schema.json", "utf8")) as object;
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
+      profileVersion: 2,
+      targetProfile: "target:postgresql-http-ui-agent-catalog/2",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
+    });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.staticToolCatalog",
+      required: true,
+      support: "native",
+      enforcement: ["agent-tool-catalog", "http"],
     });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
@@ -313,15 +321,113 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 26, targetProfile: "target:postgresql-http-ui/1" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 26, targetProfile: "target:postgresql-http-ui-agent-catalog/2" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "decisions.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "capabilities.json")?.role).toBe("contract");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "agent-tools.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "extensions.json")?.role).toBe("assurance");
     expect(provenance.artifacts.find((artifact) => artifact.path === "target-capabilities.json")?.role).toBe("assurance");
     expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
+  });
+
+  it("emits a static, closed, non-authoritative agent tool catalog", async () => {
+    const output = generateAll(await procurement());
+    const catalog = JSON.parse(output["agent-tools.json"]!) as {
+      catalogVersion: number;
+      operationManifestVersion: number;
+      capabilityManifestVersion: number;
+      view: Record<string, boolean | string>;
+      adapter: { compatibility: string; directProtocolConformance: boolean };
+      authentication: { required: boolean; source: string; callerInput: boolean };
+      tools: {
+        id: string;
+        kind: "action" | "query";
+        name: string;
+        inputSchema: { additionalProperties: boolean; required: string[]; properties: Record<string, unknown> };
+        outputSchema: Record<string, unknown>;
+        execution: { method: string; path: string; authenticated: boolean; runtimeAuthorizationRequired: boolean };
+        applicability?: { path: string; outcomes: string[]; authorizationRuleId: string; preconditionRuleIds: string[]; grantsAuthority: boolean };
+        reliability?: { idempotency: string };
+        emittedEventIds?: string[];
+        bounds?: { cardinality: string; maxItems: number };
+        annotations: { readOnly: boolean };
+      }[];
+    };
+    const schema = JSON.parse(await readFile("schemas/agent-tool-catalog.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
+    expect(catalog).toMatchObject({
+      catalogVersion: 1,
+      operationManifestVersion: 11,
+      capabilityManifestVersion: 10,
+      view: {
+        audience: "agent",
+        static: true,
+        authorizationFiltered: false,
+        containsExpressions: false,
+        containsCurrentState: false,
+        containsExtensions: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      adapter: { compatibility: "mcpTool", directProtocolConformance: false },
+      authentication: { required: true, source: "authenticatedContext", callerInput: false },
+    });
+    expect(catalog.tools).toHaveLength(4);
+    for (const tool of catalog.tools) {
+      expect(tool.inputSchema.additionalProperties).toBe(false);
+      expect(tool.inputSchema.properties).not.toHaveProperty("actor");
+      expect(tool.execution).toMatchObject({ method: "POST", authenticated: true, runtimeAuthorizationRequired: true });
+      expect(tool.execution.path).toMatch(new RegExp(`^/operations/${tool.kind === "action" ? "actions" : "queries"}/`));
+      expect(tool.annotations.readOnly).toBe(tool.kind === "query");
+      const schemaValidator = new Ajv2020({
+        allErrors: true,
+        strict: true,
+        formats: { uuid: true, "date-time": true },
+      });
+      expect(() => schemaValidator.compile(tool.inputSchema)).not.toThrow();
+      expect(() => schemaValidator.compile(tool.outputSchema)).not.toThrow();
+    }
+    const open = catalog.tools.find((tool) => tool.name === "openRequest")!;
+    expect(open).toMatchObject({
+      kind: "action",
+      reliability: { idempotency: "required" },
+      emittedEventIds: ["event:evt_10d694c9a0a274dc79c6168e47d25968"],
+      applicability: {
+        path: "/operations/actions/act_1e35db0451b1461e941af6283d86dca2/applicability",
+        outcomes: ["applicable", "denied", "notApplicable", "stale"],
+        authorizationRuleId: "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
+        grantsAuthority: false,
+      },
+    });
+    const query = catalog.tools.find((tool) => tool.name === "myRequests")!;
+    expect(query).toMatchObject({ kind: "query", bounds: { cardinality: "many", maxItems: 100 } });
+    expect(JSON.stringify(query.outputSchema)).not.toContain("$ref");
+    expect(JSON.stringify(catalog)).not.toMatch(/supplier-risk\/review|extension:|expression|sqlFunction|currentValue|commandReceipt|event_outbox|query_audit/);
+
+    const reservationCatalog = JSON.parse(generateAll(await reservations())["agent-tools.json"]!) as typeof catalog;
+    expect(validate(reservationCatalog), JSON.stringify(validate.errors)).toBe(true);
+    const paged = reservationCatalog.tools.find((tool) => tool.name === "reservationsForResource")!;
+    expect(paged).toMatchObject({
+      kind: "query",
+      bounds: { cardinality: "page", maxItems: 2 },
+      inputSchema: {
+        additionalProperties: false,
+        properties: {
+          sort: { type: "string", enum: ["default", "latestFirst", "endingSoonest"] },
+          cursor: { type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" },
+        },
+      },
+      outputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["items", "nextCursor"],
+        properties: { items: { type: "array", maxItems: 2 } },
+      },
+    });
   });
 
   it("derives a schema-valid framework-neutral UI manifest from the operation boundary", async () => {
@@ -796,7 +902,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.37.0'");
+    expect(sql).toContain("'modelVersion', '0.38.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -959,7 +1065,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.37.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.38.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');
