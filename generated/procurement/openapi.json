@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.34.0",
-    "description": "Generated from ModelLang operation manifest v9 (sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a)."
+    "version": "0.35.0",
+    "description": "Generated from ModelLang operation manifest v10 (sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1193,22 +1193,30 @@
             "format": "date-time"
           },
           "amount": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "currency",
-              "amount"
-            ],
-            "properties": {
-              "currency": {
-                "const": "USD"
+            "anyOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "currency",
+                  "amount"
+                ],
+                "properties": {
+                  "currency": {
+                    "const": "USD"
+                  },
+                  "amount": {
+                    "type": "string",
+                    "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                    "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+                  }
+                }
               },
-              "amount": {
-                "type": "string",
-                "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
-                "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+              {
+                "type": "null"
               }
-            }
+            ],
+            "description": "Conditionally disclosed; present as null when redacted."
           },
           "status": {
             "$ref": "#/components/schemas/RequestStatus"

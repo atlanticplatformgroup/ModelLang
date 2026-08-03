@@ -1,11 +1,11 @@
 {
   "$schema": "https://modellang.dev/schemas/operation-manifest.schema.json",
-  "manifestVersion": 9,
+  "manifestVersion": 10,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.34.0",
-    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a"
+    "version": "0.35.0",
+    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d"
   },
   "authentication": {
     "required": true,
@@ -261,7 +261,8 @@
             "precision": 20,
             "scale": 2
           },
-          "nullable": false
+          "nullable": true,
+          "redactable": true
         },
         {
           "id": "projectionField:pfd_74d694c9a0a274dc79c6168e47d25968",
@@ -424,6 +425,18 @@
         "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
         "source": "authenticatedContext",
         "requestSupplied": false
+      },
+      "disclosure": {
+        "redaction": "null",
+        "default": "redacted",
+        "fields": [
+          {
+            "projectionFieldPath": [
+              "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+            ],
+            "ruleId": "disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+          }
+        ]
       },
       "output": {
         "projectionId": "projection:prj_70d694c9a0a274dc79c6168e47d25968",

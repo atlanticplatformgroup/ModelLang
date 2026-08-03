@@ -104,9 +104,10 @@ function generateTypes(ir: ModelIR): string {
       const nestedProjection = selected.nestedProjectionId
         ? ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId)
         : undefined;
+      const nullable = field.optional || selected.redactable === true;
       const type = nestedProjection
-        ? `${nestedProjection.naming.typescriptName}${field.optional ? " | null" : ""}`
-        : tsType(ir, field);
+        ? `${nestedProjection.naming.typescriptName}${nullable ? " | null" : ""}`
+        : `${tsType(ir, field)}${selected.redactable && !field.optional ? " | null" : ""}`;
       lines.push(`  ${selected.name}: ${type};`);
     }
     lines.push("}", "");

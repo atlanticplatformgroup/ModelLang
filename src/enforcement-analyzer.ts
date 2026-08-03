@@ -73,6 +73,7 @@ function checkQuery(ir: ModelIR, query: IRQuery): void {
   requireEntry(ir, `boundary:${query.id}.safe_search_path`, query.span);
   requireEntry(ir, query.authorization.id, query.authorization.span);
   requireEntry(ir, query.rowPolicy.id, query.rowPolicy.span);
+  for (const disclosure of query.disclosures ?? []) requireEntry(ir, disclosure.id, disclosure.span);
   requireEntry(ir, `order:${query.id}`, query.span);
   if (query.sortProfiles?.length) requireEntry(ir, `sort-profiles:${query.id}`, query.span);
   requireEntry(ir, `limit:${query.id}`, query.span);

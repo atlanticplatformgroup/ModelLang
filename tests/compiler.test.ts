@@ -54,7 +54,7 @@ describe("semantic analysis", () => {
         authorize true;
         update item { optionalFlag = false; }
       }`));
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.consumers).toEqual([expect.objectContaining({
       id: "consumer:observeItem",
       sourceEventId: "event:ItemChanged",
@@ -181,7 +181,7 @@ describe("semantic analysis", () => {
         require still_allowed: MayManage(actor, item);
         update item { value = 2; }
       }`, "policy.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.policies).toEqual([
       expect.objectContaining({
         id: "policy:MayManage",
@@ -243,7 +243,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -363,7 +363,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -433,7 +433,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -466,7 +466,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -598,6 +598,63 @@ describe("ModelLang authenticated queries", () => {
     expect(ir.enforcement).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "sort-profiles:query:sorted", layer: "PostgreSQL query sorting" }),
     ]));
+  });
+
+  it("lowers fail-closed conditional disclosure over direct and nested projection paths", () => {
+    const ir = compileText(minimal(`
+      projection UserSummary from User { id; role redactable; }
+      projection ItemSummary from Item { id; value redactable; owner: UserSummary redactable; }
+      query items(caller actor: User) returns ItemSummary from Item as item {
+        authorize true;
+        where true;
+        disclose value when item.owner == actor;
+        disclose owner when item.owner == actor;
+        disclose owner.role when item.owner == actor;
+        orderBy item.id asc;
+        limit 10;
+      }
+    `), "conditional-disclosure.model");
+    expect(ir.projections.find((projection) => projection.name === "ItemSummary")?.fields).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "value", redactable: true }),
+      expect.objectContaining({ name: "owner", redactable: true, nestedProjectionId: "projection:UserSummary" }),
+    ]));
+    expect(ir.queries[0]?.disclosures).toEqual([
+      expect.objectContaining({ projectionFieldPath: ["projectionField:ItemSummary.value"], sourceExpression: "(item.owner == actor)" }),
+      expect.objectContaining({ projectionFieldPath: ["projectionField:ItemSummary.owner"], sourceExpression: "(item.owner == actor)" }),
+      expect.objectContaining({ projectionFieldPath: ["projectionField:ItemSummary.owner", "projectionField:UserSummary.role"], sourceExpression: "(item.owner == actor)" }),
+    ]);
+    expect(ir.enforcement).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: expect.stringMatching(/^disclose:query:items\./), layer: "PostgreSQL projection redaction" }),
+    ]));
+  });
+
+  it.each([
+    ["unknown path", "disclose missing when true;", "E2641"],
+    ["implicit traversal", "disclose value.name when true;", "E2642"],
+    ["non-redactable field", "disclose id when true;", "E2643"],
+    ["duplicate rule", "disclose value when true; disclose value when true;", "E2644"],
+    ["missing redactable parent rule", "disclose owner.role when true;", "E2645"],
+    ["non-Boolean rule", "disclose value when item.value;", "E2414"],
+  ])("rejects conditional disclosure with %s", (_name, rules, code) => {
+    const source = minimal(`
+      projection UserSummary from User { id; role redactable; }
+      projection ItemSummary from Item { id; value redactable; owner: UserSummary redactable; }
+      query items(caller actor: User) returns ItemSummary from Item as item {
+        authorize true; where true; ${rules} orderBy item.id asc; limit 10;
+      }
+    `);
+    expect(failure(source).code).toBe(code);
+  });
+
+  it("caps conditional disclosure rules at 32 per query", () => {
+    const rules = Array.from({ length: 33 }, () => "disclose value when true;").join(" ");
+    const source = minimal(`
+      projection ItemSummary from Item { id; value redactable; }
+      query items(caller actor: User) returns ItemSummary from Item as item {
+        authorize true; where true; ${rules} orderBy item.id asc; limit 10;
+      }
+    `);
+    expect(failure(source).code).toBe("E2640");
   });
 
   it("rejects an optional caller parameter", () => {
@@ -770,7 +827,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -849,7 +906,7 @@ workflow TaskLifecycle for Task.state {
 describe("ModelLang 0.9 workflows", () => {
   it("lowers initial state, action-backed transitions, and enforcement targets into the current IR", () => {
     const ir = compileText(workflowModel, "workflow.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.workflows).toEqual([
       expect.objectContaining({
         id: "workflow:TaskLifecycle",
@@ -947,7 +1004,7 @@ action make(caller actor: User) -> Record {
 
   it("preserves stable typed events and ordered action emissions in the current IR", () => {
     const ir = compileText(eventModel(), "events.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.events).toEqual([expect.objectContaining({
       id: "event:evt_11111111111111111111111111111111",
       name: "RecordChanged",
@@ -1044,7 +1101,7 @@ ${secondConsumer}`;
 
   it("preserves ordered consumer emissions in the current IR", () => {
     const ir = compileText(chainModel("emit RecordObserved;"), "chains.model");
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.consumers[0]!.emittedEventIds).toEqual([
       "event:evt_22222222222222222222222222222222",
     ]);
@@ -1081,7 +1138,7 @@ describe("ModelLang 0.24 consumer failure and recovery policies", () => {
 
   it("preserves bounded retry and terminal disposition policy in IR20", () => {
     const ir = compileText(source("retry maxAttempts 3;"));
-    expect(ir.irVersion).toBe(23);
+    expect(ir.irVersion).toBe(24);
     expect(ir.consumers[0]!.failurePolicy).toEqual({
       mode: "deadLetterAfterMaxAttempts",
       maxAttempts: 3,

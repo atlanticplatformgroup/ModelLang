@@ -116,7 +116,7 @@ const operationDefinitions = [
       "pagination": {
         "kind": "cursor",
         "cursorVersion": 1,
-        "queryRevision": "sha256:1b519691bebee5f73a5cae02ecbafd601b422970b58ae2b9fbacbe2e94f7bad1",
+        "queryRevision": "sha256:23312df0fdb9b20a5017fc04c6d33d8c36a15cba50996185e419265746099d9a",
         "cursorInput": "cursor"
       }
     },

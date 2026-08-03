@@ -1,0 +1,30 @@
+(* ModelLang 0.35 extends the complete ModelLang 0.34 grammar. *)
+
+projection_field =
+  identifier, [ ":", identifier ], [ stable_id ], [ "redactable" ], ";" ;
+
+query_decl =
+  "query", identifier, [ stable_id ], "(", [ query_parameter, { ",", query_parameter } ], ")",
+  "returns", identifier, "from", identifier, "as", identifier, "{",
+  "authorize", expression, ";",
+  "where", expression, ";",
+  { disclosure_rule },
+  "orderBy", direct_query_field, sort_direction, ";",
+  { sort_profile },
+  "limit", integer, ";",
+  [ "paginate", "cursor", ";" ],
+  "}" ;
+
+disclosure_rule = "disclose", projection_field_path, "when", expression, ";" ;
+projection_field_path = identifier, { ".", identifier } ;
+
+sort_profile = "sort", identifier, ":", direct_query_field, sort_direction, ";" ;
+direct_query_field = identifier, ".", identifier ;
+sort_direction = "asc" | "desc" ;
+
+(* `default` is reserved as the name of the required orderBy profile. *)
+(* At most 16 named profiles may be declared and all selected fields are required. *)
+(* Runtime field names, directions, expressions, limits, offsets, and SQL are not grammar. *)
+(* When present, a projection member's stable ID precedes `redactable`. *)
+(* Disclosure paths name explicit projection members, not entity traversal. *)
+(* At most 32 disclosure rules may be declared per query. *)

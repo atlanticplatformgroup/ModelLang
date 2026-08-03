@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a`
+Source hash: `sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -97,6 +97,7 @@ Source hash: `sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417
 | `boundary:query:qry_4406b045404a48449282db804f6167a8.safe_search_path` | Prevent caller-controlled object shadowing inside the privileged function. | PostgreSQL function configuration | `postgres/003_queries.sql`: `model_procurement.my_requests search_path=pg_catalog,pg_temp` | compiler-derived |
 | `authorize:query:qry_4406b045404a48449282db804f6167a8` | true | PostgreSQL query guard | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:166:13 |
 | `where:query:qry_4406b045404a48449282db804f6167a8` | (request.requester == actor) | PostgreSQL row policy | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:167:9 |
+| `disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968` | Disclose projection field path projectionField:pfd_73d694c9a0a274dc79c6168e47d25968 only when ((request.status != RequestStatus.DRAFT)) is exactly true; otherwise preserve the key with JSON null. | PostgreSQL projection redaction | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:168:3 |
 | `order:query:qry_4406b045404a48449282db804f6167a8` | Return rows in the default declared order with an ascending identity tie-breaker. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `limit:query:qry_4406b045404a48449282db804f6167a8` | Return at most 100 rows. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |
 | `read:query:qry_4406b045404a48449282db804f6167a8` | Read entity:ent_9bc680209327484c8e98f5f740bcc702 root rows and authored to-one related entities entity:ent_66c16684f17e4b4ca79eb7d916cbf725 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_procurement.my_requests` | examples/procurement.model:163:1 |

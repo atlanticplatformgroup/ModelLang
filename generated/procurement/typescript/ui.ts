@@ -6,13 +6,13 @@ import { ProcurementHttpClient } from "./http-client.js";
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ProcurementUiManifest = {
   "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
-  "uiManifestVersion": 9,
-  "operationManifestVersion": 9,
+  "uiManifestVersion": 10,
+  "operationManifestVersion": 10,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.34.0",
-    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a",
+    "version": "0.35.0",
+    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d",
     "label": "Procurement"
   },
   "authentication": {
@@ -280,7 +280,8 @@ export const ProcurementUiManifest = {
             "precision": 20,
             "scale": 2
           },
-          "nullable": false
+          "nullable": true,
+          "redactable": true
         },
         {
           "projectionFieldId": "projectionField:pfd_74d694c9a0a274dc79c6168e47d25968",
@@ -420,6 +421,18 @@ export const ProcurementUiManifest = {
       "filters": [],
       "resultProjectionId": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
       "maxItems": 100,
+      "disclosure": {
+        "redaction": "null",
+        "default": "redacted",
+        "fields": [
+          {
+            "projectionFieldPath": [
+              "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+            ],
+            "ruleId": "disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+          }
+        ]
+      },
       "errors": [
         "identityBinding",
         "authorization"

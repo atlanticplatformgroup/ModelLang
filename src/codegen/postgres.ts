@@ -1647,7 +1647,14 @@ function fieldJson(field: IRField, column: string): string {
   return `${column}${field.type === "Decimal" ? "::text" : ""}`;
 }
 
-function projectionJson(ir: ModelIR, projectionId: string, record: string, path: number[] = []): string {
+function projectionJson(
+  ir: ModelIR,
+  projectionId: string,
+  record: string,
+  context?: ExpressionContext,
+  projectionFieldPath: string[] = [],
+  aliasPath: number[] = [],
+): string {
   const projection = ir.projections.find((candidate) => candidate.id === projectionId);
   if (!projection) throw new Error(`E5008 Missing query projection '${projectionId}'.`);
   const entity = entityById(ir, projection.sourceEntityId);
@@ -1655,18 +1662,27 @@ function projectionJson(ir: ModelIR, projectionId: string, record: string, path:
     const field = entity.fields.find((candidate) => candidate.id === selected.sourceFieldId);
     if (!field) throw new Error(`E5009 Missing projection source field '${selected.sourceFieldId}'.`);
     const column = `${record}.${quoteIdent(field.naming.sqlColumn)}`;
+    const currentFieldPath = [...projectionFieldPath, selected.id];
+    let value: string;
     if (!selected.nestedProjectionId) {
-      return [`'${selected.name.replaceAll("'", "''")}'`, fieldJson(field, column)];
+      value = fieldJson(field, column);
+    } else {
+      const nestedProjection = ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId);
+      if (!nestedProjection) throw new Error(`E5010 Missing nested projection '${selected.nestedProjectionId}'.`);
+      const nestedEntity = entityById(ir, nestedProjection.sourceEntityId);
+      const nestedId = nestedEntity.fields.find((candidate) => candidate.id === nestedEntity.idFieldId);
+      if (!nestedId) throw new Error(`E5011 Missing identity field for nested projection '${nestedProjection.id}'.`);
+      const nestedPath = [...aliasPath, index];
+      const alias = `v_projection_${nestedPath.join("_")}`;
+      const lookup = `(SELECT ${projectionJson(ir, nestedProjection.id, quoteIdent(alias), context, currentFieldPath, nestedPath)} FROM ${qname(ir.model.naming.sqlSchema, nestedEntity.naming.sqlTable)} AS ${quoteIdent(alias)} WHERE ${quoteIdent(alias)}.${quoteIdent(nestedId.naming.sqlColumn)} = ${column})`;
+      value = field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${lookup} END` : lookup;
     }
-    const nestedProjection = ir.projections.find((candidate) => candidate.id === selected.nestedProjectionId);
-    if (!nestedProjection) throw new Error(`E5010 Missing nested projection '${selected.nestedProjectionId}'.`);
-    const nestedEntity = entityById(ir, nestedProjection.sourceEntityId);
-    const nestedId = nestedEntity.fields.find((candidate) => candidate.id === nestedEntity.idFieldId);
-    if (!nestedId) throw new Error(`E5011 Missing identity field for nested projection '${nestedProjection.id}'.`);
-    const nestedPath = [...path, index];
-    const alias = `v_projection_${nestedPath.join("_")}`;
-    const lookup = `(SELECT ${projectionJson(ir, nestedProjection.id, quoteIdent(alias), nestedPath)} FROM ${qname(ir.model.naming.sqlSchema, nestedEntity.naming.sqlTable)} AS ${quoteIdent(alias)} WHERE ${quoteIdent(alias)}.${quoteIdent(nestedId.naming.sqlColumn)} = ${column})`;
-    const value = field.optional ? `CASE WHEN ${column} IS NULL THEN NULL ELSE ${lookup} END` : lookup;
+    if (selected.redactable) {
+      const rule = context?.query?.disclosures?.find((candidate) =>
+        candidate.projectionFieldPath.length === currentFieldPath.length
+        && candidate.projectionFieldPath.every((fieldIdValue, pathIndex) => fieldIdValue === currentFieldPath[pathIndex]));
+      value = rule ? `CASE WHEN ((${lowerExpression(rule.expression, context!)}) IS TRUE) THEN ${value} ELSE NULL END` : "NULL";
+    }
     return [`'${selected.name.replaceAll("'", "''")}'`, value];
   });
   return `jsonb_build_object(${values.join(", ")})`;
@@ -2258,7 +2274,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "  END IF;",
       "",
       "  WITH page_rows AS MATERIALIZED (",
-      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
+      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row", context)} AS ${quoteIdent("item")},`,
       `           ${selectedSortValue("v_row")} AS ${quoteIdent("sort_value")},`,
       `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
       `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,
@@ -2294,7 +2310,7 @@ function generateQuery(ir: ModelIR, query: IRQuery): string {
       "    '[]'::jsonb",
       "  ) INTO v_result",
       "  FROM (",
-      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row")} AS ${quoteIdent("item")},`,
+      `    SELECT ${projectionJson(ir, query.returnProjectionId, "v_row", context)} AS ${quoteIdent("item")},`,
       `           ${selectedSortValue("v_row")} AS ${quoteIdent("sort_value")},`,
       `           v_row.${quoteIdent(idField.naming.sqlColumn)} AS ${quoteIdent("identity")}`,
       `    FROM ${qname(schema, sourceEntity.naming.sqlTable)} AS v_row`,

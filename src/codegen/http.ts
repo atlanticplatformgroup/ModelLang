@@ -137,13 +137,16 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       required: projection.fields.map((field) => field.name),
       properties: Object.fromEntries(projection.fields.map((field) => [
         field.name,
-        field.nullable
-          ? nullable(field.nestedProjectionId
-            ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
-            : valueSchema(manifest, field.type))
-          : field.nestedProjectionId
-            ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
-            : valueSchema(manifest, field.type),
+        {
+          ...(field.nullable
+            ? nullable(field.nestedProjectionId
+              ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
+              : valueSchema(manifest, field.type))
+            : field.nestedProjectionId
+              ? { $ref: `#/components/schemas/${manifest.projections.find((candidate) => candidate.id === field.nestedProjectionId)!.name}` }
+              : valueSchema(manifest, field.type)),
+          ...(field.redactable ? { description: "Conditionally disclosed; present as null when redacted." } : {}),
+        },
       ])),
     },
   ]));

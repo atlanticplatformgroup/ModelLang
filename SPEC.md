@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.34](./spec/0.34/LANGUAGE.md). It retains the complete 0.33 language and adds closed authored sort profiles with static lowering and cursor binding.
+The current normative specification is [ModelLang 0.35](./spec/0.35/LANGUAGE.md). It retains the complete 0.34 language and adds fail-closed conditional field disclosure over explicit projection paths.
 
-- [Authored sort-profile semantics](./spec/0.34/AUTHORED_SORT_PROFILES.md)
-- [0.34 grammar additions](./spec/0.34/GRAMMAR.ebnf)
-- [0.34 conformance requirements](./spec/0.34/CONFORMANCE.md)
-- [0.34 unstable read boundaries](./spec/0.34/UNSTABLE.md)
+- [Conditional field-disclosure semantics](./spec/0.35/CONDITIONAL_FIELD_DISCLOSURE.md)
+- [0.35 grammar additions](./spec/0.35/GRAMMAR.ebnf)
+- [0.35 conformance requirements](./spec/0.35/CONFORMANCE.md)
+- [0.35 unstable read boundaries](./spec/0.35/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

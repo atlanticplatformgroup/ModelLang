@@ -99,6 +99,7 @@ export interface ProjectionFieldDecl {
   name: string;
   nameSpan: Span;
   nestedProjectionType?: TypeRef;
+  redactable?: true;
   stableId?: Annotation;
   span: Span;
 }
@@ -203,6 +204,11 @@ export interface QueryDecl {
   rowAlias: { name: string; span: Span };
   authorize: Expression;
   where: Expression;
+  disclosures?: {
+    path: string[];
+    expression: Expression;
+    span: Span;
+  }[];
   orderBy: {
     path: string[];
     direction: "asc" | "desc";

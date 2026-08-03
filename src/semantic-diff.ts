@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 16;
+  diffVersion: 17;
   compilerVersion: string;
-  irVersion: 23;
+  irVersion: 24;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -480,6 +480,40 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
       persistenceRisk: false,
       explanation: "The query's row-visibility predicate changed.",
     });
+    const disclosureContract = (query: IRQuery) => (query.disclosures ?? [])
+      .map(({ span: _span, sourceExpression: _sourceExpression, ...rule }) => rule)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    const previousDisclosures = disclosureContract(pair.previous);
+    const currentDisclosures = disclosureContract(pair.current);
+    if (!same(previousDisclosures, currentDisclosures)) {
+      const previousById = new Map(previousDisclosures.map((rule) => [rule.id, rule]));
+      const currentById = new Map(currentDisclosures.map((rule) => [rule.id, rule]));
+      const added = currentDisclosures.filter((rule) => !previousById.has(rule.id));
+      const removed = previousDisclosures.filter((rule) => !currentById.has(rule.id));
+      const changed = currentDisclosures.filter((rule) => {
+        const before = previousById.get(rule.id);
+        return before && !same(before.expression, rule.expression);
+      });
+      let classification: SemanticChangeClassification;
+      if (added.length && !removed.length && !changed.length) classification = "expansive";
+      else if (removed.length && !added.length && !changed.length) classification = "restrictive";
+      else if (!added.length && !removed.length && changed.length) {
+        const classifications = changed.map((rule) => authorizationClassification(previousById.get(rule.id)!, rule));
+        classification = classifications.every((value) => value === "restrictive") ? "restrictive"
+          : classifications.every((value) => value === "expansive") ? "expansive"
+            : "review";
+      } else classification = "review";
+      addChange(changes, {
+        kind: "queryFieldDisclosureChanged",
+        area: "queryVisibility",
+        classification,
+        subject: subject("query", pair.current),
+        before: text(previousDisclosures),
+        after: text(currentDisclosures),
+        persistenceRisk: false,
+        explanation: "Conditional field disclosure changed without changing row authorization; null remains the fail-closed redaction value.",
+      });
+    }
     const previousResult = { orderBy: pair.previous.orderBy, limit: pair.previous.limit };
     const currentResult = { orderBy: pair.current.orderBy, limit: pair.current.limit };
     if (!same(previousResult, currentResult)) addChange(changes, {
@@ -555,6 +589,14 @@ function compareProjections(changes: SemanticChange[], previousIR: ModelIR, curr
         after: fieldPair.current.nestedProjectionId ?? "directField",
         persistenceRisk: false,
         explanation: "Changing a projection member between a direct value and a nested projection changes its closed disclosure contract.",
+      });
+      if (fieldPair.previous.redactable !== fieldPair.current.redactable) addChange(changes, {
+        kind: "projectionFieldRedactionContractChanged", area: "queryVisibility", classification: "breaking",
+        subject: subject("projectionField", fieldPair.current),
+        before: fieldPair.previous.redactable ? "redactable" : "alwaysDisclosed",
+        after: fieldPair.current.redactable ? "redactable" : "alwaysDisclosed",
+        persistenceRisk: false,
+        explanation: "Changing redaction eligibility changes the projection field's nullability and disclosure contract.",
       });
       const fieldContract = (ir: ModelIR, fieldId: string) => {
         const field = ir.entities.flatMap((entity) => entity.fields).find((candidate) => candidate.id === fieldId);
@@ -697,7 +739,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 16,
+    diffVersion: 17,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

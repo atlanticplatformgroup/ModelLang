@@ -230,7 +230,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
   return {
-    irVersion: 23,
+    irVersion: 24,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -1010,6 +1010,7 @@ function lowerProjection(projection: ProjectionDecl, symbols: Symbols, file: str
       identity: identity(selected.stableId),
       sourceFieldId: fieldId(sourceEntity, sourceField),
       ...(nestedProjectionId ? { nestedProjectionId } : {}),
+      ...(selected.redactable ? { redactable: true as const } : {}),
       span: irSpan(selected.span, file),
     };
   });
@@ -1126,6 +1127,62 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
   }, symbols, file);
   requireBoolean(rowPolicy, query.where.span, file, "Query row policy");
 
+  if ((query.disclosures?.length ?? 0) > 32) {
+    throw new ModelError("E2640", "A query may declare at most 32 conditional disclosure rules.", query.disclosures![32]!.span, file);
+  }
+  const disclosurePaths = new Map<string, Span>();
+  const redactablePrefixes = new Map<string, string[]>();
+  const disclosures = query.disclosures?.map((disclosure) => {
+    let currentProjection = projection;
+    const projectionFieldPath: string[] = [];
+    for (const [index, name] of disclosure.path.entries()) {
+      const selected = currentProjection.fields.find((field) => field.name === name);
+      if (!selected) {
+        throw new ModelError("E2641", `Unknown disclosure path '${disclosure.path.join(".")}' in projection '${projection.name}'.`, disclosure.span, file);
+      }
+      projectionFieldPath.push(projectionFieldId(currentProjection, selected));
+      if (selected.redactable) redactablePrefixes.set(projectionFieldPath.join("/"), [...projectionFieldPath]);
+      if (index < disclosure.path.length - 1) {
+        const nestedName = selected.nestedProjectionType?.name;
+        const nested = nestedName ? symbols.projections.get(nestedName) : undefined;
+        if (!nested) {
+          throw new ModelError("E2642", `Disclosure path '${disclosure.path.join(".")}' must traverse explicit nested projection fields.`, disclosure.span, file);
+        }
+        currentProjection = nested;
+      } else if (!selected.redactable) {
+        throw new ModelError("E2643", `Projection field '${disclosure.path.join(".")}' is not declared redactable.`, disclosure.span, file);
+      }
+    }
+    const key = projectionFieldPath.join("/");
+    const previous = disclosurePaths.get(key);
+    if (previous) {
+      throw new ModelError("E2644", `Duplicate disclosure rule for '${disclosure.path.join(".")}'.`, disclosure.span, file, { message: "First declared here.", span: previous });
+    }
+    disclosurePaths.set(key, disclosure.span);
+    const expression = typeExpression(disclosure.expression, {
+      kind: "query",
+      query,
+      queryEntity: sourceEntity,
+      rowAlias: query.rowAlias.name,
+      allowQueryRow: true,
+      parameters: parameterMap,
+    }, symbols, file);
+    requireBoolean(expression, disclosure.expression.span, file, `Disclosure '${disclosure.path.join(".")}'`);
+    return {
+      id: `disclose:${semanticId}.${projectionFieldPath.join(".")}`,
+      projectionFieldPath,
+      expression,
+      sourceExpression: expressionText(disclosure.expression),
+      span: irSpan(disclosure.span, file),
+    };
+  });
+  for (const [key, prefix] of redactablePrefixes) {
+    if (!disclosurePaths.has(key) && disclosures?.some((rule) => rule.projectionFieldPath.length > prefix.length
+      && prefix.every((fieldIdValue, index) => rule.projectionFieldPath[index] === fieldIdValue))) {
+      throw new ModelError("E2645", "A nested disclosure rule requires a rule for every redactable parent in its projection path.", query.span, file);
+    }
+  }
+
   const [orderAlias, orderFieldName, extraOrderPart] = query.orderBy.path;
   if (extraOrderPart || query.orderBy.path.length !== 2 || orderAlias !== query.rowAlias.name) {
     throw new ModelError("E2606", `Query orderBy must be a direct field of row alias '${query.rowAlias.name}'.`, query.orderBy.span, file);
@@ -1182,6 +1239,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
         returnProjectionId: projectionId(projection),
         authorization,
         rowPolicy,
+        disclosures: disclosures?.map(({ id, projectionFieldPath, expression }) => ({ id, projectionFieldPath, expression })) ?? [],
         orderBy: { fieldId: fieldId(sourceEntity, orderField), direction: query.orderBy.direction },
         sortProfiles: sortProfiles?.map(({ id, name, fieldId: profileFieldId, direction: profileDirection }) => ({ id, name, fieldId: profileFieldId, direction: profileDirection })) ?? [],
         limit: query.limit,
@@ -1213,6 +1271,7 @@ function lowerQuery(query: QueryDecl, symbols: Symbols, principalName: string, f
       sourceExpression: expressionText(query.where),
       span: irSpan(query.where.span, file),
     },
+    ...(disclosures?.length ? { disclosures } : {}),
     orderBy: {
       fieldId: fieldId(sourceEntity, orderField),
       direction: query.orderBy.direction,
@@ -1871,6 +1930,14 @@ function buildEnforcement(
     entries.push({ id: `boundary:${query.id}.safe_search_path`, purpose: "Prevent caller-controlled object shadowing inside the privileged function.", layer: "PostgreSQL function configuration", artifact: "postgres/003_queries.sql", objectName: `${fn} search_path=pg_catalog,pg_temp` });
     entries.push({ id: query.authorization.id, purpose: query.authorization.sourceExpression, layer: "PostgreSQL query guard", artifact: "postgres/003_queries.sql", objectName: fn, source: query.authorization.span });
     entries.push({ id: query.rowPolicy.id, purpose: query.rowPolicy.sourceExpression, layer: "PostgreSQL row policy", artifact: "postgres/003_queries.sql", objectName: fn, source: query.rowPolicy.span });
+    for (const disclosure of query.disclosures ?? []) entries.push({
+      id: disclosure.id,
+      purpose: `Disclose projection field path ${disclosure.projectionFieldPath.join(" -> ")} only when (${disclosure.sourceExpression}) is exactly true; otherwise preserve the key with JSON null.`,
+      layer: "PostgreSQL projection redaction",
+      artifact: "postgres/003_queries.sql",
+      objectName: fn,
+      source: disclosure.span,
+    });
     entries.push({ id: `order:${query.id}`, purpose: "Return rows in the default declared order with an ascending identity tie-breaker.", layer: "PostgreSQL query function", artifact: "postgres/003_queries.sql", objectName: fn, source: query.span });
     if (query.sortProfiles?.length) entries.push({
       id: `sort-profiles:${query.id}`,

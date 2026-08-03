@@ -45,7 +45,7 @@ describe("backends", () => {
     const schema = JSON.parse(await readFile("schemas/operation-manifest.schema.json", "utf8")) as object;
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
-    expect(manifest.manifestVersion).toBe(9);
+    expect(manifest.manifestVersion).toBe(10);
     expect(manifest.authentication).toEqual(expect.objectContaining({
       source: "authenticatedContext",
       requestSupplied: false,
@@ -202,17 +202,17 @@ describe("backends", () => {
         postconditions: { invariantIds: string[] };
         workflowTransitionIds: string[];
       }[];
-      projections: { id: string; fields: { name: string; nestedProjectionId?: string }[] }[];
-      queries: { disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
+      projections: { id: string; fields: { name: string; nestedProjectionId?: string; redactable?: true }[] }[];
+      queries: { disclosures?: { id: string; projectionFieldPath: string[] }[]; disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
     };
     const semanticSchema = JSON.parse(await readFile("schemas/semantic-manifest.schema.json", "utf8")) as object;
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 15,
+      manifestVersion: 16,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 23 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 24 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -252,6 +252,12 @@ describe("backends", () => {
       "projection:prj_70d694c9a0a274dc79c6168e47d25968",
       "projection:prj_76d694c9a0a274dc79c6168e47d25968",
     ]);
+    expect(semantic.queries[0]!.disclosures).toEqual([
+      expect.objectContaining({
+        id: expect.stringMatching(/^disclose:query:/),
+        projectionFieldPath: ["projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"],
+      }),
+    ]);
 
     const provenance = JSON.parse(output["provenance.json"]!) as {
       compilerVersion: string;
@@ -261,7 +267,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 23 });
+    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 24 });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -292,8 +298,8 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      uiManifestVersion: 9,
-      operationManifestVersion: 9,
+      uiManifestVersion: 10,
+      operationManifestVersion: 10,
       authentication: { required: true, callerInput: false },
     });
 
@@ -521,7 +527,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   });
 
   it("skips optional money validation and entity loading only for null query inputs", () => {
-    const source = `model OptionalQueryInputs version "0.34.0";
+    const source = `model OptionalQueryInputs version "0.35.0";
       entity User { id: UUID @id; }
       entity Vendor { id: UUID @id; }
       entity Invoice { id: UUID @id; vendor: Vendor; amount: Money<USD>; }
@@ -662,12 +668,61 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/types.ts"]).not.toMatch(/interface MyRequestsInput \{\n {2}actor:/);
     expect(output["typescript/types.ts"]).toContain("export interface RequestSummary");
     expect(output["typescript/types.ts"]).toContain("export interface UserSummary");
+    expect(output["typescript/types.ts"]).toContain('amount: Money<"USD"> | null;');
     expect(output["typescript/types.ts"]).toContain("approvedBy: UserSummary | null;");
     expect(output["typescript/client.ts"]).toContain("async myRequests(input: MyRequestsInput): Promise<RequestSummary[]>");
     expect(sql).toContain('FROM "model_procurement"."user" AS "v_projection_4"');
     expect(sql).toContain('WHERE "v_projection_4"."id" = v_row."approved_by_id"');
     expect(sql).not.toContain("'requester'");
     expect(sql).not.toContain("'approvedByRoles'");
+    expect(sql).toContain(`'amount', CASE WHEN (((v_row."status" <> 'DRAFT')) IS TRUE)`);
+    expect(sql).toContain("ELSE NULL END");
+    const operations = JSON.parse(output["operations.json"]!) as {
+      projections: { name: string; fields: { name: string; nullable: boolean; redactable?: true }[] }[];
+      operations: { name: string; disclosure?: { redaction: string; default: string; fields: { projectionFieldPath: string[]; ruleId?: string }[] } }[];
+    };
+    expect(operations.projections.find((projection) => projection.name === "RequestSummary")?.fields)
+      .toContainEqual(expect.objectContaining({ name: "amount", nullable: true, redactable: true }));
+    expect(operations.operations.find((operation) => operation.name === "myRequests")?.disclosure).toMatchObject({
+      redaction: "null",
+      default: "redacted",
+      fields: [expect.objectContaining({
+        projectionFieldPath: ["projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"],
+        ruleId: expect.stringMatching(/^disclose:query:/),
+      })],
+    });
+  });
+
+  it("redacts absent rules and statically lowers nested disclosure paths", () => {
+    const ir = compileText(`model DisclosureDefaults version "1";
+      entity User { id: UUID @id; role: String; }
+      entity Item { id: UUID @id; owner: User; value: String; }
+      projection UserSummary from User { id; role redactable; }
+      projection ItemSummary from Item { id; value redactable; owner: UserSummary redactable; }
+      query items(caller actor: User) returns ItemSummary from Item as item {
+        authorize true;
+        where item.owner == actor;
+        disclose owner when item.owner == actor;
+        disclose owner.role when item.owner == actor;
+        orderBy item.id asc;
+        limit 10;
+      }`, "disclosure-defaults.model");
+    const output = generateAll(ir);
+    const sql = output["postgres/003_queries.sql"]!;
+    expect(sql).toContain("'value', NULL");
+    expect(sql).toContain("'owner', CASE WHEN (((v_row.\"owner_id\" = v_actor.\"id\")) IS TRUE)");
+    expect(sql).toContain("'role', CASE WHEN (((v_row.\"owner_id\" = v_actor.\"id\")) IS TRUE)");
+    expect(output["typescript/types.ts"]).toContain("value: string | null;");
+    expect(output["typescript/types.ts"]).toContain("owner: UserSummary | null;");
+    expect(output["typescript/types.ts"]).toContain("role: string | null;");
+
+    const operations = JSON.parse(output["operations.json"]!) as {
+      operations: { name: string; disclosure?: { fields: { projectionFieldPath: string[]; ruleId?: string }[] } }[];
+    };
+    const fields = operations.operations.find((operation) => operation.name === "items")!.disclosure!.fields;
+    expect(fields).toHaveLength(3);
+    expect(fields.find((field) => field.projectionFieldPath.at(-1)?.endsWith(".value"))).not.toHaveProperty("ruleId");
+    expect(fields.filter((field) => field.ruleId)).toHaveLength(2);
   });
 
   it("generates opaque keyset cursor pages bound to query and filter identity", async () => {
@@ -675,7 +730,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.34.0'");
+    expect(sql).toContain("'modelVersion', '0.35.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -811,7 +866,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.34.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.35.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

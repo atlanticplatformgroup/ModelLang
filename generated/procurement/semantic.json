@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/semantic-manifest.schema.json",
-  "manifestVersion": 15,
-  "profile": "sml-transactional-core/15",
+  "manifestVersion": 16,
+  "profile": "sml-transactional-core/16",
   "audience": "engineering",
   "view": {
     "authorizationFiltered": false,
@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.34.0",
-    "irVersion": 23,
+    "compilerVersion": "0.35.0",
+    "irVersion": 24,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.34.0",
-    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a",
+    "version": "0.35.0",
+    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d",
     "sourceFile": "examples/procurement.model"
   },
   "principal": {
@@ -104,12 +104,13 @@
           "id": "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968",
           "name": "amount",
           "sourceFieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+          "redactable": true,
           "source": {
             "file": "examples/procurement.model",
             "line": 158,
             "column": 3,
             "endLine": 158,
-            "endColumn": 60
+            "endColumn": 71
           }
         },
         {
@@ -1376,7 +1377,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       },
       "caller": {
@@ -1455,6 +1456,56 @@
           }
         ]
       },
+      "disclosures": [
+        {
+          "id": "disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968",
+          "name": "disclose",
+          "projectionFieldPath": [
+            "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+          ],
+          "expression": {
+            "kind": "binary",
+            "operator": "!=",
+            "left": {
+              "kind": "fieldAccess",
+              "source": "queryRow",
+              "parameter": "request",
+              "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+              "fieldName": "status",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "right": {
+              "kind": "enumLiteral",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+              "memberName": "DRAFT",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "(request.status != RequestStatus.DRAFT)",
+          "source": {
+            "file": "examples/procurement.model",
+            "line": 168,
+            "column": 3,
+            "endLine": 168,
+            "endColumn": 62
+          },
+          "dependencies": [
+            {
+              "kind": "enumMember",
+              "id": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675"
+            },
+            {
+              "kind": "field",
+              "id": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2"
+            }
+          ]
+        }
+      ],
       "readSet": {
         "entityIds": [
           "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",

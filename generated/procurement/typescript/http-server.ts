@@ -348,7 +348,7 @@ const projectionDefinitions = {
         "precision": 20,
         "scale": 2
       },
-      "nullable": false
+      "nullable": true
     },
     {
       "name": "status",

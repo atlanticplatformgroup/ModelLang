@@ -105,6 +105,7 @@ export interface IRProjectionField {
   identity: IRIdentity;
   sourceFieldId: string;
   nestedProjectionId?: string;
+  redactable?: true;
   span: IRSpan;
 }
 
@@ -247,6 +248,13 @@ export interface IRQuery {
   rowAlias: string;
   authorization: IRRule;
   rowPolicy: IRRule;
+  disclosures?: {
+    id: string;
+    projectionFieldPath: string[];
+    expression: IRExpression;
+    sourceExpression: string;
+    span: IRSpan;
+  }[];
   orderBy: {
     fieldId: string;
     direction: "asc" | "desc";
@@ -308,7 +316,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 23;
+  irVersion: 24;
   model: {
     id: string;
     name: string;

@@ -1,4 +1,4 @@
-model Procurement version "0.34.0";
+model Procurement version "0.35.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -155,7 +155,7 @@ projection UserSummary @stableId("prj_76d694c9a0a274dc79c6168e47d25968") from Us
 projection RequestSummary @stableId("prj_70d694c9a0a274dc79c6168e47d25968") from PurchaseRequest {
   id @stableId("pfd_71d694c9a0a274dc79c6168e47d25968");
   createdAt @stableId("pfd_72d694c9a0a274dc79c6168e47d25968");
-  amount @stableId("pfd_73d694c9a0a274dc79c6168e47d25968");
+  amount @stableId("pfd_73d694c9a0a274dc79c6168e47d25968") redactable;
   status @stableId("pfd_74d694c9a0a274dc79c6168e47d25968");
   approvedBy: UserSummary @stableId("pfd_75d694c9a0a274dc79c6168e47d25968");
 }
@@ -165,6 +165,7 @@ query myRequests @stableId("qry_4406b045404a48449282db804f6167a8")(
 ) returns RequestSummary from PurchaseRequest as request {
   authorize true;
   where request.requester == actor;
+  disclose amount when request.status != RequestStatus.DRAFT;
   orderBy request.id asc;
   limit 100;
 }

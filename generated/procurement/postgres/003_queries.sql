@@ -32,7 +32,7 @@ BEGIN
     '[]'::jsonb
   ) INTO v_result
   FROM (
-    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'amount', jsonb_build_object('currency', 'USD', 'amount', (v_row."amount"::numeric(20, 2))::text), 'status', v_row."status", 'approvedBy', CASE WHEN v_row."approved_by_id" IS NULL THEN NULL ELSE (SELECT jsonb_build_object('id', "v_projection_4"."id", 'name', "v_projection_4"."name") FROM "model_procurement"."user" AS "v_projection_4" WHERE "v_projection_4"."id" = v_row."approved_by_id") END) AS "item",
+    SELECT jsonb_build_object('id', v_row."id", 'createdAt', v_row."created_at", 'amount', CASE WHEN (((v_row."status" <> 'DRAFT')) IS TRUE) THEN jsonb_build_object('currency', 'USD', 'amount', (v_row."amount"::numeric(20, 2))::text) ELSE NULL END, 'status', v_row."status", 'approvedBy', CASE WHEN v_row."approved_by_id" IS NULL THEN NULL ELSE (SELECT jsonb_build_object('id', "v_projection_4"."id", 'name', "v_projection_4"."name") FROM "model_procurement"."user" AS "v_projection_4" WHERE "v_projection_4"."id" = v_row."approved_by_id") END) AS "item",
            v_row."id" AS "sort_value",
            v_row."id" AS "identity"
     FROM "model_procurement"."purchase_request" AS v_row

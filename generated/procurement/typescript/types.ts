@@ -60,7 +60,7 @@ export interface UserSummary {
 export interface RequestSummary {
   id: string;
   createdAt: string;
-  amount: Money<"USD">;
+  amount: Money<"USD"> | null;
   status: RequestStatus;
   approvedBy: UserSummary | null;
 }

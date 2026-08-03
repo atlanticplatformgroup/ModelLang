@@ -5,6 +5,17 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 29, upgrades 17–19 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.35.0
+
+- Added `redactable` projection members and up to 32 query-local `disclose path when Boolean;` rules for conditional value disclosure without dynamic projection selection.
+- Defined a stable required-key/nullable-value contract: true yields the projected value, while false, SQL unknown, or an absent rule yields JSON `null` and never omits the key or emits a sentinel.
+- Restricted rules to explicit finite projection paths, rejected implicit traversal and duplicate or non-redactable targets, and required independent rules for every redactable nested ancestor.
+- Lowered disclosure to static PostgreSQL `CASE WHEN (...) IS TRUE` expressions while preserving operation authorization, row policy, fixed ordering/limits, and the closed projection allowlist.
+- Propagated nullability and fail-closed disclosure metadata through TypeScript, operation/OpenAPI/HTTP, UI, semantic, enforcement, provenance, and schema contracts; paginated query revisions now bind disclosure rules.
+- Classified projection redaction eligibility changes as breaking, rule additions as expansive, removals as restrictive, and condition changes by Boolean semantic direction where provable.
+- Advanced canonical IR to IR24, operation manifest to v10, capability manifest to v9, UI manifest to v10, engineering semantic manifest/profile to v16, semantic diff to v17, and generator profile to `postgresql-http-ui-conditional-field-disclosure/19`.
+- Updated Procurement so draft request amounts remain present as `null` and become visible after submission, with compiler, transport, artifact, semantic-evolution, and live PostgreSQL coverage.
+
 ## 0.34.0
 
 - Added up to 16 closed authored `sort name: row.field asc|desc;` profiles per query while retaining the required `orderBy` as the reserved `default` profile.

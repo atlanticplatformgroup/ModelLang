@@ -166,8 +166,8 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
-    "uiManifestVersion": { "const": 9 },
-    "operationManifestVersion": { "const": 9 },
+    "uiManifestVersion": { "const": 10 },
+    "operationManifestVersion": { "const": 10 },
     "model": {
       "type": "object",
       "required": ["id", "name", "label", "version", "sourceHash"],
@@ -268,6 +268,7 @@
                 "projectionFieldId": { "type": "string", "pattern": "^projectionField:" },
                 "sourceFieldId": { "type": "string", "pattern": "^field:" },
                 "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
+                "redactable": { "const": true },
                 "name": { "type": "string" },
                 "label": { "type": "string" },
                 "presentation": { "$ref": "#/$defs/presentation" },
@@ -336,6 +337,28 @@
                     "label": { "type": "string" },
                     "fieldId": { "type": "string", "pattern": "^field:" },
                     "direction": { "enum": ["asc", "desc"] }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "disclosure": {
+            "type": "object",
+            "required": ["redaction", "default", "fields"],
+            "properties": {
+              "redaction": { "const": "null" },
+              "default": { "const": "redacted" },
+              "fields": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["projectionFieldPath"],
+                  "properties": {
+                    "projectionFieldPath": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^projectionField:" } },
+                    "ruleId": { "type": "string", "pattern": "^disclose:" }
                   },
                   "additionalProperties": false
                 }

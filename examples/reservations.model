@@ -1,4 +1,4 @@
-model Reservations version "0.34.0";
+model Reservations version "0.35.0";
 
 entity User @stableId("ent_82878bde58d948d4a84d85d01279e01d") {
   id: UUID @id @stableId("fld_968ff16b1c28419d9f2f7833635e5653");

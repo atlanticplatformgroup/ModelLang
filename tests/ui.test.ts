@@ -46,6 +46,24 @@ describe("generated UI boundary", () => {
     });
   });
 
+  it("describes conditional field disclosure without treating it as operation visibility", () => {
+    const projection = ProcurementUiManifest.projections.find((candidate) => candidate.name === "RequestSummary")!;
+    expect(projection.fields).toContainEqual(expect.objectContaining({
+      name: "amount",
+      nullable: true,
+      redactable: true,
+    }));
+    const query = ProcurementUiManifest.queries.find((candidate) => candidate.name === "myRequests")!;
+    expect(query.disclosure).toMatchObject({
+      redaction: "null",
+      default: "redacted",
+      fields: [expect.objectContaining({
+        projectionFieldPath: ["projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"],
+        ruleId: expect.stringMatching(/^disclose:query:/),
+      })],
+    });
+  });
+
   it("executes a descriptor's stable operation ID through the browser HTTP client", async () => {
     const fetch = vi.fn(async () => Response.json(purchaseRequest));
     const client = new ProcurementHttpClient({

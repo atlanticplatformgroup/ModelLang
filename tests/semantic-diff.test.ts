@@ -19,7 +19,7 @@ const ids = {
   query: "qry_11111111111111111111111111111111",
 };
 
-function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean; sortProfile?: string }): string {
+function model(options: { version: string; actionName?: string; authorize?: string; precondition?: string; where?: string; note?: boolean; assignNote?: boolean; pagination?: boolean; sortProfile?: string; redactable?: boolean; disclosure?: string }): string {
   return `model SemanticChange version "${options.version}";
 entity User @stableId("${ids.user}") {
   id: UUID @id @stableId("${ids.userId}");
@@ -32,7 +32,7 @@ entity Record @stableId("${ids.record}") {
 }
 projection RecordSummary @stableId("${ids.projection}") from Record {
   id @stableId("${ids.projectionId}");
-  value @stableId("${ids.projectionValue}");
+  value @stableId("${ids.projectionValue}")${options.redactable ? " redactable" : ""};
 }
 action ${options.actionName ?? "createRecord"} @stableId("${ids.create}")(
   caller actor: User,
@@ -48,6 +48,7 @@ query records @stableId("${ids.query}")(
 ) returns RecordSummary from Record as row {
   authorize true;
   where ${options.where ?? "row.owner == actor"};
+  ${options.disclosure ?? ""}
   orderBy row.id asc;
   ${options.sortProfile ?? ""}
   limit 10;
@@ -130,6 +131,33 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(
     }));
     expect(semanticDiff(previous, current).changes).not.toContainEqual(expect.objectContaining({
       kind: "querySortProfilesChanged",
+    }));
+  });
+
+  it("classifies conditional field disclosure independently from row visibility", () => {
+    const hidden = compileText(model({ version: "1", redactable: true }));
+    const disclosed = compileText(model({ version: "2", redactable: true, disclosure: "disclose value when true;" }));
+    expect(semanticDiff(hidden, disclosed).changes).toContainEqual(expect.objectContaining({
+      kind: "queryFieldDisclosureChanged",
+      classification: "expansive",
+    }));
+    expect(semanticDiff(disclosed, hidden).changes).toContainEqual(expect.objectContaining({
+      kind: "queryFieldDisclosureChanged",
+      classification: "restrictive",
+    }));
+    const denied = compileText(model({ version: "3", redactable: true, disclosure: "disclose value when false;" }));
+    expect(semanticDiff(disclosed, denied).changes).toContainEqual(expect.objectContaining({
+      kind: "queryFieldDisclosureChanged",
+      classification: "restrictive",
+    }));
+  });
+
+  it("classifies projection redaction eligibility as a breaking field contract change", () => {
+    const previous = compileText(model({ version: "1" }));
+    const current = compileText(model({ version: "2", redactable: true }));
+    expect(semanticDiff(previous, current).changes).toContainEqual(expect.objectContaining({
+      kind: "projectionFieldRedactionContractChanged",
+      classification: "breaking",
     }));
   });
 
@@ -243,9 +271,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 16,
-      compilerVersion: "0.34.0",
-      irVersion: 23,
+      diffVersion: 17,
+      compilerVersion: "0.35.0",
+      irVersion: 24,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

@@ -232,8 +232,13 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     });
     expect(opened.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(Number.isNaN(Date.parse(opened.createdAt))).toBe(false);
+    const redactedDraft = (await clients.employeeOne.myRequests({})).find((request) => request.id === low)!;
+    expect(Object.hasOwn(redactedDraft, "amount")).toBe(true);
+    expect(redactedDraft.amount).toBeNull();
     await expect(clients.employeeTwo.submitRequest({ request: low })).rejects.toBeInstanceOf(AuthorizationError);
     expect((await clients.employeeOne.submitRequest({ request: low })).status).toBe("SUBMITTED");
+    expect((await clients.employeeOne.myRequests({})).find((request) => request.id === low)?.amount)
+      .toEqual({ currency: "USD", amount: "5000.00" });
     const approvedLow = await clients.manager.approveRequest({ request: low });
     expect(approvedLow).toMatchObject({
       status: "APPROVED",
@@ -277,7 +282,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.34.0",
+      model_version: "0.35.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -1131,7 +1136,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.34.0', $1,
+        VALUES ('model:Procurement', '0.35.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -1617,6 +1622,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     expect(employeeOneRows.every((request) => !Object.hasOwn(request, "requester"))).toBe(true);
     expect(employeeTwoRows.every((request) => !Object.hasOwn(request, "requester"))).toBe(true);
     expect(employeeOneRows.every((request) => Object.hasOwn(request, "approvedBy"))).toBe(true);
+    expect(employeeOneRows.find((request) => request.id === employeeOneId)?.amount).toBeNull();
     expect(employeeOneRows.find((request) => request.id === employeeOneId)?.approvedBy).toBeNull();
     expect(employeeOneRows.some((request) => request.id === employeeTwoId)).toBe(false);
     expect(employeeTwoRows.some((request) => request.id === employeeOneId)).toBe(false);

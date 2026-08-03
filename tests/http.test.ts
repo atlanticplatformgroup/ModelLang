@@ -49,6 +49,39 @@ function request(body: unknown, headers: Record<string, string> = {}): Request {
 }
 
 describe("generated HTTP boundary", () => {
+  it("accepts null-redacted projection fields while retaining closed output validation", async () => {
+    const route = "https://example.test/operations/queries/qry_4406b045404a48449282db804f6167a8";
+    const summary = {
+      id: "00000000-0000-4000-8000-000000000010",
+      createdAt: "2026-07-30T12:00:00Z",
+      amount: null,
+      status: "DRAFT",
+      approvedBy: null,
+    };
+    const handler = createProcurementHttpHandler(async () => ({
+      execute: async () => [summary],
+      assess,
+    }));
+    const response = await handler(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: "{}",
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual([summary]);
+
+    const malformed = createProcurementHttpHandler(async () => ({
+      execute: async () => [{ ...summary, amount: "redacted" }],
+      assess,
+    }));
+    const malformedResponse = await malformed(new Request(route, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: "{}",
+    }));
+    expect(malformedResponse.status).toBe(500);
+  });
+
   it("validates closed cursor-page inputs and outputs", async () => {
     const route = "https://example.test/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69";
     const cursor = "eyJ2IjoxfQ";

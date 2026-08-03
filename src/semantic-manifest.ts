@@ -43,8 +43,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 15;
-  profile: "sml-transactional-core/15";
+  manifestVersion: 16;
+  profile: "sml-transactional-core/16";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -53,7 +53,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 23;
+    irVersion: 24;
     generator: "semantic-manifest";
   };
   model: {
@@ -95,7 +95,7 @@ export interface SemanticPolicy {
   parameters: { id: string; name: string; type: string }[];
   evaluation: "exactlyOneBranch";
   branches: SemanticRule[];
-  usedBy: { operationId: string; ruleId: string; usage: "authorization" | "precondition" | "consumerAuthorization" | "consumerPrecondition" | "queryAuthorization" | "rowPolicy" }[];
+  usedBy: { operationId: string; ruleId: string; usage: "authorization" | "precondition" | "consumerAuthorization" | "consumerPrecondition" | "queryAuthorization" | "rowPolicy" | "fieldDisclosure" }[];
   coverage: { applicability: boolean; execution: boolean; durableEvidence: boolean };
 }
 
@@ -143,7 +143,7 @@ export interface SemanticProjection {
   name: string;
   source: IRSpan;
   sourceEntityId: string;
-  fields: { id: string; name: string; sourceFieldId: string; nestedProjectionId?: string; source: IRSpan }[];
+  fields: { id: string; name: string; sourceFieldId: string; nestedProjectionId?: string; redactable?: true; source: IRSpan }[];
 }
 
 export interface SemanticQuery {
@@ -162,6 +162,7 @@ export interface SemanticQuery {
       };
   authorization: SemanticRule;
   rowPolicy: SemanticRule;
+  disclosures?: (SemanticRule & { projectionFieldPath: string[] })[];
   readSet: SemanticReadSet;
   disclosureSet: { projectionId: string; projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] };
   orderBy: { fieldId: string; direction: "asc" | "desc"; identityTieBreaker: true };
@@ -387,7 +388,7 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
   };
   visit(projection);
   const disclosedFields = projectionClosure.flatMap((candidate) => candidate.fields);
-  const sourceReads = readSet(ir, [query.authorization, query.rowPolicy]);
+  const sourceReads = readSet(ir, [query.authorization, query.rowPolicy], (query.disclosures ?? []).map((rule) => rule.expression));
   sourceReads.entityIds = [...new Set([
     ...sourceReads.entityIds,
     query.sourceEntityId,
@@ -415,6 +416,17 @@ function queryEntry(ir: ModelIR, manifest: OperationManifest, query: IRQuery): S
       : { projectionId: operation.output.projectionId, cardinality: "many", maxItems: operation.output.maxItems },
     authorization: semanticRule(query.authorization),
     rowPolicy: semanticRule(query.rowPolicy),
+    ...(query.disclosures?.length ? {
+      disclosures: query.disclosures.map((rule) => ({
+        id: rule.id,
+        name: "disclose",
+        projectionFieldPath: [...rule.projectionFieldPath],
+        expression: rule.expression,
+        sourceExpression: rule.sourceExpression,
+        source: rule.span,
+        dependencies: expressionDependencies(rule.expression),
+      })),
+    } : {}),
     readSet: sourceReads,
     disclosureSet: {
       projectionId: projection.id,
@@ -470,12 +482,15 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
     for (const query of ir.queries) {
       if (has(query.authorization.expression)) result.push({ operationId: query.id, ruleId: query.authorization.id, usage: "queryAuthorization" });
       if (has(query.rowPolicy.expression)) result.push({ operationId: query.id, ruleId: query.rowPolicy.id, usage: "rowPolicy" });
+      for (const disclosure of query.disclosures ?? []) {
+        if (has(disclosure.expression)) result.push({ operationId: query.id, ruleId: disclosure.id, usage: "fieldDisclosure" });
+      }
     }
     return result;
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 15,
+    manifestVersion: 16,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -510,6 +525,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
         name: field.name,
         sourceFieldId: field.sourceFieldId,
         ...(field.nestedProjectionId ? { nestedProjectionId: field.nestedProjectionId } : {}),
+        ...(field.redactable ? { redactable: true as const } : {}),
         source: field.span,
       })),
     })),

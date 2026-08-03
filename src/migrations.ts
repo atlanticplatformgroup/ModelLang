@@ -389,8 +389,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].includes(Number(previous.irVersion)) || current.irVersion !== 23) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9 through IR23 baseline and canonical IR23 current input.");
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24].includes(Number(previous.irVersion)) || current.irVersion !== 24) {
+    fail(current, "E2803", "Migration planning requires a canonical IR9 through IR24 baseline and canonical IR24 current input.");
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);

@@ -78,6 +78,28 @@
       },
       "additionalProperties": false
     },
+    "disclosure": {
+      "type": "object",
+      "required": ["redaction", "default", "fields"],
+      "properties": {
+        "redaction": { "const": "null" },
+        "default": { "const": "redacted" },
+        "fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["projectionFieldPath"],
+            "properties": {
+              "projectionFieldPath": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^projectionField:" } },
+              "ruleId": { "type": "string", "pattern": "^disclose:" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "caller": {
       "type": "object",
       "required": ["parameterId", "entityId", "source", "requestSupplied"],
@@ -161,6 +183,7 @@
         "input": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
         "caller": { "$ref": "#/$defs/caller" },
         "sorting": { "$ref": "#/$defs/sorting" },
+        "disclosure": { "$ref": "#/$defs/disclosure" },
         "output": {
           "oneOf": [
             {
@@ -252,7 +275,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
-    "manifestVersion": { "const": 9 },
+    "manifestVersion": { "const": 10 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -351,6 +374,7 @@
                 "name": { "type": "string" },
                 "sourceFieldId": { "type": "string", "pattern": "^field:" },
                 "nestedProjectionId": { "type": "string", "pattern": "^projection:" },
+                "redactable": { "const": true },
                 "type": { "$ref": "#/$defs/valueType" },
                 "nullable": { "type": "boolean" }
               },

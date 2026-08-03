@@ -50,7 +50,7 @@ export interface DecisionPlan {
   audience: "enforcement";
   public: false;
   compilerVersion: string;
-  irVersion: 23;
+  irVersion: 24;
   model: { id: string; version: string; sourceHash: string };
   policies: DecisionPolicy[];
   actions: ActionDecisionPlan[];

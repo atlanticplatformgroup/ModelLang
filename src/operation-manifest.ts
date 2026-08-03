@@ -12,7 +12,7 @@ export type OperationValueType =
 
 export interface OperationManifest {
   $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
-  manifestVersion: 9;
+  manifestVersion: 10;
   model: {
     id: string;
     name: string;
@@ -55,6 +55,7 @@ export interface OperationManifest {
       type: OperationValueType;
       nullable: boolean;
       nestedProjectionId?: string;
+      redactable?: true;
     }[];
   }[];
   operations: ManifestOperation[];
@@ -123,6 +124,11 @@ export type ManifestOperation =
         input: "sort";
         defaultProfile: "default";
         profiles: ManifestSortProfile[];
+      };
+      disclosure?: {
+        redaction: "null";
+        default: "redacted";
+        fields: { projectionFieldPath: string[]; ruleId?: string }[];
       };
       output:
         | { projectionId: string; cardinality: "many"; maxItems: number }
@@ -235,6 +241,25 @@ function queryErrors(query: IRQuery): ManifestErrorKind[] {
   return errors;
 }
 
+function queryDisclosure(ir: ModelIR, query: IRQuery): Extract<ManifestOperation, { kind: "query" }>["disclosure"] {
+  const fields: { projectionFieldPath: string[]; ruleId?: string }[] = [];
+  const visit = (projectionId: string, path: string[]): void => {
+    const projection = ir.projections.find((candidate) => candidate.id === projectionId);
+    if (!projection) throw new Error(`E6006 Missing projection '${projectionId}'.`);
+    for (const field of projection.fields) {
+      const currentPath = [...path, field.id];
+      if (field.redactable) {
+        const rule = query.disclosures?.find((candidate) => candidate.projectionFieldPath.length === currentPath.length
+          && candidate.projectionFieldPath.every((fieldIdValue, index) => fieldIdValue === currentPath[index]));
+        fields.push({ projectionFieldPath: currentPath, ...(rule ? { ruleId: rule.id } : {}) });
+      }
+      if (field.nestedProjectionId) visit(field.nestedProjectionId, currentPath);
+    }
+  };
+  visit(query.returnProjectionId, []);
+  return fields.length ? { redaction: "null", default: "redacted", fields } : undefined;
+}
+
 function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
   return ir.workflows.map((workflow) => ({
     id: workflow.id,
@@ -281,7 +306,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
     $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
-    manifestVersion: 9,
+    manifestVersion: 10,
     model: {
       id: ir.model.id,
       name: ir.model.name,
@@ -334,8 +359,9 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
               name: selected.name,
               sourceFieldId: selected.sourceFieldId,
               type: operationValueType(field.type),
-              nullable: field.optional,
+              nullable: field.optional || selected.redactable === true,
               ...(selected.nestedProjectionId ? { nestedProjectionId: selected.nestedProjectionId } : {}),
+              ...(selected.redactable ? { redactable: true as const } : {}),
             };
           }),
         };
@@ -384,6 +410,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
             ],
           },
         } : {}),
+        ...(queryDisclosure(ir, query) ? { disclosure: queryDisclosure(ir, query) } : {}),
         output: query.pagination ? {
           projectionId: query.returnProjectionId,
           cardinality: "page",

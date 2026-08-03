@@ -1,10 +1,10 @@
 {
-  "irVersion": 23,
+  "irVersion": 24,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.34.0",
-    "sourceHash": "sha256:a7e9323d1b293c5adf12a6a449bc6b6b4ac32859a405f1276e22f687417dda4a",
+    "version": "0.35.0",
+    "sourceHash": "sha256:6118ff54650e43c33bbca4580bbe43688b3812d593ce32a18dc409e6a2c8438d",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1010,12 +1010,13 @@
             "stableId": "pfd_73d694c9a0a274dc79c6168e47d25968"
           },
           "sourceFieldId": "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
+          "redactable": true,
           "span": {
             "file": "examples/procurement.model",
             "line": 158,
             "column": 3,
             "endLine": 158,
-            "endColumn": 60
+            "endColumn": 71
           }
         },
         {
@@ -2270,6 +2271,45 @@
           "endColumn": 35
         }
       },
+      "disclosures": [
+        {
+          "id": "disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968",
+          "projectionFieldPath": [
+            "projectionField:pfd_73d694c9a0a274dc79c6168e47d25968"
+          ],
+          "expression": {
+            "kind": "binary",
+            "operator": "!=",
+            "left": {
+              "kind": "fieldAccess",
+              "source": "queryRow",
+              "parameter": "request",
+              "fieldId": "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
+              "fieldName": "status",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "right": {
+              "kind": "enumLiteral",
+              "enumId": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "memberId": "enumMember:emv_5528c88aa0fb42c79a9a773de2d7d675",
+              "memberName": "DRAFT",
+              "type": "enum:enm_3e6bbbdf302d482080890af3aab0b40f",
+              "nullable": false
+            },
+            "type": "Boolean",
+            "nullable": false
+          },
+          "sourceExpression": "(request.status != RequestStatus.DRAFT)",
+          "span": {
+            "file": "examples/procurement.model",
+            "line": 168,
+            "column": 3,
+            "endLine": 168,
+            "endColumn": 62
+          }
+        }
+      ],
       "orderBy": {
         "fieldId": "field:fld_af918d24406040619a77b244a81ca5d3",
         "direction": "asc",
@@ -2280,7 +2320,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       },
       "naming": {
@@ -3497,6 +3537,20 @@
       }
     },
     {
+      "id": "disclose:query:qry_4406b045404a48449282db804f6167a8.projectionField:pfd_73d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Disclose projection field path projectionField:pfd_73d694c9a0a274dc79c6168e47d25968 only when ((request.status != RequestStatus.DRAFT)) is exactly true; otherwise preserve the key with JSON null.",
+      "layer": "PostgreSQL projection redaction",
+      "artifact": "postgres/003_queries.sql",
+      "objectName": "model_procurement.my_requests",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 168,
+        "column": 3,
+        "endLine": 168,
+        "endColumn": 62
+      }
+    },
+    {
       "id": "order:query:qry_4406b045404a48449282db804f6167a8",
       "purpose": "Return rows in the default declared order with an ascending identity tie-breaker.",
       "layer": "PostgreSQL query function",
@@ -3506,7 +3560,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       }
     },
@@ -3520,7 +3574,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       }
     },
@@ -3534,7 +3588,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       }
     },
@@ -3548,7 +3602,7 @@
         "file": "examples/procurement.model",
         "line": 163,
         "column": 1,
-        "endLine": 170,
+        "endLine": 171,
         "endColumn": 2
       }
     },

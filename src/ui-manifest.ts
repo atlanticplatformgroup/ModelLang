@@ -65,8 +65,8 @@ export interface UiWorkflow {
 
 export interface UiManifest {
   $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
-  uiManifestVersion: 9;
-  operationManifestVersion: 9;
+  uiManifestVersion: 10;
+  operationManifestVersion: 10;
   model: {
     id: string;
     name: string;
@@ -95,6 +95,7 @@ export interface UiManifest {
       label: string;
       presentation: UiPresentation;
       nullable: boolean;
+      redactable?: true;
       nestedProjectionId?: string;
       generated?: "uuid" | "now";
       immutable: boolean;
@@ -139,6 +140,11 @@ export interface UiManifest {
       input: "sort";
       defaultProfile: "default";
       profiles: { id: string; name: string; label: string; fieldId: string; direction: "asc" | "desc" }[];
+    };
+    disclosure?: {
+      redaction: "null";
+      default: "redacted";
+      fields: { projectionFieldPath: string[]; ruleId?: string }[];
     };
     pagination?: {
       kind: "cursor";
@@ -194,12 +200,12 @@ function inputFields(operation: ManifestOperation): UiInputField[] {
 }
 
 export function generateUiManifest(manifest: OperationManifest): UiManifest {
-  if (manifest.manifestVersion !== 9) {
-    throw new Error(`E6201 UI generation requires operation manifest version 9, received '${manifest.manifestVersion}'.`);
+  if (manifest.manifestVersion !== 10) {
+    throw new Error(`E6201 UI generation requires operation manifest version 10, received '${manifest.manifestVersion}'.`);
   }
   return {
     $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
-    uiManifestVersion: 9,
+    uiManifestVersion: 10,
     operationManifestVersion: manifest.manifestVersion,
     model: {
       ...manifest.model,
@@ -248,6 +254,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
         presentation: uiPresentation(field.type),
         nullable: field.nullable,
         ...(field.nestedProjectionId ? { nestedProjectionId: field.nestedProjectionId } : {}),
+        ...(field.redactable ? { redactable: true as const } : {}),
       })),
     })),
     actions: manifest.operations
@@ -284,6 +291,16 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
               label: uiLabel(profile.name),
               fieldId: profile.fieldId,
               direction: profile.direction,
+            })),
+          },
+        } : {}),
+        ...(operation.disclosure ? {
+          disclosure: {
+            redaction: operation.disclosure.redaction,
+            default: operation.disclosure.default,
+            fields: operation.disclosure.fields.map((field) => ({
+              projectionFieldPath: [...field.projectionFieldPath],
+              ...(field.ruleId ? { ruleId: field.ruleId } : {}),
             })),
           },
         } : {}),

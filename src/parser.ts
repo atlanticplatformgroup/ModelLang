@@ -127,12 +127,14 @@ class Parser {
         nestedProjectionType = this.parseTypeRef();
       }
       const fieldStableId = this.at("@") ? this.parseStableId("projection field") : undefined;
+      const redactable = this.atWord("redactable") ? (this.take(), true as const) : undefined;
       const end = this.expect(";");
       fields.push({
         kind: "projectionField",
         name: field.text,
         nameSpan: field.span,
         nestedProjectionType,
+        ...(redactable ? { redactable } : {}),
         stableId: fieldStableId,
         span: this.span(field, end),
       });
@@ -494,6 +496,15 @@ class Parser {
     this.expectWord("where");
     const where = this.parseExpression();
     this.expect(";");
+    const disclosures: NonNullable<QueryDecl["disclosures"]> = [];
+    while (this.atWord("disclose")) {
+      const disclosureStart = this.take();
+      const path = this.parsePath();
+      this.expectWord("when");
+      const expression = this.parseExpression();
+      const disclosureEnd = this.expect(";");
+      disclosures.push({ path: path.parts, expression, span: this.span(disclosureStart, disclosureEnd) });
+    }
     const orderStart = this.expectWord("orderBy");
     const orderPath = this.parsePath();
     if (!this.atWord("asc") && !this.atWord("desc")) this.fail("E1110", "Expected query order direction 'asc' or 'desc'.");
@@ -538,6 +549,7 @@ class Parser {
       rowAlias: { name: alias.text, span: alias.span },
       authorize,
       where,
+      ...(disclosures.length ? { disclosures } : {}),
       orderBy: {
         path: orderPath.parts,
         direction: direction.text as "asc" | "desc",
