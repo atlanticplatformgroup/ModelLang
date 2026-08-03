@@ -209,15 +209,16 @@ describe("backends", () => {
       }[];
       projections: { id: string; fields: { name: string; nestedProjectionId?: string; redactable?: true }[] }[];
       queries: { disclosures?: { id: string; projectionFieldPath: string[] }[]; readEvidence?: { mode: string; storage: string; payloadRetention: string; revision: string }; disclosureSet: { projectionIds: string[]; projectionFieldIds: string[]; sourceFieldIds: string[] } }[];
+      extensions: { id: string; execution: string }[];
     };
     const semanticSchema = JSON.parse(await readFile("schemas/semantic-manifest.schema.json", "utf8")) as object;
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 17,
+      manifestVersion: 18,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 25 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 26 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -269,21 +270,57 @@ describe("backends", () => {
       payloadRetention: "none",
       revision: expect.stringMatching(/^sha256:/),
     });
+    expect(semantic.extensions).toEqual([
+      expect.objectContaining({ id: "extension:ext_54d694c9a0a274dc79c6168e47d25968", execution: "externalDeclarationOnly" }),
+    ]);
+
+    const extensions = JSON.parse(output["extensions.json"]!) as { ledgerVersion: number; public: boolean; executable: boolean; extensions: { id: string }[]; summary: object };
+    const extensionSchema = JSON.parse(await readFile("schemas/extension-ledger.schema.json", "utf8")) as object;
+    const validateExtensions = new Ajv2020({ allErrors: true, strict: true }).compile(extensionSchema);
+    expect(validateExtensions(extensions), JSON.stringify(validateExtensions.errors)).toBe(true);
+    expect(extensions).toMatchObject({
+      ledgerVersion: 1,
+      public: false,
+      executable: false,
+      summary: { declared: 1, externallyImplemented: 1, generatedImplementations: 0 },
+    });
+
+    const target = JSON.parse(output["target-capabilities.json"]!) as { conformance: string; authority: string; gaps: { extensionId: string }[] };
+    const targetSchema = JSON.parse(await readFile("schemas/target-capability-profile.schema.json", "utf8")) as object;
+    const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
+    expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
+    expect(target).toMatchObject({
+      conformance: "requiresExternalImplementations",
+      authority: "none",
+      gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
+    });
+    for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
+      expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
+      expect(output[path]).not.toContain("supplier-risk/review");
+    }
+    expect(output["postgres/003_actions.sql"]).not.toContain("supplier-risk/review");
+    expect(output["typescript/client.ts"]).not.toContain("supplierRiskReview");
+    const reservationTarget = JSON.parse(generateAll(await reservations())["target-capabilities.json"]!);
+    expect(reservationTarget).toMatchObject({ conformance: "complete", gaps: [] });
 
     const provenance = JSON.parse(output["provenance.json"]!) as {
+      provenanceVersion: number;
       compilerVersion: string;
+      targetProfile: string;
       irVersion: number;
       artifacts: { path: string; role: string; sha256: string }[];
     };
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ compilerVersion: packageInfo.version, irVersion: 25 });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 26, targetProfile: "target:postgresql-http-ui/1" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "decisions.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "capabilities.json")?.role).toBe("contract");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "extensions.json")?.role).toBe("assurance");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "target-capabilities.json")?.role).toBe("assurance");
     expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
   });
 
@@ -538,7 +575,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
   });
 
   it("skips optional money validation and entity loading only for null query inputs", () => {
-    const source = `model OptionalQueryInputs version "0.36.0";
+    const source = `model OptionalQueryInputs version "0.37.0";
       entity User { id: UUID @id; }
       entity Vendor { id: UUID @id; }
       entity Invoice { id: UUID @id; vendor: Vendor; amount: Money<USD>; }
@@ -759,7 +796,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.36.0'");
+    expect(sql).toContain("'modelVersion', '0.37.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -922,7 +959,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.36.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.37.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

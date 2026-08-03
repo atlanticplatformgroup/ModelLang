@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/extension-ledger.schema.json",
+  "title": "ModelLang external extension ledger",
+  "type": "object",
+  "required": ["$schema", "ledgerVersion", "compilerVersion", "irVersion", "audience", "public", "executable", "model", "extensions", "summary"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/extension-ledger.schema.json" },
+    "ledgerVersion": { "const": 1 },
+    "compilerVersion": { "type": "string" },
+    "irVersion": { "const": 26 },
+    "audience": { "const": "engineering" },
+    "public": { "const": false },
+    "executable": { "const": false },
+    "model": {
+      "type": "object",
+      "required": ["id", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "identity", "contract", "owner", "implementation", "effects", "reliability", "authorization", "testObligations", "reason", "promotionCriterion", "execution", "span"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^extension:" },
+          "name": { "type": "string" },
+          "identity": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["strategy"],
+                "properties": { "strategy": { "const": "nameDerived" } },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["strategy", "stableId"],
+                "properties": {
+                  "strategy": { "const": "explicitStableId" },
+                  "stableId": { "type": "string", "pattern": "^ext_[0-9a-f]{32}$" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "contract": {
+            "type": "object",
+            "required": ["parameters", "result"],
+            "properties": {
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "name", "type", "optional", "span"],
+                  "properties": {
+                    "id": { "type": "string", "pattern": "^parameter:extension:" },
+                    "name": { "type": "string" },
+                    "type": { "type": "string" },
+                    "optional": { "type": "boolean" },
+                    "span": { "type": "object" }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "result": {
+                "type": "object",
+                "required": ["type", "optional"],
+                "properties": { "type": { "type": "string" }, "optional": { "type": "boolean" } },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "owner": { "type": "string", "minLength": 1 },
+          "implementation": {
+            "type": "object",
+            "required": ["target", "location"],
+            "properties": {
+              "target": { "enum": ["typescript", "java", "rust", "python", "workflow", "externalService"] },
+              "location": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          },
+          "effects": {
+            "type": "object",
+            "required": ["readEntityIds", "writeEntityIds", "externalSystems", "emittedEventIds"],
+            "properties": {
+              "readEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^entity:" } },
+              "writeEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^entity:" } },
+              "externalSystems": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+              "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } }
+            },
+            "additionalProperties": false
+          },
+          "reliability": {
+            "type": "object",
+            "required": ["deterministic", "idempotent", "retry"],
+            "properties": {
+              "deterministic": { "type": "boolean" },
+              "idempotent": { "type": "boolean" },
+              "retry": { "enum": ["none", "hostManaged"] }
+            },
+            "additionalProperties": false
+          },
+          "authorization": { "enum": ["authenticatedCaller", "serviceIdentity", "none"] },
+          "testObligations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "reason": { "type": "string", "minLength": 1 },
+          "promotionCriterion": { "type": "string", "minLength": 1 },
+          "execution": { "const": "externalDeclarationOnly" },
+          "span": { "type": "object" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["declared", "externallyImplemented", "generatedImplementations"],
+      "properties": {
+        "declared": { "type": "integer", "minimum": 0 },
+        "externallyImplemented": { "type": "integer", "minimum": 0 },
+        "generatedImplementations": { "const": 0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

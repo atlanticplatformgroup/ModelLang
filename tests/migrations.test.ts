@@ -110,6 +110,31 @@ workflow TicketLifecycle @stableId("wfl_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") for T
 }
 
 describe("ModelLang 0.6 stable IDs", () => {
+  it("assigns a durable ID to an extension ledger declaration", () => {
+    const source = `model ExtensionIds version "1";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id; }
+action touch(caller actor: User, record: Record) -> Record { authorize true; update record { } }
+extension assess(record: Record) -> Boolean {
+  owner "Risk Team";
+  implementation externalService at "risk/assess";
+  reads Record;
+  writes none;
+  calls "risk-api";
+  emits none;
+  deterministic false;
+  idempotent true;
+  retry hostManaged;
+  authorization serviceIdentity;
+  tests "contracts/risk-assess";
+  reason "External risk model.";
+  promote "Portable policy exists.";
+}`;
+    const assigned = assignStableIds(source, "extension-ids.model");
+    expect(assigned.source).toMatch(/extension assess @stableId\("ext_[0-9a-f]{32}"\)/);
+    expect(compileText(assigned.source, "extension-ids.model").extensions[0]!.identity.strategy).toBe("explicitStableId");
+  });
+
   it("assigns stable IDs to reusable policies and authority branches", () => {
     const source = `model PolicyIds version "1";
 entity User { id: UUID @id; }
@@ -119,7 +144,7 @@ action make(caller actor: User) -> Record { authorize MayCreate(actor); create R
     const assigned = assignStableIds(source, "policy-ids.model", (kind) => {
       const prefix: Record<StableIdKind, string> = {
         entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
-        action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn",
+        action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc", workflow: "wfl", transition: "trn", extension: "ext",
       };
       return `${prefix[kind]}_${kind === "policy" ? "a" : kind === "policyBranch" ? "b" : "c".repeat(1)}${"0".repeat(31)}`;
     });
@@ -187,7 +212,7 @@ workflow TaskLifecycle for Task.state {
     const prefix: Record<StableIdKind, string> = {
       entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
-      workflow: "wfl", transition: "trn",
+      workflow: "wfl", transition: "trn", extension: "ext",
     };
     let sequence = 0;
     const assigned = assignStableIds(source, "workflow-ids.model", (kind) =>
@@ -236,7 +261,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     const prefixes: Record<StableIdKind, string> = {
       entity: "ent", field: "fld", projection: "prj", projectionField: "pfd", enum: "enm", enumMember: "emv", event: "evt", policy: "pol", policyBranch: "pbr",
       action: "act", consumer: "con", query: "qry", invariant: "inv", exclusion: "exc",
-      workflow: "wfl", transition: "trn",
+      workflow: "wfl", transition: "trn", extension: "ext",
     };
     const assigned = assignStableIds(source, "complete.model", (kind) => {
       seen.push(kind);
@@ -247,7 +272,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(25);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(26);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 

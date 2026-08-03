@@ -1,4 +1,4 @@
-model Procurement version "0.36.0";
+model Procurement version "0.37.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),
@@ -169,4 +169,23 @@ query myRequests @stableId("qry_4406b045404a48449282db804f6167a8")(
   orderBy request.id asc;
   limit 100;
   audit reads;
+}
+
+extension supplierRiskReview @stableId("ext_54d694c9a0a274dc79c6168e47d25968")(
+  request: PurchaseRequest,
+  requestedBy: User
+) -> Boolean {
+  owner "Procurement Platform";
+  implementation externalService at "supplier-risk/review";
+  reads PurchaseRequest, User;
+  writes none;
+  calls "supplier-risk-api";
+  emits none;
+  deterministic false;
+  idempotent true;
+  retry hostManaged;
+  authorization serviceIdentity;
+  tests "contracts/supplier-risk-review";
+  reason "Supplier risk scoring depends on a separately owned external service.";
+  promote "Promote when a portable deterministic risk policy can be represented in the core.";
 }

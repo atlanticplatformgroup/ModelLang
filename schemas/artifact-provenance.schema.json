@@ -4,14 +4,15 @@
   "title": "ModelLang artifact provenance catalog",
   "type": "object",
   "required": [
-    "$schema", "provenanceVersion", "compilerVersion", "generatorProfile",
+    "$schema", "provenanceVersion", "compilerVersion", "generatorProfile", "targetProfile",
     "model", "irVersion", "artifacts"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/artifact-provenance.schema.json" },
-    "provenanceVersion": { "const": 1 },
+    "provenanceVersion": { "const": 2 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-transactional-read-evidence/20" },
+    "generatorProfile": { "const": "postgresql-http-ui-target-capabilities/21" },
+    "targetProfile": { "const": "target:postgresql-http-ui/1" },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
@@ -23,7 +24,7 @@
       },
       "additionalProperties": false
     },
-    "irVersion": { "const": 25 },
+    "irVersion": { "const": 26 },
     "artifacts": {
       "type": "array",
       "items": {

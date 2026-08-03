@@ -1,0 +1,98 @@
+{
+  "$schema": "https://modellang.dev/schemas/extension-ledger.schema.json",
+  "ledgerVersion": 1,
+  "compilerVersion": "0.37.0",
+  "irVersion": 26,
+  "audience": "engineering",
+  "public": false,
+  "executable": false,
+  "model": {
+    "id": "model:Procurement",
+    "version": "0.37.0",
+    "sourceHash": "sha256:093a0b329a38ecd3cf4eeb7eb599d5d147ac2fde59768bb063ae2cec5d47d7f7"
+  },
+  "extensions": [
+    {
+      "id": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      "name": "supplierRiskReview",
+      "identity": {
+        "strategy": "explicitStableId",
+        "stableId": "ext_54d694c9a0a274dc79c6168e47d25968"
+      },
+      "contract": {
+        "parameters": [
+          {
+            "id": "parameter:extension:ext_54d694c9a0a274dc79c6168e47d25968.request",
+            "name": "request",
+            "type": "entity:ent_9bc680209327484c8e98f5f740bcc702",
+            "optional": false,
+            "span": {
+              "file": "examples/procurement.model",
+              "line": 175,
+              "column": 3,
+              "endLine": 175,
+              "endColumn": 27
+            }
+          },
+          {
+            "id": "parameter:extension:ext_54d694c9a0a274dc79c6168e47d25968.requestedBy",
+            "name": "requestedBy",
+            "type": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725",
+            "optional": false,
+            "span": {
+              "file": "examples/procurement.model",
+              "line": 176,
+              "column": 3,
+              "endLine": 176,
+              "endColumn": 20
+            }
+          }
+        ],
+        "result": {
+          "type": "Boolean",
+          "optional": false
+        }
+      },
+      "owner": "Procurement Platform",
+      "implementation": {
+        "target": "externalService",
+        "location": "supplier-risk/review"
+      },
+      "effects": {
+        "readEntityIds": [
+          "entity:ent_9bc680209327484c8e98f5f740bcc702",
+          "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
+        ],
+        "writeEntityIds": [],
+        "externalSystems": [
+          "supplier-risk-api"
+        ],
+        "emittedEventIds": []
+      },
+      "reliability": {
+        "deterministic": false,
+        "idempotent": true,
+        "retry": "hostManaged"
+      },
+      "authorization": "serviceIdentity",
+      "testObligations": [
+        "contracts/supplier-risk-review"
+      ],
+      "reason": "Supplier risk scoring depends on a separately owned external service.",
+      "promotionCriterion": "Promote when a portable deterministic risk policy can be represented in the core.",
+      "execution": "externalDeclarationOnly",
+      "span": {
+        "file": "examples/procurement.model",
+        "line": 174,
+        "column": 1,
+        "endLine": 191,
+        "endColumn": 2
+      }
+    }
+  ],
+  "summary": {
+    "declared": 1,
+    "externallyImplemented": 1,
+    "generatedImplementations": 0
+  }
+}

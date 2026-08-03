@@ -29,6 +29,7 @@ export type SemanticChangeArea =
   | "executionReliability"
   | "eventDelivery"
   | "eventConsumption"
+  | "extension"
   | "persistence";
 
 export interface SemanticChange {
@@ -44,9 +45,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 18;
+  diffVersion: 19;
   compilerVersion: string;
-  irVersion: 25;
+  irVersion: 26;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -715,6 +716,32 @@ function comparePolicies(changes: SemanticChange[], previous: IRPolicy[], curren
   }
 }
 
+function compareExtensions(changes: SemanticChange[], previous: ModelIR["extensions"], current: ModelIR["extensions"]): void {
+  for (const pair of pairById(changes, "extension", previous, current, "extension", "additive", "review", false)) {
+    compareNamed(changes, "extension", pair.previous, pair.current);
+    if (!same(pair.previous.contract, pair.current.contract)) addChange(changes, {
+      kind: "extensionContractChanged", area: "extension", classification: "breaking",
+      subject: subject("extension", pair.current), before: text(pair.previous.contract), after: text(pair.current.contract),
+      persistenceRisk: false, explanation: "The typed external implementation contract changed.",
+    });
+    const previousBehavior = { effects: pair.previous.effects, reliability: pair.previous.reliability, authorization: pair.previous.authorization };
+    const currentBehavior = { effects: pair.current.effects, reliability: pair.current.reliability, authorization: pair.current.authorization };
+    if (!same(previousBehavior, currentBehavior)) addChange(changes, {
+      kind: "extensionBehaviorChanged", area: "extension", classification: "review",
+      subject: subject("extension", pair.current), before: text(previousBehavior), after: text(currentBehavior),
+      persistenceRisk: pair.previous.effects.writeEntityIds.length > 0 || pair.current.effects.writeEntityIds.length > 0,
+      explanation: "The extension's declared effects, reliability, or authorization context changed.",
+    });
+    const previousGovernance = { owner: pair.previous.owner, implementation: pair.previous.implementation, testObligations: pair.previous.testObligations, reason: pair.previous.reason, promotionCriterion: pair.previous.promotionCriterion };
+    const currentGovernance = { owner: pair.current.owner, implementation: pair.current.implementation, testObligations: pair.current.testObligations, reason: pair.current.reason, promotionCriterion: pair.current.promotionCriterion };
+    if (!same(previousGovernance, currentGovernance)) addChange(changes, {
+      kind: "extensionGovernanceChanged", area: "extension", classification: "review",
+      subject: subject("extension", pair.current), before: text(previousGovernance), after: text(currentGovernance),
+      persistenceRisk: false, explanation: "The extension owner, implementation location, tests, rationale, or promotion criterion changed.",
+    });
+  }
+}
+
 export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff {
   const changes: SemanticChange[] = [];
   if (previous.model.id !== current.model.id) addChange(changes, {
@@ -741,6 +768,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   compareConsumers(changes, (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [], current.consumers);
   compareQueries(changes, previous, current);
   compareWorkflows(changes, previous.workflows, current.workflows);
+  compareExtensions(changes, (previous as ModelIR & { extensions?: ModelIR["extensions"] }).extensions ?? [], current.extensions);
   const summary: SemanticDiff["summary"] = {
     additive: 0,
     restrictive: 0,
@@ -751,7 +779,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 18,
+    diffVersion: 19,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

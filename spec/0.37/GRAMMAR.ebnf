@@ -1,0 +1,27 @@
+(* ModelLang 0.37 extends the complete ModelLang 0.36 grammar. *)
+
+declaration = prior_declaration | extension_declaration ;
+
+extension_declaration = "extension", identifier, [ stable_id ], "(", [ extension_parameters ], ")",
+                        "->", type_ref, [ "?" ], "{",
+                        "owner", string, ";",
+                        "implementation", implementation_target, "at", string, ";",
+                        "reads", ( "none" | identifier_list ), ";",
+                        "writes", ( "none" | identifier_list ), ";",
+                        "calls", ( "none" | string_list ), ";",
+                        "emits", ( "none" | identifier_list ), ";",
+                        "deterministic", boolean, ";",
+                        "idempotent", boolean, ";",
+                        "retry", ( "none" | "hostManaged" ), ";",
+                        "authorization", ( "authenticatedCaller" | "serviceIdentity" | "none" ), ";",
+                        "tests", string_list, ";",
+                        "reason", string, ";",
+                        "promote", string, ";",
+                        "}" ;
+
+extension_parameters = extension_parameter, { ",", extension_parameter } ;
+extension_parameter = identifier, ":", type_ref, [ "?" ] ;
+implementation_target = "typescript" | "java" | "rust" | "python" | "workflow" | "externalService" ;
+identifier_list = identifier, { ",", identifier } ;
+string_list = string, { ",", string } ;
+boolean = "true" | "false" ;

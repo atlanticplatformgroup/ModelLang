@@ -17,7 +17,8 @@ export type StableIdKind =
   | "invariant"
   | "exclusion"
   | "workflow"
-  | "transition";
+  | "transition"
+  | "extension";
 
 export interface AssignedStableIds {
   source: string;
@@ -42,6 +43,7 @@ function generatedId(kind: StableIdKind): string {
     exclusion: "exc",
     workflow: "wfl",
     transition: "trn",
+    extension: "ext",
   };
   return `${prefix[kind]}_${randomUUID().replaceAll("-", "")}`;
 }

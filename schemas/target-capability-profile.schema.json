@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/target-capability-profile.schema.json",
+  "title": "ModelLang target capability profile assessment",
+  "type": "object",
+  "required": ["$schema", "profileVersion", "compilerVersion", "generatorProfile", "targetProfile", "irVersion", "model", "conformance", "authority", "capabilities", "gaps"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/target-capability-profile.schema.json" },
+    "profileVersion": { "const": 1 },
+    "compilerVersion": { "type": "string" },
+    "generatorProfile": { "const": "postgresql-http-ui-target-capabilities/21" },
+    "targetProfile": { "const": "target:postgresql-http-ui/1" },
+    "irVersion": { "const": 26 },
+    "model": {
+      "type": "object",
+      "required": ["id", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "version": { "type": "string" },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "conformance": { "enum": ["complete", "requiresExternalImplementations"] },
+    "authority": { "const": "none" },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "required", "support", "enforcement"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][A-Za-z0-9.]+$" },
+          "required": { "type": "boolean" },
+          "support": { "enum": ["native", "externalImplementationRequired"] },
+          "enforcement": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["extensionId", "capabilityId", "reason", "implementation"],
+        "properties": {
+          "extensionId": { "type": "string", "pattern": "^extension:" },
+          "capabilityId": { "const": "extensions.declaredExternal" },
+          "reason": { "type": "string", "minLength": 1 },
+          "implementation": {
+            "type": "object",
+            "required": ["target", "location"],
+            "properties": { "target": { "type": "string" }, "location": { "type": "string" } },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

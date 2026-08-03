@@ -1,0 +1,159 @@
+{
+  "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
+  "profileVersion": 1,
+  "compilerVersion": "0.37.0",
+  "generatorProfile": "postgresql-http-ui-target-capabilities/21",
+  "targetProfile": "target:postgresql-http-ui/1",
+  "irVersion": 26,
+  "model": {
+    "id": "model:Reservations",
+    "version": "0.37.0",
+    "sourceHash": "sha256:46b9a46e2c5e5c0bf40488d692333be1818b7dc2a6062feb83daf005483f4c17"
+  },
+  "conformance": "complete",
+  "authority": "none",
+  "capabilities": [
+    {
+      "id": "core.stableIdentity",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "canonical-ir",
+        "semantic-diff"
+      ]
+    },
+    {
+      "id": "core.typedState",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "operations.authenticatedActions",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "operations.reliableCommands",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "policy.closedBoolean",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql"
+      ]
+    },
+    {
+      "id": "events.transactionalOutbox",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "events.transactionalConsumers",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "queries.closedProjections",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http",
+        "ui-metadata"
+      ]
+    },
+    {
+      "id": "queries.toOneTraversal",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.optionalFilters",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.authoredSortProfiles",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.cursorPagination",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.conditionalDisclosure",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.transactionalReadEvidence",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "postgresql"
+      ]
+    },
+    {
+      "id": "extensions.declaredExternal",
+      "required": false,
+      "support": "externalImplementationRequired",
+      "enforcement": [
+        "extension-ledger",
+        "host-conformance-tests"
+      ]
+    }
+  ],
+  "gaps": []
+}

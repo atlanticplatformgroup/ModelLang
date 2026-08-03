@@ -5,6 +5,17 @@
 - Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 36, upgrades 17–20 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
 - Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
 
+## 0.37.0
+
+- Added typed, stable `extension` declarations for externally implemented behavior, including ownership, implementation location, entity reads/writes, external calls, emitted events, reliability, authorization context, test obligations, rationale, and promotion criteria.
+- Kept extensions explicitly non-executable: no action, query, consumer, HTTP route, public capability, generated client, or PostgreSQL function can invoke them.
+- Added engineering-only extension ledger v1 with exact IR contracts and a summary that reports zero generated implementations.
+- Added target capability profile v1 for `target:postgresql-http-ui/1`, reporting native required semantics and one explicit external implementation gap per declared extension with `authority: none`.
+- Added compile-time checks for contract types, stable IDs, entity/event references, duplicates, supported implementation targets, host-retry idempotency, test obligations, and authorization on state-changing extensions.
+- Added extension-aware semantic evolution: additions are additive, removals and governance/behavior changes require review, and typed contract changes are breaking.
+- Advanced canonical IR to IR26, engineering semantic manifest/profile to v18, semantic diff to v19, artifact provenance to v2, and generator profile to `postgresql-http-ui-target-capabilities/21`; public manifests and private runtime profile 36 remain unchanged.
+- Declared Procurement supplier risk review as an external gap while Reservations demonstrates complete native target coverage, with schema, privacy, deterministic golden, evolution, and unchanged live PostgreSQL coverage.
+
 ## 0.36.0
 
 - Added terminal `audit reads;` for queries that require private transactional evidence without changing callable inputs or array/page result shapes.

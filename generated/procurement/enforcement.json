@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.36.0",
-    "sourceHash": "sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc",
+    "version": "0.37.0",
+    "sourceHash": "sha256:093a0b329a38ecd3cf4eeb7eb599d5d147ac2fde59768bb063ae2cec5d47d7f7",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -1277,6 +1277,27 @@
         "endLine": 147,
         "endColumn": 73
       }
+    },
+    {
+      "id": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      "purpose": "Declare external implementation ownership, typed contract, effects, reliability, authorization context, tests, rationale, and promotion criterion for supplierRiskReview; no executable authority is generated.",
+      "layer": "ModelLang extension ledger",
+      "artifact": "extensions.json",
+      "objectName": "supplier-risk/review",
+      "source": {
+        "file": "examples/procurement.model",
+        "line": 174,
+        "column": 1,
+        "endLine": 191,
+        "endColumn": 2
+      }
+    },
+    {
+      "id": "boundary:target_capabilities",
+      "purpose": "Report the canonical generator target's supported semantics and every model requirement that remains externally implemented.",
+      "layer": "ModelLang target conformance",
+      "artifact": "target-capabilities.json",
+      "objectName": "target:postgresql-http-ui/1"
     },
     {
       "id": "boundary:audit",

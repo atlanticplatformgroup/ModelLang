@@ -31,21 +31,22 @@ export function validateIR(ir: ModelIR): void {
 export function validateEvolutionIR(ir: ModelIR): void {
   const legacy = ir as unknown as { irVersion?: unknown; policies?: unknown };
   const irVersion = Number(legacy.irVersion);
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25].includes(irVersion)) {
+  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26].includes(irVersion)) {
     throw new ModelError(
       "E3002",
-      `Evolution input must use released canonical IR9 through IR25; received '${String(legacy.irVersion)}'.`,
+      `Evolution input must use released canonical IR9 through IR26; received '${String(legacy.irVersion)}'.`,
       internalSpan(),
       ir.model?.sourceFile,
     );
   }
-  if (irVersion === 25) {
+  if (irVersion === 26) {
     validateIR(ir);
     return;
   }
   const normalized = {
     ...(ir as unknown as Record<string, unknown>),
-    irVersion: 25,
+    irVersion: 26,
+    ...(irVersion < 26 ? { extensions: [] } : {}),
     ...(irVersion === 9 && legacy.policies === undefined ? { policies: [] } : {}),
     ...(irVersion < 12 && (legacy as { events?: unknown }).events === undefined ? { events: [] } : {}),
     ...(irVersion < 13 ? { consumers: [] } : {}),

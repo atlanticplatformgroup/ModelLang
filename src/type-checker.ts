@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRProjection, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExtension, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRProjection, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
 import type {
-  ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, FieldDecl, InvariantDecl, PolicyDecl, Program, ProjectionDecl, QueryDecl, TypeRef,
+  ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, ExtensionDecl, FieldDecl, InvariantDecl, PolicyDecl, Program, ProjectionDecl, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
 
@@ -34,6 +34,7 @@ interface Symbols {
   consumers: Map<string, ConsumerDecl>;
   queries: Map<string, QueryDecl>;
   workflows: Map<string, WorkflowDecl>;
+  extensions: Map<string, ExtensionDecl>;
   fields: Map<string, Map<string, FieldDecl>>;
   loweredPolicies: Map<string, IRPolicy>;
   policyStack: string[];
@@ -141,6 +142,10 @@ function exclusionId(entity: EntityDecl, exclusion: ExclusionDecl): string {
   return `exclusion:${String(exclusion.stableId?.value ?? `${entity.name}.${exclusion.name}`)}`;
 }
 
+function extensionId(extension: ExtensionDecl): string {
+  return `extension:${String(extension.stableId?.value ?? extension.name)}`;
+}
+
 function entityForType(symbols: Symbols, type: string): EntityDecl {
   const entity = [...symbols.entities.values()].find((candidate) => entityId(candidate) === type);
   if (!entity) throw new Error(`E2900 Unknown resolved entity type '${type}'.`);
@@ -228,9 +233,10 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   validateConsumerEventGraph(consumers, symbols, file);
   const queries: IRQuery[] = [...symbols.queries.values()].map((query) => lowerQuery(query, symbols, principalName, file));
   const workflows = lowerWorkflows(symbols, entities, enums, actions, file);
-  const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, schema, internalSchema);
+  const extensions = [...symbols.extensions.values()].map((extension) => lowerExtension(extension, symbols, file));
+  const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, extensions, schema, internalSchema);
   return {
-    irVersion: 25,
+    irVersion: 26,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,
@@ -249,6 +255,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
     consumers,
     queries,
     workflows,
+    extensions,
     enforcement,
   };
 }
@@ -263,6 +270,7 @@ function collectSymbols(program: Program, file: string): Symbols {
   const consumers = new Map<string, ConsumerDecl>();
   const queries = new Map<string, QueryDecl>();
   const workflows = new Map<string, WorkflowDecl>();
+  const extensions = new Map<string, ExtensionDecl>();
   const top = new Map<string, Declaration>();
   for (const declaration of program.declarations) {
     const previous = top.get(declaration.name);
@@ -277,6 +285,7 @@ function collectSymbols(program: Program, file: string): Symbols {
     if (declaration.kind === "consumer") consumers.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
     if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
+    if (declaration.kind === "extension") extensions.set(declaration.name, declaration);
   }
   for (const enumeration of enums.values()) {
     const seen = new Set<string>();
@@ -301,10 +310,10 @@ function collectSymbols(program: Program, file: string): Symbols {
     }
     fields.set(entity.name, entityFields);
   }
-  return { enums, entities, projections, events, policies, actions, consumers, queries, workflows, fields, loweredPolicies: new Map(), policyStack: [] };
+  return { enums, entities, projections, events, policies, actions, consumers, queries, workflows, extensions, fields, loweredPolicies: new Map(), policyStack: [] };
 }
 
-type StableDeclarationKind = "ent" | "fld" | "prj" | "pfd" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "con" | "qry" | "inv" | "exc" | "wfl" | "trn";
+type StableDeclarationKind = "ent" | "fld" | "prj" | "pfd" | "enm" | "emv" | "evt" | "pol" | "pbr" | "act" | "con" | "qry" | "inv" | "exc" | "wfl" | "trn" | "ext";
 
 function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, Span>, file: string): void {
   for (const enumeration of symbols.enums.values()) {
@@ -358,6 +367,9 @@ function validateDeclarationIdentities(symbols: Symbols, stableIds: Map<string, 
     for (const transition of workflow.transitions) {
       if (transition.stableId) validateStableId(transition.stableId, "trn", stableIds, file);
     }
+  }
+  for (const extension of symbols.extensions.values()) {
+    if (extension.stableId) validateStableId(extension.stableId, "ext", stableIds, file);
   }
 }
 
@@ -472,6 +484,7 @@ function validateStableId(annotation: { value?: number | string; span: Span }, k
       exc: "exclusion",
       wfl: "workflow",
       trn: "workflow transition",
+      ext: "extension",
     };
     throw new ModelError("E2801", `Stable ${subject[kind]} ID must match ${kind}_[0-9a-f]{32}.`, annotation.span, file);
   }
@@ -1674,6 +1687,99 @@ function collectEntityParameters(expression: IRExpression, found: Set<string>): 
   if (expression.kind === "nullComparison") collectEntityParameters(expression.operand, found);
 }
 
+function lowerExtension(extension: ExtensionDecl, symbols: Symbols, file: string): IRExtension {
+  const id = extensionId(extension);
+  const allowedTargets = new Set(["typescript", "java", "rust", "python", "workflow", "externalService"]);
+  if (!allowedTargets.has(extension.implementation.target)) {
+    throw new ModelError("E3602", `Unsupported extension implementation target '${extension.implementation.target}'.`, extension.span, file);
+  }
+  const requireText = (value: string, field: string): void => {
+    if (!value.trim()) throw new ModelError("E3603", `Extension '${extension.name}' requires a non-empty ${field}.`, extension.span, file);
+    if (value.length > 500) throw new ModelError("E3604", `Extension '${extension.name}' ${field} must be at most 500 characters.`, extension.span, file);
+  };
+  requireText(extension.owner, "owner");
+  requireText(extension.implementation.location, "implementation location");
+  requireText(extension.reason, "reason");
+  requireText(extension.promotion, "promotion criterion");
+  if (extension.tests.length === 0) throw new ModelError("E3605", `Extension '${extension.name}' requires at least one test obligation.`, extension.span, file);
+
+  const parameterNames = new Set<string>();
+  const parameters = extension.parameters.map((parameter) => {
+    if (parameterNames.has(parameter.name)) throw new ModelError("E3606", `Duplicate extension parameter '${extension.name}.${parameter.name}'.`, parameter.span, file);
+    parameterNames.add(parameter.name);
+    if (parameter.caller) throw new ModelError("E3607", "Extensions declare authorization context separately and cannot use caller parameters.", parameter.span, file);
+    if (parameter.type.collection === "set") throw new ModelError("E3601", "Set-valued extension parameters are not supported in extension contract v1.", parameter.type.span, file);
+    return {
+      id: `parameter:${id}.${parameter.name}`,
+      name: parameter.name,
+      type: resolvedType(parameter.type, symbols),
+      optional: parameter.optional === true,
+      span: irSpan(parameter.span, file),
+    };
+  });
+  if (extension.returnType.collection === "set") throw new ModelError("E3601", "Set-valued extension results are not supported in extension contract v1.", extension.returnType.span, file);
+
+  const resolveEntities = (values: ExtensionDecl["reads"], field: string): string[] => {
+    const seen = new Set<string>();
+    return values.map((value) => {
+      const entity = symbols.entities.get(value.name);
+      if (!entity) throw new ModelError("E3608", `Extension '${extension.name}' ${field} unknown entity '${value.name}'.`, value.span, file);
+      const resolved = entityId(entity);
+      if (seen.has(resolved)) throw new ModelError("E3609", `Extension '${extension.name}' declares duplicate ${field} entity '${value.name}'.`, value.span, file);
+      seen.add(resolved);
+      return resolved;
+    });
+  };
+  const readEntityIds = resolveEntities(extension.reads, "reads");
+  const writeEntityIds = resolveEntities(extension.writes, "writes");
+  const emittedEventIds = extension.emits.map((emission) => {
+    const event = symbols.events.get(emission.eventName);
+    if (!event) throw new ModelError("E3610", `Extension '${extension.name}' emits unknown event '${emission.eventName}'.`, emission.span, file);
+    if (event.importedFrom) throw new ModelError("E3611", `Extension '${extension.name}' cannot emit imported event '${emission.eventName}'.`, emission.span, file);
+    return eventId(event);
+  });
+  const requireUniqueText = (values: string[], field: string): void => {
+    const seen = new Set<string>();
+    for (const value of values) {
+      requireText(value, field);
+      if (seen.has(value)) throw new ModelError("E3612", `Extension '${extension.name}' declares duplicate ${field} '${value}'.`, extension.span, file);
+      seen.add(value);
+    }
+  };
+  requireUniqueText(extension.calls, "external system");
+  requireUniqueText(extension.tests, "test obligation");
+  if (new Set(emittedEventIds).size !== emittedEventIds.length) throw new ModelError("E3613", `Extension '${extension.name}' declares a duplicate emitted event.`, extension.span, file);
+  if (extension.retry === "hostManaged" && !extension.idempotent) {
+    throw new ModelError("E3614", `Extension '${extension.name}' must be idempotent before host-managed retry can be declared.`, extension.span, file);
+  }
+  if ((writeEntityIds.length > 0 || emittedEventIds.length > 0) && extension.authorization === "none") {
+    throw new ModelError("E3615", `State-changing extension '${extension.name}' must declare an authorization context.`, extension.span, file);
+  }
+  return {
+    id,
+    name: extension.name,
+    identity: identity(extension.stableId),
+    contract: {
+      parameters,
+      result: { type: resolvedType(extension.returnType, symbols), optional: extension.returnOptional },
+    },
+    owner: extension.owner,
+    implementation: extension.implementation as IRExtension["implementation"],
+    effects: { readEntityIds, writeEntityIds, externalSystems: extension.calls, emittedEventIds },
+    reliability: {
+      deterministic: extension.deterministic,
+      idempotent: extension.idempotent,
+      retry: extension.retry,
+    },
+    authorization: extension.authorization,
+    testObligations: extension.tests,
+    reason: extension.reason,
+    promotionCriterion: extension.promotion,
+    execution: "externalDeclarationOnly",
+    span: irSpan(extension.span, file),
+  };
+}
+
 function buildEnforcement(
   enums: IREnum[],
   entities: IREntity[],
@@ -1684,6 +1790,7 @@ function buildEnforcement(
   consumers: IRConsumer[],
   queries: IRQuery[],
   workflows: IRWorkflow[],
+  extensions: IRExtension[],
   schema: string,
   internalSchema: string,
 ): EnforcementEntry[] {
@@ -2017,6 +2124,23 @@ function buildEnforcement(
       });
     }
   }
+  for (const extension of extensions) {
+    entries.push({
+      id: extension.id,
+      purpose: `Declare external implementation ownership, typed contract, effects, reliability, authorization context, tests, rationale, and promotion criterion for ${extension.name}; no executable authority is generated.`,
+      layer: "ModelLang extension ledger",
+      artifact: "extensions.json",
+      objectName: extension.implementation.location,
+      source: extension.span,
+    });
+  }
+  entries.push({
+    id: "boundary:target_capabilities",
+    purpose: "Report the canonical generator target's supported semantics and every model requirement that remains externally implemented.",
+    layer: "ModelLang target conformance",
+    artifact: "target-capabilities.json",
+    objectName: "target:postgresql-http-ui/1",
+  });
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });
   entries.push({ id: "boundary:command_receipts", purpose: "Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional.", layer: "PostgreSQL receipt boundary", artifact: "postgres/002_schema.sql", objectName: `${internalSchema}.command_receipt` });

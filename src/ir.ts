@@ -310,6 +310,43 @@ export interface IRWorkflow {
   };
 }
 
+export interface IRExtensionParameter {
+  id: string;
+  name: string;
+  type: string;
+  optional: boolean;
+  span: IRSpan;
+}
+
+export interface IRExtension {
+  id: string;
+  name: string;
+  identity: IRIdentity;
+  contract: {
+    parameters: IRExtensionParameter[];
+    result: { type: string; optional: boolean };
+  };
+  owner: string;
+  implementation: { target: "typescript" | "java" | "rust" | "python" | "workflow" | "externalService"; location: string };
+  effects: {
+    readEntityIds: string[];
+    writeEntityIds: string[];
+    externalSystems: string[];
+    emittedEventIds: string[];
+  };
+  reliability: {
+    deterministic: boolean;
+    idempotent: boolean;
+    retry: "none" | "hostManaged";
+  };
+  authorization: "authenticatedCaller" | "serviceIdentity" | "none";
+  testObligations: string[];
+  reason: string;
+  promotionCriterion: string;
+  execution: "externalDeclarationOnly";
+  span: IRSpan;
+}
+
 export interface EnforcementEntry {
   id: string;
   purpose: string;
@@ -320,7 +357,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 25;
+  irVersion: 26;
   model: {
     id: string;
     name: string;
@@ -339,6 +376,7 @@ export interface ModelIR {
   consumers: IRConsumer[];
   queries: IRQuery[];
   workflows: IRWorkflow[];
+  extensions: IRExtension[];
   enforcement: EnforcementEntry[];
 }
 

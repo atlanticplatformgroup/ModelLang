@@ -16,6 +16,8 @@ import { generateArtifactProvenance } from "./provenance.js";
 import { generateDecisionPlan } from "./decision-plan.js";
 import { generateCapabilityManifest } from "./capability-manifest.js";
 import { generateEventManifest } from "./event-manifest.js";
+import { generateExtensionLedger } from "./extension-ledger.js";
+import { generateTargetCapabilityReport } from "./target-capabilities.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -36,6 +38,8 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "ui.json": stableJson(uiManifest),
     "semantic.json": stableJson(semanticManifest),
     "events.json": stableJson(eventManifest),
+    "extensions.json": stableJson(generateExtensionLedger(ir)),
+    "target-capabilities.json": stableJson(generateTargetCapabilityReport(ir)),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),

@@ -3,20 +3,22 @@ import type { ModelIR } from "./ir.js";
 import {
   MODELLANG_COMPILER_VERSION,
   MODELLANG_GENERATOR_PROFILE,
+  MODELLANG_TARGET_PROFILE,
 } from "./version.js";
 
 export interface ArtifactProvenance {
   $schema: "https://modellang.dev/schemas/artifact-provenance.schema.json";
-  provenanceVersion: 1;
+  provenanceVersion: 2;
   compilerVersion: string;
   generatorProfile: string;
+  targetProfile: string;
   model: {
     id: string;
     name: string;
     version: string;
     sourceHash: string;
   };
-  irVersion: 25;
+  irVersion: 26;
   artifacts: {
     path: string;
     role: "canonical" | "contract" | "projection" | "assurance";
@@ -31,7 +33,7 @@ function sha256(content: string): string {
 function artifactRole(path: string): ArtifactProvenance["artifacts"][number]["role"] {
   if (path === "model.ir.json") return "canonical";
   if (["operations.json", "decisions.json", "capabilities.json", "ui.json", "semantic.json", "events.json", "openapi.json"].includes(path)) return "contract";
-  if (path === "enforcement.json" || path === "enforcement.md") return "assurance";
+  if (["enforcement.json", "enforcement.md", "extensions.json", "target-capabilities.json"].includes(path)) return "assurance";
   return "projection";
 }
 
@@ -41,9 +43,10 @@ export function generateArtifactProvenance(
 ): ArtifactProvenance {
   return {
     $schema: "https://modellang.dev/schemas/artifact-provenance.schema.json",
-    provenanceVersion: 1,
+    provenanceVersion: 2,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     generatorProfile: MODELLANG_GENERATOR_PROFILE,
+    targetProfile: MODELLANG_TARGET_PROFILE,
     model: {
       id: ir.model.id,
       name: ir.model.name,

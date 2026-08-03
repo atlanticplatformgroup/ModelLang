@@ -100,12 +100,12 @@
   "type": "object",
   "required": [
     "$schema", "manifestVersion", "profile", "audience", "view", "provenance",
-    "model", "principal", "projections", "policies", "events", "actions", "consumers", "queries"
+    "model", "principal", "projections", "policies", "events", "actions", "consumers", "queries", "extensions"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/semantic-manifest.schema.json" },
-    "manifestVersion": { "const": 17 },
-    "profile": { "const": "sml-transactional-core/17" },
+    "manifestVersion": { "const": 18 },
+    "profile": { "const": "sml-transactional-core/18" },
     "audience": { "const": "engineering" },
     "view": {
       "type": "object",
@@ -122,7 +122,7 @@
       "required": ["compilerVersion", "irVersion", "generator"],
       "properties": {
         "compilerVersion": { "type": "string" },
-          "irVersion": { "const": 25 },
+          "irVersion": { "const": 26 },
         "generator": { "const": "semantic-manifest" }
       },
       "additionalProperties": false
@@ -406,6 +406,30 @@
             },
             "additionalProperties": false
           }
+        },
+        "additionalProperties": false
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "identity", "contract", "owner", "implementation", "effects", "reliability", "authorization", "testObligations", "reason", "promotionCriterion", "execution", "span"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^extension:" },
+          "name": { "type": "string" },
+          "identity": { "type": "object" },
+          "contract": { "type": "object" },
+          "owner": { "type": "string" },
+          "implementation": { "type": "object" },
+          "effects": { "type": "object" },
+          "reliability": { "type": "object" },
+          "authorization": { "enum": ["authenticatedCaller", "serviceIdentity", "none"] },
+          "testObligations": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "reason": { "type": "string" },
+          "promotionCriterion": { "type": "string" },
+          "execution": { "const": "externalDeclarationOnly" },
+          "span": { "$ref": "#/$defs/span" }
         },
         "additionalProperties": false
       }

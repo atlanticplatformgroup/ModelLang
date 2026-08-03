@@ -5,8 +5,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.36.0",
-    "sourceHash": "sha256:3aade5138907cc7daecf35257a491ff81b501ba5fe424095f91f2497876069b7",
+    "version": "0.37.0",
+    "sourceHash": "sha256:46b9a46e2c5e5c0bf40488d692333be1818b7dc2a6062feb83daf005483f4c17",
     "label": "Reservations"
   },
   "authentication": {

@@ -2,7 +2,7 @@ import { ModelError, type Span } from "./diagnostics.js";
 import { lex, type Token, type TokenKind } from "./lexer.js";
 import type {
   ActionDecl, Annotation, Assignment, ConsumerDecl, Declaration, Effect, EntityDecl, EventDecl, ExclusionDecl,
-  Expression, FieldDecl, InvariantDecl, ParameterDecl, Program, ProjectionDecl, QueryDecl, RequireDecl, TypeRef,
+  Expression, ExtensionDecl, FieldDecl, InvariantDecl, ParameterDecl, Program, ProjectionDecl, QueryDecl, RequireDecl, TypeRef,
   PolicyDecl, WorkflowDecl,
 } from "./syntax-ast.js";
 
@@ -63,7 +63,8 @@ class Parser {
       else if (this.atWord("consumer")) declarations.push(this.parseConsumer());
       else if (this.atWord("query")) declarations.push(this.parseQuery());
       else if (this.atWord("workflow")) declarations.push(this.parseWorkflow());
-      else this.fail("E1103", "Expected enum, entity, projection, event, policy, action, consumer, query, or workflow declaration.");
+      else if (this.atWord("extension")) declarations.push(this.parseExtension());
+      else this.fail("E1103", "Expected enum, entity, projection, event, policy, action, consumer, query, workflow, or extension declaration.");
     }
     return { model, declarations, span: this.span(start, this.current()) };
   }
@@ -181,6 +182,143 @@ class Parser {
     }
     const end = this.expect(";");
     return { kind: "event", name: name.text, nameSpan: name.span, stableId, payloadType, importedFrom, retry, recovery, span: this.span(start, end) };
+  }
+
+  private parseExtension(): ExtensionDecl {
+    const start = this.expectWord("extension");
+    const name = this.identifier("Expected extension name.");
+    const stableId = this.at("@") ? this.parseStableId("extension declaration") : undefined;
+    this.expect("(");
+    const parameters: ParameterDecl[] = [];
+    if (!this.at(")")) {
+      do {
+        const parameterStart = this.current();
+        const caller = this.atWord("caller") ? (this.take(), true) : false;
+        const parameterName = this.identifier("Expected extension parameter name.");
+        this.expect(":");
+        const type = this.parseTypeRef();
+        const optionalToken = this.at("?") ? this.take() : undefined;
+        parameters.push({
+          name: parameterName.text,
+          type,
+          caller,
+          ...(optionalToken ? { optional: true } : {}),
+          span: this.span(parameterStart, optionalToken ?? type.span),
+        });
+        if (!this.at(",")) break;
+        this.take();
+      } while (!this.at(")"));
+    }
+    this.expect(")");
+    this.expect("->");
+    const returnType = this.parseTypeRef();
+    const returnOptional = this.at("?") ? (this.take(), true) : false;
+    this.expect("{");
+    this.expectWord("owner");
+    const owner = this.expect("string", "Expected extension owner string.");
+    this.expect(";");
+    this.expectWord("implementation");
+    const target = this.identifier("Expected extension implementation target.");
+    this.expectWord("at");
+    const location = this.expect("string", "Expected extension implementation location string.");
+    this.expect(";");
+    const reads = this.parseExtensionNameList("reads", "entity");
+    const writes = this.parseExtensionNameList("writes", "entity");
+    const calls = this.parseExtensionStringList("calls");
+    const emits = this.parseExtensionNameList("emits", "event").map(({ name: eventName, span }) => ({ eventName, span }));
+    this.expectWord("deterministic");
+    const deterministic = this.expectBoolean("Expected true or false after 'deterministic'.");
+    this.expect(";");
+    this.expectWord("idempotent");
+    const idempotent = this.expectBoolean("Expected true or false after 'idempotent'.");
+    this.expect(";");
+    this.expectWord("retry");
+    const retry = this.identifier("Expected extension retry mode.");
+    if (retry.text !== "none" && retry.text !== "hostManaged") this.fail("E1160", "Extension retry mode must be none or hostManaged.");
+    this.expect(";");
+    this.expectWord("authorization");
+    const authorization = this.identifier("Expected extension authorization context.");
+    if (!["authenticatedCaller", "serviceIdentity", "none"].includes(authorization.text)) {
+      this.fail("E1161", "Extension authorization must be authenticatedCaller, serviceIdentity, or none.");
+    }
+    this.expect(";");
+    this.expectWord("tests");
+    const tests = this.parseStringValues();
+    this.expect(";");
+    this.expectWord("reason");
+    const reason = this.expect("string", "Expected extension reason string.");
+    this.expect(";");
+    this.expectWord("promote");
+    const promotion = this.expect("string", "Expected extension promotion criterion string.");
+    this.expect(";");
+    const end = this.expect("}");
+    return {
+      kind: "extension",
+      name: name.text,
+      nameSpan: name.span,
+      stableId,
+      parameters,
+      returnType,
+      returnOptional,
+      owner: String(owner.value),
+      implementation: { target: target.text, location: String(location.value) },
+      reads,
+      writes,
+      calls,
+      emits,
+      deterministic,
+      idempotent,
+      retry: retry.text as ExtensionDecl["retry"],
+      authorization: authorization.text as ExtensionDecl["authorization"],
+      tests,
+      reason: String(reason.value),
+      promotion: String(promotion.value),
+      span: this.span(start, end),
+    };
+  }
+
+  private expectBoolean(message: string): boolean {
+    if (this.atWord("true")) return (this.take(), true);
+    if (this.atWord("false")) return (this.take(), false);
+    this.fail("E1162", message);
+  }
+
+  private parseExtensionNameList(keyword: string, subject: string): { name: string; span: Span }[] {
+    this.expectWord(keyword);
+    if (this.atWord("none")) {
+      this.take();
+      this.expect(";");
+      return [];
+    }
+    const values: { name: string; span: Span }[] = [];
+    do {
+      if (values.length > 0) this.expect(",");
+      const value = this.identifier(`Expected extension ${subject} name.`);
+      values.push({ name: value.text, span: value.span });
+    } while (this.at(","));
+    this.expect(";");
+    return values;
+  }
+
+  private parseExtensionStringList(keyword: string): string[] {
+    this.expectWord(keyword);
+    if (this.atWord("none")) {
+      this.take();
+      this.expect(";");
+      return [];
+    }
+    const values = this.parseStringValues();
+    this.expect(";");
+    return values;
+  }
+
+  private parseStringValues(): string[] {
+    const values: string[] = [];
+    do {
+      if (values.length > 0) this.expect(",");
+      values.push(String(this.expect("string", "Expected string value.").value));
+    } while (this.at(","));
+    return values;
   }
 
   private parseStableId(subject: string): Annotation {

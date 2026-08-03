@@ -298,9 +298,9 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
-      diffVersion: 18,
-      compilerVersion: "0.36.0",
-      irVersion: 25,
+      diffVersion: 19,
+      compilerVersion: "0.37.0",
+      irVersion: 26,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([
@@ -429,6 +429,46 @@ ${authorization === null ? "" : `consumer observe @stableId("con_aaaaaaaaaaaaaaa
       before: expect.stringContaining('"recovery":"none"'),
       after: expect.stringContaining('"recovery":"manual"'),
       classification: "review",
+    }));
+  });
+
+  it("tracks extension contracts, behavior, governance, and removal by stable identity", () => {
+    const source = (version: string, resultType: string | null, owner = "Risk Team") => `model ExtensionDiff version "${version}";
+entity User { id: UUID @id; }
+entity Record { id: UUID @id; }
+action touch(caller actor: User, record: Record) -> Record {
+  authorize true;
+  update record { }
+}
+${resultType === null ? "" : `extension assess @stableId("ext_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(record: Record) -> ${resultType} {
+  owner "${owner}";
+  implementation externalService at "risk/assess";
+  reads Record;
+  writes none;
+  calls "risk-api";
+  emits none;
+  deterministic false;
+  idempotent true;
+  retry hostManaged;
+  authorization serviceIdentity;
+  tests "contracts/risk-assess";
+  reason "Externally owned risk model.";
+  promote "Portable deterministic policy exists.";
+}`}`;
+    const without = compileText(source("1", null));
+    const added = compileText(source("2", "Boolean"));
+    expect(semanticDiff(without, added).changes).toContainEqual(expect.objectContaining({
+      kind: "declarationAdded", area: "extension", classification: "additive",
+      subject: expect.objectContaining({ kind: "extension" }),
+    }));
+    expect(semanticDiff(added, compileText(source("3", "String"))).changes).toContainEqual(expect.objectContaining({
+      kind: "extensionContractChanged", area: "extension", classification: "breaking",
+    }));
+    expect(semanticDiff(added, compileText(source("3", "Boolean", "Platform Risk"))).changes).toContainEqual(expect.objectContaining({
+      kind: "extensionGovernanceChanged", area: "extension", classification: "review",
+    }));
+    expect(semanticDiff(added, compileText(source("3", null))).changes).toContainEqual(expect.objectContaining({
+      kind: "declarationRemoved", area: "extension", classification: "review",
     }));
   });
 });

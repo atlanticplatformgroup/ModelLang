@@ -1,6 +1,6 @@
 import { ModelError, type Span } from "./diagnostics.js";
 import { moneyProfile } from "./money.js";
-import type { ActionDecl, ConsumerDecl, Declaration, EntityDecl, Program, ProjectionDecl, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
+import type { ActionDecl, ConsumerDecl, Declaration, EntityDecl, ExtensionDecl, Program, ProjectionDecl, QueryDecl, WorkflowDecl } from "./syntax-ast.js";
 
 export interface ResolvedProgram {
   program: Program;
@@ -11,6 +11,7 @@ export interface ResolvedProgram {
   consumers: ReadonlyMap<string, ConsumerDecl>;
   queries: ReadonlyMap<string, QueryDecl>;
   workflows: ReadonlyMap<string, WorkflowDecl>;
+  extensions: ReadonlyMap<string, ExtensionDecl>;
   typeNames: ReadonlySet<string>;
 }
 
@@ -34,6 +35,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
   const consumers = new Map<string, ConsumerDecl>();
   const queries = new Map<string, QueryDecl>();
   const workflows = new Map<string, WorkflowDecl>();
+  const extensions = new Map<string, ExtensionDecl>();
   for (const declaration of program.declarations) {
     const previous = declarations.get(declaration.name);
     if (previous) {
@@ -49,6 +51,7 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
     if (declaration.kind === "consumer") consumers.set(declaration.name, declaration);
     if (declaration.kind === "query") queries.set(declaration.name, declaration);
     if (declaration.kind === "workflow") workflows.set(declaration.name, declaration);
+    if (declaration.kind === "extension") extensions.set(declaration.name, declaration);
   }
   const typeNames = new Set([
     ...scalarNames,
@@ -97,6 +100,14 @@ export function resolveProgram(program: Program, file: string): ResolvedProgram 
         throw new ModelError("E2621", `Projection source '${declaration.sourceType.name}' must be an entity.`, declaration.sourceType.span, file);
       }
     }
+    if (declaration.kind === "extension") {
+      for (const parameter of declaration.parameters) {
+        if (parameter.type.collection === "set") throw new ModelError("E3601", "Set-valued extension parameters are not supported in extension contract v1.", parameter.type.span, file);
+        validateType(parameter.type, typeNames, file);
+      }
+      if (declaration.returnType.collection === "set") throw new ModelError("E3601", "Set-valued extension results are not supported in extension contract v1.", declaration.returnType.span, file);
+      validateType(declaration.returnType, typeNames, file);
+    }
   }
-  return { program, declarations, entities, projections, actions, consumers, queries, workflows, typeNames };
+  return { program, declarations, entities, projections, actions, consumers, queries, workflows, extensions, typeNames };
 }

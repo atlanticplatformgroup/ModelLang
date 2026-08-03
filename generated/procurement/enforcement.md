@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35d58fc`
+Source hash: `sha256:093a0b329a38ecd3cf4eeb7eb599d5d147ac2fde59768bb063ae2cec5d47d7f7`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -106,6 +106,8 @@ Source hash: `sha256:3a8a6deb0d90bda63e43f30c7d5598d48f59c08f1f56b4e51c8c4df8b35
 | `workflow-initial:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87` | Require new entity:ent_9bc680209327484c8e98f5f740bcc702 rows to begin in the declared initial state. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_insert` | examples/procurement.model:142:1 |
 | `transition:trn_7787ccd311944f109b69e35967bcbe2c` | Permit only the declared workflow edge implemented by action:act_ed2374e822704c51a2925338253d05d2. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_update` | examples/procurement.model:144:3 |
 | `transition:trn_efd18c8576154ba8b138c97b551afae3` | Permit only the declared workflow edge implemented by action:act_d39dbb883b5f4019b9027b85add3de47. | PostgreSQL workflow trigger | `postgres/002_schema.sql`: `trg_purchase_request_status_workflow_update` | examples/procurement.model:146:3 |
+| `extension:ext_54d694c9a0a274dc79c6168e47d25968` | Declare external implementation ownership, typed contract, effects, reliability, authorization context, tests, rationale, and promotion criterion for supplierRiskReview; no executable authority is generated. | ModelLang extension ledger | `extensions.json`: `supplier-risk/review` | examples/procurement.model:174:1 |
+| `boundary:target_capabilities` | Report the canonical generator target's supported semantics and every model requirement that remains externally implemented. | ModelLang target conformance | `target-capabilities.json`: `target:postgresql-http-ui/1` | compiler-derived |
 | `boundary:audit` | Record each successful action with database and model principal identities plus gateway provenance when present. | PostgreSQL audit | `postgres/003_actions.sql`: `model_procurement_internal.action_audit` | compiler-derived |
 | `boundary:decision_evidence` | Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit. | PostgreSQL audit | `postgres/003_actions.sql`: `model_procurement_internal.action_audit.decision_evidence` | compiler-derived |
 | `boundary:command_receipts` | Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional. | PostgreSQL receipt boundary | `postgres/002_schema.sql`: `model_procurement_internal.command_receipt` | compiler-derived |

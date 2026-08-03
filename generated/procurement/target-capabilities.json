@@ -1,0 +1,169 @@
+{
+  "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
+  "profileVersion": 1,
+  "compilerVersion": "0.37.0",
+  "generatorProfile": "postgresql-http-ui-target-capabilities/21",
+  "targetProfile": "target:postgresql-http-ui/1",
+  "irVersion": 26,
+  "model": {
+    "id": "model:Procurement",
+    "version": "0.37.0",
+    "sourceHash": "sha256:093a0b329a38ecd3cf4eeb7eb599d5d147ac2fde59768bb063ae2cec5d47d7f7"
+  },
+  "conformance": "requiresExternalImplementations",
+  "authority": "none",
+  "capabilities": [
+    {
+      "id": "core.stableIdentity",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "canonical-ir",
+        "semantic-diff"
+      ]
+    },
+    {
+      "id": "core.typedState",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "operations.authenticatedActions",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "operations.reliableCommands",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "policy.closedBoolean",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql"
+      ]
+    },
+    {
+      "id": "events.transactionalOutbox",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "events.transactionalConsumers",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "typescript"
+      ]
+    },
+    {
+      "id": "queries.closedProjections",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http",
+        "ui-metadata"
+      ]
+    },
+    {
+      "id": "queries.toOneTraversal",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.optionalFilters",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.authoredSortProfiles",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.cursorPagination",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.conditionalDisclosure",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "compiler",
+        "postgresql",
+        "http"
+      ]
+    },
+    {
+      "id": "queries.transactionalReadEvidence",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "postgresql"
+      ]
+    },
+    {
+      "id": "extensions.declaredExternal",
+      "required": true,
+      "support": "externalImplementationRequired",
+      "enforcement": [
+        "extension-ledger",
+        "host-conformance-tests"
+      ]
+    }
+  ],
+  "gaps": [
+    {
+      "extensionId": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      "capabilityId": "extensions.declaredExternal",
+      "reason": "Supplier risk scoring depends on a separately owned external service.",
+      "implementation": {
+        "target": "externalService",
+        "location": "supplier-risk/review"
+      }
+    }
+  ]
+}

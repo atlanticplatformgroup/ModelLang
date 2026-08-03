@@ -18,7 +18,7 @@
             "strategy": { "const": "explicitStableId" },
             "stableId": {
               "type": "string",
-              "pattern": "^(ent|fld|prj|pfd|enm|emv|evt|pol|pbr|act|con|qry|inv|exc|wfl|trn)_[0-9a-f]{32}$"
+              "pattern": "^(ent|fld|prj|pfd|enm|emv|evt|pol|pbr|act|con|qry|inv|exc|wfl|trn|ext)_[0-9a-f]{32}$"
             }
           },
           "additionalProperties": false
@@ -336,6 +336,81 @@
         "span": { "type": "object" }
       }
     },
+    "extension": {
+      "type": "object",
+      "required": ["id", "name", "identity", "contract", "owner", "implementation", "effects", "reliability", "authorization", "testObligations", "reason", "promotionCriterion", "execution", "span"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^extension:" },
+        "name": { "type": "string", "minLength": 1 },
+        "identity": { "$ref": "#/$defs/identity" },
+        "contract": {
+          "type": "object",
+          "required": ["parameters", "result"],
+          "properties": {
+            "parameters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "name", "type", "optional", "span"],
+                "properties": {
+                  "id": { "type": "string", "pattern": "^parameter:extension:" },
+                  "name": { "type": "string" },
+                  "type": { "type": "string" },
+                  "optional": { "type": "boolean" },
+                  "span": { "type": "object" }
+                },
+                "additionalProperties": false
+              }
+            },
+            "result": {
+              "type": "object",
+              "required": ["type", "optional"],
+              "properties": { "type": { "type": "string" }, "optional": { "type": "boolean" } },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "owner": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "implementation": {
+          "type": "object",
+          "required": ["target", "location"],
+          "properties": {
+            "target": { "enum": ["typescript", "java", "rust", "python", "workflow", "externalService"] },
+            "location": { "type": "string", "minLength": 1, "maxLength": 500 }
+          },
+          "additionalProperties": false
+        },
+        "effects": {
+          "type": "object",
+          "required": ["readEntityIds", "writeEntityIds", "externalSystems", "emittedEventIds"],
+          "properties": {
+            "readEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^entity:" } },
+            "writeEntityIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^entity:" } },
+            "externalSystems": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+            "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } }
+          },
+          "additionalProperties": false
+        },
+        "reliability": {
+          "type": "object",
+          "required": ["deterministic", "idempotent", "retry"],
+          "properties": {
+            "deterministic": { "type": "boolean" },
+            "idempotent": { "type": "boolean" },
+            "retry": { "enum": ["none", "hostManaged"] }
+          },
+          "additionalProperties": false
+        },
+        "authorization": { "enum": ["authenticatedCaller", "serviceIdentity", "none"] },
+        "testObligations": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "promotionCriterion": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "execution": { "const": "externalDeclarationOnly" },
+        "span": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
     "workflow": {
       "type": "object",
       "required": ["id", "name", "identity", "entityId", "fieldId", "enumId", "initialMemberId", "transitions", "span", "naming"],
@@ -354,9 +429,9 @@
     }
   },
   "type": "object",
-  "required": ["irVersion", "model", "principal", "enums", "entities", "projections", "events", "policies", "actions", "consumers", "queries", "workflows", "enforcement"],
+  "required": ["irVersion", "model", "principal", "enums", "entities", "projections", "events", "policies", "actions", "consumers", "queries", "workflows", "extensions", "enforcement"],
   "properties": {
-    "irVersion": { "const": 25 },
+    "irVersion": { "const": 26 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash", "sourceFile", "naming"],
@@ -451,6 +526,7 @@
     "consumers": { "type": "array", "items": { "$ref": "#/$defs/consumer" } },
     "queries": { "type": "array", "items": { "$ref": "#/$defs/query" } },
     "workflows": { "type": "array", "items": { "$ref": "#/$defs/workflow" } },
+    "extensions": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
     "enforcement": { "type": "array" }
   },
   "additionalProperties": false

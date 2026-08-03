@@ -15,7 +15,31 @@ export interface ModelDecl {
   span: Span;
 }
 
-export type Declaration = EnumDecl | EntityDecl | ProjectionDecl | EventDecl | PolicyDecl | ActionDecl | ConsumerDecl | QueryDecl | WorkflowDecl;
+export type Declaration = EnumDecl | EntityDecl | ProjectionDecl | EventDecl | PolicyDecl | ActionDecl | ConsumerDecl | QueryDecl | WorkflowDecl | ExtensionDecl;
+
+export interface ExtensionDecl {
+  kind: "extension";
+  name: string;
+  nameSpan: Span;
+  stableId?: Annotation;
+  parameters: ParameterDecl[];
+  returnType: TypeRef;
+  returnOptional: boolean;
+  owner: string;
+  implementation: { target: string; location: string };
+  reads: { name: string; span: Span }[];
+  writes: { name: string; span: Span }[];
+  calls: string[];
+  emits: { eventName: string; span: Span }[];
+  deterministic: boolean;
+  idempotent: boolean;
+  retry: "none" | "hostManaged";
+  authorization: "authenticatedCaller" | "serviceIdentity" | "none";
+  tests: string[];
+  reason: string;
+  promotion: string;
+  span: Span;
+}
 
 export interface EventDecl {
   kind: "event";

@@ -1,11 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.36](./spec/0.36/LANGUAGE.md). It retains the complete 0.35 language and adds opt-in private transactional read evidence for successful committed queries.
+The current normative specification is [ModelLang 0.37](./spec/0.37/LANGUAGE.md). It retains the complete 0.36 language and adds target capability profiles plus a typed, non-executable extension ledger.
 
-- [Transactional read-evidence semantics](./spec/0.36/TRANSACTIONAL_READ_EVIDENCE.md)
-- [0.36 grammar additions](./spec/0.36/GRAMMAR.ebnf)
-- [0.36 conformance requirements](./spec/0.36/CONFORMANCE.md)
-- [0.36 unstable read boundaries](./spec/0.36/UNSTABLE.md)
+- [Target capabilities and extension-ledger semantics](./spec/0.37/TARGET_CAPABILITIES_AND_EXTENSIONS.md)
+- [0.37 grammar additions](./spec/0.37/GRAMMAR.ebnf)
+- [0.37 conformance requirements](./spec/0.37/CONFORMANCE.md)
+- [0.37 unstable extension and target boundaries](./spec/0.37/UNSTABLE.md)
 
 - [Bounded to-one traversal semantics](./spec/0.31/TO_ONE_TRAVERSAL.md)
 - [0.31 grammar additions](./spec/0.31/GRAMMAR.ebnf)

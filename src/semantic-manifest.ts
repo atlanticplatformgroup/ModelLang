@@ -2,6 +2,7 @@ import type {
   IRAction,
   IRConsumer,
   IREvent,
+  IRExtension,
   IRExpression,
   IRProjection,
   IRQuery,
@@ -43,8 +44,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 17;
-  profile: "sml-transactional-core/17";
+  manifestVersion: 18;
+  profile: "sml-transactional-core/18";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -53,7 +54,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 25;
+    irVersion: 26;
     generator: "semantic-manifest";
   };
   model: {
@@ -74,6 +75,7 @@ export interface SemanticManifest {
   actions: SemanticAction[];
   consumers: SemanticConsumer[];
   queries: SemanticQuery[];
+  extensions: IRExtension[];
 }
 
 export interface SemanticEvent {
@@ -510,7 +512,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 17,
+    manifestVersion: 18,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {
@@ -578,6 +580,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
     actions: ir.actions.map((action) => actionEntry(ir, operations, action)),
     consumers: ir.consumers.map((consumer) => consumerEntry(ir, consumer)),
     queries: ir.queries.map((query) => queryEntry(ir, operations, query)),
+    extensions: ir.extensions,
   };
 }
 
