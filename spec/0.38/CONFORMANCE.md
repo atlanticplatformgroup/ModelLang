@@ -12,4 +12,5 @@ A conforming implementation:
 8. excludes extensions, implementation locations, current state, private runtime state, and enforcement expressions;
 9. re-enforces authentication, authorization, preconditions, and state rules at runtime regardless of catalog or applicability results;
 10. does not claim direct MCP protocol or SML-Agent conformance from this artifact;
-11. emits compiler 0.38.0, agent catalog v1, target profile v2, target `target:postgresql-http-ui-agent-catalog/2`, and generator profile `/22`, while retaining IR26 and private runtime profile 36.
+11. emits compiler 0.38.0, canonical IR1, agent catalog v1, target profile v2, target `target:postgresql-http-ui-agent-catalog/2`, and generator profile `/22`, while retaining private runtime profile 36;
+12. accepts only canonical IR1 as migration or semantic-evolution input and performs no legacy IR normalization.

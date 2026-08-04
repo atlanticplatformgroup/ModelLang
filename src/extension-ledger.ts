@@ -5,7 +5,7 @@ export interface ExtensionLedger {
   $schema: "https://modellang.dev/schemas/extension-ledger.schema.json";
   ledgerVersion: 1;
   compilerVersion: string;
-  irVersion: 26;
+  irVersion: 1;
   audience: "engineering";
   public: false;
   executable: false;

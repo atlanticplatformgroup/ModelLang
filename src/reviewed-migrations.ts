@@ -25,6 +25,7 @@ import {
 import { quoteIdent } from "./naming.js";
 import { semanticDiff, type SemanticChange, type SemanticDiff } from "./semantic-diff.js";
 import { decisionFunctionName } from "./decision-plan.js";
+import { MODELLANG_IR_VERSION } from "./version.js";
 
 export const REVIEWED_MIGRATION_SCHEMA = "https://modellang.dev/schemas/reviewed-migration-plan.schema.json" as const;
 
@@ -369,7 +370,9 @@ export function planReviewedMigration(
   input: ReviewedMigrationPlanDocument | unknown,
 ): ReviewedMigrationPlan {
   const plan = parseReviewedMigrationPlan(input);
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26].includes(Number(previous.irVersion)) || current.irVersion !== 26) fail(current, "E2901", "Reviewed migration planning requires a canonical IR9 through IR26 baseline and canonical IR26 current input.");
+  if (previous.irVersion !== MODELLANG_IR_VERSION || current.irVersion !== MODELLANG_IR_VERSION) {
+    fail(current, "E2901", `Reviewed migration planning requires canonical IR${MODELLANG_IR_VERSION} inputs.`);
+  }
   requireExplicitIds(previous);
   requireExplicitIds(current);
   requireUniquePhysicalTargets(current);
@@ -502,7 +505,7 @@ export function planReviewedMigration(
       `DROP FUNCTION ${qname(schema, operation.naming.sqlFunction)}(${callableSignature(operation)});`),
     ...previous.actions.map((action) =>
       `DROP FUNCTION IF EXISTS ${qname(schema, decisionFunctionName(action.id))}(${[...action.callableParameters.map((id) => sqlType(action.parameters.find((parameter) => parameter.id === id)!.type)), "text"].join(", ")});`),
-    ...((previous as ModelIR & { consumers?: ModelIR["consumers"] }).consumers ?? []).map((consumer) =>
+    ...previous.consumers.map((consumer) =>
       `DROP FUNCTION IF EXISTS ${qname(internal, consumer.naming.sqlFunction)}(jsonb);`),
     `DROP TABLE ${previous.entities.map((entity) => qname(schema, entity.naming.sqlTable)).join(", ")};`,
     ...previous.workflows.map((workflow) => `DROP FUNCTION ${qname(internal, workflow.naming.sqlTriggerFunction)}();`),

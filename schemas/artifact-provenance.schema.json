@@ -24,7 +24,7 @@
       },
       "additionalProperties": false
     },
-    "irVersion": { "const": 26 },
+    "irVersion": { "const": 1 },
     "artifacts": {
       "type": "array",
       "items": {

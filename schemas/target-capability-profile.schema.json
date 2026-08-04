@@ -10,7 +10,7 @@
     "compilerVersion": { "type": "string" },
     "generatorProfile": { "const": "postgresql-http-ui-agent-tool-catalog/22" },
     "targetProfile": { "const": "target:postgresql-http-ui-agent-catalog/2" },
-    "irVersion": { "const": 26 },
+    "irVersion": { "const": 1 },
     "model": {
       "type": "object",
       "required": ["id", "version", "sourceHash"],

@@ -4,7 +4,7 @@
   "compilerVersion": "0.38.0",
   "generatorProfile": "postgresql-http-ui-agent-tool-catalog/22",
   "targetProfile": "target:postgresql-http-ui-agent-catalog/2",
-  "irVersion": 26,
+  "irVersion": 1,
   "model": {
     "id": "model:Reservations",
     "version": "0.38.0",

@@ -8,6 +8,7 @@ import type {
   ActionDecl, Annotation, ConsumerDecl, Declaration, EntityDecl, EventDecl, ExclusionDecl, Expression, ExtensionDecl, FieldDecl, InvariantDecl, PolicyDecl, Program, ProjectionDecl, QueryDecl, TypeRef,
   WorkflowDecl,
 } from "./syntax-ast.js";
+import { MODELLANG_IR_VERSION } from "./version.js";
 
 const scalars = new Set(["String", "Int", "Decimal", "Boolean", "UUID", "DateTime"]);
 
@@ -236,7 +237,7 @@ export function analyze(program: Program, source: string, file: string): ModelIR
   const extensions = [...symbols.extensions.values()].map((extension) => lowerExtension(extension, symbols, file));
   const enforcement = buildEnforcement(enums, entities, projections, events, policies, actions, consumers, queries, workflows, extensions, schema, internalSchema);
   return {
-    irVersion: 26,
+    irVersion: MODELLANG_IR_VERSION,
     model: {
       id: `model:${program.model.name}`,
       name: program.model.name,

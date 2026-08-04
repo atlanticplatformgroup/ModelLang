@@ -188,7 +188,7 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(
     }));
   });
 
-  it("classifies projection member and legacy entity-output changes as breaking disclosure changes", () => {
+  it("classifies projection member additions as breaking disclosure changes", () => {
     const source = (version: string, includeValue: boolean) => `model ProjectionEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
   id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
@@ -212,19 +212,6 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: Us
       classification: "breaking",
       subject: expect.objectContaining({ kind: "projectionField" }),
     }));
-
-    const legacy = structuredClone(previous) as unknown as Record<string, unknown> & {
-      irVersion: number;
-      queries: { returnProjectionId?: string }[];
-    };
-    legacy.irVersion = 18;
-    delete legacy.projections;
-    delete legacy.queries[0]!.returnProjectionId;
-    const report = semanticDiff(legacy as unknown as typeof previous, compileText(source("2", false)));
-    expect(report.changes).toEqual(expect.arrayContaining([
-      expect.objectContaining({ kind: "queryOutputChanged", classification: "breaking", before: expect.stringMatching(/^legacyEntity:/) }),
-      expect.objectContaining({ kind: "queryDisclosureChanged", classification: "breaking" }),
-    ]));
   });
 
   it("classifies changing a stable member from a UUID to a nested projection as breaking", () => {
@@ -300,7 +287,7 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     expect(report).toMatchObject({
       diffVersion: 19,
       compilerVersion: "0.38.0",
-      irVersion: 26,
+      irVersion: 1,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });
     expect(report.changes).toEqual(expect.arrayContaining([

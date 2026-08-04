@@ -43,7 +43,7 @@ The implementation has several independent version axes:
 | Axis | Current value | Meaning |
 |---|---|---|
 | Compiler release | 0.38.0 | Toolchain and generated-artifact release |
-| Canonical IR | IR26 | Typed backend boundary with declared external extensions, target capability assessment, transactional read evidence, and the prior closed read family; IR9 through IR26 remain evolution baselines |
+| Canonical IR | IR1 | Current pre-release typed backend boundary; evolution input must use this exact format and no historical IR normalization is provided |
 | Example source models | Procurement 0.38.0; Reservations 0.38.0 | Domain-model evolution versions, independent of compiler release |
 | Operation manifest | v11 | Static transport-neutral public operation, private read-evidence profile, null-redaction, optional query-input, closed sort-profile, array/page result, and transitive reachable-projection contract |
 | UI manifest | v11 | Static framework-neutral presentation, read-evidence and conditional-disclosure metadata, optional filters, closed sort choices, cursor continuation, and nested projection-result contract |

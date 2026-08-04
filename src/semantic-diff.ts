@@ -4,7 +4,6 @@ import type {
   IREntity,
   IREnum,
   IRPolicy,
-  IRProjection,
   IRQuery,
   IRWorkflow,
   ModelIR,
@@ -47,7 +46,7 @@ export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
   diffVersion: 19;
   compilerVersion: string;
-  irVersion: 26;
+  irVersion: 1;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -72,16 +71,6 @@ function text(value: unknown): string {
   return JSON.stringify(normalized(value));
 }
 
-function normalizedConsumerFailurePolicy(policy: IRConsumer["failurePolicy"] | undefined): IRConsumer["failurePolicy"] {
-  if (!policy || policy.mode === "unboundedRetry") return { mode: "unboundedRetry" };
-  return { ...policy, recovery: policy.recovery ?? "none" };
-}
-
-function normalizedEventPublicationFailurePolicy(policy: ModelIR["events"][number]["publicationFailurePolicy"] | undefined): ModelIR["events"][number]["publicationFailurePolicy"] {
-  if (!policy || policy.mode === "unboundedRetry") return { mode: "unboundedRetry" };
-  return { ...policy, recovery: policy.recovery ?? "none" };
-}
-
 function subject(kind: string, value: { id: string; name: string }): SemanticChange["subject"] {
   return { kind, id: value.id, name: value.name };
 }
@@ -98,13 +87,13 @@ function compareEvents(changes: SemanticChange[], previous: ModelIR["events"], c
       subject: subject("event", pair.current), before: pair.previous.payloadEntityId, after: pair.current.payloadEntityId,
       persistenceRisk: true, explanation: "Changing an event payload entity breaks the durable event contract.",
     });
-    if (!same(pair.previous.source ?? { kind: "local" }, pair.current.source)) addChange(changes, {
+    if (!same(pair.previous.source, pair.current.source)) addChange(changes, {
       kind: "eventSourceContractChanged", area: "eventDelivery", classification: "breaking",
-      subject: subject("event", pair.current), before: text(pair.previous.source ?? { kind: "local" }), after: text(pair.current.source),
+      subject: subject("event", pair.current), before: text(pair.previous.source), after: text(pair.current.source),
       persistenceRisk: true, explanation: "Changing an event source model, version, or hash changes the accepted durable contract.",
     });
-    const previousPolicy = normalizedEventPublicationFailurePolicy(pair.previous.publicationFailurePolicy);
-    const currentPolicy = normalizedEventPublicationFailurePolicy(pair.current.publicationFailurePolicy);
+    const previousPolicy = pair.previous.publicationFailurePolicy;
+    const currentPolicy = pair.current.publicationFailurePolicy;
     if (!same(previousPolicy, currentPolicy)) addChange(changes, {
       kind: "eventPublicationFailurePolicyChanged", area: "eventDelivery", classification: "review",
       subject: subject("event", pair.current), before: text(previousPolicy), after: text(currentPolicy),
@@ -149,13 +138,13 @@ function compareConsumers(changes: SemanticChange[], previous: IRConsumer[], cur
       subject: subject("consumer", pair.current), before: text(pair.previous.effect), after: text(pair.current.effect),
       persistenceRisk: true, explanation: "The local committed effect performed for a consumed event changed.",
     });
-    if (!same(pair.previous.emittedEventIds ?? [], pair.current.emittedEventIds)) addChange(changes, {
+    if (!same(pair.previous.emittedEventIds, pair.current.emittedEventIds)) addChange(changes, {
       kind: "consumerEmittedEventsChanged", area: "eventDelivery", classification: "review",
-      subject: subject("consumer", pair.current), before: text(pair.previous.emittedEventIds ?? []), after: text(pair.current.emittedEventIds),
+      subject: subject("consumer", pair.current), before: text(pair.previous.emittedEventIds), after: text(pair.current.emittedEventIds),
       persistenceRisk: true, explanation: "The consumer's ordered downstream durable-event effect changed.",
     });
-    const previousFailurePolicy = normalizedConsumerFailurePolicy(pair.previous.failurePolicy);
-    const currentFailurePolicy = normalizedConsumerFailurePolicy(pair.current.failurePolicy);
+    const previousFailurePolicy = pair.previous.failurePolicy;
+    const currentFailurePolicy = pair.current.failurePolicy;
     if (!same(previousFailurePolicy, currentFailurePolicy)) addChange(changes, {
       kind: "consumerFailurePolicyChanged", area: "executionReliability", classification: "review",
       subject: subject("consumer", pair.current), before: text(previousFailurePolicy), after: text(currentFailurePolicy),
@@ -399,12 +388,12 @@ function compareActions(changes: SemanticChange[], previous: IRAction[], current
       persistenceRisk: true,
       explanation: "The action's retry, receipt, or replay contract changed.",
     });
-    if (!same(pair.previous.emittedEventIds ?? [], pair.current.emittedEventIds)) addChange(changes, {
+    if (!same(pair.previous.emittedEventIds, pair.current.emittedEventIds)) addChange(changes, {
       kind: "emittedEventsChanged",
       area: "eventDelivery",
       classification: "review",
       subject: subject("action", pair.current),
-      before: text(pair.previous.emittedEventIds ?? []),
+      before: text(pair.previous.emittedEventIds),
       after: text(pair.current.emittedEventIds),
       persistenceRisk: true,
       explanation: "The action's durable externally delivered effects changed.",
@@ -436,7 +425,7 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
       persistenceRisk: false,
       explanation: "The callable query input or row source changed.",
     });
-    const previousOutput = pair.previous.returnProjectionId ?? `legacyEntity:${pair.previous.sourceEntityId}`;
+    const previousOutput = pair.previous.returnProjectionId;
     if (previousOutput !== pair.current.returnProjectionId) addChange(changes, {
       kind: "queryOutputChanged",
       area: "queryVisibility",
@@ -448,12 +437,9 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
       explanation: "The query's disclosed result contract changed.",
     });
     if (previousOutput !== pair.current.returnProjectionId) {
-      const previousProjection = (previousIR as ModelIR & { projections?: IRProjection[] }).projections
-        ?.find((candidate) => candidate.id === pair.previous.returnProjectionId);
+      const previousProjection = previousIR.projections.find((candidate) => candidate.id === pair.previous.returnProjectionId);
       const currentProjection = currentIR.projections.find((candidate) => candidate.id === pair.current.returnProjectionId);
-      const previousFields = previousProjection?.fields.map((field) => field.sourceFieldId)
-        ?? previousIR.entities.find((entity) => entity.id === pair.previous.sourceEntityId)?.fields.map((field) => field.id)
-        ?? [];
+      const previousFields = previousProjection?.fields.map((field) => field.sourceFieldId) ?? [];
       const currentFields = currentProjection?.fields.map((field) => field.sourceFieldId) ?? [];
       addChange(changes, {
         kind: "queryDisclosureChanged", area: "queryVisibility", classification: "breaking",
@@ -576,8 +562,7 @@ function compareQueries(changes: SemanticChange[], previousIR: ModelIR, currentI
 }
 
 function compareProjections(changes: SemanticChange[], previousIR: ModelIR, currentIR: ModelIR): void {
-  const previous = (previousIR as ModelIR & { projections?: IRProjection[] }).projections ?? [];
-  for (const pair of pairById(changes, "projection", previous, currentIR.projections, "queryVisibility", "additive", "breaking", false)) {
+  for (const pair of pairById(changes, "projection", previousIR.projections, currentIR.projections, "queryVisibility", "additive", "breaking", false)) {
     compareNamed(changes, "projection", pair.previous, pair.current);
     if (pair.previous.sourceEntityId !== pair.current.sourceEntityId) addChange(changes, {
       kind: "projectionSourceChanged", area: "queryVisibility", classification: "breaking",
@@ -762,13 +747,13 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
     compareExclusions(changes, pair.previous, pair.current);
   }
   compareProjections(changes, previous, current);
-  comparePolicies(changes, (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [], current.policies);
-  compareEvents(changes, (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [], current.events);
+  comparePolicies(changes, previous.policies, current.policies);
+  compareEvents(changes, previous.events, current.events);
   compareActions(changes, previous.actions, current.actions);
-  compareConsumers(changes, (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [], current.consumers);
+  compareConsumers(changes, previous.consumers, current.consumers);
   compareQueries(changes, previous, current);
   compareWorkflows(changes, previous.workflows, current.workflows);
-  compareExtensions(changes, (previous as ModelIR & { extensions?: ModelIR["extensions"] }).extensions ?? [], current.extensions);
+  compareExtensions(changes, previous.extensions, current.extensions);
   const summary: SemanticDiff["summary"] = {
     additive: 0,
     restrictive: 0,

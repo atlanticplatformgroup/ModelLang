@@ -9,7 +9,7 @@ export interface TargetCapabilityReport {
   compilerVersion: string;
   generatorProfile: string;
   targetProfile: "target:postgresql-http-ui-agent-catalog/2";
-  irVersion: 26;
+  irVersion: 1;
   model: { id: string; version: string; sourceHash: string };
   conformance: "complete" | "requiresExternalImplementations";
   authority: "none";

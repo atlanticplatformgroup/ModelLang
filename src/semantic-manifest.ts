@@ -54,7 +54,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 26;
+    irVersion: 1;
     generator: "semantic-manifest";
   };
   model: {

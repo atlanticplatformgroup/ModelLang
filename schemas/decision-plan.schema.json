@@ -11,7 +11,7 @@
     "audience": { "const": "enforcement" },
     "public": { "const": false },
     "compilerVersion": { "type": "string" },
-    "irVersion": { "const": 26 },
+    "irVersion": { "const": 1 },
     "model": {
       "type": "object",
       "additionalProperties": false,

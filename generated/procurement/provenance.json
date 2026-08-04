@@ -10,7 +10,7 @@
     "version": "0.38.0",
     "sourceHash": "sha256:a4a1c2c6f15a13da6049c57ef6d27ae86de48de2282303fe845c3d5b54e64a77"
   },
-  "irVersion": 26,
+  "irVersion": 1,
   "artifacts": [
     {
       "path": "agent-tools.json",
@@ -25,7 +25,7 @@
     {
       "path": "decisions.json",
       "role": "contract",
-      "sha256": "sha256:2e276ee7ce9fd9f1c4edee792882e10cf386d4ca35a5a70ce5ee285e4a640132"
+      "sha256": "sha256:0a9b01e356512a1ec6a983bff9c63277d608ad4808d1c71ee2ae81649d500fcd"
     },
     {
       "path": "enforcement.json",
@@ -45,12 +45,12 @@
     {
       "path": "extensions.json",
       "role": "assurance",
-      "sha256": "sha256:ed648f02a77edf391f0b1c6e5ee915603a3172b32a121c99f678b8ff6518c917"
+      "sha256": "sha256:0d5ca8db7251203944da23021b6573774a0002b2daca734cdbd0c5b4f127074c"
     },
     {
       "path": "model.ir.json",
       "role": "canonical",
-      "sha256": "sha256:c36a8b272e736c4a3ee50b545c95e221685785a1a873b4f09219b94a86cb2277"
+      "sha256": "sha256:8a63e30d3b1b21f9300a09b062156896736bb9eb8eb15ab74797792479968e6b"
     },
     {
       "path": "model.mmd",
@@ -185,12 +185,12 @@
     {
       "path": "semantic.json",
       "role": "contract",
-      "sha256": "sha256:0f86409f3b55dea111d4c948a08f81a332f0afb91aa9ca184d28b3d4a03c121f"
+      "sha256": "sha256:92891bfb43ae6b60608308d4ee2db848780836f684ebddaac3946c685cfd7dd5"
     },
     {
       "path": "target-capabilities.json",
       "role": "assurance",
-      "sha256": "sha256:1fa87dd5cfb794b4ab1ea4f2526d427e7518565321d6b22876897894aa701943"
+      "sha256": "sha256:4aad1f4044437986113c20eb2712b7a5fc8376e952eb16ec3f7972b814b84735"
     },
     {
       "path": "typescript/browser.ts",

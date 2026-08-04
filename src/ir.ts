@@ -357,7 +357,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 26;
+  irVersion: 1;
   model: {
     id: string;
     name: string;

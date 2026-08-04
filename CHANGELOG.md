@@ -11,7 +11,8 @@
 - Added filtered action applicability rule IDs and outcomes, reliability, and emitted-event metadata without publishing expressions, current state, extensions, runtime internals, or authority grants.
 - Declared the catalog MCP-tool adaptable while explicitly declining direct MCP protocol and SML-Agent conformance; runtime authorization and precondition enforcement remain authoritative on every invocation.
 - Added target capability `agents.staticToolCatalog`, advanced target capability profile to v2 and `target:postgresql-http-ui-agent-catalog/2`, and recorded the catalog as a hashed contract artifact in provenance v2.
-- Advanced compiler and examples to 0.38.0 and generator profile to `postgresql-http-ui-agent-tool-catalog/22`; IR26, operation manifest v11, capability manifest v10, and private PostgreSQL runtime profile 36 remain unchanged.
+- Reset the unreleased canonical format to IR1, removed IR9–IR26 schema normalization and migration fallbacks, and made evolution input strict-current-format while preserving migrations between two IR1 artifacts.
+- Advanced compiler and examples to 0.38.0 and generator profile to `postgresql-http-ui-agent-tool-catalog/22`; operation manifest v11, capability manifest v10, and private PostgreSQL runtime profile 36 remain unchanged.
 
 ## 0.37.0
 

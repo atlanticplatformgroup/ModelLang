@@ -4,7 +4,7 @@
   "audience": "enforcement",
   "public": false,
   "compilerVersion": "0.38.0",
-  "irVersion": 26,
+  "irVersion": 1,
   "model": {
     "id": "model:Reservations",
     "version": "0.38.0",

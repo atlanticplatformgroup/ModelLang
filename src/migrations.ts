@@ -22,6 +22,7 @@ import {
 } from "./codegen/postgres.js";
 import { isMoneyType } from "./money.js";
 import { quoteIdent, snakeCase } from "./naming.js";
+import { MODELLANG_IR_VERSION } from "./version.js";
 
 export type RenameOperation =
   | { kind: "renameEntity"; entityId: string; from: string; to: string }
@@ -102,14 +103,14 @@ export function requireExplicitIds(ir: ModelIR): void {
     for (const exclusion of entity.temporalExclusions) requireExplicit(ir, exclusion, `exclusion in '${entity.name}'`, "exclusion");
   }
   for (const action of ir.actions) requireExplicit(ir, action, "action", "action");
-  for (const consumer of (ir as ModelIR & { consumers?: IRConsumer[] }).consumers ?? []) requireExplicit(ir, consumer, "consumer", "consumer");
-  for (const event of (ir as ModelIR & { events?: ModelIR["events"] }).events ?? []) requireExplicit(ir, event, "event", "event");
-  for (const policy of (ir as ModelIR & { policies?: IRPolicy[] }).policies ?? []) {
+  for (const consumer of ir.consumers) requireExplicit(ir, consumer, "consumer", "consumer");
+  for (const event of ir.events) requireExplicit(ir, event, "event", "event");
+  for (const policy of ir.policies) {
     requireExplicit(ir, policy, "policy", "policy");
     for (const branch of policy.branches) requireExplicit(ir, branch, `branch in policy '${policy.name}'`, "policyBranch");
   }
   for (const query of ir.queries) requireExplicit(ir, query, "query", "query");
-  for (const projection of (ir as ModelIR & { projections?: IRProjection[] }).projections ?? []) {
+  for (const projection of ir.projections) {
     requireExplicit(ir, projection, "projection", "projection");
     for (const field of projection.fields) requireExplicit(ir, field, `field in projection '${projection.name}'`, "projectionField");
   }
@@ -174,15 +175,12 @@ function entityStructure(entity: IREntity): unknown {
 
 function actionStructure(action: IRAction): unknown {
   const { name: _name, identity: _identity, emittedEventIds, ...structure } = action;
-  return { ...structure, emittedEventIds: emittedEventIds ?? [] };
+  return { ...structure, emittedEventIds };
 }
 
 function consumerStructure(consumer: IRConsumer): unknown {
   const { name: _name, identity: _identity, failurePolicy, ...structure } = consumer;
-  const normalizedFailurePolicy = failurePolicy?.mode === "deadLetterAfterMaxAttempts"
-    ? { ...failurePolicy, recovery: failurePolicy.recovery ?? "none" }
-    : failurePolicy ?? { mode: "unboundedRetry" };
-  return { ...structure, failurePolicy: normalizedFailurePolicy };
+  return { ...structure, failurePolicy };
 }
 
 function policyStructure(policy: IRPolicy): unknown {
@@ -389,8 +387,8 @@ export function historyBootstrapStatements(previous: ModelIR, current: ModelIR):
 }
 
 export function planMigration(previous: ModelIR, current: ModelIR): MigrationPlan {
-  if (![9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26].includes(Number(previous.irVersion)) || current.irVersion !== 26) {
-    fail(current, "E2803", "Migration planning requires a canonical IR9 through IR26 baseline and canonical IR26 current input.");
+  if (previous.irVersion !== MODELLANG_IR_VERSION || current.irVersion !== MODELLANG_IR_VERSION) {
+    fail(current, "E2803", `Migration planning requires canonical IR${MODELLANG_IR_VERSION} inputs.`);
   }
   requireExplicitIds(previous);
   requireExplicitIds(current);
@@ -556,7 +554,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  const previousPolicies = (previous as ModelIR & { policies?: IRPolicy[] }).policies ?? [];
+  const previousPolicies = previous.policies;
   const policyDiff = additiveDiff(previousPolicies, current.policies, "Policy", current);
   for (const policy of policyDiff.added) operations.push({ kind: "addPolicy", policyId: policy.id, name: policy.name });
   const previousPoliciesById = byId(previousPolicies);
@@ -582,18 +580,15 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  const previousEvents = (previous as ModelIR & { events?: ModelIR["events"] }).events ?? [];
+  const previousEvents = previous.events;
   const eventDiff = additiveDiff(previousEvents, current.events, "Event", current);
   for (const event of eventDiff.added) operations.push({ kind: "addEvent", eventId: event.id, name: event.name });
   const previousEventsById = byId(previousEvents);
   for (const currentEvent of eventDiff.existing) {
     const previousEvent = previousEventsById.get(currentEvent.id)!;
-    const previousPublicationPolicy = previousEvent.publicationFailurePolicy?.mode === "deadLetterAfterMaxAttempts"
-      ? { ...previousEvent.publicationFailurePolicy, recovery: previousEvent.publicationFailurePolicy.recovery ?? "none" }
-      : { mode: "unboundedRetry" };
     if (previousEvent.payloadEntityId !== currentEvent.payloadEntityId
-      || !same(previousEvent.source ?? { kind: "local" }, currentEvent.source)
-      || !same(previousPublicationPolicy, currentEvent.publicationFailurePolicy)) {
+      || !same(previousEvent.source, currentEvent.source)
+      || !same(previousEvent.publicationFailurePolicy, currentEvent.publicationFailurePolicy)) {
       fail(current, "E2807", `Event payload, source, or publication policy changed for '${currentEvent.name}'; contract changes require reviewed migration.`);
     }
   }
@@ -603,7 +598,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     operations.push({ kind: "addAction", actionId: action.id, name: action.name });
   }
 
-  const previousConsumers = (previous as ModelIR & { consumers?: IRConsumer[] }).consumers ?? [];
+  const previousConsumers = previous.consumers;
   const consumerDiff = additiveDiff(previousConsumers, current.consumers, "Consumer", current);
   for (const consumer of consumerDiff.added) operations.push({ kind: "addConsumer", consumerId: consumer.id, name: consumer.name });
   const previousConsumersById = byId(previousConsumers);
@@ -634,7 +629,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     }
   }
 
-  const previousProjections = (previous as ModelIR & { projections?: IRProjection[] }).projections ?? [];
+  const previousProjections = previous.projections;
   const projectionDiff = additiveDiff(previousProjections, current.projections, "Projection", current);
   const previousProjectionsById = byId(previousProjections);
   const reachableProjectionIds = new Set<string>();

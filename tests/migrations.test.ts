@@ -4,7 +4,7 @@ import { compileText } from "../src/compiler.js";
 import { ModelError } from "../src/diagnostics.js";
 import { planMigration } from "../src/migrations.js";
 import { assignStableIds, type StableIdKind } from "../src/stable-ids.js";
-import { validateEvolutionIR, validateIR } from "../src/validate-ir.js";
+import { validateIR } from "../src/validate-ir.js";
 
 const entityUser = "ent_11111111111111111111111111111111";
 const entityPurchase = "ent_22222222222222222222222222222222";
@@ -272,7 +272,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(26);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(1);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -368,6 +368,12 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     delete (malformed.actions[0] as { identity?: unknown }).identity;
     expect(error(() => validateIR(malformed)).code).toBe("E3002");
   });
+
+  it("rejects evolution input from a non-current canonical IR format", () => {
+    const incompatible = structuredClone(compileText(renameModel({ version: "1" }))) as unknown as { irVersion: number };
+    incompatible.irVersion = 2;
+    expect(error(() => validateIR(incompatible as never)).code).toBe("E3002");
+  });
 });
 
 describe("ModelLang 0.10 safe schema evolution", () => {
@@ -398,25 +404,7 @@ query records @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: Us
     expect(migrationError.message).toContain("UserSummary");
   });
 
-  it("normalizes an IR18 entity result without inventing projection identity and rejects automatic narrowing", () => {
-    const current = compileText(readFileSync("examples/procurement.model", "utf8"), "examples/procurement.model");
-    const legacy = structuredClone(current) as unknown as Record<string, unknown> & {
-      irVersion: number;
-      model: { version: string; sourceHash: string };
-      queries: { returnProjectionId?: string }[];
-    };
-    legacy.irVersion = 18;
-    legacy.model.version = "0.29.0";
-    legacy.model.sourceHash = `sha256:${"0".repeat(64)}`;
-    delete legacy.projections;
-    delete legacy.queries[0]!.returnProjectionId;
-    expect(() => validateEvolutionIR(legacy as unknown as typeof current)).not.toThrow();
-    const migrationError = error(() => planMigration(legacy as unknown as typeof current, current));
-    expect(migrationError.code).toBe("E2807");
-    expect(migrationError.message).toContain("Query semantics changed");
-  });
-
-  it("normalizes IR15 recovery omission and rejects a real recovery-policy change", () => {
+  it("rejects a real recovery-policy change", () => {
     const source = (version: string, recovery: boolean) => `model RecoveryEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
   id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
@@ -438,11 +426,7 @@ consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") on RecordCrea
   update record { observed = true; }
 }`;
     const previous = compileText(source("1", false));
-    const ir15 = structuredClone(previous) as unknown as { irVersion: number; consumers: { failurePolicy: { recovery?: string } }[] };
-    ir15.irVersion = 15;
-    delete ir15.consumers[0]!.failurePolicy.recovery;
-    expect(() => validateEvolutionIR(ir15 as unknown as typeof previous)).not.toThrow();
-    expect(planMigration(ir15 as unknown as typeof previous, compileText(source("2", false))).operations).toEqual([]);
+    expect(planMigration(previous, compileText(source("2", false))).operations).toEqual([]);
     expect(error(() => planMigration(previous, compileText(source("2", true)))).code).toBe("E2807");
   });
 
@@ -475,49 +459,7 @@ ${consumer ? `consumer observe @stableId("con_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
     expect(plan.sql).toContain("event_inbox");
   });
 
-  it("accepts released IR9 through IR19 artifacts as previous baselines for an IR20 migration", () => {
-    const previous = compileText(evolutionSource("1.0.0", false), "evolution-v1.model");
-    const current = compileText(evolutionSource("2.0.0", true), "evolution-v2.model");
-    for (const irVersion of [9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]) {
-      const legacy = structuredClone(previous) as unknown as Record<string, unknown>;
-      legacy.irVersion = irVersion;
-      if (irVersion < 19) delete legacy.projections;
-      if (irVersion === 9) delete legacy.policies;
-      if (irVersion < 12) {
-        delete legacy.events;
-        for (const action of legacy.actions as Record<string, unknown>[]) delete action.emittedEventIds;
-      }
-      if (irVersion < 13) delete legacy.consumers;
-      else if (irVersion === 13) {
-        for (const consumer of legacy.consumers as Record<string, unknown>[]) delete consumer.emittedEventIds;
-      }
-      if (irVersion < 15 && legacy.consumers) {
-        for (const consumer of legacy.consumers as Record<string, unknown>[]) delete consumer.failurePolicy;
-      }
-      if (irVersion === 15 && legacy.consumers) {
-        for (const consumer of legacy.consumers as { failurePolicy?: Record<string, unknown> }[]) {
-          if (consumer.failurePolicy?.mode === "deadLetterAfterMaxAttempts") delete consumer.failurePolicy.recovery;
-        }
-      }
-      if (irVersion < 17 && legacy.events) {
-        for (const event of legacy.events as Record<string, unknown>[]) delete event.publicationFailurePolicy;
-      }
-      if (irVersion === 17 && legacy.events) {
-        for (const event of legacy.events as { publicationFailurePolicy?: Record<string, unknown> }[]) {
-          if (event.publicationFailurePolicy?.mode === "deadLetterAfterMaxAttempts") delete event.publicationFailurePolicy.recovery;
-        }
-      }
-      expect(() => validateEvolutionIR(legacy as unknown as typeof previous)).not.toThrow();
-      const plan = planMigration(legacy as unknown as typeof previous, current);
-      expect(plan.previousVersion).toBe("1.0.0");
-      expect(plan.currentVersion).toBe("2.0.0");
-      expect(plan.operations).toContainEqual(expect.objectContaining({ kind: "addEntity" }));
-      expect(plan.sql).toContain("ML_MIGRATION_BASELINE:");
-      expect(plan.sql).toContain("command_receipt");
-    }
-  });
-
-  it("normalizes IR16 policy omission and IR17 recovery omission while rejecting real policy changes", () => {
+  it("rejects real publication-policy changes", () => {
     const source = (version: string, policy: string) => `model PublicationEvolution version "${version}";
 entity User @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") { id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); }
 entity Record @stableId("ent_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") { id: UUID @id @stableId("fld_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"); }
@@ -528,19 +470,11 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
   emit RecordCreated;
 }`;
     const previous = compileText(source("1", ""));
-    const ir16 = structuredClone(previous) as unknown as { irVersion: number; events: Record<string, unknown>[] };
-    ir16.irVersion = 16;
-    delete ir16.events[0]!.publicationFailurePolicy;
-    expect(() => validateEvolutionIR(ir16 as unknown as typeof previous)).not.toThrow();
-    expect(planMigration(ir16 as unknown as typeof previous, compileText(source("2", ""))).operations).toEqual([]);
+    expect(planMigration(previous, compileText(source("2", ""))).operations).toEqual([]);
     expect(error(() => planMigration(previous, compileText(source("2", "retry maxAttempts 5")))).code).toBe("E2807");
 
     const bounded = compileText(source("1", "retry maxAttempts 5"));
-    const ir17 = structuredClone(bounded) as unknown as { irVersion: number; events: { publicationFailurePolicy: { recovery?: string } }[] };
-    ir17.irVersion = 17;
-    delete ir17.events[0]!.publicationFailurePolicy.recovery;
-    expect(() => validateEvolutionIR(ir17 as unknown as typeof bounded)).not.toThrow();
-    expect(planMigration(ir17 as unknown as typeof bounded, compileText(source("2", "retry maxAttempts 5"))).operations).toEqual([]);
+    expect(planMigration(bounded, compileText(source("2", "retry maxAttempts 5"))).operations).toEqual([]);
     expect(error(() => planMigration(bounded, compileText(source("2", "retry maxAttempts 5 recovery manual")))).code).toBe("E2807");
   });
 

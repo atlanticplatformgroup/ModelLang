@@ -10,7 +10,7 @@
   },
   "provenance": {
     "compilerVersion": "0.38.0",
-    "irVersion": 26,
+    "irVersion": 1,
     "generator": "semantic-manifest"
   },
   "model": {
