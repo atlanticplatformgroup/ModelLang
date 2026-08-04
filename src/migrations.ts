@@ -785,7 +785,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
   const sql = [
     `-- ModelLang safe schema migration ${previous.model.version} -> ${current.model.version}`,
     "BEGIN;",
-    "-- Bootstrap the 0.12 shared gateway role before assuming the non-login owner role.",
+    "-- Ensure current operational roles exist before assuming the non-login owner role.",
     generateGatewayRoleStatements(),
     generateDispatcherRoleStatements(),
     generateConsumerRoleStatements(),
@@ -796,7 +796,7 @@ export function planMigration(previous: ModelIR, current: ModelIR): MigrationPla
     "SET LOCAL ROLE modellang_owner;",
     ...historyBootstrapStatements(previous, current),
     ...(structuralStatements.length ? structuralStatements : ["-- No structural schema changes detected."]),
-    "-- Upgrade the internal gateway identity and audit boundary after physical renames.",
+    "-- Rebuild the current gateway identity and audit boundary after physical renames.",
     ...generateGatewayInfrastructureStatements(current),
     ...generateDecisionEvidenceInfrastructureStatements(current),
     ...generateCommandReceiptInfrastructureStatements(current),

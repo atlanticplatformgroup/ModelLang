@@ -641,7 +641,7 @@ action make @stableId("act_11111111111111111111111111111111")(caller actor: User
     expect(planMigration(previous, current)).toEqual(plan);
   });
 
-  it("renames the principal table before installing a missing 0.12 gateway boundary", () => {
+  it("renames the principal table before rebuilding the current gateway boundary", () => {
     const source = (version: string, principal: string) => `model PrincipalRename version "${version}";
 entity ${principal} @stableId("ent_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") {
   id: UUID @id @stableId("fld_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");

@@ -9,12 +9,8 @@ import {
   generateFailureClaimantRoleStatements,
   generateFailureObserverRoleStatements,
   generateGatewayRoleStatements,
-  generatePublicationRecoveryRoleStatements,
   generateRecoveryRoleStatements,
-  POSTGRES_RUNTIME_PROFILES,
-  type PostgresRuntimeProfile,
 } from "./postgres-runtime.js";
-import { generateRuntimeProfileAdvance, generateRuntimeProfileGuard, generateUpgradeBaselineCheck } from "./postgres-upgrades.js";
 
 export {
   generateConsumerRoleStatements,
@@ -36,21 +32,6 @@ export interface PostgresOutput {
   "003_queries.sql": string;
   "004_grants.sql": string;
   "005_seed.sql": string;
-  "006_upgrade_0_12.sql": string;
-  "007_upgrade_0_17.sql": string;
-  "008_upgrade_0_18.sql": string;
-  "009_upgrade_0_19.sql": string;
-  "010_upgrade_0_20.sql": string;
-  "011_upgrade_0_21.sql": string;
-  "012_upgrade_0_22.sql": string;
-  "013_upgrade_0_23.sql": string;
-  "014_upgrade_0_24.sql": string;
-  "015_upgrade_0_25.sql": string;
-  "016_upgrade_0_26.sql": string;
-  "017_upgrade_0_27.sql": string;
-  "018_upgrade_0_28.sql": string;
-  "019_upgrade_0_29.sql": string;
-  "020_upgrade_0_36.sql": string;
 }
 
 function qname(schema: string, name: string): string {
@@ -1373,7 +1354,6 @@ export function generateFailureClaimInfrastructureStatements(ir: ModelIR): strin
 
 export function generateFailureObserverInfrastructureStatements(
   ir: ModelIR,
-  profile: PostgresRuntimeProfile = POSTGRES_RUNTIME_PROFILES.current,
 ): string[] {
   const internal = ir.model.naming.internalSchema;
   const outbox = qname(internal, "event_outbox");
@@ -1385,22 +1365,14 @@ export function generateFailureObserverInfrastructureStatements(
   const consumerRecoveryEligibility = recoverableConsumerIds.length > 0
     ? `row_value.${quoteIdent("consumer_id")} IN (${recoverableConsumerIds.join(", ")})`
     : "FALSE";
-  const publicationAcknowledgedSelect = profile.failureAcknowledgement
-    ? `, EXISTS (SELECT 1 FROM ${qname(internal, "publication_failure_acknowledgement")} AS acknowledgement WHERE acknowledgement.${quoteIdent("event_outbox_id")} = row_value.${quoteIdent("id")} AND acknowledgement.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("publication_recovery_generation")}) AS acknowledged`
-    : "";
-  const publicationAcknowledgedProjection = profile.failureAcknowledgement ? ", 'acknowledged', acknowledged" : "";
-  const consumerAcknowledgedSelect = profile.failureAcknowledgement
-    ? `, EXISTS (SELECT 1 FROM ${qname(internal, "consumer_failure_acknowledgement")} AS acknowledgement WHERE acknowledgement.${quoteIdent("consumer_id")} = row_value.${quoteIdent("consumer_id")} AND acknowledgement.${quoteIdent("source_event_id")} = row_value.${quoteIdent("source_event_id")} AND acknowledgement.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("recovery_generation")}) AS acknowledged`
-    : "";
-  const consumerAcknowledgedProjection = profile.failureAcknowledgement ? ", 'acknowledged', acknowledged" : "";
-  const publicationClaimedSelect = profile.failureClaim
-    ? `, EXISTS (SELECT 1 FROM ${qname(internal, "publication_failure_claim")} AS failure_claim WHERE failure_claim.${quoteIdent("event_outbox_id")} = row_value.${quoteIdent("id")} AND failure_claim.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("publication_recovery_generation")}) AS claimed`
-    : "";
-  const publicationClaimedProjection = profile.failureClaim ? ", 'claimed', claimed" : "";
-  const consumerClaimedSelect = profile.failureClaim
-    ? `, EXISTS (SELECT 1 FROM ${qname(internal, "consumer_failure_claim")} AS failure_claim WHERE failure_claim.${quoteIdent("consumer_id")} = row_value.${quoteIdent("consumer_id")} AND failure_claim.${quoteIdent("source_event_id")} = row_value.${quoteIdent("source_event_id")} AND failure_claim.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("recovery_generation")}) AS claimed`
-    : "";
-  const consumerClaimedProjection = profile.failureClaim ? ", 'claimed', claimed" : "";
+  const publicationAcknowledgedSelect = `, EXISTS (SELECT 1 FROM ${qname(internal, "publication_failure_acknowledgement")} AS acknowledgement WHERE acknowledgement.${quoteIdent("event_outbox_id")} = row_value.${quoteIdent("id")} AND acknowledgement.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("publication_recovery_generation")}) AS acknowledged`;
+  const publicationAcknowledgedProjection = ", 'acknowledged', acknowledged";
+  const consumerAcknowledgedSelect = `, EXISTS (SELECT 1 FROM ${qname(internal, "consumer_failure_acknowledgement")} AS acknowledgement WHERE acknowledgement.${quoteIdent("consumer_id")} = row_value.${quoteIdent("consumer_id")} AND acknowledgement.${quoteIdent("source_event_id")} = row_value.${quoteIdent("source_event_id")} AND acknowledgement.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("recovery_generation")}) AS acknowledged`;
+  const consumerAcknowledgedProjection = ", 'acknowledged', acknowledged";
+  const publicationClaimedSelect = `, EXISTS (SELECT 1 FROM ${qname(internal, "publication_failure_claim")} AS failure_claim WHERE failure_claim.${quoteIdent("event_outbox_id")} = row_value.${quoteIdent("id")} AND failure_claim.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("publication_recovery_generation")}) AS claimed`;
+  const publicationClaimedProjection = ", 'claimed', claimed";
+  const consumerClaimedSelect = `, EXISTS (SELECT 1 FROM ${qname(internal, "consumer_failure_claim")} AS failure_claim WHERE failure_claim.${quoteIdent("consumer_id")} = row_value.${quoteIdent("consumer_id")} AND failure_claim.${quoteIdent("source_event_id")} = row_value.${quoteIdent("source_event_id")} AND failure_claim.${quoteIdent("recovery_generation")} = row_value.${quoteIdent("recovery_generation")}) AS claimed`;
+  const consumerClaimedProjection = ", 'claimed', claimed";
   return [
     `CREATE TABLE IF NOT EXISTS ${audit} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -1559,14 +1531,6 @@ function generateSchema(ir: ModelIR): string {
     ...generateFailureAcknowledgementInfrastructureStatements(ir),
     ...generateFailureClaimInfrastructureStatements(ir),
     ...generateFailureObserverInfrastructureStatements(ir),
-    "",
-    `CREATE TABLE ${qname(internal, "runtime_profile")} (`,
-    `  ${quoteIdent("singleton")} boolean PRIMARY KEY DEFAULT TRUE,`,
-    `  ${quoteIdent("profile_version")} integer NOT NULL,`,
-    `  CONSTRAINT ${quoteIdent("ck_runtime_profile_singleton")} CHECK (${quoteIdent("singleton")}),`,
-    `  CONSTRAINT ${quoteIdent("ck_runtime_profile_version")} CHECK (${quoteIdent("profile_version")} >= 0)`,
-    ");",
-    `INSERT INTO ${qname(internal, "runtime_profile")} (${quoteIdent("singleton")}, ${quoteIdent("profile_version")}) VALUES (TRUE, ${POSTGRES_RUNTIME_PROFILES.current.runtimeVersion});`,
     "",
     `CREATE TABLE ${qname(internal, "schema_migrations")} (`,
     `  ${quoteIdent("id")} bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,`,
@@ -2492,10 +2456,6 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     : event.source;
   const recordNames = new Map([[consumer.payloadParameter.id, "v_payload"]]);
   const context: ExpressionContext = { ir, consumer, recordNames };
-  const legacyEnvelopeKeys = [
-    "actionId", "causationId", "correlationId", "deliveryAttempt", "eventId", "eventName", "id", "modelId",
-    "modelVersion", "occurredAt", "ordinal", "payload", "sourceHash", "targetId",
-  ].map((key) => `'${key}'`).join(", ");
   const envelopeKeys = [
     "actionId", "causationId", "consumerId", "correlationId", "deliveryAttempt", "eventId", "eventName", "id", "modelId",
     "modelVersion", "occurredAt", "ordinal", "payload", "sourceHash", "targetId",
@@ -2531,9 +2491,7 @@ function generateConsumer(ir: ModelIR, consumer: IRConsumer): string {
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
     "  END IF;",
     "  SELECT pg_catalog.array_agg(key_name ORDER BY key_name) INTO v_envelope_keys FROM pg_catalog.jsonb_object_keys(p_envelope) AS key_name;",
-    `  IF v_envelope_keys IS NOT DISTINCT FROM ARRAY[${legacyEnvelopeKeys}]::text[] THEN`,
-    "    p_envelope := p_envelope || pg_catalog.jsonb_build_object('consumerId', NULL);",
-    `  ELSIF v_envelope_keys IS DISTINCT FROM ARRAY[${envelopeKeys}]::text[] THEN`,
+    `  IF v_envelope_keys IS DISTINCT FROM ARRAY[${envelopeKeys}]::text[] THEN`,
     "    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'ML_EVENT_ENVELOPE';",
     "  END IF;",
     "  IF pg_catalog.jsonb_typeof(p_envelope->'id') IS DISTINCT FROM 'string'",
@@ -2701,16 +2659,10 @@ RESET ROLE;
 `;
 }
 
-function generateGrants(
-  ir: ModelIR,
-  profile: PostgresRuntimeProfile = POSTGRES_RUNTIME_PROFILES.applicability,
-): string {
+function generateGrants(ir: ModelIR): string {
   const schema = ir.model.naming.sqlSchema;
   const internal = ir.model.naming.internalSchema;
-  const failureObserver = profile.failureObservation ? ", modellang_failure_observer" : "";
-  const failureAcknowledger = profile.failureAcknowledgement ? ", modellang_failure_acknowledger" : "";
-  const failureClaimant = profile.failureClaim ? ", modellang_failure_claimant" : "";
-  const privateOperations = `${failureObserver}${failureAcknowledger}${failureClaimant}`;
+  const privateOperations = ", modellang_failure_observer, modellang_failure_acknowledger, modellang_failure_claimant";
   const lines = [
     "-- Generated least-privilege application boundary.",
     `REVOKE CREATE ON SCHEMA ${quoteIdent(schema)} FROM PUBLIC, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery${privateOperations};`,
@@ -2721,10 +2673,10 @@ function generateGrants(
     `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_consumer;`,
     `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_recovery;`,
     `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_publication_recovery;`,
+    `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_observer;`,
+    `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_acknowledger;`,
+    `GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_claimant;`,
   ];
-  if (profile.failureObservation) lines.push(`GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_observer;`);
-  if (profile.failureAcknowledgement) lines.push(`GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_acknowledger;`);
-  if (profile.failureClaim) lines.push(`GRANT USAGE ON SCHEMA ${quoteIdent(internal)} TO modellang_failure_claimant;`);
   lines.push("");
   for (const entity of ir.entities) {
     const table = qname(schema, entity.naming.sqlTable);
@@ -2738,7 +2690,7 @@ function generateGrants(
       `REVOKE ALL ON FUNCTION ${functionSignature(ir, action)} FROM PUBLIC;`,
       `GRANT EXECUTE ON FUNCTION ${functionSignature(ir, action)} TO modellang_app;`,
     );
-    if (profile.applicability) lines.push(
+    lines.push(
       `REVOKE ALL ON FUNCTION ${decisionFunctionSignature(ir, action)} FROM PUBLIC;`,
       `GRANT EXECUTE ON FUNCTION ${decisionFunctionSignature(ir, action)} TO modellang_app;`,
     );
@@ -2767,16 +2719,10 @@ function generateGrants(
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "record_consumer_failure")}(text, text, integer, text) TO modellang_consumer;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "recover_consumer_failure")}(text, text, text) TO modellang_recovery;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "recover_event_publication")}(uuid, text) TO modellang_publication_recovery;`,
-  );
-  if (profile.failureObservation) lines.push(
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "observe_terminal_publications")}(timestamptz, timestamptz, uuid, integer) TO modellang_failure_observer;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "observe_terminal_consumers")}(timestamptz, timestamptz, text, uuid, integer) TO modellang_failure_observer;`,
-  );
-  if (profile.failureAcknowledgement) lines.push(
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "acknowledge_terminal_publication_failure")}(uuid, text) TO modellang_failure_acknowledger;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "acknowledge_terminal_consumer_failure")}(text, text, text) TO modellang_failure_acknowledger;`,
-  );
-  if (profile.failureClaim) lines.push(
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "claim_terminal_publication_failure")}(uuid) TO modellang_failure_claimant;`,
     `GRANT EXECUTE ON FUNCTION ${qname(internal, "claim_terminal_consumer_failure")}(text, text) TO modellang_failure_claimant;`,
   );
@@ -2797,21 +2743,15 @@ function generateGrants(
     `REVOKE modellang_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;`,
     `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery FROM modellang_publication_recovery;`,
     `REVOKE modellang_publication_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;`,
+    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery FROM modellang_failure_observer;`,
+    `REVOKE modellang_failure_observer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;`,
+    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer FROM modellang_failure_acknowledger;`,
+    `REVOKE modellang_failure_acknowledger FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer;`,
+    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger FROM modellang_failure_claimant;`,
+    `REVOKE modellang_failure_claimant FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger;`,
     `REVOKE modellang_gateway FROM modellang_app;`,
     `GRANT modellang_app TO modellang_gateway;`,
     "",
-  );
-  if (profile.failureObservation) lines.splice(lines.length - 3, 0,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery FROM modellang_failure_observer;`,
-    `REVOKE modellang_failure_observer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;`,
-  );
-  if (profile.failureAcknowledgement) lines.splice(lines.length - 3, 0,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer FROM modellang_failure_acknowledger;`,
-    `REVOKE modellang_failure_acknowledger FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer;`,
-  );
-  if (profile.failureClaim) lines.splice(lines.length - 3, 0,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger FROM modellang_failure_claimant;`,
-    `REVOKE modellang_failure_claimant FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger;`,
   );
   return `${lines.join("\n")}\n`;
 }
@@ -2872,298 +2812,6 @@ RESET ROLE;
 `;
 }
 
-function generateGatewayUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.11 -> 0.12 PostgreSQL gateway-boundary upgrade.
--- Run as the same administrative role used for generated installation and migrations.
-BEGIN;
-${generateGatewayRoleStatements()}
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-
-${generateGatewayInfrastructureStatements(ir, false).join("\n")}
-${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
-${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
--- Existing guarded callables must resolve both direct and gateway identities.
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateQueries(ir).trim()}
-${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.legacy).trim()}
-COMMIT;
-`;
-}
-
-function generateApplicabilityUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.16 -> 0.17 applicability-boundary upgrade.
--- Run as the same administrative role used for generated installation and migrations.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateSnapshotResolverStatements(ir).join("\n")}
-${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
-${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateDecisions(ir, plan).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateDecisionEvidenceUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.17 -> 0.18 durable decision-evidence upgrade.
--- Historical action audit rows remain explicitly evidence-unknown; new executions record complete evidence.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateDecisionEvidenceInfrastructureStatements(ir).join("\n")}
-${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateDecisions(ir, plan).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateReliableCommandUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.18 -> 0.19 reliable-command upgrade.
--- Historical audit rows remain correlation- and receipt-unknown; new reliable commands write complete receipts.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateCommandReceiptInfrastructureStatements(ir).join("\n")}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateDomainEventUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.19 -> 0.20 transactional domain-event upgrade.
--- Existing domain and audit rows do not synthesize historical events; new executions append events atomically.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateEventConsumerUpgrade(ir: ModelIR, _plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.20 -> 0.21 reliable typed event-consumer upgrade.
--- No historical events are consumed and no inbox completion is fabricated.
-BEGIN;
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateEventChainUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.21 -> 0.22 transactional event-chain upgrade.
--- Existing producer events remain valid; no historical downstream events are synthesized.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateConsumerFailureUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.22 -> 0.23 durable consumer-failure disposition upgrade.
--- Existing failure rows remain non-terminal until evaluated under a declared current policy.
-BEGIN;
-${generateConsumerRoleStatements()}
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateConsumerRecoveryUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.23 -> 0.24 private audited consumer-recovery upgrade.
--- Existing terminal failures remain terminal and no recovery audit is fabricated.
-BEGIN;
-${generateRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventInboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generatePublicationFailureUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.24 -> 0.25 private bounded event-publication failure upgrade.
--- Existing outbox rows retain unbounded retry and no failure or terminal history is fabricated.
-BEGIN;
-${generateDispatcherRoleStatements()}
-${generatePublicationRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generatePublicationRecoveryUpgrade(ir: ModelIR, plan: DecisionPlan): string {
-  return `-- Idempotent ModelLang 0.25 -> 0.26 private audited event-publication recovery upgrade.
--- Existing terminal rows remain terminal and ineligible; counts are preserved and no recovery audit is fabricated.
-BEGIN;
-${generatePublicationRecoveryRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateEventOutboxInfrastructureStatements(ir).join("\n")}
-RESET ROLE;
-
-${generateActions(ir, plan).trim()}
-${generateConsumers(ir).trim()}
-${generateGrants(ir).trim()}
-COMMIT;
-`;
-}
-
-function generateFailureObservationUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.26 -> 0.27 private terminal-failure observation upgrade.
--- Existing failure state is unchanged and no historical observation audit is fabricated.
-BEGIN;
-${generateFailureObserverRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureObservation.runtimeVersion)}
-${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureObservation).join("\n")}
-${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureObservation.runtimeVersion)}
-RESET ROLE;
-
-${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureObservation).trim()}
-COMMIT;
-`;
-}
-
-function generateFailureAcknowledgementUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.27 -> 0.28 private terminal-failure acknowledgement upgrade.
--- Existing failure and recovery state is unchanged and no acknowledgement history is fabricated.
-BEGIN;
-${generateFailureAcknowledgerRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement.runtimeVersion)}
-${generateFailureAcknowledgementInfrastructureStatements(ir).join("\n")}
-${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement).join("\n")}
-${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement.runtimeVersion)}
-RESET ROLE;
-
-${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureAcknowledgement).trim()}
-COMMIT;
-`;
-}
-
-function generateFailureClaimUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.28 -> 0.29 private terminal-failure claim upgrade.
--- Existing failure, recovery, and acknowledgement state is unchanged and no claim history is fabricated.
-BEGIN;
-${generateFailureClaimantRoleStatements()}
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.failureClaim.runtimeVersion)}
-${generateFailureClaimInfrastructureStatements(ir).join("\n")}
-${generateFailureObserverInfrastructureStatements(ir, POSTGRES_RUNTIME_PROFILES.failureClaim).join("\n")}
-${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.failureClaim.runtimeVersion)}
-RESET ROLE;
-
-${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.failureClaim).trim()}
-COMMIT;
-`;
-}
-
-function generateReadEvidenceUpgrade(ir: ModelIR): string {
-  return `-- Idempotent ModelLang 0.35 -> 0.36 private transactional read-evidence upgrade.
--- No historical reads or evidence are fabricated; only newly committed opted-in query executions append evidence.
-BEGIN;
-SET LOCAL ROLE modellang_owner;
-${generateUpgradeBaselineCheck(ir)}
-${generateRuntimeProfileGuard(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
-${generateQueryAuditInfrastructureStatements(ir).join("\n")}
-${generateRuntimeProfileAdvance(ir, POSTGRES_RUNTIME_PROFILES.current.runtimeVersion)}
-RESET ROLE;
-
-${generateQueries(ir).trim()}
-${generateGrants(ir, POSTGRES_RUNTIME_PROFILES.current).trim()}
-COMMIT;
-`;
-}
-
 export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecisionPlan(ir)): PostgresOutput {
   return {
     "001_roles.sql": generateRoles(),
@@ -3172,22 +2820,7 @@ export function generatePostgres(ir: ModelIR, plan: DecisionPlan = generateDecis
     "003_consumers.sql": generateConsumers(ir),
     "003_decisions.sql": generateDecisions(ir, plan),
     "003_queries.sql": generateQueries(ir),
-    "004_grants.sql": generateGrants(ir, POSTGRES_RUNTIME_PROFILES.current),
+    "004_grants.sql": generateGrants(ir),
     "005_seed.sql": generateSeed(ir),
-    "006_upgrade_0_12.sql": generateGatewayUpgrade(ir, plan),
-    "007_upgrade_0_17.sql": generateApplicabilityUpgrade(ir, plan),
-    "008_upgrade_0_18.sql": generateDecisionEvidenceUpgrade(ir, plan),
-    "009_upgrade_0_19.sql": generateReliableCommandUpgrade(ir, plan),
-    "010_upgrade_0_20.sql": generateDomainEventUpgrade(ir, plan),
-    "011_upgrade_0_21.sql": generateEventConsumerUpgrade(ir, plan),
-    "012_upgrade_0_22.sql": generateEventChainUpgrade(ir, plan),
-    "013_upgrade_0_23.sql": generateConsumerFailureUpgrade(ir),
-    "014_upgrade_0_24.sql": generateConsumerRecoveryUpgrade(ir),
-    "015_upgrade_0_25.sql": generatePublicationFailureUpgrade(ir, plan),
-    "016_upgrade_0_26.sql": generatePublicationRecoveryUpgrade(ir, plan),
-    "017_upgrade_0_27.sql": generateFailureObservationUpgrade(ir),
-    "018_upgrade_0_28.sql": generateFailureAcknowledgementUpgrade(ir),
-    "019_upgrade_0_29.sql": generateFailureClaimUpgrade(ir),
-    "020_upgrade_0_36.sql": generateReadEvidenceUpgrade(ir),
   };
 }

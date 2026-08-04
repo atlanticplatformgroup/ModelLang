@@ -54,7 +54,7 @@ The implementation has several independent version axes:
 | Semantic diff | v19 | Stable-ID extension-, read-evidence-, disclosure-, query-, policy-, reliability-, event-, consumer-, failure-, and recovery-aware change analysis that names separate guarded migration authorities |
 | Agent tool catalog | v1 | Static expression-free action/query schemas and HTTP bindings; MCP-adaptable but not direct MCP or SML-Agent conformance |
 | Target capability profile and extension ledger | v2 / v1 | Deterministic native-support assessment, static-catalog capability, and explicit typed external implementation gaps; neither grants authority nor generates extension behavior |
-| Private PostgreSQL runtime | profile 36 | Monotonic private operational schema through transactional read evidence; older operational artifacts refuse downgrade redeployment |
+| Private PostgreSQL runtime | current baseline | One complete fresh installation schema through transactional read evidence; no pre-release operational upgrade chain or runtime-profile ledger |
 | Reviewed migration plan and artifact provenance | v1 / v2 | Independently versioned evolution-intent and target-aware build-assurance contracts |
 
 These distinctions are intentional. A compiler upgrade need not change a domain model, IR schema, HTTP contract, or UI schema.

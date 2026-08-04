@@ -183,8 +183,6 @@ describe("backends", () => {
     expect(output["typescript/http-server.ts"]).toContain("validateDecision");
     expect(output["postgres/003_actions.sql"]).toContain('"decision_evidence"');
     expect(output["postgres/003_actions.sql"]).toContain("policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688");
-    expect(output["postgres/008_upgrade_0_18.sql"]).toContain("durable decision-evidence upgrade");
-    expect(output["postgres/009_upgrade_0_19.sql"]).toContain("reliable-command upgrade");
     expect(output["postgres/003_actions.sql"]).toContain('"command_receipt"');
     expect(output["postgres/003_actions.sql"]).toContain("pg_catalog.sha256");
   });
@@ -794,8 +792,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(gateway).toContain('connection.query("ROLLBACK")');
     expect(gateway).not.toMatch(/principalId|principal_id/);
     expect(output["typescript/browser.ts"]).not.toContain("Gateway");
-    expect(output["postgres/006_upgrade_0_12.sql"]).toContain("0.11 -> 0.12");
-    expect(output["postgres/006_upgrade_0_12.sql"]).toContain("ML_MIGRATION_BASELINE:");
   });
 
   it("emits safe privileged functions and an execute-only application boundary", async () => {
@@ -1109,7 +1105,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."claim_events"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."fail_event"');
     expect(output["postgres/004_grants.sql"]).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."recover_event_publication"(uuid, text) TO modellang_publication_recovery');
-    expect(output["postgres/010_upgrade_0_20.sql"]).toContain("transactional domain-event upgrade");
     expect(output["typescript/events.ts"]).toContain("export type RequestOpenedEvent");
     expect(output["typescript/dispatcher.ts"]).toContain("claimProcurementEvents");
     expect(output["typescript/dispatcher.ts"]).toContain("acknowledgeProcurementEvent");
@@ -1120,8 +1115,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/index.ts"]).toContain('export * from "./events.js"');
     expect(output["typescript/index.ts"]).toContain('export * from "./dispatcher.js"');
     expect(output["typescript/index.ts"]).toContain('export * from "./publication-recovery.js"');
-    expect(output["postgres/015_upgrade_0_25.sql"]).toContain("bounded event-publication failure upgrade");
-    expect(output["postgres/016_upgrade_0_26.sql"]).toContain("audited event-publication recovery upgrade");
     expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_observer NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."failure_observation_audit"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE OR REPLACE FUNCTION "model_procurement_internal"."observe_terminal_publications"');
@@ -1130,8 +1123,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalPublications");
     expect(output["typescript/failure-observer.ts"]).toContain("observeProcurementTerminalConsumers");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-observer.js"');
-    expect(output["postgres/017_upgrade_0_27.sql"]).toContain("private terminal-failure observation upgrade");
-    expect(output["postgres/017_upgrade_0_27.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:27:");
     expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_acknowledger NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_acknowledgement"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_acknowledgement"');
@@ -1145,8 +1136,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("reason_code");
     expect(output["typescript/failure-acknowledgement.ts"]).not.toContain("database_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-acknowledgement.js"');
-    expect(output["postgres/018_upgrade_0_28.sql"]).toContain("private terminal-failure acknowledgement upgrade");
-    expect(output["postgres/018_upgrade_0_28.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:28:");
     expect(output["postgres/001_roles.sql"]).toContain("modellang_failure_claimant NOLOGIN");
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."publication_failure_claim"');
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_failure_claim"');
@@ -1159,13 +1148,8 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/failure-claim.ts"]).toContain("claimProcurementTerminalConsumer");
     expect(output["typescript/failure-claim.ts"]).not.toContain("claimant_principal");
     expect(output["typescript/index.ts"]).toContain('export * from "./failure-claim.js"');
-    expect(output["postgres/019_upgrade_0_29.sql"]).toContain("private terminal-failure claim upgrade");
-    expect(output["postgres/002_schema.sql"]).toContain('INSERT INTO "model_procurement_internal"."runtime_profile" ("singleton", "profile_version") VALUES (TRUE, 36)');
-    expect(output["postgres/019_upgrade_0_29.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:29:");
-    expect(output["postgres/020_upgrade_0_36.sql"]).toContain("private transactional read-evidence upgrade");
-    expect(output["postgres/020_upgrade_0_36.sql"]).toContain("ML_RUNTIME_PROFILE_DOWNGRADE:36:");
-    expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("publication_failure_claim");
-    expect(output["postgres/018_upgrade_0_28.sql"]).not.toContain("'claimed', claimed");
+    expect(output["postgres/002_schema.sql"]).not.toContain("runtime_profile");
+    expect(Object.keys(output).some((path) => path.includes("upgrade_0_"))).toBe(false);
     for (const publicArtifact of ["operations.json", "capabilities.json", "ui.json", "openapi.json", "events.json"]) {
       expect(output[publicArtifact]).not.toContain("publication_failure_count");
       expect(output[publicArtifact]).not.toContain("lastPublicationErrorCode");
@@ -1228,7 +1212,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."consumer_audit"');
     expect(output["postgres/003_consumers.sql"]).toContain('ON CONFLICT ("consumer_id", "source_event_id") DO NOTHING');
     expect(output["postgres/003_consumers.sql"]).toContain("p_envelope - 'deliveryAttempt'");
-    expect(output["postgres/003_consumers.sql"]).toContain("p_envelope := p_envelope || pg_catalog.jsonb_build_object('consumerId', NULL)");
+    expect(output["postgres/003_consumers.sql"]).not.toContain("p_envelope := p_envelope ||");
     expect(output["postgres/003_consumers.sql"]).toContain("ML_EVENT_CONFLICT");
     expect(output["postgres/003_consumers.sql"]).toContain("ML_CONSUMER_DEAD_LETTER");
     expect(output["postgres/003_consumers.sql"]).toContain("pg_advisory_xact_lock");
@@ -1242,10 +1226,6 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["typescript/consumers.ts"]).toContain("recoverObserveRequestApproval");
     expect(output["typescript/consumers.ts"]).toContain('status: "retry" | "deadLetter"');
     expect(output["typescript/consumers.ts"]).toContain("record_consumer_failure");
-    expect(output["postgres/011_upgrade_0_21.sql"]).toContain("reliable typed event-consumer upgrade");
-    expect(output["postgres/012_upgrade_0_22.sql"]).toContain("transactional event-chain upgrade");
-    expect(output["postgres/013_upgrade_0_23.sql"]).toContain("durable consumer-failure disposition upgrade");
-    expect(output["postgres/014_upgrade_0_24.sql"]).toContain("private audited consumer-recovery upgrade");
     expect(output["postgres/002_schema.sql"]).toContain('"disposition" text NOT NULL DEFAULT \'retry\'');
     expect(output["postgres/002_schema.sql"]).toContain('"consumer_failure_state"');
     expect(output["postgres/002_schema.sql"]).toContain('"consumer_recovery_audit"');

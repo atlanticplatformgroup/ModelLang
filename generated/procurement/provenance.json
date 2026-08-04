@@ -75,7 +75,7 @@
     {
       "path": "postgres/002_schema.sql",
       "role": "projection",
-      "sha256": "sha256:2f5a6bce253b6a9e01ceea9a4ece96abaeccc5d0df020ec62f1c492696620553"
+      "sha256": "sha256:de0df99ae51ad755add56a990fb03104bcb98c9bf8273aafefe11a63be165bc0"
     },
     {
       "path": "postgres/003_actions.sql",
@@ -85,7 +85,7 @@
     {
       "path": "postgres/003_consumers.sql",
       "role": "projection",
-      "sha256": "sha256:921b843a366def542e45e49ba7f82d92d055eed4eaa716a50620eab0107bded7"
+      "sha256": "sha256:bc11b21dd6f1b8179c884ec471a01c0230c1cd98caddaef51e15ae541c6792f4"
     },
     {
       "path": "postgres/003_decisions.sql",
@@ -106,81 +106,6 @@
       "path": "postgres/005_seed.sql",
       "role": "projection",
       "sha256": "sha256:3e740a0c36264d7992071296cfaa53d201172c260d440700ba69e3320875a703"
-    },
-    {
-      "path": "postgres/006_upgrade_0_12.sql",
-      "role": "projection",
-      "sha256": "sha256:dcd4da90e5317aefda5bdcd265ab6b5ecbb52fdf59707375dff853ddc1711e08"
-    },
-    {
-      "path": "postgres/007_upgrade_0_17.sql",
-      "role": "projection",
-      "sha256": "sha256:f597071b1cd7037a52ecb449f791125ccce57b19f267f015a77eab4ef6ce1dc5"
-    },
-    {
-      "path": "postgres/008_upgrade_0_18.sql",
-      "role": "projection",
-      "sha256": "sha256:29940b018fde93b5356c90de324e1adc5aadb45af5c3919f28a21af15fffef27"
-    },
-    {
-      "path": "postgres/009_upgrade_0_19.sql",
-      "role": "projection",
-      "sha256": "sha256:088ad4fda931b385ad2e4af9a9149fe838d723c7195082acd11c0c60bd9268e0"
-    },
-    {
-      "path": "postgres/010_upgrade_0_20.sql",
-      "role": "projection",
-      "sha256": "sha256:3a6cdf6286a55dd62fde58febb0aaddfde1b0a3b092f7585359a790b18351345"
-    },
-    {
-      "path": "postgres/011_upgrade_0_21.sql",
-      "role": "projection",
-      "sha256": "sha256:e0708fae4099fec771879e841f64bcb968b47b4507ff104590f5c68e317704db"
-    },
-    {
-      "path": "postgres/012_upgrade_0_22.sql",
-      "role": "projection",
-      "sha256": "sha256:09fc8f63b99e5c97e25199b3039d2b5fd1ffd2b98e53077101c6cd88e8d1c3c5"
-    },
-    {
-      "path": "postgres/013_upgrade_0_23.sql",
-      "role": "projection",
-      "sha256": "sha256:8ac2e6c81548a9156a0340f2f7422161a511d3eda7a467c573537c632b6128aa"
-    },
-    {
-      "path": "postgres/014_upgrade_0_24.sql",
-      "role": "projection",
-      "sha256": "sha256:5126984b2abcff6b22b57a0df1d2d90e36abff15743d406470ab3ff96456e2f0"
-    },
-    {
-      "path": "postgres/015_upgrade_0_25.sql",
-      "role": "projection",
-      "sha256": "sha256:124aebf44900354bbab103fc2563ef7c93a4ad9b39a96adb5656198d3fa5255a"
-    },
-    {
-      "path": "postgres/016_upgrade_0_26.sql",
-      "role": "projection",
-      "sha256": "sha256:e0abf3f151e67d7e32542c1d14b8a71a33903cdad3b75168809d394cad6475cd"
-    },
-    {
-      "path": "postgres/017_upgrade_0_27.sql",
-      "role": "projection",
-      "sha256": "sha256:216f78bb75ae6cbc3d01b965bebdd4e4502ce9d01c6715106f07ffe0e8bec73b"
-    },
-    {
-      "path": "postgres/018_upgrade_0_28.sql",
-      "role": "projection",
-      "sha256": "sha256:203ad1750983cb77b32d9f1a6a1868b6645a9e635a0309dac01dd96654152d36"
-    },
-    {
-      "path": "postgres/019_upgrade_0_29.sql",
-      "role": "projection",
-      "sha256": "sha256:520571d627d3739c705f87dfec558db68ee34744211fce597689e2d58b4f3c50"
-    },
-    {
-      "path": "postgres/020_upgrade_0_36.sql",
-      "role": "projection",
-      "sha256": "sha256:ae00e193aaf2f78374a85f0ddfb0a70aaf5c6c45fc99965e697a1f89e7ed256e"
     },
     {
       "path": "semantic.json",

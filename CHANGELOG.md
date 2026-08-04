@@ -2,8 +2,8 @@
 
 ## Unreleased
 
-- Prevented generated private operational upgrades from redeploying an older runtime projection over a newer installation. Fresh schemas record runtime profile 36, upgrades 17–20 advance the private ledger monotonically, and downgrade attempts fail transactionally with `ML_RUNTIME_PROFILE_DOWNGRADE` before runtime functions change.
-- Centralized PostgreSQL runtime profiles, operational-role isolation, and migration baseline checks without changing public contracts.
+- Removed pre-release PostgreSQL operational upgrade artifacts and the private runtime-profile ledger. Fresh builds now emit one complete current installation baseline while current-to-current model migrations remain supported.
+- Removed legacy event-envelope adaptation so consumers accept only the exact current envelope contract.
 
 ## 0.38.0
 
@@ -12,7 +12,7 @@
 - Declared the catalog MCP-tool adaptable while explicitly declining direct MCP protocol and SML-Agent conformance; runtime authorization and precondition enforcement remain authoritative on every invocation.
 - Added target capability `agents.staticToolCatalog`, advanced target capability profile to v2 and `target:postgresql-http-ui-agent-catalog/2`, and recorded the catalog as a hashed contract artifact in provenance v2.
 - Reset the unreleased canonical format to IR1, removed IR9–IR26 schema normalization and migration fallbacks, and made evolution input strict-current-format while preserving migrations between two IR1 artifacts.
-- Advanced compiler and examples to 0.38.0 and generator profile to `postgresql-http-ui-agent-tool-catalog/22`; operation manifest v11, capability manifest v10, and private PostgreSQL runtime profile 36 remain unchanged.
+- Advanced compiler and examples to 0.38.0 and generator profile to `postgresql-http-ui-agent-tool-catalog/22`; operation manifest v11 and capability manifest v10 remain unchanged, and PostgreSQL generation now has one fresh current-runtime baseline.
 
 ## 0.37.0
 

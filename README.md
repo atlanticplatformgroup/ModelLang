@@ -101,7 +101,7 @@ The PostgreSQL backend emits:
 - opt-in private query evidence that stores identity, contract revision, canonical request/response hashes, item count, sort profile, continuation state, and transaction time without retaining payloads;
 - execute-only application grants with no direct entity-table access;
 - example-only deterministic seed data;
-- idempotent administrative upgrades through the 0.36 transactional-read-evidence boundary.
+- one complete current PostgreSQL installation baseline with transactional read evidence.
 
 The generated TypeScript clients expose only declared actions, queries, and action applicability. They have no generic table or mutation API. Caller identity is not an input field.
 
@@ -367,7 +367,7 @@ if (decision.status === "applicable") {
 
 `authorize` failure is `denied`; `require` failure is `notApplicable`. Missing or invisible referenced entities use the same denial projection by default. Safe explanations contain only a category and stable rule ID allowlisted by `capabilities.json`. `stale` is possible only when an explicit opaque revision is supplied through generated options or a quoted HTTP `If-Match`. A successful applicability response is advisory and cannot bypass execution-time checks.
 
-The 0.12 shared-pool path verifies a bearer credential in the host, maps it to stable external claims, and lets the generated gateway executor own one complete database transaction:
+The generated shared-pool path verifies a bearer credential in the host, maps it to stable external claims, and lets the gateway executor own one complete database transaction:
 
 ```ts
 import { createProcurementGatewayExecutor } from "./generated/procurement/typescript/gateway.js";
@@ -452,135 +452,9 @@ The separate `semantic-diff` command is non-mutating and broader than migration 
 
 Every migration checks the owner-controlled `schema_migrations` history against the previous IR's model ID, version, and source hash before changing anything. Structural DDL, workflow refreshes, the complete current action/query boundary, grants, and the new history record are applied in one transaction. A repeated or out-of-order migration fails with `ML_MIGRATION_BASELINE`.
 
-Private operational upgrades 0.27–0.29 and 0.36 maintain an owner-controlled singleton `runtime_profile`. The profile advances monotonically; applying an older operational artifact after a newer one fails before any runtime function is replaced with `ML_RUNTIME_PROFILE_DOWNGRADE`. Databases created before the ledger was introduced bootstrap it when they apply one of these upgrades. The current profile is 36.
+Generated PostgreSQL is one fresh installation baseline. Apply `001_roles.sql` through `005_seed.sql` in filename order to a new database. Pre-release operational upgrade artifacts and a runtime-profile ledger are not emitted. Evolution between two current IR1 models continues to use `migration` or `reviewed-migration`.
 
 Changes outside the automatic safe subset use a versioned JSON plan conforming to `schemas/reviewed-migration-plan.schema.json`. `reviewed-migration` requires exact source hashes, acknowledges every non-additive semantic change by stable ID, and supports typed literal/enum/copy-field backfills, scalar enum mappings, and explicitly accepted removals. The plan contains no raw SQL or callback surface. PostgreSQL execution takes offline locks, copies retained data into a deterministic staging schema with all current constraints, validates row counts and references, then replaces the old model schema and records the canonical plan hash in the same transaction. An invalid backfill rolls back before replacement. Version 1 rejects field-type and enum-set transformations, principal/schema replacement, and inferred rollback.
-
-For an existing 0.11 database that is not otherwise receiving a model migration, apply the generated 0.12 backend upgrade with the same administrative credential used for installation:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/006_upgrade_0_12.sql
-```
-
-The artifact is transactional and idempotent. It first verifies the installed model ID, version, and source hash, then changes only the internal identity/audit boundary, generated callables, roles, and grants; it does not alter model entity data or migration history. A mismatched artifact fails with `ML_MIGRATION_BASELINE`. A normal generated safe migration includes the same upgrade automatically. The credential applying either path must be able to create/alter roles and assume `modellang_owner`. Production issuer/subject bindings are then provisioned through a trusted administrative path; the example seed values are demo-only.
-
-Existing installations can add the 0.17 decision/applicability functions without changing entity data or migration history:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/007_upgrade_0_17.sql
-```
-
-This baseline-checked artifact transactionally redeploys actions from the canonical decision plan, installs applicability functions, and refreshes least-privilege grants. Safe and reviewed migrations redeploy the same boundary automatically.
-
-Existing installations can add the private 0.18 evidence boundary without changing domain rows or migration history:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/008_upgrade_0_18.sql
-```
-
-The upgrade adds internal evidence columns and constraints, then redeploys decisions, actions, and grants. Historical audit rows remain evidence-unknown; ModelLang never reconstructs past exact authority from broad role snapshots. If model source also changes to introduce policies, that source evolution uses the applicable safe or reviewed migration path separately.
-
-Existing installations can add the private 0.19 command-receipt and correlation boundary without changing domain rows or migration history:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/009_upgrade_0_19.sql
-```
-
-The baseline-checked artifact installs private receipts, adds nullable command links to historical audit rows, and redeploys actions and grants. It is transactional and idempotent. Existing history remains unchanged, and no past command receipt is fabricated. Receipt retention is deployment-governed; the generated runtime performs no automatic deletion.
-
-Existing installations can add the private 0.20 transactional event boundary without synthesizing historical events:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/010_upgrade_0_20.sql
-```
-
-The baseline-checked artifact creates the outbox and execute-only dispatcher functions, then redeploys actions and grants. New action executions append their declared post-effect payloads atomically with state, audit, evidence, and receipts. Reliable-command replay inserts no second event.
-
-Existing installations can add the private 0.21 transactional consumer boundary without consuming historical events:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/011_upgrade_0_21.sql
-```
-
-The baseline-checked artifact creates the isolated consumer role, private inbox/audit/failure tables, typed handlers, and execute-only grants. It is transactional and idempotent, fabricates no completion record, and does not run a handler for already queued or historical events.
-
-Existing installations can add the private 0.22 transactional event-chain boundary without synthesizing downstream events:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/012_upgrade_0_22.sql
-```
-
-The baseline-checked artifact generalizes private outbox producer provenance, installs envelope-v2 dispatch and current handlers, and refreshes grants. It is transactional and idempotent, preserves existing action-produced events, and emits nothing until a new consumer execution commits.
-
-Existing installations can add the private 0.23 durable consumer-failure boundary without fabricating historical failures:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/013_upgrade_0_23.sql
-```
-
-The baseline-checked artifact upgrades private failure state, installs policy-derived state and recorder functions plus current handlers, and refreshes execute-only grants. It is transactional and idempotent. Existing inbox completions remain authoritative, no historical attempt or terminal disposition is inferred, and a model change that adds or changes a consumer policy still uses reviewed evolution.
-
-Existing installations can add the private 0.24 audited consumer-recovery boundary without reopening terminal failures:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/014_upgrade_0_24.sql
-```
-
-The baseline-checked artifact installs the isolated recovery role, recovery-cycle state, immutable private audit, execute-only recovery function, current handlers, and grants. It is transactional and idempotent. It fabricates no recovery, operator identity, handler execution, inbox completion, or broker operation.
-
-Existing installations can add the private 0.25 bounded publication-failure boundary without fabricating delivery history:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/015_upgrade_0_25.sql
-```
-
-The baseline-checked artifact adds private copied publication policy, recorded-failure count, terminal disposition, and lease-bound failure recording, then redeploys producers and grants. Existing outbox rows retain unbounded retry. The upgrade is transactional and idempotent and invents no failure, dead letter, publication, lease, or broker operation.
-
-Existing installations can add the private 0.26 audited publication-recovery boundary without reopening terminal rows:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/016_upgrade_0_26.sql
-```
-
-The baseline-checked artifact installs copied recovery eligibility, monotonic total failures, recovery generations, immutable private audit, an isolated execute-only recovery role, and current producers/grants. Existing rows remain ineligible, including existing terminal rows. The upgrade is transactional and idempotent and fabricates no recovery, operator, audit, claim, publication, lease, or broker operation.
-
-Existing installations can add the private 0.27 terminal-failure observation boundary without changing failure state:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/017_upgrade_0_27.sql
-```
-
-The baseline-checked artifact installs the isolated observer role, immutable private observation audit, bounded keyset functions, indexes, typed server adapter, and least-privilege grants. It is transactional and idempotent and fabricates no observation, recovery, failure, claim, publication, consumer execution, or broker history. It refuses to replace a runtime already advanced beyond profile 27.
-
-Existing installations can add the private 0.28 terminal-failure acknowledgement boundary without changing failure state:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/018_upgrade_0_28.sql
-```
-
-The baseline-checked artifact installs the isolated acknowledger role, immutable per-generation publication and consumer acknowledgement audit, acknowledgement functions, updated private observer projection, typed server adapter, and least-privilege grants. It is transactional and idempotent, preserves all existing state, fabricates no acknowledgement history, and refuses to replace a runtime already advanced beyond profile 28.
-
-Existing installations can add the private 0.29 terminal-failure self-claim boundary without changing failure or acknowledgement state:
-
-```bash
-psql "$MODELLANG_DATABASE_URL" -v ON_ERROR_STOP=1 \
-  -f generated/procurement/postgres/019_upgrade_0_29.sql
-```
-
-The baseline-checked artifact installs the isolated claimant role, immutable first-writer publication and consumer claim records, claim functions, updated private observer projection, typed server adapter, and least-privilege grants. It is transactional and idempotent, preserves all existing state, and fabricates no claim history.
 
 The safe planner continues to refuse removals, existing semantic changes, required fields without defaults/generation, data-dependent unique additions, enum-member value migration, and new invariants/exclusions on populated entity types. Policy and branch renames preserve stable identity, while changed policy signatures, branches, action authority, idempotency requirements, existing-event publication policies, or existing-consumer failure policies require reviewed evolution. Unsupported transformations still fail closed rather than becoming compiler guesses.
 
@@ -702,14 +576,14 @@ The full suite validates reliable-command replay and conflicts, bounded event-pu
 
 - Enums use text plus named `CHECK` constraints for deterministic DDL and explicit migration control.
 - Expressions support literals, paths, Boolean operators, and comparisons only. Money is exact and currency-typed, but arithmetic, allocation, tax, exchange, rounding, string operations, aggregates, and computed values require explicit future semantics.
-- Direct per-user PostgreSQL logins remain a supported adapter. The generated 0.12 gateway is the shared-pool adapter and accepts only verified issuer/subject claims, never arbitrary principal IDs.
+- Direct per-user PostgreSQL logins remain a supported adapter. The generated gateway is the shared-pool adapter and accepts only verified issuer/subject claims, never arbitrary principal IDs.
 - Lock planning is sound for finite entity rows identified by action parameters. Temporal `noOverlap` is the one supported predicate rule and uses a PostgreSQL exclusion constraint. General collections, aggregates, absence checks, and other phantom-sensitive rules remain unstable.
 - Queries intentionally omit inferred joins, reverse or collection traversal, aggregates, compound or nullable sort keys, arbitrary caller-controlled sorting and limits, offset/page-number pagination, runtime-selected fields, redaction reason objects, freshness lifetimes, as-of reads, public audit observation, full-text search, and cache policy. ModelLang 0.38 retains explicit optional filters, closed authored single-field sort profiles, bounded to-one projection traversal, fail-closed conditional field disclosure, opt-in fixed-limit keyset cursors, and opt-in committed private read evidence.
 - Enum sets intentionally omit literals, defaults, API parameters, equality, ordering, algebraic operations, incremental mutation, and role inheritance in 0.4.
 - Workflows intentionally omit parallel or hierarchical states, cross-entity lifecycles, wildcard edges, entry/exit hooks, timers, asynchronous events, compensation, and framework-specific workflow controls.
 - Policy v1 intentionally omits structured payloads, deny branches, priorities, multiple action authorities, recursive/effectful policies, public traces, signed evidence, and authority inference from arbitrary expressions.
 - Safe evolution intentionally omits removals, type/default/generation/mutability changes, arbitrary backfills, enum stored-value transformations, workflow rewrites, online DDL scheduling, down migrations, and distributed deployment orchestration in 0.10.
-- The 0.12 gateway profile intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, transport retry scheduling, package publication, deployment, and observability to the host.
+- The gateway boundary intentionally leaves token formats and verification libraries, trusted issuer/audience policy, binding administration, credential rotation, cookie/CSRF/CORS policy, caching, transport retry scheduling, package publication, deployment, and observability to the host.
 - Reliable commands intentionally omit automatic retry scheduling, receipt expiry/deletion, multi-action sagas, asynchronous recovery, external side-effect deduplication, cross-model keys, and signed/public receipts. Retention is deployment-governed.
 - Event delivery intentionally omits network publication, broker-specific polling and acknowledgement, retry timing/backoff schedules, destinations or message movement, publication recovery/redrive, replay-message selection/retrieval, third-party assignment, release, reassignment, delegation, claim leases, workload balancing, approval workflows, notifications, alerts, dashboards, batch operations, bulk or automatic consumer recovery, authored separation of duties, retention, arbitrary payload transformations, imported-event emission, cyclic chains, cross-context translation, partition assignment, global ordering, sagas, and exactly-once network delivery. ModelLang supplies private lease-bound publication disposition, durable consumer failure accounting, opt-in single-event audited reopening, bounded observation, single-cycle acknowledgement, and immutable first-writer self-claiming only.
 - UI manifest v11 intentionally omits framework components, layout, localization, entity option queries, authorization visibility/preflight, generic CRUD, prescribed pagination controls, optimistic concurrency, and client-side validation policy. It describes filter nullability, sort choices, cursor continuation, null-redaction metadata, and the static committed-read-evidence guarantee but leaves rendering to consumers. Alternate transports and AI/MCP generation remain deferred consumers of declared operations.
