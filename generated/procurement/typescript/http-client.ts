@@ -29,10 +29,63 @@ export interface ProcurementTaskPacketRequest {
   readonly observations: readonly ProcurementTaskPacketObservationRequest[];
 }
 
+export type ProcurementDelegatedActionCandidate =
+  | { readonly operationId: "action:act_1e35db0451b1461e941af6283d86dca2"; readonly input: OpenRequestInput }
+  | { readonly operationId: "action:act_ed2374e822704c51a2925338253d05d2"; readonly input: SubmitRequestInput }
+  | { readonly operationId: "action:act_d39dbb883b5f4019b9027b85add3de47"; readonly input: ApproveRequestInput };
+
+export interface ProcurementDelegationRequest {
+  readonly action: ProcurementDelegatedActionCandidate;
+  readonly delegate: { readonly issuer: string; readonly subject: string };
+  readonly audience: string;
+  readonly expiresInSeconds: number;
+}
+
+export interface ProcurementDelegatedCapability {
+  readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
+  readonly delegatedCapabilityVersion: 1;
+  readonly catalogVersion: 5;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly grantId: string;
+  readonly operationId: ProcurementDelegatedActionCandidate["operationId"];
+  readonly inputHash: string;
+  readonly authority: "delegated";
+  readonly issuedAt: number;
+  readonly notBefore: number;
+  readonly expiresAt: number;
+  readonly revision: string;
+  readonly audience: string;
+  readonly constraints: {
+    readonly operation: "exact";
+    readonly input: "canonicalSha256";
+    readonly revision: "required";
+    readonly uses: 1;
+    readonly transferable: false;
+    readonly redelegation: false;
+  };
+  readonly view: {
+    readonly audience: "agent";
+    readonly containsOperationInput: false;
+    readonly containsGrantorIdentity: false;
+    readonly containsDelegateIdentity: false;
+    readonly containsCredential: true;
+    readonly credentialDelivery: "once";
+    readonly grantsAuthority: true;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly credential: { readonly scheme: "ModelLang-Delegation"; readonly secret: true; readonly delivery: "once"; readonly value: string };
+}
+
+export interface ProcurementDelegationRevocation {
+  readonly grantId: string;
+  readonly status: "revoked" | "alreadyRevoked" | "consumed" | "expired" | "notFound";
+  readonly revoked: boolean;
+}
+
 export interface ProcurementSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -73,7 +126,7 @@ export interface ProcurementSubjectCapabilityView {
 export interface ProcurementAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -104,7 +157,7 @@ export type ProcurementTaskPacketObservation =
 export interface ProcurementAgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -221,6 +274,14 @@ export class ProcurementHttpClient {
 
   async taskPacket(request: ProcurementTaskPacketRequest): Promise<ProcurementAgentTaskPacket> {
     return this.call("/agent/task-packets", request);
+  }
+
+  async issueDelegatedCapability(request: ProcurementDelegationRequest): Promise<ProcurementDelegatedCapability> {
+    return this.call("/agent/delegations", request);
+  }
+
+  async revokeDelegatedCapability(grantId: string): Promise<ProcurementDelegationRevocation> {
+    return this.call(`/agent/delegations/${encodeURIComponent(grantId)}/revoke`, {});
   }
 
   async openRequest(input: OpenRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {

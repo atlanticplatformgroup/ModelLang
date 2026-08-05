@@ -13,10 +13,13 @@ import {
 import type { ExecutionOptions } from "./types.js";
 import {
   assembleReservationsTaskPacket,
+  invokeReservationsDelegatedCapability,
+  type ReservationsActionOperationId,
+  type ReservationsDelegationRuntime,
   type ReservationsOperationExecutor,
   type ReservationsOperationId,
 } from "./http-server.js";
-import { ModelOperationError } from "./errors.js";
+import { AuthorizationError, ModelOperationError, ValidationError } from "./errors.js";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -410,7 +413,7 @@ const taskPacketDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 4
+        "const": 5
       },
       "resourceVersion": {
         "const": 1
@@ -419,8 +422,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.42.0",
-          "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+          "version": "0.43.0",
+          "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
         }
       },
       "packetId": {
@@ -869,14 +872,14 @@ const taskPacketDefinition = {
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 4
+                      "const": 5
                     },
                     "model": {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.42.0",
-                        "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                        "version": "0.43.0",
+                        "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
                       }
                     },
                     "operationId": {
@@ -1023,17 +1026,271 @@ const taskPacketDefinition = {
     "grantsAuthority": false
   }
 } as const;
+const delegatedCapabilityDefinition = {
+  "version": 1,
+  "issuePath": "/agent/delegations",
+  "revokePathTemplate": "/agent/delegations/{grantId}/revoke",
+  "issueInputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "action",
+      "delegate",
+      "audience",
+      "expiresInSeconds"
+    ],
+    "properties": {
+      "action": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationId",
+              "input"
+            ],
+            "properties": {
+              "operationId": {
+                "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+              },
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "startsAt",
+                  "endsAt"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "delegate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuer",
+          "subject"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "audience": {
+        "type": "string",
+        "format": "uri",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "expiresInSeconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3600
+      }
+    }
+  },
+  "issueOutputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "$schema",
+      "delegatedCapabilityVersion",
+      "catalogVersion",
+      "model",
+      "grantId",
+      "operationId",
+      "inputHash",
+      "authority",
+      "issuedAt",
+      "notBefore",
+      "expiresAt",
+      "revision",
+      "audience",
+      "constraints",
+      "view",
+      "credential"
+    ],
+    "properties": {
+      "$schema": {
+        "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+      },
+      "delegatedCapabilityVersion": {
+        "const": 1
+      },
+      "catalogVersion": {
+        "const": 5
+      },
+      "model": {
+        "const": {
+          "id": "model:Reservations",
+          "name": "Reservations",
+          "version": "0.43.0",
+          "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+        }
+      },
+      "grantId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "operationId": {
+        "enum": [
+          "action:act_508ad810a19d4b79a5009871de5cd26b"
+        ]
+      },
+      "inputHash": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "authority": {
+        "const": "delegated"
+      },
+      "issuedAt": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "notBefore": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "expiresAt": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "revision": {
+        "type": "string",
+        "pattern": "^rev:1:[0-9a-f]{32}$"
+      },
+      "audience": {
+        "type": "string",
+        "format": "uri",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "constraints": {
+        "const": {
+          "operation": "exact",
+          "input": "canonicalSha256",
+          "revision": "required",
+          "uses": 1,
+          "transferable": false,
+          "redelegation": false
+        }
+      },
+      "view": {
+        "const": {
+          "audience": "agent",
+          "containsOperationInput": false,
+          "containsGrantorIdentity": false,
+          "containsDelegateIdentity": false,
+          "containsCredential": true,
+          "credentialDelivery": "once",
+          "grantsAuthority": true,
+          "runtimeAuthorizationRequired": true
+        }
+      },
+      "credential": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheme",
+          "secret",
+          "delivery",
+          "value"
+        ],
+        "properties": {
+          "scheme": {
+            "const": "ModelLang-Delegation"
+          },
+          "secret": {
+            "const": true
+          },
+          "delivery": {
+            "const": "once"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 4096
+          }
+        }
+      }
+    }
+  },
+  "revokeOutputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "grantId",
+      "status",
+      "revoked"
+    ],
+    "properties": {
+      "grantId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "enum": [
+          "revoked",
+          "alreadyRevoked",
+          "consumed",
+          "expired",
+          "notFound"
+        ]
+      },
+      "revoked": {
+        "type": "boolean"
+      }
+    }
+  },
+  "invocationMetadata": "dev.modellang/delegatedCapability",
+  "credentialScheme": "ModelLang-Delegation",
+  "authenticatedDelegateRequired": true,
+  "hostAtomicConsumeAndExecuteRequired": true,
+  "discoveryGrantsAuthority": false
+} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
 const correlationIdKey = "dev.modellang/correlationId";
 const causationIdKey = "dev.modellang/causationId";
+const delegatedCapabilityKey = "dev.modellang/delegatedCapability";
 const commandMetadataKeys = [expectedRevisionKey, idempotencyKeyKey, correlationIdKey, causationIdKey] as const;
 const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
 export interface ReservationsAuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ReservationsOperationExecutor;
+  readonly delegation?: ReservationsDelegationRuntime;
 }
 
 export type ReservationsMcpAuthenticator = (
@@ -1090,8 +1347,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 4 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.42.0","sourceHash":"sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"},
+    catalogVersion: 5 as const,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.43.0","sourceHash":"sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1133,13 +1390,15 @@ function safeToolError(error: unknown): CallToolResult {
 
 function buildReservationsMcpServer(
   executor: ReservationsOperationExecutor,
+  delegation: ReservationsDelegationRuntime | undefined,
+  delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.42.0" },
+    { name: "Reservations-ModelLang", version: "0.43.0" },
     {
-      instructions: "Tool discovery and task packets grant no authority. Every call is authenticated and runtime authorization remains authoritative. Query resources and task packets have zero reusable lifetime and must be re-read before reuse.",
+      instructions: "Tool discovery and task packets grant no authority. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -1158,6 +1417,10 @@ function buildReservationsMcpServer(
           "dev.modellang/operationId": definition.operationId,
           "dev.modellang/grantsAuthority": false,
           "dev.modellang/runtimeAuthorizationRequired": true,
+          ...(definition.kind === "action" ? {
+            "dev.modellang/delegatedCapabilityVersion": delegatedCapabilityDefinition.version,
+            "dev.modellang/delegatedInvocationMetadata": delegatedCapabilityDefinition.invocationMetadata,
+          } : {}),
           ...(definition.kind === "query" ? {
             "dev.modellang/resourceEnvelopeVersion": 1,
             "dev.modellang/maxAgeSeconds": 0,
@@ -1166,11 +1429,30 @@ function buildReservationsMcpServer(
       },
       async (input, ctx): Promise<CallToolResult> => {
         try {
-          const data = await executor.execute(
-            definition.operationId,
-            input,
-            executionOptions(definition, ctx),
-          );
+          const delegatedCredential = metadataString(ctx.mcpReq._meta, delegatedCapabilityKey);
+          let data: unknown;
+          if (delegatedCredential !== undefined) {
+            if (definition.kind !== "action" || !delegation) {
+              throw new AuthorizationError("Delegated capabilities are valid only for exact action invocation", "ML_DELEGATION_SCOPE", "delegation:scope");
+            }
+            if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+              throw new ValidationError("Caller command metadata is not accepted with delegated capabilities", "ML_VALIDATION", "delegation:metadata");
+            }
+            data = await invokeReservationsDelegatedCapability(
+              delegation,
+              delegatedCredential,
+              definition.operationId as ReservationsActionOperationId,
+              input,
+              delegationAudience,
+              now,
+            );
+          } else {
+            data = await executor.execute(
+              definition.operationId,
+              input,
+              executionOptions(definition, ctx),
+            );
+          }
           if (definition.kind === "action") {
             return {
               content: [{ type: "text", text: JSON.stringify(data) }],
@@ -1233,8 +1515,8 @@ function buildReservationsMcpServer(
     },
     async (input, ctx): Promise<CallToolResult> => {
       try {
-        if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
-          throw new Error("Command metadata is not accepted by task packet assembly");
+        if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new ValidationError("Command metadata is not accepted by task packet assembly", "ML_VALIDATION", "agent:task-packet");
         }
         const packet = await assembleReservationsTaskPacket(executor, input, now);
         const uri = `modellang:///models/model%3AReservations/task-packets/${packet.packetId}`;
@@ -1322,13 +1604,19 @@ export function createReservationsMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const executors = new WeakMap<AuthInfo, ReservationsOperationExecutor>();
+  const contexts = new WeakMap<AuthInfo, { executor: ReservationsOperationExecutor; delegation?: ReservationsDelegationRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
-      const executor = authInfo && executors.get(authInfo);
-      if (!authInfo || !executor) throw new Error("Authenticated ModelLang MCP context is unavailable");
-      return buildReservationsMcpServer(executor, now, options.onerror);
+      const authenticated = authInfo && contexts.get(authInfo);
+      if (!authInfo || !authenticated) throw new Error("Authenticated ModelLang MCP context is unavailable");
+      return buildReservationsMcpServer(
+        authenticated.executor,
+        authenticated.delegation,
+        resourceServerUrl.href,
+        now,
+        options.onerror,
+      );
     },
     { legacy: "stateless", onerror: options.onerror },
   );
@@ -1362,7 +1650,10 @@ export function createReservationsMcpHandler(
         scopes: [...authenticated.authInfo.scopes],
         ...(authenticated.authInfo.extra ? { extra: { ...authenticated.authInfo.extra } } : {}),
       };
-      executors.set(authInfo, authenticated.executor);
+      contexts.set(authInfo, {
+        executor: authenticated.executor,
+        ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+      });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
         const headers = new Headers(response.headers);
@@ -1373,7 +1664,7 @@ export function createReservationsMcpHandler(
           headers,
         });
       } finally {
-        executors.delete(authInfo);
+        contexts.delete(authInfo);
       }
     },
   };

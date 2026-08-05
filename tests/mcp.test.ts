@@ -1,10 +1,15 @@
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createProcurementMcpHandler,
   type ProcurementMcpAuthenticator,
 } from "../generated/procurement/typescript/mcp-server.js";
+import type {
+  ProcurementDelegatedCapabilityClaim,
+  ProcurementDelegationRuntime,
+} from "../generated/procurement/typescript/http-server.js";
 
 const endpoint = new URL("https://mcp.example.test/mcp");
 const resourceMetadataUrl = "https://mcp.example.test/.well-known/oauth-protected-resource/mcp";
@@ -42,7 +47,7 @@ afterEach(async () => {
 });
 
 describe("generated MCP adapter", () => {
-  it("serves catalog v4 tools and the task-packet assembler with exact JSON schemas", async () => {
+  it("serves catalog v5 tools and the task-packet assembler with exact JSON schemas", async () => {
     const execute = vi.fn(async () => []);
     const authenticate = vi.fn<ProcurementMcpAuthenticator>(async () => ({
       authInfo: authInfo(),
@@ -95,6 +100,8 @@ describe("generated MCP adapter", () => {
         "dev.modellang/operationId": actionId,
         "dev.modellang/grantsAuthority": false,
         "dev.modellang/runtimeAuthorizationRequired": true,
+        "dev.modellang/delegatedCapabilityVersion": 1,
+        "dev.modellang/delegatedInvocationMetadata": "dev.modellang/delegatedCapability",
       },
     });
     expect(action.inputSchema).toMatchObject({
@@ -150,8 +157,8 @@ describe("generated MCP adapter", () => {
     );
     expect(envelope).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 4,
-      model: { id: "model:Procurement", version: "0.42.0" },
+      catalogVersion: 5,
+      model: { id: "model:Procurement", version: "0.43.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -294,7 +301,7 @@ describe("generated MCP adapter", () => {
         "dev.modellang/causationId": "mcp-test-causation",
       },
     });
-    expect(result.isError).not.toBe(true);
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
     expect(result.structuredContent).toEqual(actionResult);
     expect(result.content.some((content) => content.type === "resource")).toBe(false);
     expect(execute).toHaveBeenCalledWith(
@@ -307,6 +314,133 @@ describe("generated MCP adapter", () => {
         causationId: "mcp-test-causation",
       },
     );
+  });
+
+  it("invokes exact single-use delegated actions through authenticated MCP request metadata", async () => {
+    const delegatedInput = { amount: { currency: "USD", amount: "42.00" } } as const;
+    const credential = "mcp-delegated-secret-that-is-at-least-thirty-two-bytes";
+    const grantId = "10000000-0000-4000-8000-000000000002";
+    const nowEpoch = Math.floor(new Date(retrievedAt).getTime() / 1000);
+    const canonicalInput = JSON.stringify({ amount: { amount: "42.00", currency: "USD" } });
+    const claim: ProcurementDelegatedCapabilityClaim = {
+      $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+      delegatedCapabilityVersion: 1,
+      catalogVersion: 5,
+      model: {
+        id: "model:Procurement",
+        name: "Procurement",
+        version: "0.43.0",
+        sourceHash: "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76",
+      },
+      grantId,
+      operationId: actionId,
+      inputHash: `sha256:${createHash("sha256").update(canonicalInput).digest("hex")}`,
+      authority: "delegated",
+      issuedAt: nowEpoch,
+      notBefore: nowEpoch,
+      expiresAt: nowEpoch + 60,
+      revision: "rev:1:0123456789abcdef0123456789abcdef",
+      audience: endpoint.href,
+      constraints: {
+        operation: "exact",
+        input: "canonicalSha256",
+        revision: "required",
+        uses: 1,
+        transferable: false,
+        redelegation: false,
+      },
+    };
+    const actionResult = {
+      id: "00000000-0000-4000-8000-000000000010",
+      createdAt: retrievedAt,
+      requester: "00000000-0000-4000-8000-000000000001",
+      amount: delegatedInput.amount,
+      status: "DRAFT",
+      approvedBy: null,
+      approvedByRoles: null,
+      approvalObserved: false,
+    };
+    let consumed = false;
+    const invoke = vi.fn(async () => {
+      consumed = true;
+      return actionResult;
+    });
+    const delegation: ProcurementDelegationRuntime = {
+      issue: vi.fn(),
+      revoke: vi.fn(),
+      inspect: vi.fn(async (candidate) => candidate === credential && !consumed ? claim : null),
+      invoke,
+    };
+    const directExecute = vi.fn();
+    const handler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute: directExecute, assess: vi.fn() },
+      delegation,
+    }), {
+      resourceServerUrl: endpoint.href,
+      now: () => new Date(retrievedAt),
+    });
+    const { client, transport } = createClient((input, init) => handler.fetch(new Request(input, init)));
+    closeables.push(client, handler);
+    await client.connect(transport);
+
+    const result = await client.callTool({
+      name: actionToolName,
+      arguments: delegatedInput,
+      _meta: { "dev.modellang/delegatedCapability": credential },
+    });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toEqual(actionResult);
+    expect(directExecute).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith(
+      credential,
+      claim,
+      actionId,
+      delegatedInput,
+      {
+        expectedRevision: claim.revision,
+        idempotencyKey: `delegation-${grantId}`,
+        correlationId: `delegation-${grantId}`,
+      },
+    );
+
+    const replay = await client.callTool({
+      name: actionToolName,
+      arguments: delegatedInput,
+      _meta: { "dev.modellang/delegatedCapability": credential },
+    });
+    expect(replay.isError).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(1);
+
+    consumed = false;
+    const wrongInput = await client.callTool({
+      name: actionToolName,
+      arguments: { amount: { currency: "USD", amount: "43.00" } },
+      _meta: { "dev.modellang/delegatedCapability": credential },
+    });
+    expect(wrongInput.isError).toBe(true);
+    const delegatedQuery = await client.callTool({
+      name: queryToolName,
+      arguments: {},
+      _meta: { "dev.modellang/delegatedCapability": credential },
+    });
+    expect(delegatedQuery.isError).toBe(true);
+    const delegatedTaskPacket = await client.callTool({
+      name: "modellang_task_packet",
+      arguments: { actions: [{ operationId: actionId, input: delegatedInput }], observations: [] },
+      _meta: { "dev.modellang/delegatedCapability": credential },
+    });
+    expect(delegatedTaskPacket.isError).toBe(true);
+    const callerMetadata = await client.callTool({
+      name: actionToolName,
+      arguments: delegatedInput,
+      _meta: {
+        "dev.modellang/delegatedCapability": credential,
+        "dev.modellang/idempotencyKey": "caller-controlled",
+      },
+    });
+    expect(callerMetadata.isError).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(1);
   });
 
   it("authenticates every protocol request and rejects expired or wrong-audience tokens", async () => {

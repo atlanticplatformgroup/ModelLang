@@ -169,7 +169,7 @@ function resourceSchema(catalog: AgentToolCatalog, tool: Extract<AgentTool, { ki
     properties: {
       $schema: { const: "https://modellang.dev/schemas/agent-resource.schema.json" },
       resourceVersion: { const: 1 },
-      catalogVersion: { const: 4 },
+      catalogVersion: { const: 5 },
       model: { const: catalog.model },
       operationId: { const: tool.id },
       kind: { const: "queryResult" },
@@ -308,7 +308,7 @@ export function generateTaskPacketSchemas(
     properties: {
       $schema: { const: "https://modellang.dev/schemas/agent-task-packet.schema.json" },
       packetVersion: { const: 1 },
-      catalogVersion: { const: 4 },
+      catalogVersion: { const: 5 },
       resourceVersion: { const: 1 },
       model: { const: catalog.model },
       packetId: { type: "string", format: "uuid" },

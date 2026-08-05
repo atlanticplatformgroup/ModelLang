@@ -4,6 +4,9 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { ProcurementHttpClient } from "../generated/procurement/typescript/http-client.js";
 import {
   createProcurementHttpHandler,
+  type ProcurementDelegatedCapabilityClaim,
+  type ProcurementDelegationIssueRequest,
+  type ProcurementDelegationRuntime,
   type ProcurementOperationExecutor,
 } from "../generated/procurement/typescript/http-server.js";
 import {
@@ -339,7 +342,7 @@ describe("generated HTTP boundary", () => {
     expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
     expect(view).toMatchObject({
       viewVersion: 1,
-      catalogVersion: 4,
+      catalogVersion: 5,
       model: { id: "model:Procurement" },
       view: {
         subjectSpecific: true,
@@ -434,8 +437,8 @@ describe("generated HTTP boundary", () => {
 
     expect(resource).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 4,
-      model: { id: "model:Procurement", version: "0.42.0" },
+      catalogVersion: 5,
+      model: { id: "model:Procurement", version: "0.43.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",
@@ -521,9 +524,9 @@ describe("generated HTTP boundary", () => {
 
     expect(packet).toMatchObject({
       packetVersion: 1,
-      catalogVersion: 4,
+      catalogVersion: 5,
       resourceVersion: 1,
-      model: { id: "model:Procurement", version: "0.42.0" },
+      model: { id: "model:Procurement", version: "0.43.0" },
       kind: "boundedTaskContext",
       authority: "none",
       view: {
@@ -612,6 +615,186 @@ describe("generated HTTP boundary", () => {
     }));
     expect(commandMetadata.status).toBe(400);
     expect(assessOperation).toHaveBeenCalledTimes(1);
+  });
+
+  it("issues, invokes, expires, revokes, and consumes exact delegated action authority", async () => {
+    const grantId = "10000000-0000-4000-8000-000000000001";
+    const credential = "delegated-secret-that-is-at-least-thirty-two-bytes";
+    const audience = "https://example.test";
+    const delegatedInput = { amount: { currency: "USD", amount: "42.00" } } as const;
+    let currentTime = new Date("2026-08-05T13:00:00.000Z");
+    let issuedRequest: ProcurementDelegationIssueRequest | undefined;
+    let claim: ProcurementDelegatedCapabilityClaim | undefined;
+    let consumed = false;
+    let revoked = false;
+    const executeAsGrantor = vi.fn(async (
+      _operationId: string,
+      _input: Readonly<Record<string, unknown>>,
+      _options?: Readonly<Record<string, unknown>>,
+    ) => purchaseRequest);
+
+    const grantorRuntime: ProcurementDelegationRuntime = {
+      issue: vi.fn(async (request) => {
+        issuedRequest = request;
+        consumed = false;
+        revoked = false;
+        return { grantId, credential };
+      }),
+      revoke: vi.fn(async (candidate) => {
+        expect(candidate).toBe(grantId);
+        revoked = true;
+        return { grantId, status: "revoked" as const, revoked: true };
+      }),
+      inspect: vi.fn(async () => null),
+      invoke: vi.fn(async () => {
+        throw new Error("grantors cannot invoke delegate credentials");
+      }),
+    };
+    const delegateRuntime: ProcurementDelegationRuntime = {
+      issue: vi.fn(async () => {
+        throw new Error("delegates cannot issue grants");
+      }),
+      revoke: vi.fn(async () => ({ grantId, status: "notFound" as const, revoked: false })),
+      inspect: vi.fn(async (candidate) => candidate === credential && !consumed && !revoked ? claim ?? null : null),
+      invoke: vi.fn(async (candidate, inspected, operationId, input, options) => {
+        if (candidate !== credential || inspected !== claim || consumed || revoked) {
+          throw new AuthorizationError("delegation unavailable", "ML_DELEGATION_INVALID", "delegation:host");
+        }
+        consumed = true;
+        return executeAsGrantor(operationId, input, options);
+      }),
+    };
+    const handler = createProcurementHttpHandler(async (token) => {
+      if (token === "grantor-token") return { executor: { execute: executeAsGrantor, assess }, delegation: grantorRuntime };
+      if (token === "delegate-token") return { executor: { execute: vi.fn(), assess: vi.fn() }, delegation: delegateRuntime };
+      return null;
+    }, { now: () => currentTime, delegationAudience: audience });
+    const grantor = new ProcurementHttpClient({
+      baseUrl: audience,
+      accessToken: () => "grantor-token",
+      fetch: (input, init) => handler(new Request(input, init)),
+    });
+
+    const capability = await grantor.issueDelegatedCapability({
+      action: { operationId: applicableDecision.operationId, input: delegatedInput },
+      delegate: { issuer: "https://issuer.example", subject: "employee:42" },
+      audience,
+      expiresInSeconds: 60,
+    });
+    const { credential: deliveredCredential, view: _view, ...issuedClaim } = capability;
+    claim = issuedClaim;
+    expect(deliveredCredential).toEqual({
+      scheme: "ModelLang-Delegation",
+      secret: true,
+      delivery: "once",
+      value: credential,
+    });
+    expect(capability).toMatchObject({
+      delegatedCapabilityVersion: 1,
+      catalogVersion: 5,
+      grantId,
+      operationId: applicableDecision.operationId,
+      authority: "delegated",
+      revision: applicableDecision.revision,
+      audience,
+      constraints: {
+        operation: "exact",
+        input: "canonicalSha256",
+        revision: "required",
+        uses: 1,
+        transferable: false,
+        redelegation: false,
+      },
+      view: {
+        containsOperationInput: false,
+        containsGrantorIdentity: false,
+        containsDelegateIdentity: false,
+        containsCredential: true,
+        grantsAuthority: true,
+        runtimeAuthorizationRequired: true,
+      },
+    });
+    expect(issuedRequest).toMatchObject({
+      action: { operationId: applicableDecision.operationId, input: delegatedInput },
+      delegate: { issuer: "https://issuer.example", subject: "employee:42" },
+      audience,
+      revision: applicableDecision.revision,
+    });
+    expect(issuedRequest!.inputHash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(JSON.stringify(capability)).not.toMatch(/employee:42|issuer\.example|42\.00|grantor-token|delegate-token/);
+    const delegatedSchema = JSON.parse(await readFile("schemas/delegated-capability.schema.json", "utf8"));
+    const validate = new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, uri: true },
+    }).compile(delegatedSchema);
+    expect(validate(capability), JSON.stringify(validate.errors)).toBe(true);
+
+    const delegate = new ProcurementHttpClient({
+      baseUrl: audience,
+      accessToken: () => "delegate-token",
+      headers: { "delegated-capability": credential },
+      fetch: (input, init) => handler(new Request(input, init)),
+    });
+    const wrongDelegate = new ProcurementHttpClient({
+      baseUrl: audience,
+      accessToken: () => "grantor-token",
+      headers: { "delegated-capability": credential },
+      fetch: (input, init) => handler(new Request(input, init)),
+    });
+    await expect(wrongDelegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
+    const correctClaim = claim;
+    claim = { ...correctClaim, audience: "https://wrong-audience.example" };
+    await expect(delegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
+    claim = correctClaim;
+    await expect(delegate.openRequest(
+      { amount: { currency: "USD", amount: "43.00" } },
+    )).rejects.toBeInstanceOf(AuthorizationError);
+    expect(delegateRuntime.invoke).not.toHaveBeenCalled();
+    await expect(delegate.myRequests({})).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(delegate.openRequest(delegatedInput, { idempotencyKey: "caller-metadata" }))
+      .rejects.toBeInstanceOf(ValidationError);
+
+    await expect(delegate.openRequest(delegatedInput)).resolves.toEqual(purchaseRequest);
+    expect(executeAsGrantor).toHaveBeenCalledWith(
+      applicableDecision.operationId,
+      delegatedInput,
+      {
+        expectedRevision: applicableDecision.revision,
+        idempotencyKey: `delegation-${grantId}`,
+        correlationId: `delegation-${grantId}`,
+      },
+    );
+    await expect(delegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
+    expect(delegateRuntime.invoke).toHaveBeenCalledTimes(1);
+
+    const revokedCapability = await grantor.issueDelegatedCapability({
+      action: { operationId: applicableDecision.operationId, input: delegatedInput },
+      delegate: { issuer: "https://issuer.example", subject: "employee:42" },
+      audience,
+      expiresInSeconds: 60,
+    });
+    const { credential: _revokedCredential, view: _revokedView, ...revokedClaim } = revokedCapability;
+    claim = revokedClaim;
+    await expect(grantor.revokeDelegatedCapability(grantId)).resolves.toEqual({ grantId, status: "revoked", revoked: true });
+    await expect(delegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
+    await expect(delegate.issueDelegatedCapability({
+      action: { operationId: applicableDecision.operationId, input: delegatedInput },
+      delegate: { issuer: "https://issuer.example", subject: "employee:99" },
+      audience,
+      expiresInSeconds: 60,
+    })).rejects.toBeInstanceOf(AuthorizationError);
+
+    const expiringCapability = await grantor.issueDelegatedCapability({
+      action: { operationId: applicableDecision.operationId, input: delegatedInput },
+      delegate: { issuer: "https://issuer.example", subject: "employee:42" },
+      audience,
+      expiresInSeconds: 1,
+    });
+    const { credential: _expiringCredential, view: _expiringView, ...expiringClaim } = expiringCapability;
+    claim = expiringClaim;
+    currentTime = new Date(currentTime.getTime() + 1_000);
+    await expect(delegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {

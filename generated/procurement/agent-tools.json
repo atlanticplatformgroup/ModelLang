@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 4,
-  "compilerVersion": "0.42.0",
+  "catalogVersion": 5,
+  "compilerVersion": "0.43.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.42.0",
-    "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+    "version": "0.43.0",
+    "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
   },
   "view": {
     "audience": "agent",
@@ -67,6 +67,30 @@
     "atomic": false,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
+  },
+  "delegatedCapabilities": {
+    "version": 1,
+    "protocol": "http",
+    "issue": {
+      "method": "POST",
+      "path": "/agent/delegations"
+    },
+    "revoke": {
+      "method": "POST",
+      "pathTemplate": "/agent/delegations/{grantId}/revoke"
+    },
+    "invocation": "authenticatedRequestCredential",
+    "authenticatedGrantor": true,
+    "exactAction": true,
+    "exactInputHash": "canonicalSha256",
+    "revisionBound": true,
+    "maxTtlSeconds": 3600,
+    "maxUses": 1,
+    "transferable": false,
+    "redelegation": false,
+    "hostCredentialAuthorityRequired": true,
+    "runtimeAuthorizationRequired": true,
+    "discoveryGrantsAuthority": false
   },
   "tools": [
     {

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.43.0
+
+- Added delegated capability v1 for one currently applicable exact action/input, one named authenticated delegate, one audience, one required concurrency revision, one use, and a maximum one-hour lifetime.
+- Added authenticated HTTP issuance and grantor-bound revocation, once-only opaque credential delivery with no-store/no-cache semantics, and HTTP action invocation through a separate `delegated-capability` credential that supplements ordinary delegate authentication.
+- Added MCP action invocation through `_meta["dev.modellang/delegatedCapability"]` while keeping issuance HTTP-only and rejecting delegated credentials on queries, resources, applicability, subject views, task packets, issuance, and revocation.
+- Required a host credential authority for secure storage, grantor/delegate binding, revocation, and atomic consume-and-execute; generated adapters validate exact model/catalog/action/input/audience/time/revision/attenuation constraints and re-enter the existing authoritative action runtime.
+- Kept discovery non-authoritative and actions distinct from resources; no transferable or chained delegation, delegated task packets, prompts, subscriptions, public decision traces, extension-backed tools, or full SML-Agent conformance is claimed.
+- Added standalone and exact schemas, OpenAPI, generated TypeScript, catalog/MCP bindings, specification, whitepaper status, deterministic goldens, adversarial unit coverage, and live PostgreSQL tests for delegate binding, policy enforcement, audit attribution, stale revisions, revocation, and replay rejection.
+- Advanced compiler/examples to 0.43.0, catalog to v5, MCP adapter to v3, target capability profile to v7, target to `target:postgresql-http-ui-delegated-capabilities/7`, and generator profile to `postgresql-http-ui-delegated-capabilities/27`; canonical IR1, task packet v1, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.42.0
 
 - Added authenticated bounded task packet v1 assembly over exact action candidates and caller-selected declared query observations, available through generated HTTP clients/servers and a stable `/agent/task-packets` route.

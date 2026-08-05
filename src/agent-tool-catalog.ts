@@ -12,6 +12,9 @@ import {
   TASK_PACKET_MAX_ACTIONS,
   TASK_PACKET_MAX_OBSERVATIONS,
   TASK_PACKET_ROUTE,
+  DELEGATION_MAX_TTL_SECONDS,
+  DELEGATION_ROUTE,
+  DELEGATION_REVOKE_ROUTE_PREFIX,
 } from "./agent-routes.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -74,7 +77,7 @@ export type AgentTool =
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 4;
+  catalogVersion: 5;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -134,6 +137,24 @@ export interface AgentToolCatalog {
     atomic: false;
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
+  };
+  delegatedCapabilities: {
+    version: 1;
+    protocol: "http";
+    issue: { method: "POST"; path: "/agent/delegations" };
+    revoke: { method: "POST"; pathTemplate: "/agent/delegations/{grantId}/revoke" };
+    invocation: "authenticatedRequestCredential";
+    authenticatedGrantor: true;
+    exactAction: true;
+    exactInputHash: "canonicalSha256";
+    revisionBound: true;
+    maxTtlSeconds: 3600;
+    maxUses: 1;
+    transferable: false;
+    redelegation: false;
+    hostCredentialAuthorityRequired: true;
+    runtimeAuthorizationRequired: true;
+    discoveryGrantsAuthority: false;
   };
   tools: AgentTool[];
 }
@@ -345,7 +366,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 4,
+    catalogVersion: 5,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -398,6 +419,24 @@ export function generateAgentToolCatalog(
       atomic: false,
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,
+    },
+    delegatedCapabilities: {
+      version: 1,
+      protocol: "http",
+      issue: { method: "POST", path: DELEGATION_ROUTE },
+      revoke: { method: "POST", pathTemplate: `${DELEGATION_REVOKE_ROUTE_PREFIX}{grantId}/revoke` },
+      invocation: "authenticatedRequestCredential",
+      authenticatedGrantor: true,
+      exactAction: true,
+      exactInputHash: "canonicalSha256",
+      revisionBound: true,
+      maxTtlSeconds: DELEGATION_MAX_TTL_SECONDS,
+      maxUses: 1,
+      transferable: false,
+      redelegation: false,
+      hostCredentialAuthorityRequired: true,
+      runtimeAuthorizationRequired: true,
+      discoveryGrantsAuthority: false,
     },
     tools,
   };

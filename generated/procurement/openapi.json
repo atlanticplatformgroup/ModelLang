@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.42.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2)."
+    "version": "0.43.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -22,6 +22,9 @@
         "x-modellang-operation-id": "action:act_1e35db0451b1461e941af6283d86dca2",
         "parameters": [
           {
+            "$ref": "#/components/parameters/DelegatedCapabilityCredential"
+          },
+          {
             "$ref": "#/components/parameters/ExpectedRevision"
           },
           {
@@ -35,6 +38,11 @@
           }
         ],
         "x-modellang-idempotency": "required",
+        "x-modellang-delegated-capability": {
+          "version": 1,
+          "ordinaryBearerAuthenticationRequired": true,
+          "mutuallyExclusiveWithCommandMetadata": true
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -196,6 +204,9 @@
         "x-modellang-operation-id": "action:act_ed2374e822704c51a2925338253d05d2",
         "parameters": [
           {
+            "$ref": "#/components/parameters/DelegatedCapabilityCredential"
+          },
+          {
             "$ref": "#/components/parameters/ExpectedRevision"
           },
           {
@@ -206,6 +217,11 @@
           }
         ],
         "x-modellang-idempotency": "unsupported",
+        "x-modellang-delegated-capability": {
+          "version": 1,
+          "ordinaryBearerAuthenticationRequired": true,
+          "mutuallyExclusiveWithCommandMetadata": true
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -353,6 +369,9 @@
         "x-modellang-operation-id": "action:act_d39dbb883b5f4019b9027b85add3de47",
         "parameters": [
           {
+            "$ref": "#/components/parameters/DelegatedCapabilityCredential"
+          },
+          {
             "$ref": "#/components/parameters/ExpectedRevision"
           },
           {
@@ -363,6 +382,11 @@
           }
         ],
         "x-modellang-idempotency": "unsupported",
+        "x-modellang-delegated-capability": {
+          "version": 1,
+          "ordinaryBearerAuthenticationRequired": true,
+          "mutuallyExclusiveWithCommandMetadata": true
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -1063,7 +1087,7 @@
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 4
+                      "const": 5
                     },
                     "model": {
                       "type": "object",
@@ -1082,10 +1106,10 @@
                           "const": "Procurement"
                         },
                         "version": {
-                          "const": "0.42.0"
+                          "const": "0.43.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+                          "const": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
                         }
                       }
                     },
@@ -1764,6 +1788,425 @@
           }
         }
       }
+    },
+    "/agent/delegations": {
+      "post": {
+        "operationId": "modellang_issue_delegated_capability",
+        "summary": "Issue one exact-input delegated action capability",
+        "tags": [
+          "Delegated capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-authority": "delegated",
+        "x-modellang-max-uses": 1,
+        "x-modellang-redelegation": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "delegate",
+                  "audience",
+                  "expiresInSeconds"
+                ],
+                "properties": {
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operationId",
+                          "input"
+                        ],
+                        "properties": {
+                          "operationId": {
+                            "const": "action:act_1e35db0451b1461e941af6283d86dca2"
+                          },
+                          "input": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "amount"
+                            ],
+                            "properties": {
+                              "amount": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "currency",
+                                  "amount"
+                                ],
+                                "properties": {
+                                  "currency": {
+                                    "const": "USD"
+                                  },
+                                  "amount": {
+                                    "type": "string",
+                                    "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                                    "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operationId",
+                          "input"
+                        ],
+                        "properties": {
+                          "operationId": {
+                            "const": "action:act_ed2374e822704c51a2925338253d05d2"
+                          },
+                          "input": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "request"
+                            ],
+                            "properties": {
+                              "request": {
+                                "type": "string",
+                                "format": "uuid"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operationId",
+                          "input"
+                        ],
+                        "properties": {
+                          "operationId": {
+                            "const": "action:act_d39dbb883b5f4019b9027b85add3de47"
+                          },
+                          "input": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "request"
+                            ],
+                            "properties": {
+                              "request": {
+                                "type": "string",
+                                "format": "uuid"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "delegate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "issuer",
+                      "subject"
+                    ],
+                    "properties": {
+                      "issuer": {
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "subject": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
+                  },
+                  "audience": {
+                    "type": "string",
+                    "format": "uri",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "expiresInSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3600
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Single-delivery delegated bearer credential; this response is secret",
+            "headers": {
+              "Cache-Control": {
+                "description": "Delegated credentials must never be stored by intermediaries",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedCapability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/delegations/{grantId}/revoke": {
+      "post": {
+        "operationId": "modellang_revoke_delegated_capability",
+        "summary": "Revoke one delegated capability as its authenticated grantor",
+        "tags": [
+          "Delegated capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "grantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current revocation disposition without identity disclosure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Revocation results must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "grantId",
+                    "status",
+                    "revoked"
+                  ],
+                  "properties": {
+                    "grantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "enum": [
+                        "revoked",
+                        "alreadyRevoked",
+                        "consumed",
+                        "expired",
+                        "notFound"
+                      ]
+                    },
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1781,11 +2224,22 @@
       "IdempotencyKey": {
         "name": "Idempotency-Key",
         "in": "header",
-        "required": true,
-        "description": "Principal-scoped retry key; it grants no authority.",
+        "required": false,
+        "description": "Required for ordinary invocation of reliable actions and forbidden with Delegated-Capability; it grants no authority.",
         "schema": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "DelegatedCapabilityCredential": {
+        "name": "Delegated-Capability",
+        "in": "header",
+        "required": false,
+        "description": "Once-delivered ModelLang-Delegation credential. It supplements ordinary bearer authentication and is mutually exclusive with caller command metadata.",
+        "schema": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 4096
         }
       },
       "CorrelationId": {
@@ -2259,7 +2713,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 4
+            "const": 5
           },
           "resourceVersion": {
             "const": 1
@@ -2268,8 +2722,8 @@
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.42.0",
-              "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+              "version": "0.43.0",
+              "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
             }
           },
           "packetId": {
@@ -3473,14 +3927,14 @@
                           "const": 1
                         },
                         "catalogVersion": {
-                          "const": 4
+                          "const": 5
                         },
                         "model": {
                           "const": {
                             "id": "model:Procurement",
                             "name": "Procurement",
-                            "version": "0.42.0",
-                            "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+                            "version": "0.43.0",
+                            "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
                           }
                         },
                         "operationId": {
@@ -3622,6 +4076,136 @@
           }
         }
       },
+      "DelegatedCapability": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "delegatedCapabilityVersion",
+          "catalogVersion",
+          "model",
+          "grantId",
+          "operationId",
+          "inputHash",
+          "authority",
+          "issuedAt",
+          "notBefore",
+          "expiresAt",
+          "revision",
+          "audience",
+          "constraints",
+          "view",
+          "credential"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+          },
+          "delegatedCapabilityVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 5
+          },
+          "model": {
+            "const": {
+              "id": "model:Procurement",
+              "name": "Procurement",
+              "version": "0.43.0",
+              "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
+            }
+          },
+          "grantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "enum": [
+              "action:act_1e35db0451b1461e941af6283d86dca2",
+              "action:act_ed2374e822704c51a2925338253d05d2",
+              "action:act_d39dbb883b5f4019b9027b85add3de47"
+            ]
+          },
+          "inputHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "authority": {
+            "const": "delegated"
+          },
+          "issuedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notBefore": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^rev:1:[0-9a-f]{32}$"
+          },
+          "audience": {
+            "type": "string",
+            "format": "uri",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "constraints": {
+            "const": {
+              "operation": "exact",
+              "input": "canonicalSha256",
+              "revision": "required",
+              "uses": 1,
+              "transferable": false,
+              "redelegation": false
+            }
+          },
+          "view": {
+            "const": {
+              "audience": "agent",
+              "containsOperationInput": false,
+              "containsGrantorIdentity": false,
+              "containsDelegateIdentity": false,
+              "containsCredential": true,
+              "credentialDelivery": "once",
+              "grantsAuthority": true,
+              "runtimeAuthorizationRequired": true
+            }
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scheme",
+              "secret",
+              "delivery",
+              "value"
+            ],
+            "properties": {
+              "scheme": {
+                "const": "ModelLang-Delegation"
+              },
+              "secret": {
+                "const": true
+              },
+              "delivery": {
+                "const": "once"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      },
       "SubjectCapabilityView": {
         "type": "object",
         "additionalProperties": false,
@@ -3643,7 +4227,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 4
+            "const": 5
           },
           "model": {
             "type": "object",
@@ -3662,10 +4246,10 @@
                 "const": "Procurement"
               },
               "version": {
-                "const": "0.42.0"
+                "const": "0.43.0"
               },
               "sourceHash": {
-                "const": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+                "const": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
               }
             }
           },

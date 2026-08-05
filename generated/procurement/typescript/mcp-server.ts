@@ -13,10 +13,13 @@ import {
 import type { ExecutionOptions } from "./types.js";
 import {
   assembleProcurementTaskPacket,
+  invokeProcurementDelegatedCapability,
+  type ProcurementActionOperationId,
+  type ProcurementDelegationRuntime,
   type ProcurementOperationExecutor,
   type ProcurementOperationId,
 } from "./http-server.js";
-import { ModelOperationError } from "./errors.js";
+import { AuthorizationError, ModelOperationError, ValidationError } from "./errors.js";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -711,7 +714,7 @@ const taskPacketDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 4
+        "const": 5
       },
       "resourceVersion": {
         "const": 1
@@ -720,8 +723,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Procurement",
           "name": "Procurement",
-          "version": "0.42.0",
-          "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+          "version": "0.43.0",
+          "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
         }
       },
       "packetId": {
@@ -1925,14 +1928,14 @@ const taskPacketDefinition = {
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 4
+                      "const": 5
                     },
                     "model": {
                       "const": {
                         "id": "model:Procurement",
                         "name": "Procurement",
-                        "version": "0.42.0",
-                        "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
+                        "version": "0.43.0",
+                        "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
                       }
                     },
                     "operationId": {
@@ -2093,17 +2096,331 @@ const taskPacketDefinition = {
     "grantsAuthority": false
   }
 } as const;
+const delegatedCapabilityDefinition = {
+  "version": 1,
+  "issuePath": "/agent/delegations",
+  "revokePathTemplate": "/agent/delegations/{grantId}/revoke",
+  "issueInputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "action",
+      "delegate",
+      "audience",
+      "expiresInSeconds"
+    ],
+    "properties": {
+      "action": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationId",
+              "input"
+            ],
+            "properties": {
+              "operationId": {
+                "const": "action:act_1e35db0451b1461e941af6283d86dca2"
+              },
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "amount"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "currency",
+                      "amount"
+                    ],
+                    "properties": {
+                      "currency": {
+                        "const": "USD"
+                      },
+                      "amount": {
+                        "type": "string",
+                        "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                        "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationId",
+              "input"
+            ],
+            "properties": {
+              "operationId": {
+                "const": "action:act_ed2374e822704c51a2925338253d05d2"
+              },
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationId",
+              "input"
+            ],
+            "properties": {
+              "operationId": {
+                "const": "action:act_d39dbb883b5f4019b9027b85add3de47"
+              },
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "delegate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issuer",
+          "subject"
+        ],
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "format": "uri",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        }
+      },
+      "audience": {
+        "type": "string",
+        "format": "uri",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "expiresInSeconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 3600
+      }
+    }
+  },
+  "issueOutputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "$schema",
+      "delegatedCapabilityVersion",
+      "catalogVersion",
+      "model",
+      "grantId",
+      "operationId",
+      "inputHash",
+      "authority",
+      "issuedAt",
+      "notBefore",
+      "expiresAt",
+      "revision",
+      "audience",
+      "constraints",
+      "view",
+      "credential"
+    ],
+    "properties": {
+      "$schema": {
+        "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+      },
+      "delegatedCapabilityVersion": {
+        "const": 1
+      },
+      "catalogVersion": {
+        "const": 5
+      },
+      "model": {
+        "const": {
+          "id": "model:Procurement",
+          "name": "Procurement",
+          "version": "0.43.0",
+          "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
+        }
+      },
+      "grantId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "operationId": {
+        "enum": [
+          "action:act_1e35db0451b1461e941af6283d86dca2",
+          "action:act_ed2374e822704c51a2925338253d05d2",
+          "action:act_d39dbb883b5f4019b9027b85add3de47"
+        ]
+      },
+      "inputHash": {
+        "type": "string",
+        "pattern": "^sha256:[0-9a-f]{64}$"
+      },
+      "authority": {
+        "const": "delegated"
+      },
+      "issuedAt": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "notBefore": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "expiresAt": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "revision": {
+        "type": "string",
+        "pattern": "^rev:1:[0-9a-f]{32}$"
+      },
+      "audience": {
+        "type": "string",
+        "format": "uri",
+        "minLength": 1,
+        "maxLength": 2048
+      },
+      "constraints": {
+        "const": {
+          "operation": "exact",
+          "input": "canonicalSha256",
+          "revision": "required",
+          "uses": 1,
+          "transferable": false,
+          "redelegation": false
+        }
+      },
+      "view": {
+        "const": {
+          "audience": "agent",
+          "containsOperationInput": false,
+          "containsGrantorIdentity": false,
+          "containsDelegateIdentity": false,
+          "containsCredential": true,
+          "credentialDelivery": "once",
+          "grantsAuthority": true,
+          "runtimeAuthorizationRequired": true
+        }
+      },
+      "credential": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheme",
+          "secret",
+          "delivery",
+          "value"
+        ],
+        "properties": {
+          "scheme": {
+            "const": "ModelLang-Delegation"
+          },
+          "secret": {
+            "const": true
+          },
+          "delivery": {
+            "const": "once"
+          },
+          "value": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 4096
+          }
+        }
+      }
+    }
+  },
+  "revokeOutputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "grantId",
+      "status",
+      "revoked"
+    ],
+    "properties": {
+      "grantId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "status": {
+        "enum": [
+          "revoked",
+          "alreadyRevoked",
+          "consumed",
+          "expired",
+          "notFound"
+        ]
+      },
+      "revoked": {
+        "type": "boolean"
+      }
+    }
+  },
+  "invocationMetadata": "dev.modellang/delegatedCapability",
+  "credentialScheme": "ModelLang-Delegation",
+  "authenticatedDelegateRequired": true,
+  "hostAtomicConsumeAndExecuteRequired": true,
+  "discoveryGrantsAuthority": false
+} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
 const correlationIdKey = "dev.modellang/correlationId";
 const causationIdKey = "dev.modellang/causationId";
+const delegatedCapabilityKey = "dev.modellang/delegatedCapability";
 const commandMetadataKeys = [expectedRevisionKey, idempotencyKeyKey, correlationIdKey, causationIdKey] as const;
 const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
 export interface ProcurementAuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ProcurementOperationExecutor;
+  readonly delegation?: ProcurementDelegationRuntime;
 }
 
 export type ProcurementMcpAuthenticator = (
@@ -2160,8 +2477,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 4 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.42.0","sourceHash":"sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"},
+    catalogVersion: 5 as const,
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -2203,13 +2520,15 @@ function safeToolError(error: unknown): CallToolResult {
 
 function buildProcurementMcpServer(
   executor: ProcurementOperationExecutor,
+  delegation: ProcurementDelegationRuntime | undefined,
+  delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Procurement-ModelLang", version: "0.42.0" },
+    { name: "Procurement-ModelLang", version: "0.43.0" },
     {
-      instructions: "Tool discovery and task packets grant no authority. Every call is authenticated and runtime authorization remains authoritative. Query resources and task packets have zero reusable lifetime and must be re-read before reuse.",
+      instructions: "Tool discovery and task packets grant no authority. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -2228,6 +2547,10 @@ function buildProcurementMcpServer(
           "dev.modellang/operationId": definition.operationId,
           "dev.modellang/grantsAuthority": false,
           "dev.modellang/runtimeAuthorizationRequired": true,
+          ...(definition.kind === "action" ? {
+            "dev.modellang/delegatedCapabilityVersion": delegatedCapabilityDefinition.version,
+            "dev.modellang/delegatedInvocationMetadata": delegatedCapabilityDefinition.invocationMetadata,
+          } : {}),
           ...(definition.kind === "query" ? {
             "dev.modellang/resourceEnvelopeVersion": 1,
             "dev.modellang/maxAgeSeconds": 0,
@@ -2236,11 +2559,30 @@ function buildProcurementMcpServer(
       },
       async (input, ctx): Promise<CallToolResult> => {
         try {
-          const data = await executor.execute(
-            definition.operationId,
-            input,
-            executionOptions(definition, ctx),
-          );
+          const delegatedCredential = metadataString(ctx.mcpReq._meta, delegatedCapabilityKey);
+          let data: unknown;
+          if (delegatedCredential !== undefined) {
+            if (definition.kind !== "action" || !delegation) {
+              throw new AuthorizationError("Delegated capabilities are valid only for exact action invocation", "ML_DELEGATION_SCOPE", "delegation:scope");
+            }
+            if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+              throw new ValidationError("Caller command metadata is not accepted with delegated capabilities", "ML_VALIDATION", "delegation:metadata");
+            }
+            data = await invokeProcurementDelegatedCapability(
+              delegation,
+              delegatedCredential,
+              definition.operationId as ProcurementActionOperationId,
+              input,
+              delegationAudience,
+              now,
+            );
+          } else {
+            data = await executor.execute(
+              definition.operationId,
+              input,
+              executionOptions(definition, ctx),
+            );
+          }
           if (definition.kind === "action") {
             return {
               content: [{ type: "text", text: JSON.stringify(data) }],
@@ -2303,8 +2645,8 @@ function buildProcurementMcpServer(
     },
     async (input, ctx): Promise<CallToolResult> => {
       try {
-        if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
-          throw new Error("Command metadata is not accepted by task packet assembly");
+        if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new ValidationError("Command metadata is not accepted by task packet assembly", "ML_VALIDATION", "agent:task-packet");
         }
         const packet = await assembleProcurementTaskPacket(executor, input, now);
         const uri = `modellang:///models/model%3AProcurement/task-packets/${packet.packetId}`;
@@ -2392,13 +2734,19 @@ export function createProcurementMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const executors = new WeakMap<AuthInfo, ProcurementOperationExecutor>();
+  const contexts = new WeakMap<AuthInfo, { executor: ProcurementOperationExecutor; delegation?: ProcurementDelegationRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
-      const executor = authInfo && executors.get(authInfo);
-      if (!authInfo || !executor) throw new Error("Authenticated ModelLang MCP context is unavailable");
-      return buildProcurementMcpServer(executor, now, options.onerror);
+      const authenticated = authInfo && contexts.get(authInfo);
+      if (!authInfo || !authenticated) throw new Error("Authenticated ModelLang MCP context is unavailable");
+      return buildProcurementMcpServer(
+        authenticated.executor,
+        authenticated.delegation,
+        resourceServerUrl.href,
+        now,
+        options.onerror,
+      );
     },
     { legacy: "stateless", onerror: options.onerror },
   );
@@ -2432,7 +2780,10 @@ export function createProcurementMcpHandler(
         scopes: [...authenticated.authInfo.scopes],
         ...(authenticated.authInfo.extra ? { extra: { ...authenticated.authInfo.extra } } : {}),
       };
-      executors.set(authInfo, authenticated.executor);
+      contexts.set(authInfo, {
+        executor: authenticated.executor,
+        ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+      });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
         const headers = new Headers(response.headers);
@@ -2443,7 +2794,7 @@ export function createProcurementMcpHandler(
           headers,
         });
       } finally {
-        executors.delete(authInfo);
+        contexts.delete(authInfo);
       }
     },
   };

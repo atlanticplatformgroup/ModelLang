@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 4,
-  "compilerVersion": "0.42.0",
+  "catalogVersion": 5,
+  "compilerVersion": "0.43.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.42.0",
-    "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+    "version": "0.43.0",
+    "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
   },
   "view": {
     "audience": "agent",
@@ -67,6 +67,30 @@
     "atomic": false,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
+  },
+  "delegatedCapabilities": {
+    "version": 1,
+    "protocol": "http",
+    "issue": {
+      "method": "POST",
+      "path": "/agent/delegations"
+    },
+    "revoke": {
+      "method": "POST",
+      "pathTemplate": "/agent/delegations/{grantId}/revoke"
+    },
+    "invocation": "authenticatedRequestCredential",
+    "authenticatedGrantor": true,
+    "exactAction": true,
+    "exactInputHash": "canonicalSha256",
+    "revisionBound": true,
+    "maxTtlSeconds": 3600,
+    "maxUses": 1,
+    "transferable": false,
+    "redelegation": false,
+    "hostCredentialAuthorityRequired": true,
+    "runtimeAuthorizationRequired": true,
+    "discoveryGrantsAuthority": false
   },
   "tools": [
     {

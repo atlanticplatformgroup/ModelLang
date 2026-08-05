@@ -5,17 +5,18 @@
   "type": "object",
   "required": [
     "$schema", "adapterVersion", "compilerVersion", "protocolVersion",
-    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "model", "transport",
-    "authentication", "discovery", "capabilities", "taskPacket", "tools"
+    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "delegatedCapabilityVersion", "model", "transport",
+    "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
-    "adapterVersion": { "const": 2 },
+    "adapterVersion": { "const": 3 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },
-    "catalogVersion": { "const": 4 },
+    "catalogVersion": { "const": 5 },
     "resourceEnvelopeVersion": { "const": 1 },
     "taskPacketVersion": { "const": 1 },
+    "delegatedCapabilityVersion": { "const": 1 },
     "model": { "$ref": "#/$defs/model" },
     "transport": {
       "type": "object",
@@ -57,7 +58,7 @@
     },
     "capabilities": {
       "type": "object",
-      "required": ["tools", "embeddedResources", "taskPackets", "prompts", "tasks"],
+      "required": ["tools", "embeddedResources", "taskPackets", "delegatedCapabilities", "prompts", "tasks"],
       "properties": {
         "tools": {
           "type": "object",
@@ -90,12 +91,25 @@
           },
           "additionalProperties": false
         },
+        "delegatedCapabilities": {
+          "type": "object",
+          "required": ["issuance", "invocation", "exactActionAndInput", "maxUses", "redelegation"],
+          "properties": {
+            "issuance": { "const": "httpOnly" },
+            "invocation": { "const": "authenticatedRequestMetadata" },
+            "exactActionAndInput": { "const": true },
+            "maxUses": { "const": 1 },
+            "redelegation": { "const": false }
+          },
+          "additionalProperties": false
+        },
         "prompts": { "const": false },
         "tasks": { "const": false }
       },
       "additionalProperties": false
     },
     "taskPacket": { "$ref": "#/$defs/taskPacket" },
+    "delegatedCapabilities": { "$ref": "#/$defs/delegatedCapabilities" },
     "tools": {
       "type": "array",
       "items": { "$ref": "#/$defs/tool" }
@@ -218,6 +232,28 @@
           },
           "additionalProperties": false
         }
+      },
+      "additionalProperties": false
+    },
+    "delegatedCapabilities": {
+      "type": "object",
+      "required": [
+        "version", "issuePath", "revokePathTemplate", "issueInputSchema", "issueOutputSchema",
+        "revokeOutputSchema", "invocationMetadata", "credentialScheme", "authenticatedDelegateRequired",
+        "hostAtomicConsumeAndExecuteRequired", "discoveryGrantsAuthority"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "issuePath": { "const": "/agent/delegations" },
+        "revokePathTemplate": { "const": "/agent/delegations/{grantId}/revoke" },
+        "issueInputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "issueOutputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "revokeOutputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "invocationMetadata": { "const": "dev.modellang/delegatedCapability" },
+        "credentialScheme": { "const": "ModelLang-Delegation" },
+        "authenticatedDelegateRequired": { "const": true },
+        "hostAtomicConsumeAndExecuteRequired": { "const": true },
+        "discoveryGrantsAuthority": { "const": false }
       },
       "additionalProperties": false
     },

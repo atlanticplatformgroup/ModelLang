@@ -5,11 +5,11 @@
   "type": "object",
   "required": [
     "$schema", "catalogVersion", "compilerVersion", "operationManifestVersion",
-    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "tools"
+    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "delegatedCapabilities", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
-    "catalogVersion": { "const": 4 },
+    "catalogVersion": { "const": 5 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },
     "capabilityManifestVersion": { "const": 10 },
@@ -120,6 +120,44 @@
         "atomic": { "const": false },
         "grantsAuthority": { "const": false },
         "runtimeAuthorizationRequired": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "delegatedCapabilities": {
+      "type": "object",
+      "required": [
+        "version", "protocol", "issue", "revoke", "invocation", "authenticatedGrantor",
+        "exactAction", "exactInputHash", "revisionBound", "maxTtlSeconds", "maxUses",
+        "transferable", "redelegation", "hostCredentialAuthorityRequired",
+        "runtimeAuthorizationRequired", "discoveryGrantsAuthority"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "protocol": { "const": "http" },
+        "issue": {
+          "type": "object",
+          "required": ["method", "path"],
+          "properties": { "method": { "const": "POST" }, "path": { "const": "/agent/delegations" } },
+          "additionalProperties": false
+        },
+        "revoke": {
+          "type": "object",
+          "required": ["method", "pathTemplate"],
+          "properties": { "method": { "const": "POST" }, "pathTemplate": { "const": "/agent/delegations/{grantId}/revoke" } },
+          "additionalProperties": false
+        },
+        "invocation": { "const": "authenticatedRequestCredential" },
+        "authenticatedGrantor": { "const": true },
+        "exactAction": { "const": true },
+        "exactInputHash": { "const": "canonicalSha256" },
+        "revisionBound": { "const": true },
+        "maxTtlSeconds": { "const": 3600 },
+        "maxUses": { "const": 1 },
+        "transferable": { "const": false },
+        "redelegation": { "const": false },
+        "hostCredentialAuthorityRequired": { "const": true },
+        "runtimeAuthorizationRequired": { "const": true },
+        "discoveryGrantsAuthority": { "const": false }
       },
       "additionalProperties": false
     },

@@ -1,6 +1,7 @@
 import type { AgentToolCatalog } from "./agent-tool-catalog.js";
 import type { GeneratedFiles } from "./build.js";
 import type { TaskPacketSchemas } from "./task-packet.js";
+import type { DelegatedCapabilitySchemas } from "./delegated-capability.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -40,12 +41,13 @@ interface McpToolBinding {
 
 export interface McpAdapterManifest {
   $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
-  adapterVersion: 2;
+  adapterVersion: 3;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
-  catalogVersion: 4;
+  catalogVersion: 5;
   resourceEnvelopeVersion: 1;
   taskPacketVersion: 1;
+  delegatedCapabilityVersion: 1;
   model: AgentToolCatalog["model"];
   transport: {
     kind: "streamableHttp";
@@ -81,6 +83,13 @@ export interface McpAdapterManifest {
       delivery: "embeddedToolResult";
       maxAgeSeconds: 0;
     };
+    delegatedCapabilities: {
+      issuance: "httpOnly";
+      invocation: "authenticatedRequestMetadata";
+      exactActionAndInput: true;
+      maxUses: 1;
+      redelegation: false;
+    };
     prompts: false;
     tasks: false;
   };
@@ -105,6 +114,19 @@ export interface McpAdapterManifest {
       grantsAuthority: false;
     };
   };
+  delegatedCapabilities: {
+    version: 1;
+    issuePath: "/agent/delegations";
+    revokePathTemplate: "/agent/delegations/{grantId}/revoke";
+    issueInputSchema: Record<string, unknown>;
+    issueOutputSchema: Record<string, unknown>;
+    revokeOutputSchema: Record<string, unknown>;
+    invocationMetadata: "dev.modellang/delegatedCapability";
+    credentialScheme: "ModelLang-Delegation";
+    authenticatedDelegateRequired: true;
+    hostAtomicConsumeAndExecuteRequired: true;
+    discoveryGrantsAuthority: false;
+  };
   tools: McpToolBinding[];
 }
 
@@ -120,15 +142,17 @@ function stableMcpName(operationId: string): string {
 export function generateMcpAdapterManifest(
   catalog: AgentToolCatalog,
   taskPacketSchemas: TaskPacketSchemas,
+  delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
 ): McpAdapterManifest {
   return {
     $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
-    adapterVersion: 2,
+    adapterVersion: 3,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
     catalogVersion: catalog.catalogVersion,
     resourceEnvelopeVersion: 1,
     taskPacketVersion: 1,
+    delegatedCapabilityVersion: 1,
     model: { ...catalog.model },
     transport: {
       kind: "streamableHttp",
@@ -164,6 +188,13 @@ export function generateMcpAdapterManifest(
         delivery: "embeddedToolResult",
         maxAgeSeconds: 0,
       },
+      delegatedCapabilities: {
+        issuance: "httpOnly",
+        invocation: "authenticatedRequestMetadata",
+        exactActionAndInput: true,
+        maxUses: 1,
+        redelegation: false,
+      },
       prompts: false,
       tasks: false,
     },
@@ -187,6 +218,19 @@ export function generateMcpAdapterManifest(
         freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
         grantsAuthority: false,
       },
+    },
+    delegatedCapabilities: {
+      version: 1,
+      issuePath: "/agent/delegations",
+      revokePathTemplate: "/agent/delegations/{grantId}/revoke",
+      issueInputSchema: structuredClone(delegatedCapabilitySchemas.issueInputSchema),
+      issueOutputSchema: structuredClone(delegatedCapabilitySchemas.issueOutputSchema),
+      revokeOutputSchema: structuredClone(delegatedCapabilitySchemas.revokeOutputSchema),
+      invocationMetadata: "dev.modellang/delegatedCapability",
+      credentialScheme: "ModelLang-Delegation",
+      authenticatedDelegateRequired: true,
+      hostAtomicConsumeAndExecuteRequired: true,
+      discoveryGrantsAuthority: false,
     },
     tools: catalog.tools.map((tool): McpToolBinding => ({
       name: stableMcpName(tool.id),
@@ -242,10 +286,13 @@ import {
 import type { ExecutionOptions } from "./types.js";
 import {
   assemble${modelName}TaskPacket,
+  invoke${modelName}DelegatedCapability,
+  type ${modelName}ActionOperationId,
+  type ${modelName}DelegationRuntime,
   type ${modelName}OperationExecutor,
   type ${modelName}OperationId,
 } from "./http-server.js";
-import { ModelOperationError } from "./errors.js";
+import { AuthorizationError, ModelOperationError, ValidationError } from "./errors.js";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -281,17 +328,20 @@ const toolDefinitions = ${JSON.stringify(manifest.tools.map((tool) => ({
   })), null, 2)} as const satisfies readonly McpToolDefinition[];
 
 const taskPacketDefinition = ${JSON.stringify(manifest.taskPacket, null, 2)} as const;
+const delegatedCapabilityDefinition = ${JSON.stringify(manifest.delegatedCapabilities, null, 2)} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
 const correlationIdKey = "dev.modellang/correlationId";
 const causationIdKey = "dev.modellang/causationId";
+const delegatedCapabilityKey = "dev.modellang/delegatedCapability";
 const commandMetadataKeys = [expectedRevisionKey, idempotencyKeyKey, correlationIdKey, causationIdKey] as const;
 const commandMetadataPattern = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 
 export interface ${modelName}AuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ${modelName}OperationExecutor;
+  readonly delegation?: ${modelName}DelegationRuntime;
 }
 
 export type ${modelName}McpAuthenticator = (
@@ -348,7 +398,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 4 as const,
+    catalogVersion: 5 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.operationId,
     kind: "queryResult" as const,
@@ -391,13 +441,15 @@ function safeToolError(error: unknown): CallToolResult {
 
 function build${modelName}McpServer(
   executor: ${modelName}OperationExecutor,
+  delegation: ${modelName}DelegationRuntime | undefined,
+  delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
     { name: ${JSON.stringify(`${modelName}-ModelLang`)}, version: ${JSON.stringify(manifest.model.version)} },
     {
-      instructions: "Tool discovery and task packets grant no authority. Every call is authenticated and runtime authorization remains authoritative. Query resources and task packets have zero reusable lifetime and must be re-read before reuse.",
+      instructions: "Tool discovery and task packets grant no authority. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -416,6 +468,10 @@ function build${modelName}McpServer(
           "dev.modellang/operationId": definition.operationId,
           "dev.modellang/grantsAuthority": false,
           "dev.modellang/runtimeAuthorizationRequired": true,
+          ...(definition.kind === "action" ? {
+            "dev.modellang/delegatedCapabilityVersion": delegatedCapabilityDefinition.version,
+            "dev.modellang/delegatedInvocationMetadata": delegatedCapabilityDefinition.invocationMetadata,
+          } : {}),
           ...(definition.kind === "query" ? {
             "dev.modellang/resourceEnvelopeVersion": 1,
             "dev.modellang/maxAgeSeconds": 0,
@@ -424,11 +480,30 @@ function build${modelName}McpServer(
       },
       async (input, ctx): Promise<CallToolResult> => {
         try {
-          const data = await executor.execute(
-            definition.operationId,
-            input,
-            executionOptions(definition, ctx),
-          );
+          const delegatedCredential = metadataString(ctx.mcpReq._meta, delegatedCapabilityKey);
+          let data: unknown;
+          if (delegatedCredential !== undefined) {
+            if (definition.kind !== "action" || !delegation) {
+              throw new AuthorizationError("Delegated capabilities are valid only for exact action invocation", "ML_DELEGATION_SCOPE", "delegation:scope");
+            }
+            if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+              throw new ValidationError("Caller command metadata is not accepted with delegated capabilities", "ML_VALIDATION", "delegation:metadata");
+            }
+            data = await invoke${modelName}DelegatedCapability(
+              delegation,
+              delegatedCredential,
+              definition.operationId as ${modelName}ActionOperationId,
+              input,
+              delegationAudience,
+              now,
+            );
+          } else {
+            data = await executor.execute(
+              definition.operationId,
+              input,
+              executionOptions(definition, ctx),
+            );
+          }
           if (definition.kind === "action") {
             return {
               content: [{ type: "text", text: JSON.stringify(data) }],
@@ -491,8 +566,8 @@ function build${modelName}McpServer(
     },
     async (input, ctx): Promise<CallToolResult> => {
       try {
-        if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
-          throw new Error("Command metadata is not accepted by task packet assembly");
+        if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new ValidationError("Command metadata is not accepted by task packet assembly", "ML_VALIDATION", "agent:task-packet");
         }
         const packet = await assemble${modelName}TaskPacket(executor, input, now);
         const uri = \`modellang:///models/${encodeURIComponent(manifest.model.id)}/task-packets/\${packet.packetId}\`;
@@ -580,13 +655,19 @@ export function create${modelName}McpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const executors = new WeakMap<AuthInfo, ${modelName}OperationExecutor>();
+  const contexts = new WeakMap<AuthInfo, { executor: ${modelName}OperationExecutor; delegation?: ${modelName}DelegationRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
-      const executor = authInfo && executors.get(authInfo);
-      if (!authInfo || !executor) throw new Error("Authenticated ModelLang MCP context is unavailable");
-      return build${modelName}McpServer(executor, now, options.onerror);
+      const authenticated = authInfo && contexts.get(authInfo);
+      if (!authInfo || !authenticated) throw new Error("Authenticated ModelLang MCP context is unavailable");
+      return build${modelName}McpServer(
+        authenticated.executor,
+        authenticated.delegation,
+        resourceServerUrl.href,
+        now,
+        options.onerror,
+      );
     },
     { legacy: "stateless", onerror: options.onerror },
   );
@@ -620,7 +701,10 @@ export function create${modelName}McpHandler(
         scopes: [...authenticated.authInfo.scopes],
         ...(authenticated.authInfo.extra ? { extra: { ...authenticated.authInfo.extra } } : {}),
       };
-      executors.set(authInfo, authenticated.executor);
+      contexts.set(authInfo, {
+        executor: authenticated.executor,
+        ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+      });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
         const headers = new Headers(response.headers);
@@ -631,7 +715,7 @@ export function create${modelName}McpHandler(
           headers,
         });
       } finally {
-        executors.delete(authInfo);
+        contexts.delete(authInfo);
       }
     },
   };
@@ -639,8 +723,12 @@ export function create${modelName}McpHandler(
 `;
 }
 
-export function generateMcp(catalog: AgentToolCatalog, taskPacketSchemas: TaskPacketSchemas): GeneratedFiles {
-  const manifest = generateMcpAdapterManifest(catalog, taskPacketSchemas);
+export function generateMcp(
+  catalog: AgentToolCatalog,
+  taskPacketSchemas: TaskPacketSchemas,
+  delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
+): GeneratedFiles {
+  const manifest = generateMcpAdapterManifest(catalog, taskPacketSchemas, delegatedCapabilitySchemas);
   return {
     "mcp.json": `${JSON.stringify(manifest, null, 2)}\n`,
     "typescript/mcp-server.ts": generateMcpServer(manifest),

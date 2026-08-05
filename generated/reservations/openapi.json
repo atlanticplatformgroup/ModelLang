@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.42.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6)."
+    "version": "0.43.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -22,6 +22,9 @@
         "x-modellang-operation-id": "action:act_508ad810a19d4b79a5009871de5cd26b",
         "parameters": [
           {
+            "$ref": "#/components/parameters/DelegatedCapabilityCredential"
+          },
+          {
             "$ref": "#/components/parameters/ExpectedRevision"
           },
           {
@@ -35,6 +38,11 @@
           }
         ],
         "x-modellang-idempotency": "required",
+        "x-modellang-delegated-capability": {
+          "version": 1,
+          "ordinaryBearerAuthenticationRequired": true,
+          "mutuallyExclusiveWithCommandMetadata": true
+        },
         "requestBody": {
           "required": true,
           "content": {
@@ -587,7 +595,7 @@
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 4
+                      "const": 5
                     },
                     "model": {
                       "type": "object",
@@ -606,10 +614,10 @@
                           "const": "Reservations"
                         },
                         "version": {
-                          "const": "0.42.0"
+                          "const": "0.43.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                          "const": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
                         }
                       }
                     },
@@ -1213,6 +1221,367 @@
           }
         }
       }
+    },
+    "/agent/delegations": {
+      "post": {
+        "operationId": "modellang_issue_delegated_capability",
+        "summary": "Issue one exact-input delegated action capability",
+        "tags": [
+          "Delegated capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-authority": "delegated",
+        "x-modellang-max-uses": 1,
+        "x-modellang-redelegation": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action",
+                  "delegate",
+                  "audience",
+                  "expiresInSeconds"
+                ],
+                "properties": {
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operationId",
+                          "input"
+                        ],
+                        "properties": {
+                          "operationId": {
+                            "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                          },
+                          "input": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "resource",
+                              "startsAt",
+                              "endsAt"
+                            ],
+                            "properties": {
+                              "resource": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "startsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "endsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "delegate": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "issuer",
+                      "subject"
+                    ],
+                    "properties": {
+                      "issuer": {
+                        "type": "string",
+                        "format": "uri",
+                        "minLength": 1,
+                        "maxLength": 2048
+                      },
+                      "subject": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      }
+                    }
+                  },
+                  "audience": {
+                    "type": "string",
+                    "format": "uri",
+                    "minLength": 1,
+                    "maxLength": 2048
+                  },
+                  "expiresInSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3600
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Single-delivery delegated bearer credential; this response is secret",
+            "headers": {
+              "Cache-Control": {
+                "description": "Delegated credentials must never be stored by intermediaries",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedCapability"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/delegations/{grantId}/revoke": {
+      "post": {
+        "operationId": "modellang_revoke_delegated_capability",
+        "summary": "Revoke one delegated capability as its authenticated grantor",
+        "tags": [
+          "Delegated capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "grantId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current revocation disposition without identity disclosure",
+            "headers": {
+              "Cache-Control": {
+                "description": "Revocation results must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "grantId",
+                    "status",
+                    "revoked"
+                  ],
+                  "properties": {
+                    "grantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "enum": [
+                        "revoked",
+                        "alreadyRevoked",
+                        "consumed",
+                        "expired",
+                        "notFound"
+                      ]
+                    },
+                    "revoked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1230,11 +1599,22 @@
       "IdempotencyKey": {
         "name": "Idempotency-Key",
         "in": "header",
-        "required": true,
-        "description": "Principal-scoped retry key; it grants no authority.",
+        "required": false,
+        "description": "Required for ordinary invocation of reliable actions and forbidden with Delegated-Capability; it grants no authority.",
         "schema": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+        }
+      },
+      "DelegatedCapabilityCredential": {
+        "name": "Delegated-Capability",
+        "in": "header",
+        "required": false,
+        "description": "Once-delivered ModelLang-Delegation credential. It supplements ordinary bearer authentication and is mutually exclusive with caller command metadata.",
+        "schema": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 4096
         }
       },
       "CorrelationId": {
@@ -1626,7 +2006,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 4
+            "const": 5
           },
           "resourceVersion": {
             "const": 1
@@ -1635,8 +2015,8 @@
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.42.0",
-              "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+              "version": "0.43.0",
+              "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
             }
           },
           "packetId": {
@@ -2085,14 +2465,14 @@
                           "const": 1
                         },
                         "catalogVersion": {
-                          "const": 4
+                          "const": 5
                         },
                         "model": {
                           "const": {
                             "id": "model:Reservations",
                             "name": "Reservations",
-                            "version": "0.42.0",
-                            "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                            "version": "0.43.0",
+                            "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
                           }
                         },
                         "operationId": {
@@ -2220,6 +2600,134 @@
           }
         }
       },
+      "DelegatedCapability": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "delegatedCapabilityVersion",
+          "catalogVersion",
+          "model",
+          "grantId",
+          "operationId",
+          "inputHash",
+          "authority",
+          "issuedAt",
+          "notBefore",
+          "expiresAt",
+          "revision",
+          "audience",
+          "constraints",
+          "view",
+          "credential"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+          },
+          "delegatedCapabilityVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 5
+          },
+          "model": {
+            "const": {
+              "id": "model:Reservations",
+              "name": "Reservations",
+              "version": "0.43.0",
+              "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+            }
+          },
+          "grantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "enum": [
+              "action:act_508ad810a19d4b79a5009871de5cd26b"
+            ]
+          },
+          "inputHash": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "authority": {
+            "const": "delegated"
+          },
+          "issuedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notBefore": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiresAt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^rev:1:[0-9a-f]{32}$"
+          },
+          "audience": {
+            "type": "string",
+            "format": "uri",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "constraints": {
+            "const": {
+              "operation": "exact",
+              "input": "canonicalSha256",
+              "revision": "required",
+              "uses": 1,
+              "transferable": false,
+              "redelegation": false
+            }
+          },
+          "view": {
+            "const": {
+              "audience": "agent",
+              "containsOperationInput": false,
+              "containsGrantorIdentity": false,
+              "containsDelegateIdentity": false,
+              "containsCredential": true,
+              "credentialDelivery": "once",
+              "grantsAuthority": true,
+              "runtimeAuthorizationRequired": true
+            }
+          },
+          "credential": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "scheme",
+              "secret",
+              "delivery",
+              "value"
+            ],
+            "properties": {
+              "scheme": {
+                "const": "ModelLang-Delegation"
+              },
+              "secret": {
+                "const": true
+              },
+              "delivery": {
+                "const": "once"
+              },
+              "value": {
+                "type": "string",
+                "minLength": 32,
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      },
       "SubjectCapabilityView": {
         "type": "object",
         "additionalProperties": false,
@@ -2241,7 +2749,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 4
+            "const": 5
           },
           "model": {
             "type": "object",
@@ -2260,10 +2768,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.42.0"
+                "const": "0.43.0"
               },
               "sourceHash": {
-                "const": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                "const": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
               }
             }
           },

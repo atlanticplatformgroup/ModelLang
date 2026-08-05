@@ -1,16 +1,17 @@
 {
   "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
-  "adapterVersion": 2,
-  "compilerVersion": "0.42.0",
+  "adapterVersion": 3,
+  "compilerVersion": "0.43.0",
   "protocolVersion": "2026-07-28",
-  "catalogVersion": 4,
+  "catalogVersion": 5,
   "resourceEnvelopeVersion": 1,
   "taskPacketVersion": 1,
+  "delegatedCapabilityVersion": 1,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.42.0",
-    "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+    "version": "0.43.0",
+    "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
   },
   "transport": {
     "kind": "streamableHttp",
@@ -48,6 +49,13 @@
       "mcpTasks": false,
       "delivery": "embeddedToolResult",
       "maxAgeSeconds": 0
+    },
+    "delegatedCapabilities": {
+      "issuance": "httpOnly",
+      "invocation": "authenticatedRequestMetadata",
+      "exactActionAndInput": true,
+      "maxUses": 1,
+      "redelegation": false
     },
     "prompts": false,
     "tasks": false
@@ -213,7 +221,7 @@
           "const": 1
         },
         "catalogVersion": {
-          "const": 4
+          "const": 5
         },
         "resourceVersion": {
           "const": 1
@@ -222,8 +230,8 @@
           "const": {
             "id": "model:Reservations",
             "name": "Reservations",
-            "version": "0.42.0",
-            "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+            "version": "0.43.0",
+            "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
           }
         },
         "packetId": {
@@ -672,14 +680,14 @@
                         "const": 1
                       },
                       "catalogVersion": {
-                        "const": 4
+                        "const": 5
                       },
                       "model": {
                         "const": {
                           "id": "model:Reservations",
                           "name": "Reservations",
-                          "version": "0.42.0",
-                          "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                          "version": "0.43.0",
+                          "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
                         }
                       },
                       "operationId": {
@@ -825,6 +833,258 @@
       },
       "grantsAuthority": false
     }
+  },
+  "delegatedCapabilities": {
+    "version": 1,
+    "issuePath": "/agent/delegations",
+    "revokePathTemplate": "/agent/delegations/{grantId}/revoke",
+    "issueInputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action",
+        "delegate",
+        "audience",
+        "expiresInSeconds"
+      ],
+      "properties": {
+        "action": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "input"
+              ],
+              "properties": {
+                "operationId": {
+                  "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                },
+                "input": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "resource",
+                    "startsAt",
+                    "endsAt"
+                  ],
+                  "properties": {
+                    "resource": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "delegate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "issuer",
+            "subject"
+          ],
+          "properties": {
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "minLength": 1,
+              "maxLength": 2048
+            },
+            "subject": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "audience": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "expiresInSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3600
+        }
+      }
+    },
+    "issueOutputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "delegatedCapabilityVersion",
+        "catalogVersion",
+        "model",
+        "grantId",
+        "operationId",
+        "inputHash",
+        "authority",
+        "issuedAt",
+        "notBefore",
+        "expiresAt",
+        "revision",
+        "audience",
+        "constraints",
+        "view",
+        "credential"
+      ],
+      "properties": {
+        "$schema": {
+          "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+        },
+        "delegatedCapabilityVersion": {
+          "const": 1
+        },
+        "catalogVersion": {
+          "const": 5
+        },
+        "model": {
+          "const": {
+            "id": "model:Reservations",
+            "name": "Reservations",
+            "version": "0.43.0",
+            "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+          }
+        },
+        "grantId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "operationId": {
+          "enum": [
+            "action:act_508ad810a19d4b79a5009871de5cd26b"
+          ]
+        },
+        "inputHash": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "authority": {
+          "const": "delegated"
+        },
+        "issuedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notBefore": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^rev:1:[0-9a-f]{32}$"
+        },
+        "audience": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "constraints": {
+          "const": {
+            "operation": "exact",
+            "input": "canonicalSha256",
+            "revision": "required",
+            "uses": 1,
+            "transferable": false,
+            "redelegation": false
+          }
+        },
+        "view": {
+          "const": {
+            "audience": "agent",
+            "containsOperationInput": false,
+            "containsGrantorIdentity": false,
+            "containsDelegateIdentity": false,
+            "containsCredential": true,
+            "credentialDelivery": "once",
+            "grantsAuthority": true,
+            "runtimeAuthorizationRequired": true
+          }
+        },
+        "credential": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "scheme",
+            "secret",
+            "delivery",
+            "value"
+          ],
+          "properties": {
+            "scheme": {
+              "const": "ModelLang-Delegation"
+            },
+            "secret": {
+              "const": true
+            },
+            "delivery": {
+              "const": "once"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 4096
+            }
+          }
+        }
+      }
+    },
+    "revokeOutputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grantId",
+        "status",
+        "revoked"
+      ],
+      "properties": {
+        "grantId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "status": {
+          "enum": [
+            "revoked",
+            "alreadyRevoked",
+            "consumed",
+            "expired",
+            "notFound"
+          ]
+        },
+        "revoked": {
+          "type": "boolean"
+        }
+      }
+    },
+    "invocationMetadata": "dev.modellang/delegatedCapability",
+    "credentialScheme": "ModelLang-Delegation",
+    "authenticatedDelegateRequired": true,
+    "hostAtomicConsumeAndExecuteRequired": true,
+    "discoveryGrantsAuthority": false
   },
   "tools": [
     {

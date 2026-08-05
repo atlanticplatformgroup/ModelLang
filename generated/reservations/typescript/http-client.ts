@@ -25,10 +25,61 @@ export interface ReservationsTaskPacketRequest {
   readonly observations: readonly ReservationsTaskPacketObservationRequest[];
 }
 
+export type ReservationsDelegatedActionCandidate =
+  | { readonly operationId: "action:act_508ad810a19d4b79a5009871de5cd26b"; readonly input: ReserveInput };
+
+export interface ReservationsDelegationRequest {
+  readonly action: ReservationsDelegatedActionCandidate;
+  readonly delegate: { readonly issuer: string; readonly subject: string };
+  readonly audience: string;
+  readonly expiresInSeconds: number;
+}
+
+export interface ReservationsDelegatedCapability {
+  readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
+  readonly delegatedCapabilityVersion: 1;
+  readonly catalogVersion: 5;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly grantId: string;
+  readonly operationId: ReservationsDelegatedActionCandidate["operationId"];
+  readonly inputHash: string;
+  readonly authority: "delegated";
+  readonly issuedAt: number;
+  readonly notBefore: number;
+  readonly expiresAt: number;
+  readonly revision: string;
+  readonly audience: string;
+  readonly constraints: {
+    readonly operation: "exact";
+    readonly input: "canonicalSha256";
+    readonly revision: "required";
+    readonly uses: 1;
+    readonly transferable: false;
+    readonly redelegation: false;
+  };
+  readonly view: {
+    readonly audience: "agent";
+    readonly containsOperationInput: false;
+    readonly containsGrantorIdentity: false;
+    readonly containsDelegateIdentity: false;
+    readonly containsCredential: true;
+    readonly credentialDelivery: "once";
+    readonly grantsAuthority: true;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly credential: { readonly scheme: "ModelLang-Delegation"; readonly secret: true; readonly delivery: "once"; readonly value: string };
+}
+
+export interface ReservationsDelegationRevocation {
+  readonly grantId: string;
+  readonly status: "revoked" | "alreadyRevoked" | "consumed" | "expired" | "notFound";
+  readonly revoked: boolean;
+}
+
 export interface ReservationsSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -69,7 +120,7 @@ export interface ReservationsSubjectCapabilityView {
 export interface ReservationsAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -100,7 +151,7 @@ export type ReservationsTaskPacketObservation =
 export interface ReservationsAgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 4;
+  readonly catalogVersion: 5;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -217,6 +268,14 @@ export class ReservationsHttpClient {
 
   async taskPacket(request: ReservationsTaskPacketRequest): Promise<ReservationsAgentTaskPacket> {
     return this.call("/agent/task-packets", request);
+  }
+
+  async issueDelegatedCapability(request: ReservationsDelegationRequest): Promise<ReservationsDelegatedCapability> {
+    return this.call("/agent/delegations", request);
+  }
+
+  async revokeDelegatedCapability(grantId: string): Promise<ReservationsDelegationRevocation> {
+    return this.call(`/agent/delegations/${encodeURIComponent(grantId)}/revoke`, {});
   }
 
   async reserve(input: ReserveInput, options: ExecutionOptions = {}): Promise<Reservation> {

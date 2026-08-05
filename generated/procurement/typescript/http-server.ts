@@ -2,6 +2,9 @@
 import type { OpenRequestInput, SubmitRequestInput, ApproveRequestInput, MyRequestsInput, ApplicabilityDecision, ApplicabilityOptions, ExecutionOptions } from "./types.js";
 import type {
   ProcurementAgentTaskPacket,
+  ProcurementDelegatedCapability,
+  ProcurementDelegationRequest,
+  ProcurementDelegationRevocation,
   ProcurementSubjectCapabilityCandidate,
   ProcurementSubjectCapabilityView,
   ProcurementTaskPacketRequest,
@@ -828,14 +831,54 @@ export interface ProcurementOperationExecutor {
   assess(operationId: ProcurementActionOperationId, input: Readonly<Record<string, unknown>>, options?: ApplicabilityOptions): Promise<ApplicabilityDecision>;
 }
 
+export type ProcurementDelegatedCapabilityClaim = Omit<ProcurementDelegatedCapability, "credential" | "view">;
+
+export interface ProcurementDelegationIssueRequest {
+  readonly action: { readonly operationId: ProcurementActionOperationId; readonly input: Readonly<Record<string, unknown>> };
+  readonly inputHash: string;
+  readonly delegate: { readonly issuer: string; readonly subject: string };
+  readonly audience: string;
+  readonly issuedAt: number;
+  readonly notBefore: number;
+  readonly expiresAt: number;
+  readonly revision: string;
+}
+
+/**
+ * Host credential authority bound to the principal authenticated for this request.
+ * issue and revoke must enforce grantor ownership. inspect must expose claims only
+ * to the named authenticated delegate. invoke must atomically recheck the grant,
+ * consume its single use, and execute through the stored grantor-bound executor.
+ */
+export interface ProcurementDelegationRuntime {
+  issue(request: ProcurementDelegationIssueRequest): Promise<{ grantId: string; credential: string }>;
+  revoke(grantId: string): Promise<ProcurementDelegationRevocation>;
+  inspect(credential: string): Promise<ProcurementDelegatedCapabilityClaim | null>;
+  invoke(
+    credential: string,
+    claim: ProcurementDelegatedCapabilityClaim,
+    operationId: ProcurementActionOperationId,
+    input: Readonly<Record<string, unknown>>,
+    options: ExecutionOptions,
+  ): Promise<unknown>;
+}
+
+export interface ProcurementAuthenticatedContext {
+  readonly executor: ProcurementOperationExecutor;
+  readonly delegation?: ProcurementDelegationRuntime;
+}
+
+export type ProcurementAuthenticationResult = ProcurementOperationExecutor | ProcurementAuthenticatedContext;
+
 export type ProcurementAuthenticator = (
   bearerToken: string,
-) => ProcurementOperationExecutor | null | Promise<ProcurementOperationExecutor | null>;
+) => ProcurementAuthenticationResult | null | Promise<ProcurementAuthenticationResult | null>;
 
 export interface ProcurementHttpHandlerOptions {
   basePath?: string;
   maxBodyBytes?: number;
   now?: () => Date;
+  delegationAudience?: string;
 }
 
 export function createProcurementDatabaseExecutor(
@@ -1172,12 +1215,161 @@ function validateTaskPacketRequest(value: unknown): ProcurementTaskPacketRequest
   return { actions, observations } as unknown as ProcurementTaskPacketRequest;
 }
 
+function authenticatedContext(value: ProcurementAuthenticationResult): ProcurementAuthenticatedContext {
+  return "executor" in value ? value : { executor: value };
+}
+
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value === "boolean" || typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "number" && Number.isFinite(value)) return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(object[key])}`).join(",")}}`;
+  }
+  throw new ValidationError("Delegated capability input must be JSON", "ML_VALIDATION", "agent:delegation-input");
+}
+
+async function canonicalSha256(value: unknown): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonicalJson(value)));
+  return `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+function absoluteUri(value: unknown): value is string {
+  if (typeof value !== "string" || value.length < 1 || value.length > 2048) return false;
+  try {
+    const parsed = new URL(value);
+    return Boolean(parsed.protocol && parsed.host);
+  } catch {
+    return false;
+  }
+}
+
+function validateDelegationRequest(value: unknown): ProcurementDelegationRequest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("Delegation input must be a JSON object", "ML_VALIDATION", "agent:delegation");
+  }
+  const request = value as Record<string, unknown>;
+  if (Object.keys(request).some((key) => !["action", "delegate", "audience", "expiresInSeconds"].includes(key))
+    || !request.action || typeof request.action !== "object" || Array.isArray(request.action)
+    || !request.delegate || typeof request.delegate !== "object" || Array.isArray(request.delegate)
+    || !absoluteUri(request.audience)
+    || !Number.isInteger(request.expiresInSeconds)
+    || (request.expiresInSeconds as number) < 1
+    || (request.expiresInSeconds as number) > 3600) {
+    throw new ValidationError("Delegation input is outside the exact bounded contract", "ML_VALIDATION", "agent:delegation");
+  }
+  const action = request.action as Record<string, unknown>;
+  const delegate = request.delegate as Record<string, unknown>;
+  if (Object.keys(action).some((key) => key !== "operationId" && key !== "input")
+    || typeof action.operationId !== "string" || !Object.hasOwn(action, "input")
+    || Object.keys(delegate).some((key) => key !== "issuer" && key !== "subject")
+    || !absoluteUri(delegate.issuer)
+    || typeof delegate.subject !== "string" || delegate.subject.length < 1 || delegate.subject.length > 256) {
+    throw new ValidationError("Delegation action or delegate is invalid", "ML_VALIDATION", "agent:delegation");
+  }
+  const definition = operationDefinitions.find((item) =>
+    item.endpoint === "execution" && item.action && item.id === action.operationId);
+  if (!definition) {
+    throw new ValidationError("Delegation must name one declared action", "ML_VALIDATION", "agent:delegation-action");
+  }
+  return {
+    action: { operationId: definition.id as ProcurementActionOperationId, input: validateInput(definition, action.input) },
+    delegate: { issuer: delegate.issuer, subject: delegate.subject },
+    audience: request.audience,
+    expiresInSeconds: request.expiresInSeconds,
+  } as unknown as ProcurementDelegationRequest;
+}
+
+function validGrantId(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function validateDelegatedClaim(
+  value: unknown,
+  expectedAudience: string,
+  nowEpoch: number,
+): ProcurementDelegatedCapabilityClaim {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new AuthorizationError("Delegated capability is invalid", "ML_DELEGATION_INVALID", "delegation:claim");
+  }
+  const claim = value as Record<string, unknown>;
+  const allowed = new Set([
+    "$schema", "delegatedCapabilityVersion", "catalogVersion", "model", "grantId", "operationId",
+    "inputHash", "authority", "issuedAt", "notBefore", "expiresAt", "revision", "audience", "constraints",
+  ]);
+  const model = claim.model as Record<string, unknown> | undefined;
+  const constraints = claim.constraints as Record<string, unknown> | undefined;
+  const valid = Object.keys(claim).every((key) => allowed.has(key))
+    && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
+    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 5
+    && model?.id === "model:Procurement"
+    && model?.name === "Procurement"
+    && model?.version === "0.43.0"
+    && model?.sourceHash === "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
+    && Object.keys(model).length === 4
+    && validGrantId(claim.grantId)
+    && operationDefinitions.some((item) => item.endpoint === "execution" && item.action && item.id === claim.operationId)
+    && typeof claim.inputHash === "string" && /^sha256:[0-9a-f]{64}$/.test(claim.inputHash)
+    && claim.authority === "delegated"
+    && Number.isInteger(claim.issuedAt) && Number.isInteger(claim.notBefore) && Number.isInteger(claim.expiresAt)
+    && (claim.issuedAt as number) <= (claim.notBefore as number)
+    && (claim.notBefore as number) <= nowEpoch && nowEpoch < (claim.expiresAt as number)
+    && (claim.expiresAt as number) - (claim.issuedAt as number) <= 3600
+    && typeof claim.revision === "string" && /^rev:1:[0-9a-f]{32}$/.test(claim.revision)
+    && claim.audience === expectedAudience
+    && constraints?.operation === "exact"
+    && constraints?.input === "canonicalSha256"
+    && constraints?.revision === "required"
+    && constraints?.uses === 1
+    && constraints?.transferable === false
+    && constraints?.redelegation === false
+    && Object.keys(constraints).length === 6;
+  if (!valid) {
+    throw new AuthorizationError("Delegated capability is invalid, expired, or outside its audience", "ML_DELEGATION_INVALID", "delegation:claim");
+  }
+  return value as ProcurementDelegatedCapabilityClaim;
+}
+
+export async function invokeProcurementDelegatedCapability(
+  delegation: ProcurementDelegationRuntime,
+  credential: string,
+  operationId: ProcurementActionOperationId,
+  value: unknown,
+  audience: string,
+  now: () => Date = () => new Date(),
+): Promise<unknown> {
+  if (credential.length < 32 || credential.length > 4096) {
+    throw new AuthorizationError("Delegated capability is unavailable", "ML_DELEGATION_INVALID", "delegation:credential");
+  }
+  const definition = operationDefinitions.find((item) =>
+    item.endpoint === "execution" && item.action && item.id === operationId)!;
+  const input = validateInput(definition, value);
+  const claim = validateDelegatedClaim(
+    await delegation.inspect(credential),
+    audience,
+    Math.floor(now().getTime() / 1000),
+  );
+  if (claim.operationId !== operationId || claim.inputHash !== await canonicalSha256(input)) {
+    throw new AuthorizationError("Delegated capability does not match this exact action input", "ML_DELEGATION_SCOPE", "delegation:scope");
+  }
+  const command: ExecutionOptions = {
+    expectedRevision: claim.revision,
+    ...(definition.idempotency === "required"
+      ? { idempotencyKey: `delegation-${claim.grantId}`, correlationId: `delegation-${claim.grantId}` }
+      : {}),
+  };
+  const result = await delegation.invoke(credential, claim, operationId, input, command);
+  validateOutput(definition, result);
+  return result;
+}
+
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 4 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.42.0","sourceHash":"sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"},
+    catalogVersion: 5 as const,
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
     operationId: definition.id,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1240,9 +1432,9 @@ export async function assembleProcurementTaskPacket(
   return {
     $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
-    catalogVersion: 4,
+    catalogVersion: 5,
     resourceVersion: 1,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.42.0","sourceHash":"sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
     packetId: globalThis.crypto.randomUUID(),
     kind: "boundedTaskContext",
     authority: "none",
@@ -1322,6 +1514,11 @@ function problemResponse(error: unknown, headers: Record<string, string> = {}): 
   });
 }
 
+function escapeRegExp(value: string): string {
+  const syntax = ".*+?^$" + "{}()|[]\\";
+  return [...value].map((character) => syntax.includes(character) ? "\\" + character : character).join("");
+}
+
 async function readJson(request: Request, maxBodyBytes: number): Promise<unknown> {
   const declaredLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(declaredLength) && declaredLength > maxBodyBytes) {
@@ -1349,8 +1546,10 @@ export function createProcurementHttpHandler(
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === `${basePath}/agent/capabilities`;
     const taskPacketRequest = path === `${basePath}/agent/task-packets`;
+    const delegationIssueRequest = path === `${basePath}/agent/delegations`;
+    const delegationRevokeMatch = new RegExp(`^${escapeRegExp(basePath)}/agent/delegations/([0-9a-fA-F-]{36})/revoke$`).exec(path);
     const definition = operationDefinitions.find((candidate) => `${basePath}${candidate.route}` === path);
-    if (!definition && !subjectCapabilityRequest && !taskPacketRequest) {
+    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !delegationIssueRequest && !delegationRevokeMatch) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
@@ -1367,9 +1566,134 @@ export function createProcurementHttpHandler(
       return problemResponse(new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"));
     }
     try {
-      const executor = await authenticate(bearer);
-      if (!executor) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
+      const authenticated = await authenticate(bearer);
+      if (!authenticated) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
+      const context = authenticatedContext(authenticated);
+      const executor = context.executor;
       const body = await readJson(request, maxBodyBytes);
+      const delegatedCredential = request.headers.get("delegated-capability");
+      if (delegationIssueRequest) {
+        if (delegatedCredential) {
+          throw new AuthorizationError("Delegated capabilities cannot be re-delegated", "ML_DELEGATION_REDELEGATION", "delegation:redelegation");
+        }
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by delegation issuance", "ML_VALIDATION", "agent:delegation");
+          }
+        }
+        if (!context.delegation) {
+          throw new AuthorizationError("Delegation authority is not available", "ML_DELEGATION_UNAVAILABLE", "delegation:authority");
+        }
+        const delegation = validateDelegationRequest(body);
+        const actionDefinition = operationDefinitions.find((item) =>
+          item.endpoint === "execution" && item.action && item.id === delegation.action.operationId)!;
+        const decision = validateDecision(
+          actionDefinition,
+          await executor.assess(delegation.action.operationId, delegation.action.input as unknown as Readonly<Record<string, unknown>>, {}),
+        );
+        if (decision.status !== "applicable") {
+          return Response.json({
+            type: "https://modellang.dev/problems/delegation-unavailable",
+            title: "The exact action cannot currently be delegated.",
+            status: 409,
+            code: "ML_DELEGATION_UNAVAILABLE",
+            ruleId: decision.explanation?.ruleId,
+          }, { status: 409, headers: { "content-type": "application/problem+json", "cache-control": "no-store" } });
+        }
+        const issuedAt = Math.floor(now().getTime() / 1000);
+        const inputHash = await canonicalSha256(delegation.action.input);
+        const issueRequest: ProcurementDelegationIssueRequest = {
+          action: {
+            operationId: delegation.action.operationId,
+            input: delegation.action.input as unknown as Readonly<Record<string, unknown>>,
+          },
+          inputHash,
+          delegate: delegation.delegate,
+          audience: delegation.audience,
+          issuedAt,
+          notBefore: issuedAt,
+          expiresAt: issuedAt + delegation.expiresInSeconds,
+          revision: decision.revision!,
+        };
+        const issued = await context.delegation.issue(issueRequest);
+        if (!validGrantId(issued.grantId)
+          || typeof issued.credential !== "string" || issued.credential.length < 32 || issued.credential.length > 4096) {
+          throw new Error("Delegation authority returned an invalid credential");
+        }
+        const result: ProcurementDelegatedCapability = {
+          $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+          delegatedCapabilityVersion: 1,
+          catalogVersion: 5,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
+          grantId: issued.grantId,
+          operationId: issueRequest.action.operationId,
+          inputHash,
+          authority: "delegated",
+          issuedAt,
+          notBefore: issuedAt,
+          expiresAt: issueRequest.expiresAt,
+          revision: decision.revision!,
+          audience: delegation.audience,
+          constraints: {"operation":"exact","input":"canonicalSha256","revision":"required","uses":1,"transferable":false,"redelegation":false},
+          view: {"audience":"agent","containsOperationInput":false,"containsGrantorIdentity":false,"containsDelegateIdentity":false,"containsCredential":true,"credentialDelivery":"once","grantsAuthority":true,"runtimeAuthorizationRequired":true},
+          credential: { scheme: "ModelLang-Delegation", secret: true, delivery: "once", value: issued.credential },
+        };
+        return Response.json(result, {
+          status: 201,
+          headers: { "content-type": "application/json", "cache-control": "no-store", pragma: "no-cache" },
+        });
+      }
+      if (delegationRevokeMatch) {
+        if (delegatedCredential) {
+          throw new AuthorizationError("Delegated capabilities cannot revoke grants", "ML_DELEGATION_REDELEGATION", "delegation:revocation");
+        }
+        if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body as object).length !== 0) {
+          throw new ValidationError("Delegation revocation body must be empty", "ML_VALIDATION", "agent:delegation-revoke");
+        }
+        if (!context.delegation) {
+          throw new AuthorizationError("Delegation authority is not available", "ML_DELEGATION_UNAVAILABLE", "delegation:authority");
+        }
+        const grantId = delegationRevokeMatch[1]!;
+        if (!validGrantId(grantId)) {
+          throw new ValidationError("Delegation grant ID is invalid", "ML_VALIDATION", "agent:delegation-grant");
+        }
+        const result = await context.delegation.revoke(grantId);
+        if (result.grantId !== grantId
+          || !["revoked", "alreadyRevoked", "consumed", "expired", "notFound"].includes(result.status)
+          || result.revoked !== (result.status === "revoked" || result.status === "alreadyRevoked")) {
+          throw new Error("Delegation authority returned an invalid revocation result");
+        }
+        return Response.json(result, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+      if (delegatedCredential) {
+        if (!definition || definition.endpoint !== "execution" || !definition.action) {
+          throw new AuthorizationError("Delegated capabilities are valid only for exact action execution", "ML_DELEGATION_SCOPE", "delegation:scope");
+        }
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Caller command metadata is not accepted with delegated capabilities", "ML_VALIDATION", "delegation:metadata");
+          }
+        }
+        if (!context.delegation) {
+          throw new AuthorizationError("Delegated capability is unavailable", "ML_DELEGATION_INVALID", "delegation:credential");
+        }
+        const expectedAudience = options.delegationAudience ?? new URL(request.url).origin;
+        const result = await invokeProcurementDelegatedCapability(
+          context.delegation,
+          delegatedCredential,
+          definition.id as ProcurementActionOperationId,
+          body,
+          expectedAudience,
+          now,
+        );
+        return Response.json(result, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (taskPacketRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -1422,8 +1746,8 @@ export function createProcurementHttpHandler(
         const view: ProcurementSubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 4,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.42.0","sourceHash":"sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"},
+          catalogVersion: 5,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -1490,7 +1814,9 @@ export function createProcurementHttpHandler(
         },
       });
     } catch (error) {
-      return problemResponse(error);
+      return problemResponse(error, delegationIssueRequest || delegationRevokeMatch || request.headers.has("delegated-capability")
+        ? { "cache-control": "no-store" }
+        : {});
     }
   };
 }

@@ -9,6 +9,10 @@ import { ProcurementHttpClient } from "../../generated/procurement/typescript/ht
 import {
   createProcurementHttpHandler,
   type ProcurementAuthenticator,
+  type ProcurementDelegatedCapabilityClaim,
+  type ProcurementDelegationIssueRequest,
+  type ProcurementDelegationRuntime,
+  type ProcurementOperationExecutor,
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
 import { createProcurementMcpHandler } from "../../generated/procurement/typescript/mcp-server.js";
@@ -273,7 +277,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.42.0",
+      model_version: "0.43.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -338,7 +342,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.42.0",
+      model_version: "0.43.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1207,7 +1211,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.42.0', $1,
+        VALUES ('model:Procurement', '0.43.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2026,14 +2030,102 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   it("preserves authenticated Procurement semantics through generated HTTP and browser boundaries", async () => {
     const identities = new Map([
       ["employee-one", { issuer: "https://auth.example.test", subject: "employee-one" }],
+      ["employee-two", { issuer: "https://auth.example.test", subject: "employee-two" }],
       ["manager", { issuer: "https://auth.example.test", subject: "manager" }],
       ["finance", { issuer: "https://auth.example.test", subject: "finance" }],
     ]);
+    type StoredGrant = {
+      grantorToken: string;
+      delegateToken: string;
+      credential: string;
+      claim: ProcurementDelegatedCapabilityClaim;
+      executor: ProcurementOperationExecutor;
+      consumed: boolean;
+      revoked: boolean;
+    };
+    const grants = new Map<string, StoredGrant>();
+    let delegationAudience = "";
     await withHttpServer(async (token) => {
       const identity = identities.get(token);
-      return identity ? createProcurementGatewayExecutor(gateway, identity) : null;
+      if (!identity) return null;
+      const executor = createProcurementGatewayExecutor(gateway, identity);
+      const runtime: ProcurementDelegationRuntime = {
+        async issue(request: ProcurementDelegationIssueRequest) {
+          const delegateToken = [...identities.entries()].find(([, candidate]) =>
+            candidate.issuer === request.delegate.issuer && candidate.subject === request.delegate.subject)?.[0];
+          if (!delegateToken || request.audience !== delegationAudience) {
+            throw new AuthorizationError("Unknown delegate or audience", "ML_DELEGATION_INVALID", "delegation:host");
+          }
+          const grantId = randomUUID();
+          const credential = `delegation-${randomUUID()}-${randomUUID()}`;
+          const claim: ProcurementDelegatedCapabilityClaim = {
+            $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+            delegatedCapabilityVersion: 1,
+            catalogVersion: 5,
+            model: {
+              id: "model:Procurement",
+              name: "Procurement",
+              version: "0.43.0",
+              sourceHash: "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76",
+            },
+            grantId,
+            operationId: request.action.operationId,
+            inputHash: request.inputHash,
+            authority: "delegated",
+            issuedAt: request.issuedAt,
+            notBefore: request.notBefore,
+            expiresAt: request.expiresAt,
+            revision: request.revision,
+            audience: request.audience,
+            constraints: {
+              operation: "exact",
+              input: "canonicalSha256",
+              revision: "required",
+              uses: 1,
+              transferable: false,
+              redelegation: false,
+            },
+          };
+          grants.set(grantId, {
+            grantorToken: token,
+            delegateToken,
+            credential,
+            claim,
+            executor,
+            consumed: false,
+            revoked: false,
+          });
+          return { grantId, credential };
+        },
+        async revoke(grantId) {
+          const grant = grants.get(grantId);
+          if (!grant || grant.grantorToken !== token) return { grantId, status: "notFound", revoked: false };
+          if (grant.consumed) return { grantId, status: "consumed", revoked: false };
+          if (grant.revoked) return { grantId, status: "alreadyRevoked", revoked: true };
+          grant.revoked = true;
+          return { grantId, status: "revoked", revoked: true };
+        },
+        async inspect(credential) {
+          const grant = [...grants.values()].find((candidate) => candidate.credential === credential);
+          return grant && grant.delegateToken === token && !grant.consumed && !grant.revoked ? grant.claim : null;
+        },
+        async invoke(credential, claim, operationId, input, options) {
+          const grant = grants.get(claim.grantId);
+          if (!grant || grant.credential !== credential || grant.claim !== claim
+            || grant.delegateToken !== token || grant.consumed || grant.revoked) {
+            throw new AuthorizationError("Delegation is unavailable", "ML_DELEGATION_INVALID", "delegation:host");
+          }
+          // A production host must couple this transition and action execution atomically in its credential store.
+          // This in-process live fixture makes the transition synchronously before exercising PostgreSQL policy.
+          grant.consumed = true;
+          return grant.executor.execute(operationId, input, options);
+        },
+      };
+      return { executor, delegation: runtime };
     }, async (baseUrl) => {
+      delegationAudience = baseUrl;
       const employee = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-one" });
+      const employeeTwo = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-two" });
       const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
       const finance = new ProcurementHttpClient({ baseUrl, accessToken: () => "finance" });
       const employeeUi = createProcurementUiExecutor(employee);
@@ -2159,6 +2251,72 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         status: "APPROVED",
         approvedBy: "00000000-0000-4000-8000-000000000003",
       });
+
+      const delegatedRequest = await employee.openRequest({ amount: usd("7000") }, commandOptions("delegated-open"));
+      await employee.submitRequest({ request: delegatedRequest.id });
+      await expect(employeeTwo.approveRequest({ request: delegatedRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
+      const delegatedCapability = await manager.issueDelegatedCapability({
+        action: { operationId: approveOperationId, input: { request: delegatedRequest.id } },
+        delegate: { issuer: "https://auth.example.test", subject: "employee-two" },
+        audience: baseUrl,
+        expiresInSeconds: 60,
+      });
+      expect(JSON.stringify(delegatedCapability)).not.toMatch(/employee-two|manager|auth\.example|delegatedRequest/);
+      const delegatedEmployee = new ProcurementHttpClient({
+        baseUrl,
+        accessToken: () => "employee-two",
+        headers: { "delegated-capability": delegatedCapability.credential.value },
+      });
+      const delegatedApproval = await delegatedEmployee.approveRequest({ request: delegatedRequest.id });
+      expect(delegatedApproval).toMatchObject({
+        status: "APPROVED",
+        approvedBy: "00000000-0000-4000-8000-000000000003",
+      });
+      await expect(delegatedEmployee.approveRequest({ request: delegatedRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
+      const delegatedAudit = await admin.query<{ principal_id: string; identity_subject: string }>(
+        `SELECT principal_id::text, identity_subject FROM model_procurement_internal.action_audit
+         WHERE action_id = $1 AND target_id = $2`,
+        [approveOperationId, delegatedRequest.id],
+      );
+      expect(delegatedAudit.rows).toEqual([expect.objectContaining({
+        principal_id: "00000000-0000-4000-8000-000000000003",
+        identity_subject: "manager",
+      })]);
+
+      const revokedRequest = await employee.openRequest({ amount: usd("7100") }, commandOptions("revoked-open"));
+      await employee.submitRequest({ request: revokedRequest.id });
+      const revokedCapability = await manager.issueDelegatedCapability({
+        action: { operationId: approveOperationId, input: { request: revokedRequest.id } },
+        delegate: { issuer: "https://auth.example.test", subject: "employee-two" },
+        audience: baseUrl,
+        expiresInSeconds: 60,
+      });
+      await expect(manager.revokeDelegatedCapability(revokedCapability.grantId)).resolves.toMatchObject({
+        status: "revoked",
+        revoked: true,
+      });
+      const revokedEmployee = new ProcurementHttpClient({
+        baseUrl,
+        accessToken: () => "employee-two",
+        headers: { "delegated-capability": revokedCapability.credential.value },
+      });
+      await expect(revokedEmployee.approveRequest({ request: revokedRequest.id })).rejects.toBeInstanceOf(AuthorizationError);
+
+      const staleRequest = await employee.openRequest({ amount: usd("7200") }, commandOptions("stale-open"));
+      await employee.submitRequest({ request: staleRequest.id });
+      const staleCapability = await manager.issueDelegatedCapability({
+        action: { operationId: approveOperationId, input: { request: staleRequest.id } },
+        delegate: { issuer: "https://auth.example.test", subject: "employee-two" },
+        audience: baseUrl,
+        expiresInSeconds: 60,
+      });
+      await manager.approveRequest({ request: staleRequest.id });
+      const staleEmployee = new ProcurementHttpClient({
+        baseUrl,
+        accessToken: () => "employee-two",
+        headers: { "delegated-capability": staleCapability.credential.value },
+      });
+      await expect(staleEmployee.approveRequest({ request: staleRequest.id })).rejects.toBeInstanceOf(StaleError);
 
       const high = await employee.openRequest({ amount: usd("25000") }, commandOptions());
       const highSubmit = employeeWorkflow.available(workflow.workflowId, high.status)[0]!;

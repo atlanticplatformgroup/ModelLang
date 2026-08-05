@@ -111,6 +111,7 @@ describe("backends", () => {
     expect(requestSchema.additionalProperties).toBe(false);
     expect(requestSchema.properties).not.toHaveProperty("actor");
     expect(openapi.paths[openRoute]!.post.parameters).toEqual(expect.arrayContaining([
+      { $ref: "#/components/parameters/DelegatedCapabilityCredential" },
       { $ref: "#/components/parameters/IdempotencyKey" },
       { $ref: "#/components/parameters/CorrelationId" },
       { $ref: "#/components/parameters/CausationId" },
@@ -135,7 +136,11 @@ describe("backends", () => {
     expect(subjectRequest.properties.candidates.items.oneOf).toHaveLength(3);
     expect(JSON.stringify(subjectRequest)).not.toContain("qry_4406b045404a48449282db804f6167a8");
     expect(openapi.components.schemas).toHaveProperty("SubjectCapabilityView");
-    expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: true });
+    expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: false });
+    expect(openapi.components.parameters.DelegatedCapabilityCredential).toMatchObject({
+      name: "Delegated-Capability",
+      required: false,
+    });
     expect(openapi.components.parameters.CorrelationId).toMatchObject({ name: "X-Correlation-ID", required: false });
     expect(openapi.components.parameters.CausationId).toMatchObject({ name: "X-Causation-ID", required: false });
     expect(openapi.components.schemas.RequestSummary?.properties?.approvedBy).toEqual({
@@ -303,8 +308,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 6,
-      targetProfile: "target:postgresql-http-ui-agent-task-packets/6",
+      profileVersion: 7,
+      targetProfile: "target:postgresql-http-ui-delegated-capabilities/7",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -339,6 +344,12 @@ describe("backends", () => {
       support: "native",
       enforcement: ["agent-task-packet", "http", "mcp", "postgresql-runtime"],
     });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.delegatedCapabilities",
+      required: true,
+      support: "native",
+      enforcement: ["delegated-capability", "http", "mcp", "host-credential-authority", "postgresql-runtime"],
+    });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
       expect(output[path]).not.toContain("supplier-risk/review");
@@ -358,7 +369,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-task-packets/6" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-delegated-capabilities/7" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -382,6 +393,7 @@ describe("backends", () => {
       authentication: { required: boolean; source: string; callerInput: boolean };
       subjectView: Record<string, boolean | string | number | string[]>;
       taskPackets: Record<string, unknown>;
+      delegatedCapabilities: Record<string, unknown>;
       tools: {
         id: string;
         kind: "action" | "query";
@@ -401,7 +413,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 4,
+      catalogVersion: 5,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -451,6 +463,24 @@ describe("backends", () => {
         atomic: false,
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
+      },
+      delegatedCapabilities: {
+        version: 1,
+        protocol: "http",
+        issue: { method: "POST", path: "/agent/delegations" },
+        revoke: { method: "POST", pathTemplate: "/agent/delegations/{grantId}/revoke" },
+        invocation: "authenticatedRequestCredential",
+        authenticatedGrantor: true,
+        exactAction: true,
+        exactInputHash: "canonicalSha256",
+        revisionBound: true,
+        maxTtlSeconds: 3600,
+        maxUses: 1,
+        transferable: false,
+        redelegation: false,
+        hostCredentialAuthorityRequired: true,
+        runtimeAuthorizationRequired: true,
+        discoveryGrantsAuthority: false,
       },
     });
     expect(catalog.tools).toHaveLength(4);
@@ -526,11 +556,13 @@ describe("backends", () => {
       protocolVersion: string;
       catalogVersion: number;
       taskPacketVersion: number;
+      delegatedCapabilityVersion: number;
       transport: { kind: string; stateless: boolean };
       authentication: Record<string, unknown>;
       discovery: Record<string, unknown>;
-      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; prompts: boolean; tasks: boolean };
       taskPacket: { name: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
+      delegatedCapabilities: { issueInputSchema: object; issueOutputSchema: object; revokeOutputSchema: object } & Record<string, unknown>;
       tools: {
         name: string;
         operationId: string;
@@ -544,10 +576,11 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      adapterVersion: 2,
+      adapterVersion: 3,
       protocolVersion: "2026-07-28",
-      catalogVersion: 4,
+      catalogVersion: 5,
       taskPacketVersion: 1,
+      delegatedCapabilityVersion: 1,
       transport: { kind: "streamableHttp", stateless: true },
       authentication: {
         requiredPerRequest: true,
@@ -566,6 +599,13 @@ describe("backends", () => {
       capabilities: {
         embeddedResources: { delivery: "embeddedToolResult", templates: false, subscriptions: false },
         taskPackets: { modelLangContract: true, mcpTasks: false, delivery: "embeddedToolResult", maxAgeSeconds: 0 },
+        delegatedCapabilities: {
+          issuance: "httpOnly",
+          invocation: "authenticatedRequestMetadata",
+          exactActionAndInput: true,
+          maxUses: 1,
+          redelegation: false,
+        },
         prompts: false,
         tasks: false,
       },
@@ -581,6 +621,26 @@ describe("backends", () => {
         freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
       },
     });
+    expect(manifest.delegatedCapabilities).toMatchObject({
+      version: 1,
+      issuePath: "/agent/delegations",
+      revokePathTemplate: "/agent/delegations/{grantId}/revoke",
+      invocationMetadata: "dev.modellang/delegatedCapability",
+      credentialScheme: "ModelLang-Delegation",
+      authenticatedDelegateRequired: true,
+      hostAtomicConsumeAndExecuteRequired: true,
+      discoveryGrantsAuthority: false,
+    });
+    const delegatedSchema = JSON.parse(await readFile("schemas/delegated-capability.schema.json", "utf8")) as object;
+    const strictAjv = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true, uri: true } });
+    expect(() => strictAjv.compile(delegatedSchema)).not.toThrow();
+    for (const exactSchema of [
+      manifest.delegatedCapabilities.issueInputSchema,
+      manifest.delegatedCapabilities.issueOutputSchema,
+      manifest.delegatedCapabilities.revokeOutputSchema,
+    ]) {
+      expect(() => strictAjv.compile(exactSchema)).not.toThrow();
+    }
     const taskPacketSchema = JSON.parse(await readFile("schemas/agent-task-packet.schema.json", "utf8")) as object;
     expect(() => new Ajv2020({
       allErrors: true,
@@ -809,6 +869,8 @@ query active(caller actor: User) returns RecordSummary from Record as row {
       "/operations/actions/act_11111111111111111111111111111111/applicability",
       "/agent/capabilities",
       "/agent/task-packets",
+      "/agent/delegations",
+      "/agent/delegations/{grantId}/revoke",
     ]);
     const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
@@ -1132,7 +1194,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.42.0'");
+    expect(sql).toContain("'modelVersion', '0.43.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1295,7 +1357,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.42.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.43.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

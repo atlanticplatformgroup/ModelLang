@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
-  "profileVersion": 6,
-  "compilerVersion": "0.42.0",
-  "generatorProfile": "postgresql-http-ui-agent-task-packets/26",
-  "targetProfile": "target:postgresql-http-ui-agent-task-packets/6",
+  "profileVersion": 7,
+  "compilerVersion": "0.43.0",
+  "generatorProfile": "postgresql-http-ui-delegated-capabilities/27",
+  "targetProfile": "target:postgresql-http-ui-delegated-capabilities/7",
   "irVersion": 1,
   "model": {
     "id": "model:Reservations",
-    "version": "0.42.0",
-    "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+    "version": "0.43.0",
+    "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
   },
   "conformance": "complete",
   "authority": "none",
@@ -192,6 +192,18 @@
         "agent-task-packet",
         "http",
         "mcp",
+        "postgresql-runtime"
+      ]
+    },
+    {
+      "id": "agents.delegatedCapabilities",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "delegated-capability",
+        "http",
+        "mcp",
+        "host-credential-authority",
         "postgresql-runtime"
       ]
     },
