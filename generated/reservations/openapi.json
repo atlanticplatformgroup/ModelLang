@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.43.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71)."
+    "version": "0.44.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -614,10 +614,10 @@
                           "const": "Reservations"
                         },
                         "version": {
-                          "const": "0.43.0"
+                          "const": "0.44.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+                          "const": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
                         }
                       }
                     },
@@ -1582,6 +1582,181 @@
           }
         }
       }
+    },
+    "/agent/decision-traces": {
+      "post": {
+        "operationId": "modellang_public_decision_trace",
+        "summary": "Trace current authenticated action applicability without publishing values or private evidence",
+        "tags": [
+          "Public decision traces"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-grants-authority": false,
+        "x-modellang-trace-scope": "applicability",
+        "x-modellang-execution-observed": false,
+        "x-modellang-durable-evidence": false,
+        "x-modellang-freshness": {
+          "mode": "pointInTime",
+          "maxAgeSeconds": 0,
+          "revalidate": "beforeReuse"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "action"
+                ],
+                "properties": {
+                  "action": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "operationId",
+                          "input"
+                        ],
+                        "properties": {
+                          "operationId": {
+                            "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                          },
+                          "input": {
+                            "$schema": "https://json-schema.org/draft/2020-12/schema",
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "resource",
+                              "startsAt",
+                              "endsAt"
+                            ],
+                            "properties": {
+                              "resource": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "startsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "endsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          },
+                          "expectedRevision": {
+                            "type": "string",
+                            "pattern": "^rev:1:[0-9a-f]{32}$"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated bounded applicability trace; this grants no authority and contains no state values",
+            "headers": {
+              "Cache-Control": {
+                "description": "Decision traces must not be stored or reused",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublicDecisionTrace"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2006,7 +2181,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 5
+            "const": 6
           },
           "resourceVersion": {
             "const": 1
@@ -2015,8 +2190,8 @@
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.43.0",
-              "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+              "version": "0.44.0",
+              "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
             }
           },
           "packetId": {
@@ -2465,14 +2640,14 @@
                           "const": 1
                         },
                         "catalogVersion": {
-                          "const": 5
+                          "const": 6
                         },
                         "model": {
                           "const": {
                             "id": "model:Reservations",
                             "name": "Reservations",
-                            "version": "0.43.0",
-                            "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+                            "version": "0.44.0",
+                            "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
                           }
                         },
                         "operationId": {
@@ -2630,14 +2805,14 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 5
+            "const": 6
           },
           "model": {
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.43.0",
-              "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+              "version": "0.44.0",
+              "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
             }
           },
           "grantId": {
@@ -2728,6 +2903,458 @@
           }
         }
       },
+      "PublicDecisionTrace": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "$schema",
+              "traceVersion",
+              "catalogVersion",
+              "model",
+              "traceId",
+              "kind",
+              "operationId",
+              "authority",
+              "view",
+              "freshness",
+              "decision",
+              "stages",
+              "closure"
+            ],
+            "properties": {
+              "$schema": {
+                "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+              },
+              "traceVersion": {
+                "const": 1
+              },
+              "catalogVersion": {
+                "const": 6
+              },
+              "model": {
+                "const": {
+                  "id": "model:Reservations",
+                  "name": "Reservations",
+                  "version": "0.44.0",
+                  "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+                }
+              },
+              "traceId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "kind": {
+                "const": "applicabilityDecisionTrace"
+              },
+              "operationId": {
+                "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+              },
+              "authority": {
+                "const": "none"
+              },
+              "view": {
+                "const": {
+                  "audience": "agent",
+                  "subjectSpecific": true,
+                  "authorizationFiltered": true,
+                  "inputSpecific": true,
+                  "derivedFromCurrentState": true,
+                  "containsCurrentStateValues": false,
+                  "containsOperationInput": false,
+                  "containsAuthenticatedIdentity": false,
+                  "containsExpressions": false,
+                  "containsPolicyIds": false,
+                  "containsAuthorityIds": false,
+                  "containsPrivateEvidence": false,
+                  "grantsAuthority": false,
+                  "runtimeAuthorizationRequired": true
+                }
+              },
+              "freshness": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "mode",
+                  "tracedAt",
+                  "maxAgeSeconds",
+                  "revalidate"
+                ],
+                "properties": {
+                  "mode": {
+                    "const": "pointInTime"
+                  },
+                  "tracedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "maxAgeSeconds": {
+                    "const": 0
+                  },
+                  "revalidate": {
+                    "const": "beforeReuse"
+                  }
+                }
+              },
+              "decision": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operationId",
+                      "status",
+                      "applicable",
+                      "authority",
+                      "revision"
+                    ],
+                    "properties": {
+                      "operationId": {
+                        "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                      },
+                      "status": {
+                        "const": "applicable"
+                      },
+                      "applicable": {
+                        "const": true
+                      },
+                      "authority": {
+                        "const": "none"
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operationId",
+                      "status",
+                      "applicable",
+                      "authority",
+                      "explanation"
+                    ],
+                    "properties": {
+                      "operationId": {
+                        "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                      },
+                      "status": {
+                        "const": "denied"
+                      },
+                      "applicable": {
+                        "const": false
+                      },
+                      "authority": {
+                        "const": "none"
+                      },
+                      "explanation": {
+                        "const": {
+                          "kind": "authorization",
+                          "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operationId",
+                      "status",
+                      "applicable",
+                      "authority",
+                      "revision",
+                      "explanation"
+                    ],
+                    "properties": {
+                      "operationId": {
+                        "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                      },
+                      "status": {
+                        "const": "notApplicable"
+                      },
+                      "applicable": {
+                        "const": false
+                      },
+                      "authority": {
+                        "const": "none"
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      },
+                      "explanation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "kind",
+                          "ruleId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "requirement"
+                          },
+                          "ruleId": {
+                            "enum": [
+                              "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
+                            ]
+                          }
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "operationId",
+                      "status",
+                      "applicable",
+                      "authority",
+                      "revision",
+                      "explanation"
+                    ],
+                    "properties": {
+                      "operationId": {
+                        "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                      },
+                      "status": {
+                        "const": "stale"
+                      },
+                      "applicable": {
+                        "const": false
+                      },
+                      "authority": {
+                        "const": "none"
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      },
+                      "explanation": {
+                        "const": {
+                          "kind": "revision",
+                          "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              "stages": {
+                "type": "object"
+              },
+              "closure": {
+                "const": {
+                  "scope": "applicability",
+                  "currentEvaluation": true,
+                  "executionObserved": false,
+                  "durableEvidence": false,
+                  "completeDecisionTrace": false
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": "denied"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "stages": {
+                      "const": {
+                        "authorization": {
+                          "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "failed"
+                        },
+                        "requirements": [
+                          {
+                            "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                            "outcome": "notEvaluated"
+                          }
+                        ],
+                        "revision": {
+                          "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "notEvaluated"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": "stale"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "stages": {
+                      "const": {
+                        "authorization": {
+                          "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "passed"
+                        },
+                        "requirements": [
+                          {
+                            "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                            "outcome": "passed"
+                          }
+                        ],
+                        "revision": {
+                          "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "mismatched"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": "applicable"
+                        }
+                      },
+                      "required": [
+                        "status"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "stages": {
+                      "enum": [
+                        {
+                          "authorization": {
+                            "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                            "outcome": "passed"
+                          },
+                          "requirements": [
+                            {
+                              "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                              "outcome": "passed"
+                            }
+                          ],
+                          "revision": {
+                            "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                            "outcome": "notRequested"
+                          }
+                        },
+                        {
+                          "authorization": {
+                            "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                            "outcome": "passed"
+                          },
+                          "requirements": [
+                            {
+                              "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                              "outcome": "passed"
+                            }
+                          ],
+                          "revision": {
+                            "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                            "outcome": "matched"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "type": "object",
+                  "properties": {
+                    "decision": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "const": "notApplicable"
+                        },
+                        "explanation": {
+                          "type": "object",
+                          "properties": {
+                            "ruleId": {
+                              "const": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
+                            }
+                          },
+                          "required": [
+                            "ruleId"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "status",
+                        "explanation"
+                      ]
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "stages": {
+                      "const": {
+                        "authorization": {
+                          "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "passed"
+                        },
+                        "requirements": [
+                          {
+                            "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                            "outcome": "failed"
+                          }
+                        ],
+                        "revision": {
+                          "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                          "outcome": "notEvaluated"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
       "SubjectCapabilityView": {
         "type": "object",
         "additionalProperties": false,
@@ -2768,10 +3395,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.43.0"
+                "const": "0.44.0"
               },
               "sourceHash": {
-                "const": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+                "const": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
               }
             }
           },

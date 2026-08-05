@@ -47,7 +47,7 @@ afterEach(async () => {
 });
 
 describe("generated MCP adapter", () => {
-  it("serves catalog v5 tools and the task-packet assembler with exact JSON schemas", async () => {
+  it("serves catalog v6 tools, task packets, and public decision traces with exact JSON schemas", async () => {
     const execute = vi.fn(async () => []);
     const authenticate = vi.fn<ProcurementMcpAuthenticator>(async () => ({
       authInfo: authInfo(),
@@ -70,6 +70,7 @@ describe("generated MCP adapter", () => {
     const result = await client.listTools();
     const manifest = JSON.parse(await readFile("generated/procurement/mcp.json", "utf8")) as {
       taskPacket: { name: string; inputSchema: object; outputSchema: object };
+      publicDecisionTrace: { name: string; inputSchema: object; outputSchema: object };
       tools: { name: string; inputSchema: object; outputSchema: object }[];
     };
     expect(result.tools.map((tool) => tool.name)).toEqual([
@@ -78,11 +79,14 @@ describe("generated MCP adapter", () => {
       "act_d39dbb883b5f4019b9027b85add3de47",
       queryToolName,
       "modellang_task_packet",
+      "modellang_public_decision_trace",
     ]);
     for (const tool of result.tools) {
       const binding = tool.name === manifest.taskPacket.name
         ? manifest.taskPacket
-        : manifest.tools.find((candidate) => candidate.name === tool.name)!;
+        : tool.name === manifest.publicDecisionTrace.name
+          ? manifest.publicDecisionTrace
+          : manifest.tools.find((candidate) => candidate.name === tool.name)!;
       expect(tool.inputSchema).toEqual(binding.inputSchema);
       expect(tool.outputSchema).toEqual(binding.outputSchema);
     }
@@ -157,8 +161,8 @@ describe("generated MCP adapter", () => {
     );
     expect(envelope).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 5,
-      model: { id: "model:Procurement", version: "0.43.0" },
+      catalogVersion: 6,
+      model: { id: "model:Procurement", version: "0.44.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -268,6 +272,87 @@ describe("generated MCP adapter", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  it("returns public applicability traces as zero-age embedded resources without executing actions", async () => {
+    const revision = "rev:1:0123456789abcdef0123456789abcdef";
+    const input = { amount: { currency: "USD", amount: "765432.10" } } as const;
+    const assess = vi.fn(async () => ({
+      operationId: actionId,
+      status: "applicable" as const,
+      applicable: true,
+      authority: "none" as const,
+      revision,
+    }));
+    const execute = vi.fn();
+    const handler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute, assess },
+    }), {
+      resourceServerUrl: endpoint.href,
+      now: () => new Date(retrievedAt),
+    });
+    let cacheControl: string | null = null;
+    const { client, transport } = createClient(async (requestInput, init) => {
+      const response = await handler.fetch(new Request(requestInput, init));
+      cacheControl = response.headers.get("cache-control");
+      return response;
+    });
+    closeables.push(client, handler);
+    await client.connect(transport);
+    const listed = await client.listTools();
+    const traceTool = listed.tools.find((tool) => tool.name === "modellang_public_decision_trace")!;
+    expect(traceTool).toMatchObject({
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: {
+        "dev.modellang/publicDecisionTraceVersion": 1,
+        "dev.modellang/traceScope": "applicability",
+        "dev.modellang/executionObserved": false,
+        "dev.modellang/durableEvidence": false,
+        "dev.modellang/completeDecisionTrace": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    });
+
+    const result = await client.callTool({
+      name: "modellang_public_decision_trace",
+      arguments: { action: { operationId: actionId, input, expectedRevision: revision } },
+    });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      traceVersion: 1,
+      catalogVersion: 6,
+      kind: "applicabilityDecisionTrace",
+      operationId: actionId,
+      authority: "none",
+      freshness: { tracedAt: retrievedAt, maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      decision: { status: "applicable", authority: "none", revision },
+      stages: {
+        authorization: { outcome: "passed" },
+        requirements: [{ outcome: "passed" }],
+        revision: { outcome: "matched" },
+      },
+      closure: { scope: "applicability", executionObserved: false, durableEvidence: false, completeDecisionTrace: false },
+    });
+    const embedded = result.content.find((content) => content.type === "resource");
+    expect(embedded).toBeDefined();
+    if (!embedded || embedded.type !== "resource" || !("text" in embedded.resource)) return;
+    expect(embedded.resource.mimeType).toBe("application/vnd.modellang.public-decision-trace+json");
+    expect(embedded.resource.uri).toMatch(/^modellang:\/\/\/models\/model%3AProcurement\/decision-traces\/[0-9a-f-]{36}$/);
+    expect(JSON.parse(embedded.resource.text)).toEqual(result.structuredContent);
+    expect(JSON.stringify(result)).not.toMatch(/765432\.10|valid-token|mcp-test-client|decision_evidence/);
+    expect(cacheControl).toBe("no-store");
+    expect(assess).toHaveBeenCalledWith(actionId, input, { expectedRevision: revision });
+    expect(execute).not.toHaveBeenCalled();
+
+    const metadata = await client.callTool({
+      name: "modellang_public_decision_trace",
+      arguments: { action: { operationId: actionId, input } },
+      _meta: { "dev.modellang/delegatedCapability": "not-trace-authority" },
+    });
+    expect(metadata.isError).toBe(true);
+    expect(assess).toHaveBeenCalledTimes(1);
+  });
+
   it("passes namespaced command metadata while preserving the closed action input schema", async () => {
     const actionResult = {
       id: "00000000-0000-4000-8000-000000000010",
@@ -325,12 +410,12 @@ describe("generated MCP adapter", () => {
     const claim: ProcurementDelegatedCapabilityClaim = {
       $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
       delegatedCapabilityVersion: 1,
-      catalogVersion: 5,
+      catalogVersion: 6,
       model: {
         id: "model:Procurement",
         name: "Procurement",
-        version: "0.43.0",
-        sourceHash: "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76",
+        version: "0.44.0",
+        sourceHash: "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61",
       },
       grantId,
       operationId: actionId,

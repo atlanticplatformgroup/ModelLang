@@ -5,6 +5,7 @@ import type {
   ProcurementDelegatedCapability,
   ProcurementDelegationRequest,
   ProcurementDelegationRevocation,
+  ProcurementPublicDecisionTrace,
   ProcurementSubjectCapabilityCandidate,
   ProcurementSubjectCapabilityView,
   ProcurementTaskPacketRequest,
@@ -825,6 +826,32 @@ const taskActionContracts = [
     ]
   }
 ] as Readonly<Record<string, unknown>[]>;
+const publicDecisionTraceActionContracts = [
+  {
+    "operationId": "action:act_1e35db0451b1461e941af6283d86dca2",
+    "authorizationRuleId": "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
+    "preconditionRuleIds": [
+      "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount"
+    ],
+    "revisionRuleId": "revision:action:act_1e35db0451b1461e941af6283d86dca2"
+  },
+  {
+    "operationId": "action:act_ed2374e822704c51a2925338253d05d2",
+    "authorizationRuleId": "authorize:action:act_ed2374e822704c51a2925338253d05d2",
+    "preconditionRuleIds": [
+      "require:action:act_ed2374e822704c51a2925338253d05d2.is_draft"
+    ],
+    "revisionRuleId": "revision:action:act_ed2374e822704c51a2925338253d05d2"
+  },
+  {
+    "operationId": "action:act_d39dbb883b5f4019b9027b85add3de47",
+    "authorizationRuleId": "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+    "preconditionRuleIds": [
+      "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted"
+    ],
+    "revisionRuleId": "revision:action:act_d39dbb883b5f4019b9027b85add3de47"
+  }
+] as const;
 
 export interface ProcurementOperationExecutor {
   execute(operationId: ProcurementOperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
@@ -1147,6 +1174,14 @@ function validateSubjectCandidates(value: unknown): readonly ProcurementSubjectC
   });
 }
 
+function validatePublicDecisionTraceRequest(value: unknown): ProcurementSubjectCapabilityCandidate {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value as object).length !== 1 || !Object.hasOwn(value, "action")) {
+    throw new ValidationError("Public decision trace input must contain one exact action", "ML_VALIDATION", "agent:public-decision-trace");
+  }
+  return validateSubjectCandidates({ candidates: [(value as { action: unknown }).action] })[0]!;
+}
+
 function validateTaskPacketRequest(value: unknown): ProcurementTaskPacketRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ValidationError("Task packet input must be a JSON object", "ML_VALIDATION", "agent:task-packet");
@@ -1302,11 +1337,11 @@ function validateDelegatedClaim(
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
     && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
-    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 5
+    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 6
     && model?.id === "model:Procurement"
     && model?.name === "Procurement"
-    && model?.version === "0.43.0"
-    && model?.sourceHash === "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
+    && model?.version === "0.44.0"
+    && model?.sourceHash === "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
     && Object.keys(model).length === 4
     && validGrantId(claim.grantId)
     && operationDefinitions.some((item) => item.endpoint === "execution" && item.action && item.id === claim.operationId)
@@ -1368,8 +1403,8 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 5 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
+    catalogVersion: 6 as const,
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
     operationId: definition.id,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1391,6 +1426,66 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
       revalidate: "beforeReuse" as const,
     },
     data,
+  };
+}
+
+export async function assembleProcurementPublicDecisionTrace(
+  executor: ProcurementOperationExecutor,
+  value: unknown,
+  now: () => Date = () => new Date(),
+): Promise<ProcurementPublicDecisionTrace> {
+  const candidate = validatePublicDecisionTraceRequest(value);
+  const definition = operationDefinitions.find((item) =>
+    item.endpoint === "execution" && item.action && item.id === candidate.operationId)!;
+  const decision = validateDecision(
+    definition,
+    await executor.assess(candidate.operationId, candidate.input as unknown as Readonly<Record<string, unknown>>, {
+      expectedRevision: candidate.expectedRevision,
+    }),
+  );
+  const contract = publicDecisionTraceActionContracts.find((item) => item.operationId === candidate.operationId)!;
+  const requirementOutcomes = contract.preconditionRuleIds.map((): "passed" | "failed" | "notEvaluated" =>
+    decision.status === "denied" ? "notEvaluated" : "passed");
+  if (decision.status === "notApplicable") {
+    const failedIndex = (contract.preconditionRuleIds as readonly string[]).indexOf(decision.explanation!.ruleId);
+    if (failedIndex < 0) throw new Error("Applicability trace contains an unknown requirement rule");
+    for (let index = failedIndex; index < requirementOutcomes.length; index += 1) {
+      requirementOutcomes[index] = index === failedIndex ? "failed" : "notEvaluated";
+    }
+  }
+  return {
+    $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
+    traceVersion: 1,
+    catalogVersion: 6,
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
+    traceId: globalThis.crypto.randomUUID(),
+    kind: "applicabilityDecisionTrace",
+    operationId: candidate.operationId,
+    authority: "none",
+    view: {"audience":"agent","subjectSpecific":true,"authorizationFiltered":true,"inputSpecific":true,"derivedFromCurrentState":true,"containsCurrentStateValues":false,"containsOperationInput":false,"containsAuthenticatedIdentity":false,"containsExpressions":false,"containsPolicyIds":false,"containsAuthorityIds":false,"containsPrivateEvidence":false,"grantsAuthority":false,"runtimeAuthorizationRequired":true},
+    freshness: {
+      mode: "pointInTime",
+      tracedAt: now().toISOString(),
+      maxAgeSeconds: 0,
+      revalidate: "beforeReuse",
+    },
+    decision,
+    stages: {
+      authorization: {
+        ruleId: contract.authorizationRuleId,
+        outcome: decision.status === "denied" ? "failed" : "passed",
+      },
+      requirements: contract.preconditionRuleIds.map((ruleId, index) => ({ ruleId, outcome: requirementOutcomes[index]! })),
+      revision: {
+        ruleId: contract.revisionRuleId,
+        outcome: decision.status === "denied" || decision.status === "notApplicable"
+          ? "notEvaluated"
+          : decision.status === "stale"
+            ? "mismatched"
+            : candidate.expectedRevision === undefined ? "notRequested" : "matched",
+      },
+    },
+    closure: {"scope":"applicability","currentEvaluation":true,"executionObserved":false,"durableEvidence":false,"completeDecisionTrace":false},
   };
 }
 
@@ -1432,9 +1527,9 @@ export async function assembleProcurementTaskPacket(
   return {
     $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
-    catalogVersion: 5,
+    catalogVersion: 6,
     resourceVersion: 1,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
     packetId: globalThis.crypto.randomUUID(),
     kind: "boundedTaskContext",
     authority: "none",
@@ -1546,24 +1641,35 @@ export function createProcurementHttpHandler(
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === `${basePath}/agent/capabilities`;
     const taskPacketRequest = path === `${basePath}/agent/task-packets`;
+    const publicDecisionTraceRequest = path === `${basePath}/agent/decision-traces`;
+    const publicDecisionTraceHeaders: Record<string, string> = publicDecisionTraceRequest
+      ? { "cache-control": "no-store" }
+      : {};
     const delegationIssueRequest = path === `${basePath}/agent/delegations`;
     const delegationRevokeMatch = new RegExp(`^${escapeRegExp(basePath)}/agent/delegations/([0-9a-fA-F-]{36})/revoke$`).exec(path);
     const definition = operationDefinitions.find((candidate) => `${basePath}${candidate.route}` === path);
-    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !delegationIssueRequest && !delegationRevokeMatch) {
+    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
+      && !delegationIssueRequest && !delegationRevokeMatch) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
       return problemResponse(
         new ValidationError("ModelLang HTTP operations require POST", "ML_METHOD_NOT_ALLOWED", "transport:method"),
-        { allow: "POST" },
+        { allow: "POST", ...publicDecisionTraceHeaders },
       );
     }
     const authorization = request.headers.get("authorization");
     const bearer = authorization && /^Bearer\s+(.+)$/i.exec(authorization)?.[1];
-    if (!bearer) return problemResponse(new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"));
+    if (!bearer) return problemResponse(
+      new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"),
+      publicDecisionTraceHeaders,
+    );
     const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
     if (contentType !== "application/json") {
-      return problemResponse(new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"));
+      return problemResponse(
+        new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"),
+        publicDecisionTraceHeaders,
+      );
     }
     try {
       const authenticated = await authenticate(bearer);
@@ -1623,8 +1729,8 @@ export function createProcurementHttpHandler(
         const result: ProcurementDelegatedCapability = {
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
-          catalogVersion: 5,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
+          catalogVersion: 6,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
           inputHash,
@@ -1706,6 +1812,18 @@ export function createProcurementHttpHandler(
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });
       }
+      if (publicDecisionTraceRequest) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by public decision traces", "ML_VALIDATION", "agent:public-decision-trace");
+          }
+        }
+        const trace = await assembleProcurementPublicDecisionTrace(executor, body, now);
+        return Response.json(trace, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (subjectCapabilityRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -1746,8 +1864,8 @@ export function createProcurementHttpHandler(
         const view: ProcurementSubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 5,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.43.0","sourceHash":"sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"},
+          catalogVersion: 6,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -1814,7 +1932,8 @@ export function createProcurementHttpHandler(
         },
       });
     } catch (error) {
-      return problemResponse(error, delegationIssueRequest || delegationRevokeMatch || request.headers.has("delegated-capability")
+      return problemResponse(error, publicDecisionTraceRequest || delegationIssueRequest || delegationRevokeMatch
+        || request.headers.has("delegated-capability")
         ? { "cache-control": "no-store" }
         : {});
     }

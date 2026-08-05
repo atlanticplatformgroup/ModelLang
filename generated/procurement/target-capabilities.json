@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
-  "profileVersion": 7,
-  "compilerVersion": "0.43.0",
-  "generatorProfile": "postgresql-http-ui-delegated-capabilities/27",
-  "targetProfile": "target:postgresql-http-ui-delegated-capabilities/7",
+  "profileVersion": 8,
+  "compilerVersion": "0.44.0",
+  "generatorProfile": "postgresql-http-ui-public-decision-traces/28",
+  "targetProfile": "target:postgresql-http-ui-public-decision-traces/8",
   "irVersion": 1,
   "model": {
     "id": "model:Procurement",
-    "version": "0.43.0",
-    "sourceHash": "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76"
+    "version": "0.44.0",
+    "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
   },
   "conformance": "requiresExternalImplementations",
   "authority": "none",
@@ -205,6 +205,17 @@
         "mcp",
         "host-credential-authority",
         "postgresql-runtime"
+      ]
+    },
+    {
+      "id": "agents.publicDecisionTraces",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "public-decision-trace",
+        "http",
+        "mcp",
+        "postgresql-applicability"
       ]
     },
     {

@@ -5,10 +5,10 @@ export type TargetCapabilitySupport = "native" | "externalImplementationRequired
 
 export interface TargetCapabilityReport {
   $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json";
-  profileVersion: 7;
+  profileVersion: 8;
   compilerVersion: string;
   generatorProfile: string;
-  targetProfile: "target:postgresql-http-ui-delegated-capabilities/7";
+  targetProfile: "target:postgresql-http-ui-public-decision-traces/8";
   irVersion: 1;
   model: { id: string; version: string; sourceHash: string };
   conformance: "complete" | "requiresExternalImplementations";
@@ -49,6 +49,7 @@ export function generateTargetCapabilityReport(ir: ModelIR): TargetCapabilityRep
     { id: "agents.mcpAdapter", required: true, support: "native", enforcement: ["mcp", "agent-tool-catalog", "postgresql-runtime"] },
     { id: "agents.taskPackets", required: true, support: "native", enforcement: ["agent-task-packet", "http", "mcp", "postgresql-runtime"] },
     { id: "agents.delegatedCapabilities", required: ir.actions.length > 0, support: "native", enforcement: ["delegated-capability", "http", "mcp", "host-credential-authority", "postgresql-runtime"] },
+    { id: "agents.publicDecisionTraces", required: ir.actions.length > 0, support: "native", enforcement: ["public-decision-trace", "http", "mcp", "postgresql-applicability"] },
     { id: "extensions.declaredExternal", required: ir.extensions.length > 0, support: "externalImplementationRequired", enforcement: ["extension-ledger", "host-conformance-tests"] },
   ];
   const gaps = ir.extensions.map((extension) => ({
@@ -59,7 +60,7 @@ export function generateTargetCapabilityReport(ir: ModelIR): TargetCapabilityRep
   }));
   return {
     $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json",
-    profileVersion: 7,
+    profileVersion: 8,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     generatorProfile: MODELLANG_GENERATOR_PROFILE,
     targetProfile: MODELLANG_TARGET_PROFILE,

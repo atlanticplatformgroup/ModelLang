@@ -308,8 +308,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 7,
-      targetProfile: "target:postgresql-http-ui-delegated-capabilities/7",
+      profileVersion: 8,
+      targetProfile: "target:postgresql-http-ui-public-decision-traces/8",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -350,6 +350,12 @@ describe("backends", () => {
       support: "native",
       enforcement: ["delegated-capability", "http", "mcp", "host-credential-authority", "postgresql-runtime"],
     });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.publicDecisionTraces",
+      required: true,
+      support: "native",
+      enforcement: ["public-decision-trace", "http", "mcp", "postgresql-applicability"],
+    });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
       expect(output[path]).not.toContain("supplier-risk/review");
@@ -369,7 +375,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-delegated-capabilities/7" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-public-decision-traces/8" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -394,6 +400,7 @@ describe("backends", () => {
       subjectView: Record<string, boolean | string | number | string[]>;
       taskPackets: Record<string, unknown>;
       delegatedCapabilities: Record<string, unknown>;
+      publicDecisionTraces: Record<string, unknown>;
       tools: {
         id: string;
         kind: "action" | "query";
@@ -413,7 +420,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 5,
+      catalogVersion: 6,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -481,6 +488,30 @@ describe("backends", () => {
         hostCredentialAuthorityRequired: true,
         runtimeAuthorizationRequired: true,
         discoveryGrantsAuthority: false,
+      },
+      publicDecisionTraces: {
+        version: 1,
+        protocol: "http",
+        method: "POST",
+        path: "/agent/decision-traces",
+        authenticated: true,
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        inputSpecific: true,
+        scope: "applicability",
+        orderedRuleOutcomes: true,
+        containsCurrentStateValues: false,
+        containsOperationInput: false,
+        containsAuthenticatedIdentity: false,
+        containsExpressions: false,
+        containsPolicyIds: false,
+        containsAuthorityIds: false,
+        containsPrivateEvidence: false,
+        executionObserved: false,
+        durableEvidence: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
       },
     });
     expect(catalog.tools).toHaveLength(4);
@@ -557,12 +588,14 @@ describe("backends", () => {
       catalogVersion: number;
       taskPacketVersion: number;
       delegatedCapabilityVersion: number;
+      publicDecisionTraceVersion: number;
       transport: { kind: string; stateless: boolean };
       authentication: Record<string, unknown>;
       discovery: Record<string, unknown>;
-      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; publicDecisionTraces: Record<string, unknown>; prompts: boolean; tasks: boolean };
       taskPacket: { name: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
       delegatedCapabilities: { issueInputSchema: object; issueOutputSchema: object; revokeOutputSchema: object } & Record<string, unknown>;
+      publicDecisionTrace: { name: string; kind: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
       tools: {
         name: string;
         operationId: string;
@@ -576,11 +609,12 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      adapterVersion: 3,
+      adapterVersion: 4,
       protocolVersion: "2026-07-28",
-      catalogVersion: 5,
+      catalogVersion: 6,
       taskPacketVersion: 1,
       delegatedCapabilityVersion: 1,
+      publicDecisionTraceVersion: 1,
       transport: { kind: "streamableHttp", stateless: true },
       authentication: {
         requiredPerRequest: true,
@@ -605,6 +639,13 @@ describe("backends", () => {
           exactActionAndInput: true,
           maxUses: 1,
           redelegation: false,
+        },
+        publicDecisionTraces: {
+          modelLangContract: true,
+          delivery: "embeddedToolResult",
+          scope: "applicability",
+          maxAgeSeconds: 0,
+          durableEvidence: false,
         },
         prompts: false,
         tasks: false,
@@ -631,6 +672,18 @@ describe("backends", () => {
       hostAtomicConsumeAndExecuteRequired: true,
       discoveryGrantsAuthority: false,
     });
+    expect(manifest.publicDecisionTrace).toMatchObject({
+      name: "modellang_public_decision_trace",
+      kind: "publicDecisionTrace",
+      resource: {
+        delivery: "embeddedToolResult",
+        traceVersion: 1,
+        mimeType: "application/vnd.modellang.public-decision-trace+json",
+        uriContainsInput: false,
+        grantsAuthority: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      },
+    });
     const delegatedSchema = JSON.parse(await readFile("schemas/delegated-capability.schema.json", "utf8")) as object;
     const strictAjv = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true, uri: true } });
     expect(() => strictAjv.compile(delegatedSchema)).not.toThrow();
@@ -654,13 +707,29 @@ describe("backends", () => {
         formats: { uuid: true, "date-time": true },
       }).compile(exactSchema)).not.toThrow();
     }
+    const publicTraceSchema = JSON.parse(await readFile("schemas/public-decision-trace.schema.json", "utf8")) as object;
+    expect(() => new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, "date-time": true },
+    }).compile(publicTraceSchema)).not.toThrow();
+    for (const exactSchema of [manifest.publicDecisionTrace.inputSchema, manifest.publicDecisionTrace.outputSchema]) {
+      expect(() => new Ajv2020({
+        allErrors: true,
+        strict: true,
+        formats: { uuid: true, "date-time": true },
+      }).compile(exactSchema)).not.toThrow();
+    }
     const openapi = JSON.parse(output["openapi.json"]!) as {
       paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: object } } } } }>;
-      components: { schemas: { AgentTaskPacket: object } };
+      components: { schemas: { AgentTaskPacket: object; PublicDecisionTrace: object } };
     };
     expect(openapi.paths["/agent/task-packets"]!.post.requestBody.content["application/json"].schema)
       .toEqual(manifest.taskPacket.inputSchema);
     expect(openapi.components.schemas.AgentTaskPacket).toEqual(manifest.taskPacket.outputSchema);
+    expect(openapi.paths["/agent/decision-traces"]!.post.requestBody.content["application/json"].schema)
+      .toEqual(manifest.publicDecisionTrace.inputSchema);
+    expect(openapi.components.schemas.PublicDecisionTrace).toEqual(manifest.publicDecisionTrace.outputSchema);
     expect(manifest.tools).toHaveLength(catalog.tools.length);
     for (const tool of manifest.tools) {
       const catalogTool = catalog.tools.find((candidate) => candidate.id === tool.operationId)!;
@@ -871,6 +940,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
       "/agent/task-packets",
       "/agent/delegations",
       "/agent/delegations/{grantId}/revoke",
+      "/agent/decision-traces",
     ]);
     const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
@@ -1194,7 +1264,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.43.0'");
+    expect(sql).toContain("'modelVersion', '0.44.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1357,7 +1427,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.43.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.44.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

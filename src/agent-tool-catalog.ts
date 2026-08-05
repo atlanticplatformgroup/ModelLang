@@ -15,6 +15,7 @@ import {
   DELEGATION_MAX_TTL_SECONDS,
   DELEGATION_ROUTE,
   DELEGATION_REVOKE_ROUTE_PREFIX,
+  PUBLIC_DECISION_TRACE_ROUTE,
 } from "./agent-routes.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -77,7 +78,7 @@ export type AgentTool =
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 5;
+  catalogVersion: 6;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -155,6 +156,30 @@ export interface AgentToolCatalog {
     hostCredentialAuthorityRequired: true;
     runtimeAuthorizationRequired: true;
     discoveryGrantsAuthority: false;
+  };
+  publicDecisionTraces: {
+    version: 1;
+    protocol: "http";
+    method: "POST";
+    path: "/agent/decision-traces";
+    authenticated: true;
+    subjectSpecific: true;
+    authorizationFiltered: true;
+    inputSpecific: true;
+    scope: "applicability";
+    orderedRuleOutcomes: true;
+    containsCurrentStateValues: false;
+    containsOperationInput: false;
+    containsAuthenticatedIdentity: false;
+    containsExpressions: false;
+    containsPolicyIds: false;
+    containsAuthorityIds: false;
+    containsPrivateEvidence: false;
+    executionObserved: false;
+    durableEvidence: false;
+    freshness: { mode: "pointInTime"; maxAgeSeconds: 0; revalidate: "beforeReuse" };
+    grantsAuthority: false;
+    runtimeAuthorizationRequired: true;
   };
   tools: AgentTool[];
 }
@@ -366,7 +391,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 5,
+    catalogVersion: 6,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -437,6 +462,30 @@ export function generateAgentToolCatalog(
       hostCredentialAuthorityRequired: true,
       runtimeAuthorizationRequired: true,
       discoveryGrantsAuthority: false,
+    },
+    publicDecisionTraces: {
+      version: 1,
+      protocol: "http",
+      method: "POST",
+      path: PUBLIC_DECISION_TRACE_ROUTE,
+      authenticated: true,
+      subjectSpecific: true,
+      authorizationFiltered: true,
+      inputSpecific: true,
+      scope: "applicability",
+      orderedRuleOutcomes: true,
+      containsCurrentStateValues: false,
+      containsOperationInput: false,
+      containsAuthenticatedIdentity: false,
+      containsExpressions: false,
+      containsPolicyIds: false,
+      containsAuthorityIds: false,
+      containsPrivateEvidence: false,
+      executionObserved: false,
+      durableEvidence: false,
+      freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      grantsAuthority: false,
+      runtimeAuthorizationRequired: true,
     },
     tools,
   };

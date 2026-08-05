@@ -12,6 +12,7 @@ import {
 } from "@modelcontextprotocol/server";
 import type { ExecutionOptions } from "./types.js";
 import {
+  assembleReservationsPublicDecisionTrace,
   assembleReservationsTaskPacket,
   invokeReservationsDelegatedCapability,
   type ReservationsActionOperationId,
@@ -413,7 +414,7 @@ const taskPacketDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 5
+        "const": 6
       },
       "resourceVersion": {
         "const": 1
@@ -422,8 +423,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.43.0",
-          "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+          "version": "0.44.0",
+          "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
         }
       },
       "packetId": {
@@ -872,14 +873,14 @@ const taskPacketDefinition = {
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 5
+                      "const": 6
                     },
                     "model": {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.43.0",
-                        "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+                        "version": "0.44.0",
+                        "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
                       }
                     },
                     "operationId": {
@@ -1146,14 +1147,14 @@ const delegatedCapabilityDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 5
+        "const": 6
       },
       "model": {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.43.0",
-          "sourceHash": "sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"
+          "version": "0.44.0",
+          "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
         }
       },
       "grantId": {
@@ -1278,6 +1279,536 @@ const delegatedCapabilityDefinition = {
   "hostAtomicConsumeAndExecuteRequired": true,
   "discoveryGrantsAuthority": false
 } as const;
+const publicDecisionTraceDefinition = {
+  "name": "modellang_public_decision_trace",
+  "kind": "publicDecisionTrace",
+  "description": "Trace the current authenticated applicability of one exact action as ordered rule outcomes without publishing input, state values, identity, expressions, policy IDs, authority IDs, or private execution evidence.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "action"
+    ],
+    "properties": {
+      "action": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operationId",
+              "input"
+            ],
+            "properties": {
+              "operationId": {
+                "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+              },
+              "input": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource",
+                  "startsAt",
+                  "endsAt"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              },
+              "expectedRevision": {
+                "type": "string",
+                "pattern": "^rev:1:[0-9a-f]{32}$"
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "oneOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "traceVersion",
+          "catalogVersion",
+          "model",
+          "traceId",
+          "kind",
+          "operationId",
+          "authority",
+          "view",
+          "freshness",
+          "decision",
+          "stages",
+          "closure"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+          },
+          "traceVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 6
+          },
+          "model": {
+            "const": {
+              "id": "model:Reservations",
+              "name": "Reservations",
+              "version": "0.44.0",
+              "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+            }
+          },
+          "traceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "applicabilityDecisionTrace"
+          },
+          "operationId": {
+            "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+          },
+          "authority": {
+            "const": "none"
+          },
+          "view": {
+            "const": {
+              "audience": "agent",
+              "subjectSpecific": true,
+              "authorizationFiltered": true,
+              "inputSpecific": true,
+              "derivedFromCurrentState": true,
+              "containsCurrentStateValues": false,
+              "containsOperationInput": false,
+              "containsAuthenticatedIdentity": false,
+              "containsExpressions": false,
+              "containsPolicyIds": false,
+              "containsAuthorityIds": false,
+              "containsPrivateEvidence": false,
+              "grantsAuthority": false,
+              "runtimeAuthorizationRequired": true
+            }
+          },
+          "freshness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "tracedAt",
+              "maxAgeSeconds",
+              "revalidate"
+            ],
+            "properties": {
+              "mode": {
+                "const": "pointInTime"
+              },
+              "tracedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "maxAgeSeconds": {
+                "const": 0
+              },
+              "revalidate": {
+                "const": "beforeReuse"
+              }
+            }
+          },
+          "decision": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operationId",
+                  "status",
+                  "applicable",
+                  "authority",
+                  "revision"
+                ],
+                "properties": {
+                  "operationId": {
+                    "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                  },
+                  "status": {
+                    "const": "applicable"
+                  },
+                  "applicable": {
+                    "const": true
+                  },
+                  "authority": {
+                    "const": "none"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "pattern": "^rev:1:[0-9a-f]{32}$"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operationId",
+                  "status",
+                  "applicable",
+                  "authority",
+                  "explanation"
+                ],
+                "properties": {
+                  "operationId": {
+                    "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                  },
+                  "status": {
+                    "const": "denied"
+                  },
+                  "applicable": {
+                    "const": false
+                  },
+                  "authority": {
+                    "const": "none"
+                  },
+                  "explanation": {
+                    "const": {
+                      "kind": "authorization",
+                      "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b"
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operationId",
+                  "status",
+                  "applicable",
+                  "authority",
+                  "revision",
+                  "explanation"
+                ],
+                "properties": {
+                  "operationId": {
+                    "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                  },
+                  "status": {
+                    "const": "notApplicable"
+                  },
+                  "applicable": {
+                    "const": false
+                  },
+                  "authority": {
+                    "const": "none"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "pattern": "^rev:1:[0-9a-f]{32}$"
+                  },
+                  "explanation": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "kind",
+                      "ruleId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "requirement"
+                      },
+                      "ruleId": {
+                        "enum": [
+                          "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
+                        ]
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "operationId",
+                  "status",
+                  "applicable",
+                  "authority",
+                  "revision",
+                  "explanation"
+                ],
+                "properties": {
+                  "operationId": {
+                    "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                  },
+                  "status": {
+                    "const": "stale"
+                  },
+                  "applicable": {
+                    "const": false
+                  },
+                  "authority": {
+                    "const": "none"
+                  },
+                  "revision": {
+                    "type": "string",
+                    "pattern": "^rev:1:[0-9a-f]{32}$"
+                  },
+                  "explanation": {
+                    "const": {
+                      "kind": "revision",
+                      "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "stages": {
+            "type": "object"
+          },
+          "closure": {
+            "const": {
+              "scope": "applicability",
+              "currentEvaluation": true,
+              "executionObserved": false,
+              "durableEvidence": false,
+              "completeDecisionTrace": false
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "decision": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "denied"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "stages": {
+                  "const": {
+                    "authorization": {
+                      "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "failed"
+                    },
+                    "requirements": [
+                      {
+                        "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                        "outcome": "notEvaluated"
+                      }
+                    ],
+                    "revision": {
+                      "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "notEvaluated"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "decision": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "stale"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "stages": {
+                  "const": {
+                    "authorization": {
+                      "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "passed"
+                    },
+                    "requirements": [
+                      {
+                        "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                        "outcome": "passed"
+                      }
+                    ],
+                    "revision": {
+                      "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "mismatched"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "decision": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "applicable"
+                    }
+                  },
+                  "required": [
+                    "status"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "stages": {
+                  "enum": [
+                    {
+                      "authorization": {
+                        "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                        "outcome": "passed"
+                      },
+                      "requirements": [
+                        {
+                          "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                          "outcome": "passed"
+                        }
+                      ],
+                      "revision": {
+                        "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                        "outcome": "notRequested"
+                      }
+                    },
+                    {
+                      "authorization": {
+                        "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                        "outcome": "passed"
+                      },
+                      "requirements": [
+                        {
+                          "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                          "outcome": "passed"
+                        }
+                      ],
+                      "revision": {
+                        "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                        "outcome": "matched"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "properties": {
+                "decision": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "notApplicable"
+                    },
+                    "explanation": {
+                      "type": "object",
+                      "properties": {
+                        "ruleId": {
+                          "const": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
+                        }
+                      },
+                      "required": [
+                        "ruleId"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "explanation"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "stages": {
+                  "const": {
+                    "authorization": {
+                      "ruleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "passed"
+                    },
+                    "requirements": [
+                      {
+                        "ruleId": "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                        "outcome": "failed"
+                      }
+                    ],
+                    "revision": {
+                      "ruleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
+                      "outcome": "notEvaluated"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+  },
+  "resource": {
+    "delivery": "embeddedToolResult",
+    "traceVersion": 1,
+    "mimeType": "application/vnd.modellang.public-decision-trace+json",
+    "uriContainsInput": false,
+    "freshness": {
+      "mode": "pointInTime",
+      "maxAgeSeconds": 0,
+      "revalidate": "beforeReuse"
+    },
+    "grantsAuthority": false
+  }
+} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -1347,8 +1878,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 5 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.43.0","sourceHash":"sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71"},
+    catalogVersion: 6 as const,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1396,9 +1927,9 @@ function buildReservationsMcpServer(
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.43.0" },
+    { name: "Reservations-ModelLang", version: "0.44.0" },
     {
-      instructions: "Tool discovery and task packets grant no authority. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
+      instructions: "Tool discovery, task packets, and public applicability traces grant no authority. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -1544,6 +2075,71 @@ function buildReservationsMcpServer(
             "dev.modellang/cacheControl": "no-store",
             "dev.modellang/maxAgeSeconds": 0,
             "dev.modellang/mcpTasks": false,
+          },
+        };
+      } catch (error) {
+        if (!(error instanceof ModelOperationError)) {
+          onerror?.(error instanceof Error ? error : new Error(String(error)));
+        }
+        return safeToolError(error);
+      }
+    },
+  );
+  server.registerTool(
+    publicDecisionTraceDefinition.name,
+    {
+      title: "Trace ModelLang action applicability",
+      description: publicDecisionTraceDefinition.description,
+      inputSchema: fromJsonSchema<Record<string, unknown>>(publicDecisionTraceDefinition.inputSchema),
+      outputSchema: fromJsonSchema<unknown>(publicDecisionTraceDefinition.outputSchema),
+      annotations: publicDecisionTraceDefinition.annotations,
+      _meta: {
+        "dev.modellang/kind": publicDecisionTraceDefinition.kind,
+        "dev.modellang/publicDecisionTraceVersion": 1,
+        "dev.modellang/traceScope": "applicability",
+        "dev.modellang/executionObserved": false,
+        "dev.modellang/durableEvidence": false,
+        "dev.modellang/completeDecisionTrace": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/runtimeAuthorizationRequired": true,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    },
+    async (input, ctx): Promise<CallToolResult> => {
+      try {
+        if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new ValidationError("Command or delegated metadata is not accepted by public decision traces", "ML_VALIDATION", "agent:public-decision-trace");
+        }
+        const trace = await assembleReservationsPublicDecisionTrace(executor, input, now);
+        const uri = `modellang:///models/model%3AReservations/decision-traces/${trace.traceId}`;
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(trace) },
+            {
+              type: "resource",
+              resource: {
+                uri,
+                mimeType: "application/vnd.modellang.public-decision-trace+json",
+                text: JSON.stringify(trace),
+                _meta: {
+                  "dev.modellang/cacheControl": "no-store",
+                  "dev.modellang/maxAgeSeconds": 0,
+                  "dev.modellang/revalidate": "beforeReuse",
+                  "dev.modellang/traceScope": "applicability",
+                  "dev.modellang/executionObserved": false,
+                  "dev.modellang/durableEvidence": false,
+                },
+              },
+            },
+          ],
+          structuredContent: trace as never,
+          _meta: {
+            "dev.modellang/resourceUri": uri,
+            "dev.modellang/cacheControl": "no-store",
+            "dev.modellang/maxAgeSeconds": 0,
+            "dev.modellang/traceScope": "applicability",
+            "dev.modellang/executionObserved": false,
+            "dev.modellang/durableEvidence": false,
           },
         };
       } catch (error) {

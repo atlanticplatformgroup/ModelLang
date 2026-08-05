@@ -5,18 +5,19 @@
   "type": "object",
   "required": [
     "$schema", "adapterVersion", "compilerVersion", "protocolVersion",
-    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "delegatedCapabilityVersion", "model", "transport",
-    "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "tools"
+    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "delegatedCapabilityVersion", "publicDecisionTraceVersion", "model", "transport",
+    "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "publicDecisionTrace", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
-    "adapterVersion": { "const": 3 },
+    "adapterVersion": { "const": 4 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },
-    "catalogVersion": { "const": 5 },
+    "catalogVersion": { "const": 6 },
     "resourceEnvelopeVersion": { "const": 1 },
     "taskPacketVersion": { "const": 1 },
     "delegatedCapabilityVersion": { "const": 1 },
+    "publicDecisionTraceVersion": { "const": 1 },
     "model": { "$ref": "#/$defs/model" },
     "transport": {
       "type": "object",
@@ -58,7 +59,7 @@
     },
     "capabilities": {
       "type": "object",
-      "required": ["tools", "embeddedResources", "taskPackets", "delegatedCapabilities", "prompts", "tasks"],
+      "required": ["tools", "embeddedResources", "taskPackets", "delegatedCapabilities", "publicDecisionTraces", "prompts", "tasks"],
       "properties": {
         "tools": {
           "type": "object",
@@ -103,6 +104,18 @@
           },
           "additionalProperties": false
         },
+        "publicDecisionTraces": {
+          "type": "object",
+          "required": ["modelLangContract", "delivery", "scope", "maxAgeSeconds", "durableEvidence"],
+          "properties": {
+            "modelLangContract": { "const": true },
+            "delivery": { "const": "embeddedToolResult" },
+            "scope": { "const": "applicability" },
+            "maxAgeSeconds": { "const": 0 },
+            "durableEvidence": { "const": false }
+          },
+          "additionalProperties": false
+        },
         "prompts": { "const": false },
         "tasks": { "const": false }
       },
@@ -110,6 +123,7 @@
     },
     "taskPacket": { "$ref": "#/$defs/taskPacket" },
     "delegatedCapabilities": { "$ref": "#/$defs/delegatedCapabilities" },
+    "publicDecisionTrace": { "$ref": "#/$defs/publicDecisionTrace" },
     "tools": {
       "type": "array",
       "items": { "$ref": "#/$defs/tool" }
@@ -254,6 +268,51 @@
         "authenticatedDelegateRequired": { "const": true },
         "hostAtomicConsumeAndExecuteRequired": { "const": true },
         "discoveryGrantsAuthority": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "publicDecisionTrace": {
+      "type": "object",
+      "required": ["name", "kind", "description", "inputSchema", "outputSchema", "annotations", "resource"],
+      "properties": {
+        "name": { "const": "modellang_public_decision_trace" },
+        "kind": { "const": "publicDecisionTrace" },
+        "description": { "type": "string", "minLength": 1 },
+        "inputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "outputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "annotations": {
+          "type": "object",
+          "required": ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"],
+          "properties": {
+            "readOnlyHint": { "const": true },
+            "destructiveHint": { "const": false },
+            "idempotentHint": { "const": false },
+            "openWorldHint": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "resource": {
+          "type": "object",
+          "required": ["delivery", "traceVersion", "mimeType", "uriContainsInput", "freshness", "grantsAuthority"],
+          "properties": {
+            "delivery": { "const": "embeddedToolResult" },
+            "traceVersion": { "const": 1 },
+            "mimeType": { "const": "application/vnd.modellang.public-decision-trace+json" },
+            "uriContainsInput": { "const": false },
+            "freshness": {
+              "type": "object",
+              "required": ["mode", "maxAgeSeconds", "revalidate"],
+              "properties": {
+                "mode": { "const": "pointInTime" },
+                "maxAgeSeconds": { "const": 0 },
+                "revalidate": { "const": "beforeReuse" }
+              },
+              "additionalProperties": false
+            },
+            "grantsAuthority": { "const": false }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

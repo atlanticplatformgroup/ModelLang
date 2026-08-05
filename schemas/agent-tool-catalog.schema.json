@@ -5,11 +5,11 @@
   "type": "object",
   "required": [
     "$schema", "catalogVersion", "compilerVersion", "operationManifestVersion",
-    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "delegatedCapabilities", "tools"
+    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "delegatedCapabilities", "publicDecisionTraces", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
-    "catalogVersion": { "const": 5 },
+    "catalogVersion": { "const": 6 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },
     "capabilityManifestVersion": { "const": 10 },
@@ -158,6 +158,50 @@
         "hostCredentialAuthorityRequired": { "const": true },
         "runtimeAuthorizationRequired": { "const": true },
         "discoveryGrantsAuthority": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "publicDecisionTraces": {
+      "type": "object",
+      "required": [
+        "version", "protocol", "method", "path", "authenticated", "subjectSpecific", "authorizationFiltered", "inputSpecific",
+        "scope", "orderedRuleOutcomes", "containsCurrentStateValues", "containsOperationInput",
+        "containsAuthenticatedIdentity", "containsExpressions", "containsPolicyIds", "containsAuthorityIds",
+        "containsPrivateEvidence", "executionObserved", "durableEvidence", "freshness",
+        "grantsAuthority", "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "protocol": { "const": "http" },
+        "method": { "const": "POST" },
+        "path": { "const": "/agent/decision-traces" },
+        "authenticated": { "const": true },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "inputSpecific": { "const": true },
+        "scope": { "const": "applicability" },
+        "orderedRuleOutcomes": { "const": true },
+        "containsCurrentStateValues": { "const": false },
+        "containsOperationInput": { "const": false },
+        "containsAuthenticatedIdentity": { "const": false },
+        "containsExpressions": { "const": false },
+        "containsPolicyIds": { "const": false },
+        "containsAuthorityIds": { "const": false },
+        "containsPrivateEvidence": { "const": false },
+        "executionObserved": { "const": false },
+        "durableEvidence": { "const": false },
+        "freshness": {
+          "type": "object",
+          "required": ["mode", "maxAgeSeconds", "revalidate"],
+          "properties": {
+            "mode": { "const": "pointInTime" },
+            "maxAgeSeconds": { "const": 0 },
+            "revalidate": { "const": "beforeReuse" }
+          },
+          "additionalProperties": false
+        },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
       },
       "additionalProperties": false
     },

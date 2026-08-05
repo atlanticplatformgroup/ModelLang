@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFile } from "node:fs/promises";
 import { Ajv2020 } from "ajv/dist/2020.js";
-import { ProcurementHttpClient } from "../generated/procurement/typescript/http-client.js";
+import {
+  ProcurementHttpClient,
+  type ProcurementPublicDecisionTrace,
+} from "../generated/procurement/typescript/http-client.js";
 import {
   createProcurementHttpHandler,
   type ProcurementDelegatedCapabilityClaim,
@@ -342,7 +345,7 @@ describe("generated HTTP boundary", () => {
     expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
     expect(view).toMatchObject({
       viewVersion: 1,
-      catalogVersion: 5,
+      catalogVersion: 6,
       model: { id: "model:Procurement" },
       view: {
         subjectSpecific: true,
@@ -437,8 +440,8 @@ describe("generated HTTP boundary", () => {
 
     expect(resource).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 5,
-      model: { id: "model:Procurement", version: "0.43.0" },
+      catalogVersion: 6,
+      model: { id: "model:Procurement", version: "0.44.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",
@@ -524,9 +527,9 @@ describe("generated HTTP boundary", () => {
 
     expect(packet).toMatchObject({
       packetVersion: 1,
-      catalogVersion: 5,
+      catalogVersion: 6,
       resourceVersion: 1,
-      model: { id: "model:Procurement", version: "0.43.0" },
+      model: { id: "model:Procurement", version: "0.44.0" },
       kind: "boundedTaskContext",
       authority: "none",
       view: {
@@ -617,6 +620,166 @@ describe("generated HTTP boundary", () => {
     expect(assessOperation).toHaveBeenCalledTimes(1);
   });
 
+  it("publishes bounded zero-age applicability traces without input, state values, or execution evidence", async () => {
+    const tracedAt = "2026-08-05T14:00:00.000Z";
+    const operationId = applicableDecision.operationId;
+    const authorizationRuleId = `authorize:${operationId}`;
+    const requirementRuleId = `require:${operationId}.positive_amount`;
+    const revisionRuleId = `revision:${operationId}`;
+    const decisions: ProcurementPublicDecisionTrace["decision"][] = [
+      applicableDecision,
+      {
+        operationId,
+        status: "denied",
+        applicable: false,
+        authority: "none",
+        explanation: { kind: "authorization", ruleId: authorizationRuleId },
+      },
+      {
+        operationId,
+        status: "notApplicable",
+        applicable: false,
+        authority: "none",
+        revision: applicableDecision.revision,
+        explanation: { kind: "requirement", ruleId: requirementRuleId },
+      },
+      {
+        operationId,
+        status: "stale",
+        applicable: false,
+        authority: "none",
+        revision: applicableDecision.revision,
+        explanation: { kind: "revision", ruleId: revisionRuleId },
+      },
+    ];
+    const assessOperation = vi.fn(async () => decisions.shift()!);
+    const execute = vi.fn();
+    const handler = createProcurementHttpHandler(async () => ({ execute, assess: assessOperation }), {
+      now: () => new Date(tracedAt),
+    });
+    const responses: Response[] = [];
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "trace-token",
+      fetch: async (input, init) => {
+        const response = await handler(new Request(input, init));
+        responses.push(response.clone());
+        return response;
+      },
+    });
+    const input = { amount: { currency: "USD", amount: "987654.32" } } as const;
+    const applicable = await client.publicDecisionTrace({ operationId, input });
+    const denied = await client.publicDecisionTrace({ operationId, input });
+    const notApplicable = await client.publicDecisionTrace({ operationId, input });
+    const stale = await client.publicDecisionTrace({ operationId, input, expectedRevision: applicableDecision.revision });
+
+    expect(applicable).toMatchObject({
+      traceVersion: 1,
+      catalogVersion: 6,
+      model: { id: "model:Procurement", version: "0.44.0" },
+      kind: "applicabilityDecisionTrace",
+      operationId,
+      authority: "none",
+      view: {
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        inputSpecific: true,
+        derivedFromCurrentState: true,
+        containsCurrentStateValues: false,
+        containsOperationInput: false,
+        containsAuthenticatedIdentity: false,
+        containsExpressions: false,
+        containsPolicyIds: false,
+        containsAuthorityIds: false,
+        containsPrivateEvidence: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      freshness: { mode: "pointInTime", tracedAt, maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      decision: applicableDecision,
+      stages: {
+        authorization: { ruleId: authorizationRuleId, outcome: "passed" },
+        requirements: [{ ruleId: requirementRuleId, outcome: "passed" }],
+        revision: { ruleId: revisionRuleId, outcome: "notRequested" },
+      },
+      closure: {
+        scope: "applicability",
+        currentEvaluation: true,
+        executionObserved: false,
+        durableEvidence: false,
+        completeDecisionTrace: false,
+      },
+    });
+    expect(denied.stages).toEqual({
+      authorization: { ruleId: authorizationRuleId, outcome: "failed" },
+      requirements: [{ ruleId: requirementRuleId, outcome: "notEvaluated" }],
+      revision: { ruleId: revisionRuleId, outcome: "notEvaluated" },
+    });
+    expect(notApplicable.stages).toEqual({
+      authorization: { ruleId: authorizationRuleId, outcome: "passed" },
+      requirements: [{ ruleId: requirementRuleId, outcome: "failed" }],
+      revision: { ruleId: revisionRuleId, outcome: "notEvaluated" },
+    });
+    expect(stale.stages.revision.outcome).toBe("mismatched");
+    expect(responses.every((response) => response.headers.get("cache-control") === "no-store")).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
+    expect(assessOperation).toHaveBeenLastCalledWith(operationId, input, { expectedRevision: applicableDecision.revision });
+    expect(JSON.stringify([applicable, denied, notApplicable, stale])).not.toMatch(/987654\.32|trace-token|principal|decision_evidence/);
+
+    const exactSchema = (JSON.parse(await readFile("generated/procurement/mcp.json", "utf8")) as {
+      publicDecisionTrace: { outputSchema: object };
+    }).publicDecisionTrace.outputSchema;
+    const validate = new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, "date-time": true },
+    }).compile(exactSchema);
+    for (const trace of [applicable, denied, notApplicable, stale]) {
+      expect(validate(trace), JSON.stringify(validate.errors)).toBe(true);
+    }
+    const standaloneSchema = JSON.parse(await readFile("schemas/public-decision-trace.schema.json", "utf8"));
+    const validateStandalone = new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, "date-time": true },
+    }).compile(standaloneSchema);
+    for (const trace of [applicable, denied, notApplicable, stale]) {
+      expect(validateStandalone(trace), JSON.stringify(validateStandalone.errors)).toBe(true);
+    }
+
+    const rejectedMetadata = await handler(new Request("https://example.test/agent/decision-traces", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer trace-token",
+        "content-type": "application/json",
+        "if-match": `"${applicableDecision.revision}"`,
+      },
+      body: JSON.stringify({ action: { operationId, input } }),
+    }));
+    expect(rejectedMetadata.status).toBe(400);
+    expect(rejectedMetadata.headers.get("cache-control")).toBe("no-store");
+
+    const rejectedDelegation = await handler(new Request("https://example.test/agent/decision-traces", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer trace-token",
+        "content-type": "application/json",
+        "delegated-capability": "delegated-secret-that-is-at-least-thirty-two-bytes",
+      },
+      body: JSON.stringify({ action: { operationId, input } }),
+    }));
+    expect(rejectedDelegation.status).toBe(403);
+    expect(rejectedDelegation.headers.get("cache-control")).toBe("no-store");
+
+    const unauthenticated = await handler(new Request("https://example.test/agent/decision-traces", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: { operationId, input } }),
+    }));
+    expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.headers.get("cache-control")).toBe("no-store");
+  });
+
   it("issues, invokes, expires, revokes, and consumes exact delegated action authority", async () => {
     const grantId = "10000000-0000-4000-8000-000000000001";
     const credential = "delegated-secret-that-is-at-least-thirty-two-bytes";
@@ -691,7 +854,7 @@ describe("generated HTTP boundary", () => {
     });
     expect(capability).toMatchObject({
       delegatedCapabilityVersion: 1,
-      catalogVersion: 5,
+      catalogVersion: 6,
       grantId,
       operationId: applicableDecision.operationId,
       authority: "delegated",

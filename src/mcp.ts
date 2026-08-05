@@ -2,6 +2,7 @@ import type { AgentToolCatalog } from "./agent-tool-catalog.js";
 import type { GeneratedFiles } from "./build.js";
 import type { TaskPacketSchemas } from "./task-packet.js";
 import type { DelegatedCapabilitySchemas } from "./delegated-capability.js";
+import type { PublicDecisionTraceSchemas } from "./public-decision-trace.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -41,13 +42,14 @@ interface McpToolBinding {
 
 export interface McpAdapterManifest {
   $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
-  adapterVersion: 3;
+  adapterVersion: 4;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
-  catalogVersion: 5;
+  catalogVersion: 6;
   resourceEnvelopeVersion: 1;
   taskPacketVersion: 1;
   delegatedCapabilityVersion: 1;
+  publicDecisionTraceVersion: 1;
   model: AgentToolCatalog["model"];
   transport: {
     kind: "streamableHttp";
@@ -90,6 +92,13 @@ export interface McpAdapterManifest {
       maxUses: 1;
       redelegation: false;
     };
+    publicDecisionTraces: {
+      modelLangContract: true;
+      delivery: "embeddedToolResult";
+      scope: "applicability";
+      maxAgeSeconds: 0;
+      durableEvidence: false;
+    };
     prompts: false;
     tasks: false;
   };
@@ -127,6 +136,27 @@ export interface McpAdapterManifest {
     hostAtomicConsumeAndExecuteRequired: true;
     discoveryGrantsAuthority: false;
   };
+  publicDecisionTrace: {
+    name: "modellang_public_decision_trace";
+    kind: "publicDecisionTrace";
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+    annotations: {
+      readOnlyHint: true;
+      destructiveHint: false;
+      idempotentHint: false;
+      openWorldHint: false;
+    };
+    resource: {
+      delivery: "embeddedToolResult";
+      traceVersion: 1;
+      mimeType: "application/vnd.modellang.public-decision-trace+json";
+      uriContainsInput: false;
+      freshness: { mode: "pointInTime"; maxAgeSeconds: 0; revalidate: "beforeReuse" };
+      grantsAuthority: false;
+    };
+  };
   tools: McpToolBinding[];
 }
 
@@ -143,16 +173,18 @@ export function generateMcpAdapterManifest(
   catalog: AgentToolCatalog,
   taskPacketSchemas: TaskPacketSchemas,
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
+  publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
 ): McpAdapterManifest {
   return {
     $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
-    adapterVersion: 3,
+    adapterVersion: 4,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
     catalogVersion: catalog.catalogVersion,
     resourceEnvelopeVersion: 1,
     taskPacketVersion: 1,
     delegatedCapabilityVersion: 1,
+    publicDecisionTraceVersion: 1,
     model: { ...catalog.model },
     transport: {
       kind: "streamableHttp",
@@ -195,6 +227,13 @@ export function generateMcpAdapterManifest(
         maxUses: 1,
         redelegation: false,
       },
+      publicDecisionTraces: {
+        modelLangContract: true,
+        delivery: "embeddedToolResult",
+        scope: "applicability",
+        maxAgeSeconds: 0,
+        durableEvidence: false,
+      },
       prompts: false,
       tasks: false,
     },
@@ -231,6 +270,27 @@ export function generateMcpAdapterManifest(
       authenticatedDelegateRequired: true,
       hostAtomicConsumeAndExecuteRequired: true,
       discoveryGrantsAuthority: false,
+    },
+    publicDecisionTrace: {
+      name: "modellang_public_decision_trace",
+      kind: "publicDecisionTrace",
+      description: "Trace the current authenticated applicability of one exact action as ordered rule outcomes without publishing input, state values, identity, expressions, policy IDs, authority IDs, or private execution evidence.",
+      inputSchema: structuredClone(publicDecisionTraceSchemas.inputSchema),
+      outputSchema: structuredClone(publicDecisionTraceSchemas.outputSchema),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      resource: {
+        delivery: "embeddedToolResult",
+        traceVersion: 1,
+        mimeType: "application/vnd.modellang.public-decision-trace+json",
+        uriContainsInput: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        grantsAuthority: false,
+      },
     },
     tools: catalog.tools.map((tool): McpToolBinding => ({
       name: stableMcpName(tool.id),
@@ -285,6 +345,7 @@ import {
 } from "@modelcontextprotocol/server";
 import type { ExecutionOptions } from "./types.js";
 import {
+  assemble${modelName}PublicDecisionTrace,
   assemble${modelName}TaskPacket,
   invoke${modelName}DelegatedCapability,
   type ${modelName}ActionOperationId,
@@ -329,6 +390,7 @@ const toolDefinitions = ${JSON.stringify(manifest.tools.map((tool) => ({
 
 const taskPacketDefinition = ${JSON.stringify(manifest.taskPacket, null, 2)} as const;
 const delegatedCapabilityDefinition = ${JSON.stringify(manifest.delegatedCapabilities, null, 2)} as const;
+const publicDecisionTraceDefinition = ${JSON.stringify(manifest.publicDecisionTrace, null, 2)} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -398,7 +460,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 5 as const,
+    catalogVersion: 6 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.operationId,
     kind: "queryResult" as const,
@@ -449,7 +511,7 @@ function build${modelName}McpServer(
   const server = new McpServer(
     { name: ${JSON.stringify(`${modelName}-ModelLang`)}, version: ${JSON.stringify(manifest.model.version)} },
     {
-      instructions: "Tool discovery and task packets grant no authority. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
+      instructions: "Tool discovery, task packets, and public applicability traces grant no authority. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -605,6 +667,71 @@ function build${modelName}McpServer(
       }
     },
   );
+  server.registerTool(
+    publicDecisionTraceDefinition.name,
+    {
+      title: "Trace ModelLang action applicability",
+      description: publicDecisionTraceDefinition.description,
+      inputSchema: fromJsonSchema<Record<string, unknown>>(publicDecisionTraceDefinition.inputSchema),
+      outputSchema: fromJsonSchema<unknown>(publicDecisionTraceDefinition.outputSchema),
+      annotations: publicDecisionTraceDefinition.annotations,
+      _meta: {
+        "dev.modellang/kind": publicDecisionTraceDefinition.kind,
+        "dev.modellang/publicDecisionTraceVersion": 1,
+        "dev.modellang/traceScope": "applicability",
+        "dev.modellang/executionObserved": false,
+        "dev.modellang/durableEvidence": false,
+        "dev.modellang/completeDecisionTrace": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/runtimeAuthorizationRequired": true,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    },
+    async (input, ctx): Promise<CallToolResult> => {
+      try {
+        if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new ValidationError("Command or delegated metadata is not accepted by public decision traces", "ML_VALIDATION", "agent:public-decision-trace");
+        }
+        const trace = await assemble${modelName}PublicDecisionTrace(executor, input, now);
+        const uri = \`modellang:///models/${encodeURIComponent(manifest.model.id)}/decision-traces/\${trace.traceId}\`;
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(trace) },
+            {
+              type: "resource",
+              resource: {
+                uri,
+                mimeType: "application/vnd.modellang.public-decision-trace+json",
+                text: JSON.stringify(trace),
+                _meta: {
+                  "dev.modellang/cacheControl": "no-store",
+                  "dev.modellang/maxAgeSeconds": 0,
+                  "dev.modellang/revalidate": "beforeReuse",
+                  "dev.modellang/traceScope": "applicability",
+                  "dev.modellang/executionObserved": false,
+                  "dev.modellang/durableEvidence": false,
+                },
+              },
+            },
+          ],
+          structuredContent: trace as never,
+          _meta: {
+            "dev.modellang/resourceUri": uri,
+            "dev.modellang/cacheControl": "no-store",
+            "dev.modellang/maxAgeSeconds": 0,
+            "dev.modellang/traceScope": "applicability",
+            "dev.modellang/executionObserved": false,
+            "dev.modellang/durableEvidence": false,
+          },
+        };
+      } catch (error) {
+        if (!(error instanceof ModelOperationError)) {
+          onerror?.(error instanceof Error ? error : new Error(String(error)));
+        }
+        return safeToolError(error);
+      }
+    },
+  );
   return server;
 }
 
@@ -727,8 +854,9 @@ export function generateMcp(
   catalog: AgentToolCatalog,
   taskPacketSchemas: TaskPacketSchemas,
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
+  publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
 ): GeneratedFiles {
-  const manifest = generateMcpAdapterManifest(catalog, taskPacketSchemas, delegatedCapabilitySchemas);
+  const manifest = generateMcpAdapterManifest(catalog, taskPacketSchemas, delegatedCapabilitySchemas, publicDecisionTraceSchemas);
   return {
     "mcp.json": `${JSON.stringify(manifest, null, 2)}\n`,
     "typescript/mcp-server.ts": generateMcpServer(manifest),

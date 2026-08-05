@@ -76,7 +76,7 @@ export function generateDelegatedCapabilitySchemas(
     properties: {
       $schema: { const: "https://modellang.dev/schemas/delegated-capability.schema.json" },
       delegatedCapabilityVersion: { const: 1 },
-      catalogVersion: { const: 5 },
+      catalogVersion: { const: 6 },
       model: { const: catalog.model },
       grantId: { type: "string", format: "uuid" },
       operationId: actions.length ? { enum: actions.map((action) => action.id) } : false,

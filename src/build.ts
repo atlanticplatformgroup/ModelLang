@@ -22,6 +22,7 @@ import { generateAgentToolCatalog } from "./agent-tool-catalog.js";
 import { generateMcp } from "./mcp.js";
 import { generateTaskPacketSchemas, taskPacketActionContracts } from "./task-packet.js";
 import { generateDelegatedCapabilitySchemas } from "./delegated-capability.js";
+import { generatePublicDecisionTraceSchemas, publicDecisionTraceActionContracts } from "./public-decision-trace.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -37,6 +38,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   const agentToolCatalog = generateAgentToolCatalog(operationManifest, capabilityManifest);
   const taskPacketSchemas = generateTaskPacketSchemas(agentToolCatalog, operationManifest);
   const delegatedCapabilitySchemas = generateDelegatedCapabilitySchemas(agentToolCatalog);
+  const publicDecisionTraceSchemas = generatePublicDecisionTraceSchemas(agentToolCatalog);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
@@ -52,7 +54,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
   };
-  Object.assign(files, generateMcp(agentToolCatalog, taskPacketSchemas, delegatedCapabilitySchemas));
+  Object.assign(files, generateMcp(agentToolCatalog, taskPacketSchemas, delegatedCapabilitySchemas, publicDecisionTraceSchemas));
   for (const [name, content] of Object.entries(generatePostgres(ir, decisionPlan))) files[`postgres/${name}`] = content;
   for (const [name, content] of Object.entries(generateTypeScript(ir, decisionPlan, capabilityManifest))) files[`typescript/${name}`] = content;
   Object.assign(files, generateHttp(
@@ -61,6 +63,8 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     taskPacketSchemas,
     taskPacketActionContracts(agentToolCatalog, operationManifest),
     delegatedCapabilitySchemas,
+    publicDecisionTraceSchemas,
+    publicDecisionTraceActionContracts(agentToolCatalog),
   ));
   Object.assign(files, generateUi(operationManifest, uiManifest));
   files["provenance.json"] = stableJson(generateArtifactProvenance(ir, files));

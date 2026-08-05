@@ -6,3 +6,4 @@ export const TASK_PACKET_MAX_OBSERVATIONS = 32;
 export const DELEGATION_ROUTE = "/agent/delegations";
 export const DELEGATION_REVOKE_ROUTE_PREFIX = "/agent/delegations/";
 export const DELEGATION_MAX_TTL_SECONDS = 3_600;
+export const PUBLIC_DECISION_TRACE_ROUTE = "/agent/decision-traces";

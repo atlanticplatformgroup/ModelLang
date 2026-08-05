@@ -44,7 +44,7 @@ export interface ProcurementDelegationRequest {
 export interface ProcurementDelegatedCapability {
   readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly grantId: string;
   readonly operationId: ProcurementDelegatedActionCandidate["operationId"];
@@ -82,10 +82,56 @@ export interface ProcurementDelegationRevocation {
   readonly revoked: boolean;
 }
 
+export interface ProcurementPublicDecisionTrace {
+  readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
+  readonly traceVersion: 1;
+  readonly catalogVersion: 6;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly traceId: string;
+  readonly kind: "applicabilityDecisionTrace";
+  readonly operationId: ProcurementSubjectCapabilityCandidate["operationId"];
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly derivedFromCurrentState: true;
+    readonly containsCurrentStateValues: false;
+    readonly containsOperationInput: false;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExpressions: false;
+    readonly containsPolicyIds: false;
+    readonly containsAuthorityIds: false;
+    readonly containsPrivateEvidence: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly tracedAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly decision: ApplicabilityDecision;
+  readonly stages: {
+    readonly authorization: { readonly ruleId: string; readonly outcome: "passed" | "failed" };
+    readonly requirements: readonly { readonly ruleId: string; readonly outcome: "passed" | "failed" | "notEvaluated" }[];
+    readonly revision: { readonly ruleId: string; readonly outcome: "notRequested" | "matched" | "mismatched" | "notEvaluated" };
+  };
+  readonly closure: {
+    readonly scope: "applicability";
+    readonly currentEvaluation: true;
+    readonly executionObserved: false;
+    readonly durableEvidence: false;
+    readonly completeDecisionTrace: false;
+  };
+}
+
 export interface ProcurementSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -126,7 +172,7 @@ export interface ProcurementSubjectCapabilityView {
 export interface ProcurementAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -157,7 +203,7 @@ export type ProcurementTaskPacketObservation =
 export interface ProcurementAgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -274,6 +320,10 @@ export class ProcurementHttpClient {
 
   async taskPacket(request: ProcurementTaskPacketRequest): Promise<ProcurementAgentTaskPacket> {
     return this.call("/agent/task-packets", request);
+  }
+
+  async publicDecisionTrace(action: ProcurementSubjectCapabilityCandidate): Promise<ProcurementPublicDecisionTrace> {
+    return this.call("/agent/decision-traces", { action });
   }
 
   async issueDelegatedCapability(request: ProcurementDelegationRequest): Promise<ProcurementDelegatedCapability> {

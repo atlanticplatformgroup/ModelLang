@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.44.0
+
+- Added public decision trace v1 as an authenticated, exact-input explanation of current action applicability through generated `POST /agent/decision-traces` clients/servers and the read-only MCP tool `modellang_public_decision_trace`.
+- Reused the authoritative applicability evaluator and exposed ordered categorical authorization, requirement, and revision outcomes plus the existing safe applicability decision without executing actions or writing action-audit evidence.
+- Established a strict disclosure boundary: traces omit operation inputs, current state values, authenticated identity, expressions, policy and authority identities, SQL, private `decision_evidence`, receipts, and event/consumer evidence.
+- Made closure and freshness explicit: applicability-only scope, no observed execution, no durable evidence, no complete-trace claim, point-in-time transport time, zero reusable lifetime, revalidation before reuse, `authority: none`, and no-store HTTP/MCP metadata.
+- Kept actions, current-state resources, task packets, delegated capabilities, and public traces distinct; trace calls reject command metadata and delegated credentials, and discovery never grants authority.
+- Added standalone and exact schemas, OpenAPI, catalog/MCP bindings, generated TypeScript, specification, whitepaper status, deterministic goldens, adversarial unit coverage, and live PostgreSQL HTTP/MCP tests proving policy-sensitive outcomes and absence of audit writes.
+- Advanced compiler/examples to 0.44.0, catalog to v6, MCP adapter to v4, target capability profile to v8, target to `target:postgresql-http-ui-public-decision-traces/8`, and generator profile to `postgresql-http-ui-public-decision-traces/28`; canonical IR1, delegated capability v1, task packet v1, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.43.0
 
 - Added delegated capability v1 for one currently applicable exact action/input, one named authenticated delegate, one audience, one required concurrency revision, one use, and a maximum one-hour lifetime.

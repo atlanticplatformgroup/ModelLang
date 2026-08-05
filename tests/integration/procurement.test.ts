@@ -277,7 +277,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.43.0",
+      model_version: "0.44.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -342,7 +342,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.43.0",
+      model_version: "0.44.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1211,7 +1211,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.43.0', $1,
+        VALUES ('model:Procurement', '0.44.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2061,12 +2061,12 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
           const claim: ProcurementDelegatedCapabilityClaim = {
             $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
             delegatedCapabilityVersion: 1,
-            catalogVersion: 5,
+            catalogVersion: 6,
             model: {
               id: "model:Procurement",
               name: "Procurement",
-              version: "0.43.0",
-              sourceHash: "sha256:16a280a95821892997fb43cce70a20d0414e03d411c1ffa5a69e7d76dd145c76",
+              version: "0.44.0",
+              sourceHash: "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61",
             },
             grantId,
             operationId: request.action.operationId,
@@ -2169,6 +2169,49 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [approveOperationId, low.id],
       );
       expect(discoveryAudit.rows[0]!.count).toBe("0");
+      const [employeeTrace, managerTrace, staleManagerTrace] = await Promise.all([
+        employee.publicDecisionTrace(candidate[0]),
+        manager.publicDecisionTrace(candidate[0]),
+        manager.publicDecisionTrace({
+          ...candidate[0],
+          expectedRevision: "rev:1:00000000000000000000000000000000",
+        }),
+      ]);
+      expect(employeeTrace).toMatchObject({
+        traceVersion: 1,
+        authority: "none",
+        decision: { status: "denied", authority: "none" },
+        stages: {
+          authorization: { outcome: "failed" },
+          requirements: [{ outcome: "notEvaluated" }],
+          revision: { outcome: "notEvaluated" },
+        },
+        closure: { scope: "applicability", executionObserved: false, durableEvidence: false, completeDecisionTrace: false },
+      });
+      expect(managerTrace).toMatchObject({
+        traceVersion: 1,
+        authority: "none",
+        freshness: { maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        decision: { status: "applicable", authority: "none" },
+        stages: {
+          authorization: { outcome: "passed" },
+          requirements: [{ outcome: "passed" }],
+          revision: { outcome: "notRequested" },
+        },
+      });
+      expect(staleManagerTrace).toMatchObject({
+        decision: { status: "stale", authority: "none" },
+        stages: { revision: { outcome: "mismatched" } },
+      });
+      expect(JSON.stringify([employeeTrace, managerTrace, staleManagerTrace])).not.toMatch(
+        new RegExp(`${low.id}|employee-one|manager|decision_evidence|principal_id|identity_subject`),
+      );
+      const traceAudit = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = $1 AND target_id = $2`,
+        [approveOperationId, low.id],
+      );
+      expect(traceAudit.rows[0]!.count).toBe("0");
       const packetReadAuditBefore = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
          WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
@@ -2385,7 +2428,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     try {
       await mcp.connect(transport);
       const tools = await mcp.listTools();
-      expect(tools.tools).toHaveLength(5);
+      expect(tools.tools).toHaveLength(6);
 
       const opened = await mcp.callTool({
         name: "act_1e35db0451b1461e941af6283d86dca2",
@@ -2414,6 +2457,52 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       expect(JSON.stringify(denied.content)).toContain(
         "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       );
+
+      const traceAuditBefore = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = 'action:act_d39dbb883b5f4019b9027b85add3de47' AND target_id = $1`,
+        [request.id],
+      );
+      const trace = await mcp.callTool({
+        name: "modellang_public_decision_trace",
+        arguments: {
+          action: {
+            operationId: "action:act_d39dbb883b5f4019b9027b85add3de47",
+            input: { request: request.id },
+          },
+        },
+      });
+      expect(trace.isError, unexpectedError?.stack ?? JSON.stringify(trace)).not.toBe(true);
+      expect(trace.structuredContent).toMatchObject({
+        traceVersion: 1,
+        authority: "none",
+        decision: { status: "denied", authority: "none" },
+        stages: {
+          authorization: { outcome: "failed" },
+          requirements: [{ outcome: "notEvaluated" }],
+          revision: { outcome: "notEvaluated" },
+        },
+        closure: { scope: "applicability", executionObserved: false, durableEvidence: false, completeDecisionTrace: false },
+      });
+      expect(JSON.stringify(trace)).not.toMatch(new RegExp(`${request.id}|employee-one|decision_evidence|principal_id`));
+      const traceResource = trace.content.find((content) => content.type === "resource");
+      expect(traceResource?.type).toBe("resource");
+      if (traceResource?.type === "resource") {
+        expect(traceResource.resource.mimeType).toBe("application/vnd.modellang.public-decision-trace+json");
+        expect(traceResource.resource._meta).toMatchObject({
+          "dev.modellang/cacheControl": "no-store",
+          "dev.modellang/maxAgeSeconds": 0,
+          "dev.modellang/traceScope": "applicability",
+          "dev.modellang/executionObserved": false,
+          "dev.modellang/durableEvidence": false,
+        });
+      }
+      const traceAuditAfter = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = 'action:act_d39dbb883b5f4019b9027b85add3de47' AND target_id = $1`,
+        [request.id],
+      );
+      expect(traceAuditAfter.rows[0]!.count).toBe(traceAuditBefore.rows[0]!.count);
 
       const auditBefore = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
@@ -2488,7 +2577,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [queryId],
       );
       expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 2);
-      expect(authenticationCount).toBeGreaterThanOrEqual(7);
+      expect(authenticationCount).toBeGreaterThanOrEqual(8);
     } finally {
       await Promise.all([mcp.close(), handler.close()]);
     }

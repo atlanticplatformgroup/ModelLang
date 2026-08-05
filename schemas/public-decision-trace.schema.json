@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/public-decision-trace.schema.json",
+  "title": "ModelLang bounded public decision trace",
+  "type": "object",
+  "required": [
+    "$schema", "traceVersion", "catalogVersion", "model", "traceId", "kind", "operationId",
+    "authority", "view", "freshness", "decision", "stages", "closure"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/public-decision-trace.schema.json" },
+    "traceVersion": { "const": 1 },
+    "catalogVersion": { "const": 6 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "traceId": { "type": "string", "format": "uuid" },
+    "kind": { "const": "applicabilityDecisionTrace" },
+    "operationId": { "type": "string", "pattern": "^action:" },
+    "authority": { "const": "none" },
+    "view": {
+      "type": "object",
+      "required": [
+        "audience", "subjectSpecific", "authorizationFiltered", "inputSpecific", "derivedFromCurrentState",
+        "containsCurrentStateValues", "containsOperationInput", "containsAuthenticatedIdentity", "containsExpressions",
+        "containsPolicyIds", "containsAuthorityIds", "containsPrivateEvidence", "grantsAuthority", "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "audience": { "const": "agent" },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "inputSpecific": { "const": true },
+        "derivedFromCurrentState": { "const": true },
+        "containsCurrentStateValues": { "const": false },
+        "containsOperationInput": { "const": false },
+        "containsAuthenticatedIdentity": { "const": false },
+        "containsExpressions": { "const": false },
+        "containsPolicyIds": { "const": false },
+        "containsAuthorityIds": { "const": false },
+        "containsPrivateEvidence": { "const": false },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["mode", "tracedAt", "maxAgeSeconds", "revalidate"],
+      "properties": {
+        "mode": { "const": "pointInTime" },
+        "tracedAt": { "type": "string", "format": "date-time" },
+        "maxAgeSeconds": { "const": 0 },
+        "revalidate": { "const": "beforeReuse" }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["operationId", "status", "applicable", "authority", "revision"],
+          "properties": {
+            "operationId": { "type": "string", "pattern": "^action:" },
+            "status": { "const": "applicable" },
+            "applicable": { "const": true },
+            "authority": { "const": "none" },
+            "revision": { "type": "string", "pattern": "^rev:1:[0-9a-f]{32}$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["operationId", "status", "applicable", "authority", "explanation"],
+          "properties": {
+            "operationId": { "type": "string", "pattern": "^action:" },
+            "status": { "const": "denied" },
+            "applicable": { "const": false },
+            "authority": { "const": "none" },
+            "explanation": {
+              "type": "object",
+              "required": ["kind", "ruleId"],
+              "properties": {
+                "kind": { "const": "authorization" },
+                "ruleId": { "type": "string", "pattern": "^authorize:" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["operationId", "status", "applicable", "authority", "revision", "explanation"],
+          "properties": {
+            "operationId": { "type": "string", "pattern": "^action:" },
+            "status": { "const": "notApplicable" },
+            "applicable": { "const": false },
+            "authority": { "const": "none" },
+            "revision": { "type": "string", "pattern": "^rev:1:[0-9a-f]{32}$" },
+            "explanation": {
+              "type": "object",
+              "required": ["kind", "ruleId"],
+              "properties": {
+                "kind": { "const": "requirement" },
+                "ruleId": { "type": "string", "pattern": "^require:" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["operationId", "status", "applicable", "authority", "revision", "explanation"],
+          "properties": {
+            "operationId": { "type": "string", "pattern": "^action:" },
+            "status": { "const": "stale" },
+            "applicable": { "const": false },
+            "authority": { "const": "none" },
+            "revision": { "type": "string", "pattern": "^rev:1:[0-9a-f]{32}$" },
+            "explanation": {
+              "type": "object",
+              "required": ["kind", "ruleId"],
+              "properties": {
+                "kind": { "const": "revision" },
+                "ruleId": { "type": "string", "pattern": "^revision:" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "stages": {
+      "type": "object",
+      "required": ["authorization", "requirements", "revision"],
+      "properties": {
+        "authorization": { "$ref": "#/$defs/ruleEvaluation" },
+        "requirements": { "type": "array", "items": { "$ref": "#/$defs/requirementEvaluation" }, "maxItems": 32 },
+        "revision": { "$ref": "#/$defs/revisionEvaluation" }
+      },
+      "additionalProperties": false
+    },
+    "closure": {
+      "const": {
+        "scope": "applicability",
+        "currentEvaluation": true,
+        "executionObserved": false,
+        "durableEvidence": false,
+        "completeDecisionTrace": false
+      }
+    }
+  },
+  "$defs": {
+    "ruleEvaluation": {
+      "type": "object",
+      "required": ["ruleId", "outcome"],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^authorize:" },
+        "outcome": { "enum": ["passed", "failed"] }
+      },
+      "additionalProperties": false
+    },
+    "requirementEvaluation": {
+      "type": "object",
+      "required": ["ruleId", "outcome"],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^require:" },
+        "outcome": { "enum": ["passed", "failed", "notEvaluated"] }
+      },
+      "additionalProperties": false
+    },
+    "revisionEvaluation": {
+      "type": "object",
+      "required": ["ruleId", "outcome"],
+      "properties": {
+        "ruleId": { "type": "string", "pattern": "^revision:" },
+        "outcome": { "enum": ["notRequested", "matched", "mismatched", "notEvaluated"] }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

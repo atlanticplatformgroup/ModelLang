@@ -14,11 +14,14 @@ import {
   DELEGATION_MAX_TTL_SECONDS,
   DELEGATION_ROUTE,
   DELEGATION_REVOKE_ROUTE_PREFIX,
+  PUBLIC_DECISION_TRACE_ROUTE,
 } from "../agent-routes.js";
 import type { TaskPacketActionContract, TaskPacketSchemas } from "../task-packet.js";
 import { TASK_PACKET_CLOSURE, TASK_PACKET_VIEW } from "../task-packet.js";
 import type { DelegatedCapabilitySchemas } from "../delegated-capability.js";
 import { DELEGATED_CAPABILITY_CONSTRAINTS, DELEGATED_CAPABILITY_VIEW } from "../delegated-capability.js";
+import type { PublicDecisionTraceActionContract, PublicDecisionTraceSchemas } from "../public-decision-trace.js";
+import { PUBLIC_DECISION_TRACE_CLOSURE, PUBLIC_DECISION_TRACE_VIEW } from "../public-decision-trace.js";
 
 export interface HttpOutput {
   "openapi.json": string;
@@ -249,6 +252,7 @@ export function generateOpenApi(
   capabilities: CapabilityManifest,
   taskPacketSchemas: TaskPacketSchemas,
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
+  publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
 ): Record<string, unknown> {
   const actions = manifest.operations.filter((operation) => operation.kind === "action");
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
@@ -538,6 +542,37 @@ export function generateOpenApi(
       },
     },
   ];
+  const publicDecisionTracePath = [
+    PUBLIC_DECISION_TRACE_ROUTE,
+    {
+      post: {
+        operationId: "modellang_public_decision_trace",
+        summary: "Trace current authenticated action applicability without publishing values or private evidence",
+        tags: ["Public decision traces"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-grants-authority": false,
+        "x-modellang-trace-scope": "applicability",
+        "x-modellang-execution-observed": false,
+        "x-modellang-durable-evidence": false,
+        "x-modellang-freshness": { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: publicDecisionTraceSchemas.inputSchema } },
+        },
+        responses: {
+          "200": {
+            description: "Authenticated bounded applicability trace; this grants no authority and contains no state values",
+            headers: { "Cache-Control": { description: "Decision traces must not be stored or reused", schema: { const: "no-store" } } },
+            content: { "application/json": { schema: { $ref: "#/components/schemas/PublicDecisionTrace" } } },
+          },
+          ...Object.fromEntries(["400", "401", "403", "405", "413", "415", "500"].map((status) => [
+            status,
+            operationResponses(manifest.operations[0]!)[status] ?? operationResponses(manifest.operations[0]!)["500"],
+          ])),
+        },
+      },
+    },
+  ];
   const paths = Object.fromEntries([
     ...executionPaths,
     ...applicabilityPaths,
@@ -546,6 +581,7 @@ export function generateOpenApi(
     taskPacketPath,
     delegationPath,
     delegationRevokePath,
+    publicDecisionTracePath,
   ]);
   const safeRuleIds = capabilities.actions.flatMap((action) => [
     action.explanation.authorizationRuleId,
@@ -670,6 +706,7 @@ export function generateOpenApi(
         },
         AgentTaskPacket: taskPacketSchemas.outputSchema,
         DelegatedCapability: delegatedCapabilitySchemas.issueOutputSchema,
+        PublicDecisionTrace: publicDecisionTraceSchemas.outputSchema,
         SubjectCapabilityView: {
           type: "object",
           additionalProperties: false,
@@ -912,7 +949,7 @@ export interface ${manifest.model.name}DelegationRequest {
 export interface ${manifest.model.name}DelegatedCapability {
   readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly grantId: string;
   readonly operationId: ${manifest.model.name}DelegatedActionCandidate["operationId"];
@@ -950,10 +987,56 @@ export interface ${manifest.model.name}DelegationRevocation {
   readonly revoked: boolean;
 }
 
+export interface ${manifest.model.name}PublicDecisionTrace {
+  readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
+  readonly traceVersion: 1;
+  readonly catalogVersion: 6;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly traceId: string;
+  readonly kind: "applicabilityDecisionTrace";
+  readonly operationId: ${manifest.model.name}SubjectCapabilityCandidate["operationId"];
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly derivedFromCurrentState: true;
+    readonly containsCurrentStateValues: false;
+    readonly containsOperationInput: false;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExpressions: false;
+    readonly containsPolicyIds: false;
+    readonly containsAuthorityIds: false;
+    readonly containsPrivateEvidence: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly tracedAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly decision: ApplicabilityDecision;
+  readonly stages: {
+    readonly authorization: { readonly ruleId: string; readonly outcome: "passed" | "failed" };
+    readonly requirements: readonly { readonly ruleId: string; readonly outcome: "passed" | "failed" | "notEvaluated" }[];
+    readonly revision: { readonly ruleId: string; readonly outcome: "notRequested" | "matched" | "mismatched" | "notEvaluated" };
+  };
+  readonly closure: {
+    readonly scope: "applicability";
+    readonly currentEvaluation: true;
+    readonly executionObserved: false;
+    readonly durableEvidence: false;
+    readonly completeDecisionTrace: false;
+  };
+}
+
 export interface ${manifest.model.name}SubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -994,7 +1077,7 @@ export interface ${manifest.model.name}SubjectCapabilityView {
 export interface ${manifest.model.name}AgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -1025,7 +1108,7 @@ ${taskObservationResults || "  never"};
 export interface ${manifest.model.name}AgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 5;
+  readonly catalogVersion: 6;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -1144,6 +1227,10 @@ export class ${manifest.model.name}HttpClient {
     return this.call(${JSON.stringify(TASK_PACKET_ROUTE)}, request);
   }
 
+  async publicDecisionTrace(action: ${manifest.model.name}SubjectCapabilityCandidate): Promise<${manifest.model.name}PublicDecisionTrace> {
+    return this.call(${JSON.stringify(PUBLIC_DECISION_TRACE_ROUTE)}, { action });
+  }
+
   async issueDelegatedCapability(request: ${manifest.model.name}DelegationRequest): Promise<${manifest.model.name}DelegatedCapability> {
     return this.call(${JSON.stringify(DELEGATION_ROUTE)}, request);
   }
@@ -1165,6 +1252,7 @@ function generateHttpServer(
   manifest: OperationManifest,
   capabilities: CapabilityManifest,
   taskActionContracts: readonly TaskPacketActionContract[],
+  publicDecisionTraceActionContracts: readonly PublicDecisionTraceActionContract[],
 ): string {
   const definitions = manifest.operations.map((operation) => ({
     id: operation.id,
@@ -1236,6 +1324,7 @@ import type {
   ${manifest.model.name}DelegatedCapability,
   ${manifest.model.name}DelegationRequest,
   ${manifest.model.name}DelegationRevocation,
+  ${manifest.model.name}PublicDecisionTrace,
   ${manifest.model.name}SubjectCapabilityCandidate,
   ${manifest.model.name}SubjectCapabilityView,
   ${manifest.model.name}TaskPacketRequest,
@@ -1303,6 +1392,7 @@ const safeExplanations = ${JSON.stringify(safeExplanations, null, 2)} as Readonl
   { authorization: string; requirements: readonly string[]; revision: string }
 >>;
 const taskActionContracts = ${JSON.stringify(taskActionContracts, null, 2)} as Readonly<Record<string, unknown>[]>;
+const publicDecisionTraceActionContracts = ${JSON.stringify(publicDecisionTraceActionContracts, null, 2)} as const;
 
 export interface ${manifest.model.name}OperationExecutor {
   execute(operationId: ${manifest.model.name}OperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
@@ -1620,6 +1710,14 @@ function validateSubjectCandidates(value: unknown): readonly ${manifest.model.na
   });
 }
 
+function validatePublicDecisionTraceRequest(value: unknown): ${manifest.model.name}SubjectCapabilityCandidate {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value as object).length !== 1 || !Object.hasOwn(value, "action")) {
+    throw new ValidationError("Public decision trace input must contain one exact action", "ML_VALIDATION", "agent:public-decision-trace");
+  }
+  return validateSubjectCandidates({ candidates: [(value as { action: unknown }).action] })[0]!;
+}
+
 function validateTaskPacketRequest(value: unknown): ${manifest.model.name}TaskPacketRequest {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new ValidationError("Task packet input must be a JSON object", "ML_VALIDATION", "agent:task-packet");
@@ -1775,7 +1873,7 @@ function validateDelegatedClaim(
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
     && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
-    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 5
+    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 6
     && model?.id === ${JSON.stringify(manifest.model.id)}
     && model?.name === ${JSON.stringify(manifest.model.name)}
     && model?.version === ${JSON.stringify(manifest.model.version)}
@@ -1841,7 +1939,7 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 5 as const,
+    catalogVersion: 6 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.id,
     kind: "queryResult" as const,
@@ -1864,6 +1962,66 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
       revalidate: "beforeReuse" as const,
     },
     data,
+  };
+}
+
+export async function assemble${manifest.model.name}PublicDecisionTrace(
+  executor: ${manifest.model.name}OperationExecutor,
+  value: unknown,
+  now: () => Date = () => new Date(),
+): Promise<${manifest.model.name}PublicDecisionTrace> {
+  const candidate = validatePublicDecisionTraceRequest(value);
+  const definition = operationDefinitions.find((item) =>
+    item.endpoint === "execution" && item.action && item.id === candidate.operationId)!;
+  const decision = validateDecision(
+    definition,
+    await executor.assess(candidate.operationId, candidate.input as unknown as Readonly<Record<string, unknown>>, {
+      expectedRevision: candidate.expectedRevision,
+    }),
+  );
+  const contract = publicDecisionTraceActionContracts.find((item) => item.operationId === candidate.operationId)!;
+  const requirementOutcomes = contract.preconditionRuleIds.map((): "passed" | "failed" | "notEvaluated" =>
+    decision.status === "denied" ? "notEvaluated" : "passed");
+  if (decision.status === "notApplicable") {
+    const failedIndex = (contract.preconditionRuleIds as readonly string[]).indexOf(decision.explanation!.ruleId);
+    if (failedIndex < 0) throw new Error("Applicability trace contains an unknown requirement rule");
+    for (let index = failedIndex; index < requirementOutcomes.length; index += 1) {
+      requirementOutcomes[index] = index === failedIndex ? "failed" : "notEvaluated";
+    }
+  }
+  return {
+    $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
+    traceVersion: 1,
+    catalogVersion: 6,
+    model: ${JSON.stringify(manifest.model)},
+    traceId: globalThis.crypto.randomUUID(),
+    kind: "applicabilityDecisionTrace",
+    operationId: candidate.operationId,
+    authority: "none",
+    view: ${JSON.stringify(PUBLIC_DECISION_TRACE_VIEW)},
+    freshness: {
+      mode: "pointInTime",
+      tracedAt: now().toISOString(),
+      maxAgeSeconds: 0,
+      revalidate: "beforeReuse",
+    },
+    decision,
+    stages: {
+      authorization: {
+        ruleId: contract.authorizationRuleId,
+        outcome: decision.status === "denied" ? "failed" : "passed",
+      },
+      requirements: contract.preconditionRuleIds.map((ruleId, index) => ({ ruleId, outcome: requirementOutcomes[index]! })),
+      revision: {
+        ruleId: contract.revisionRuleId,
+        outcome: decision.status === "denied" || decision.status === "notApplicable"
+          ? "notEvaluated"
+          : decision.status === "stale"
+            ? "mismatched"
+            : candidate.expectedRevision === undefined ? "notRequested" : "matched",
+      },
+    },
+    closure: ${JSON.stringify(PUBLIC_DECISION_TRACE_CLOSURE)},
   };
 }
 
@@ -1905,7 +2063,7 @@ export async function assemble${manifest.model.name}TaskPacket(
   return {
     $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
-    catalogVersion: 5,
+    catalogVersion: 6,
     resourceVersion: 1,
     model: ${JSON.stringify(manifest.model)},
     packetId: globalThis.crypto.randomUUID(),
@@ -2019,24 +2177,35 @@ export function create${manifest.model.name}HttpHandler(
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === \`\${basePath}${SUBJECT_CAPABILITY_ROUTE}\`;
     const taskPacketRequest = path === \`\${basePath}${TASK_PACKET_ROUTE}\`;
+    const publicDecisionTraceRequest = path === \`\${basePath}${PUBLIC_DECISION_TRACE_ROUTE}\`;
+    const publicDecisionTraceHeaders: Record<string, string> = publicDecisionTraceRequest
+      ? { "cache-control": "no-store" }
+      : {};
     const delegationIssueRequest = path === \`\${basePath}${DELEGATION_ROUTE}\`;
     const delegationRevokeMatch = new RegExp(\`^\${escapeRegExp(basePath)}${DELEGATION_REVOKE_ROUTE_PREFIX}([0-9a-fA-F-]{36})/revoke$\`).exec(path);
     const definition = operationDefinitions.find((candidate) => \`\${basePath}\${candidate.route}\` === path);
-    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !delegationIssueRequest && !delegationRevokeMatch) {
+    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
+      && !delegationIssueRequest && !delegationRevokeMatch) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
       return problemResponse(
         new ValidationError("ModelLang HTTP operations require POST", "ML_METHOD_NOT_ALLOWED", "transport:method"),
-        { allow: "POST" },
+        { allow: "POST", ...publicDecisionTraceHeaders },
       );
     }
     const authorization = request.headers.get("authorization");
     const bearer = authorization && /^Bearer\\s+(.+)$/i.exec(authorization)?.[1];
-    if (!bearer) return problemResponse(new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"));
+    if (!bearer) return problemResponse(
+      new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"),
+      publicDecisionTraceHeaders,
+    );
     const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
     if (contentType !== "application/json") {
-      return problemResponse(new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"));
+      return problemResponse(
+        new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"),
+        publicDecisionTraceHeaders,
+      );
     }
     try {
       const authenticated = await authenticate(bearer);
@@ -2096,7 +2265,7 @@ export function create${manifest.model.name}HttpHandler(
         const result: ${manifest.model.name}DelegatedCapability = {
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
-          catalogVersion: 5,
+          catalogVersion: 6,
           model: ${JSON.stringify(manifest.model)},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
@@ -2179,6 +2348,18 @@ export function create${manifest.model.name}HttpHandler(
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });
       }
+      if (publicDecisionTraceRequest) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by public decision traces", "ML_VALIDATION", "agent:public-decision-trace");
+          }
+        }
+        const trace = await assemble${manifest.model.name}PublicDecisionTrace(executor, body, now);
+        return Response.json(trace, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (subjectCapabilityRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -2219,7 +2400,7 @@ export function create${manifest.model.name}HttpHandler(
         const view: ${manifest.model.name}SubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 5,
+          catalogVersion: 6,
           model: ${JSON.stringify(manifest.model)},
           view: {
             audience: "agent",
@@ -2287,7 +2468,8 @@ export function create${manifest.model.name}HttpHandler(
         },
       });
     } catch (error) {
-      return problemResponse(error, delegationIssueRequest || delegationRevokeMatch || request.headers.has("delegated-capability")
+      return problemResponse(error, publicDecisionTraceRequest || delegationIssueRequest || delegationRevokeMatch
+        || request.headers.has("delegated-capability")
         ? { "cache-control": "no-store" }
         : {});
     }
@@ -2302,11 +2484,13 @@ export function generateHttp(
   taskPacketSchemas: TaskPacketSchemas,
   taskActionContracts: readonly TaskPacketActionContract[],
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
+  publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
+  publicDecisionTraceActionContracts: readonly PublicDecisionTraceActionContract[],
 ): HttpOutput {
   return {
-    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities, taskPacketSchemas, delegatedCapabilitySchemas), null, 2)}\n`,
+    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities, taskPacketSchemas, delegatedCapabilitySchemas, publicDecisionTraceSchemas), null, 2)}\n`,
     "typescript/http-client.ts": generateHttpClient(manifest),
-    "typescript/http-server.ts": generateHttpServer(manifest, capabilities, taskActionContracts),
+    "typescript/http-server.ts": generateHttpServer(manifest, capabilities, taskActionContracts, publicDecisionTraceActionContracts),
     "typescript/browser.ts": `export * from "./types.js";
 export {
   ModelOperationError,

@@ -1,6 +1,6 @@
 # Reservations enforcement map
 
-Source hash: `sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c1077998f71`
+Source hash: `sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|
@@ -77,7 +77,7 @@ Source hash: `sha256:bf42e0687562dcfc8f1bb975af7c7bd645473ce17052509cbf994c10779
 | `cursor:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Continue by the declared order and identity key; bind the opaque cursor to model/query identity, source, caller, filters, and ordering, and re-evaluate authorization and row policy. | PostgreSQL keyset pagination | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `read:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Read entity:ent_ba2d028e915841d1ab90adfa40d38404 root rows and authored to-one related entities entity:ent_7cb2307972954d83a6f344764faaae39 through the generated query boundary. | PostgreSQL query function | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
 | `disclose:query:qry_94d8a56f4c2640fab58a4c2190c35c69` | Disclose only projection closure projection:prj_80d694c9a0a274dc79c6168e47d25968 -> projection:prj_85d694c9a0a274dc79c6168e47d25968 through the generated query boundary. | PostgreSQL projection encoder | `postgres/003_queries.sql`: `model_reservations.reservations_for_resource` | examples/reservations.model:74:1 |
-| `boundary:target_capabilities` | Report the canonical generator target's supported semantics and every model requirement that remains externally implemented. | ModelLang target conformance | `target-capabilities.json`: `target:postgresql-http-ui-delegated-capabilities/7` | compiler-derived |
+| `boundary:target_capabilities` | Report the canonical generator target's supported semantics and every model requirement that remains externally implemented. | ModelLang target conformance | `target-capabilities.json`: `target:postgresql-http-ui-public-decision-traces/8` | compiler-derived |
 | `boundary:audit` | Record each successful action with database and model principal identities plus gateway provenance when present. | PostgreSQL audit | `postgres/003_actions.sql`: `model_reservations_internal.action_audit` | compiler-derived |
 | `boundary:decision_evidence` | Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit. | PostgreSQL audit | `postgres/003_actions.sql`: `model_reservations_internal.action_audit.decision_evidence` | compiler-derived |
 | `boundary:command_receipts` | Keep idempotency keys, request fingerprints, correlations, stored results, and audit links private and transactional. | PostgreSQL receipt boundary | `postgres/002_schema.sql`: `model_reservations_internal.command_receipt` | compiler-derived |
