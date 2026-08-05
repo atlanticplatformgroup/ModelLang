@@ -14,10 +14,21 @@ export interface ReservationsHttpClientOptions {
 export type ReservationsSubjectCapabilityCandidate =
   | { readonly operationId: "action:act_508ad810a19d4b79a5009871de5cd26b"; readonly input: ReserveInput; readonly expectedRevision?: string };
 
+export type ReservationsTaskPacketActionCandidate =
+  | { readonly operationId: "action:act_508ad810a19d4b79a5009871de5cd26b"; readonly input: ReserveInput; readonly expectedRevision?: string };
+
+export type ReservationsTaskPacketObservationRequest =
+  | { readonly binding: string; readonly operationId: "query:qry_94d8a56f4c2640fab58a4c2190c35c69"; readonly input: ReservationsForResourceInput };
+
+export interface ReservationsTaskPacketRequest {
+  readonly actions: readonly ReservationsTaskPacketActionCandidate[];
+  readonly observations: readonly ReservationsTaskPacketObservationRequest[];
+}
+
 export interface ReservationsSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -58,7 +69,7 @@ export interface ReservationsSubjectCapabilityView {
 export interface ReservationsAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -81,6 +92,88 @@ export interface ReservationsAgentResource<Data, OperationId extends string = st
     readonly revalidate: "beforeReuse";
   };
   readonly data: Data;
+}
+
+export type ReservationsTaskPacketObservation =
+  | { readonly binding: string; readonly operationId: "query:qry_94d8a56f4c2640fab58a4c2190c35c69"; readonly resource: ReservationsAgentResource<CursorPage<ReservationSummary>, "query:qry_94d8a56f4c2640fab58a4c2190c35c69"> };
+
+export interface ReservationsAgentTaskPacket {
+  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly packetVersion: 1;
+  readonly catalogVersion: 4;
+  readonly resourceVersion: 1;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly packetId: string;
+  readonly kind: "boundedTaskContext";
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsCurrentState: true;
+    readonly containsOperationInput: false;
+    readonly containsObservationInput: false;
+    readonly containsRequestBindings: true;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExpressions: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly assembledAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly snapshot: { readonly atomic: false; readonly observations: "independentReads" };
+  readonly closure: {
+    readonly status: "partial";
+    readonly dimensions: {
+      readonly identity: "bounded";
+      readonly type: "complete";
+      readonly applicability: "evaluated";
+      readonly effect: "bounded";
+      readonly lifecycle: "bounded";
+      readonly observation: "callerSelected";
+      readonly version: "complete";
+      readonly recovery: "absent";
+    };
+    readonly gaps: readonly [
+      "declarationIdentityClosureNotPublished",
+      "taskGoalNotModeled",
+      "observationRelevanceNotProven",
+      "stateWriteEffectsNotPublished",
+      "externalEffectsNotPublished",
+      "reversibilityNotPublished",
+      "recoveryNotPublished",
+    ];
+  };
+  readonly actions: readonly {
+    readonly operationId: string;
+    readonly name: string;
+    readonly description: string;
+    readonly inputSchema: Readonly<Record<string, unknown>>;
+    readonly outputSchema: Readonly<Record<string, unknown>>;
+    readonly errors: readonly string[];
+    readonly reliability: {
+      readonly idempotency: "required" | "unsupported";
+      readonly scope: "authenticatedPrincipal";
+      readonly replay: "storedResult" | "none";
+      readonly fingerprint: "canonicalSha256" | "none";
+    };
+    readonly emittedEventIds: readonly string[];
+    readonly workflowTransitions: readonly {
+      readonly workflowId: string;
+      readonly transitionId: string;
+      readonly fromMemberId: string;
+      readonly toMemberId: string;
+      readonly targetParameterId: string;
+    }[];
+    readonly applicability: ApplicabilityDecision;
+  }[];
+  readonly observations: readonly ReservationsTaskPacketObservation[];
 }
 
 export class ReservationsHttpClient {
@@ -120,6 +213,10 @@ export class ReservationsHttpClient {
     candidates: readonly ReservationsSubjectCapabilityCandidate[],
   ): Promise<ReservationsSubjectCapabilityView> {
     return this.call("/agent/capabilities", { candidates });
+  }
+
+  async taskPacket(request: ReservationsTaskPacketRequest): Promise<ReservationsAgentTaskPacket> {
+    return this.call("/agent/task-packets", request);
   }
 
   async reserve(input: ReserveInput, options: ExecutionOptions = {}): Promise<Reservation> {

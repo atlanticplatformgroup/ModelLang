@@ -1,4 +1,4 @@
-model Procurement version "0.41.0";
+model Procurement version "0.42.0";
 
 enum Role @stableId("enm_025acdd67483499fbd780d0e19867e9b") {
   EMPLOYEE @stableId("emv_409f87bd5a4340d79e21d4d982175494"),

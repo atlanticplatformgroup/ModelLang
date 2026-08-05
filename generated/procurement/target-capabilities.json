@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
-  "profileVersion": 5,
-  "compilerVersion": "0.41.0",
-  "generatorProfile": "postgresql-http-ui-mcp/25",
-  "targetProfile": "target:postgresql-http-ui-mcp/5",
+  "profileVersion": 6,
+  "compilerVersion": "0.42.0",
+  "generatorProfile": "postgresql-http-ui-agent-task-packets/26",
+  "targetProfile": "target:postgresql-http-ui-agent-task-packets/6",
   "irVersion": 1,
   "model": {
     "id": "model:Procurement",
-    "version": "0.41.0",
-    "sourceHash": "sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44"
+    "version": "0.42.0",
+    "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2"
   },
   "conformance": "requiresExternalImplementations",
   "authority": "none",
@@ -181,6 +181,17 @@
       "enforcement": [
         "mcp",
         "agent-tool-catalog",
+        "postgresql-runtime"
+      ]
+    },
+    {
+      "id": "agents.taskPackets",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "agent-task-packet",
+        "http",
+        "mcp",
         "postgresql-runtime"
       ]
     },

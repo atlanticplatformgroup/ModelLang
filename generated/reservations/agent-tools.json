@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 3,
-  "compilerVersion": "0.41.0",
+  "catalogVersion": 4,
+  "compilerVersion": "0.42.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.41.0",
-    "sourceHash": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
+    "version": "0.42.0",
+    "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
   },
   "view": {
     "audience": "agent",
@@ -43,6 +43,28 @@
     "maxCandidates": 32,
     "queryTools": "separateResourceBindings",
     "containsResourceState": false,
+    "grantsAuthority": false,
+    "runtimeAuthorizationRequired": true
+  },
+  "taskPackets": {
+    "protocol": "http",
+    "method": "POST",
+    "path": "/agent/task-packets",
+    "packetVersion": 1,
+    "authenticated": true,
+    "subjectSpecific": true,
+    "authorizationFiltered": true,
+    "inputSpecific": true,
+    "actionCandidates": "exact",
+    "observations": "callerSelectedQueries",
+    "maxActions": 32,
+    "maxObservations": 32,
+    "containsCurrentState": true,
+    "containsOperationInput": false,
+    "containsObservationInput": false,
+    "containsAuthenticatedIdentity": false,
+    "closure": "explicitPartial",
+    "atomic": false,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
   },

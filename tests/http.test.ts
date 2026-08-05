@@ -339,7 +339,7 @@ describe("generated HTTP boundary", () => {
     expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
     expect(view).toMatchObject({
       viewVersion: 1,
-      catalogVersion: 3,
+      catalogVersion: 4,
       model: { id: "model:Procurement" },
       view: {
         subjectSpecific: true,
@@ -434,8 +434,8 @@ describe("generated HTTP boundary", () => {
 
     expect(resource).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 3,
-      model: { id: "model:Procurement", version: "0.41.0" },
+      catalogVersion: 4,
+      model: { id: "model:Procurement", version: "0.42.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",
@@ -477,6 +477,141 @@ describe("generated HTTP boundary", () => {
     }));
     expect(metadata.status).toBe(400);
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("assembles an authenticated bounded task packet without executing actions or disclosing request inputs", async () => {
+    const assembledAt = "2026-08-05T13:00:00.000Z";
+    const observationData = [{
+      id: purchaseRequest.id,
+      createdAt: purchaseRequest.createdAt,
+      amount: purchaseRequest.amount,
+      status: purchaseRequest.status,
+      approvedBy: null,
+    }];
+    const execute = vi.fn(async (operationId: string) => {
+      expect(operationId).toBe("query:qry_4406b045404a48449282db804f6167a8");
+      return observationData;
+    });
+    const assessOperation = vi.fn(async () => applicableDecision);
+    const handler = createProcurementHttpHandler(async () => ({ execute, assess: assessOperation }), {
+      now: () => new Date(assembledAt),
+    });
+    const responses: Response[] = [];
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "task-packet-token",
+      fetch: async (input, init) => {
+        const response = await handler(new Request(input, init));
+        responses.push(response.clone());
+        return response;
+      },
+    });
+    const packet = await client.taskPacket({
+      actions: [{
+        operationId: applicableDecision.operationId,
+        input: { amount: { currency: "USD", amount: "987654.32" } },
+        expectedRevision: applicableDecision.revision,
+      }],
+      observations: [{
+        binding: "request-list",
+        operationId: "query:qry_4406b045404a48449282db804f6167a8",
+        input: {},
+      }],
+    });
+
+    expect(packet).toMatchObject({
+      packetVersion: 1,
+      catalogVersion: 4,
+      resourceVersion: 1,
+      model: { id: "model:Procurement", version: "0.42.0" },
+      kind: "boundedTaskContext",
+      authority: "none",
+      view: {
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        inputSpecific: true,
+        containsCurrentState: true,
+        containsOperationInput: false,
+        containsObservationInput: false,
+        containsRequestBindings: true,
+        containsAuthenticatedIdentity: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      freshness: { mode: "pointInTime", assembledAt, maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      snapshot: { atomic: false, observations: "independentReads" },
+      closure: {
+        status: "partial",
+        dimensions: { applicability: "evaluated", observation: "callerSelected", recovery: "absent" },
+        gaps: expect.arrayContaining(["taskGoalNotModeled", "recoveryNotPublished"]),
+      },
+      actions: [{
+        operationId: applicableDecision.operationId,
+        name: "openRequest",
+        emittedEventIds: ["event:evt_10d694c9a0a274dc79c6168e47d25968"],
+        applicability: applicableDecision,
+      }],
+      observations: [{
+        binding: "request-list",
+        operationId: "query:qry_4406b045404a48449282db804f6167a8",
+        resource: {
+          authority: "none",
+          freshness: { retrievedAt: assembledAt, maxAgeSeconds: 0, revalidate: "beforeReuse" },
+          data: observationData,
+        },
+      }],
+    });
+    expect(packet.packetId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
+    expect(assessOperation).toHaveBeenCalledWith(
+      applicableDecision.operationId,
+      { amount: { currency: "USD", amount: "987654.32" } },
+      { expectedRevision: applicableDecision.revision },
+    );
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith(
+      "query:qry_4406b045404a48449282db804f6167a8",
+      {},
+      {},
+    );
+    expect(JSON.stringify(packet)).not.toMatch(/987654\.32|task-packet-token/);
+
+    const schema = JSON.parse(await readFile("schemas/agent-task-packet.schema.json", "utf8"));
+    const validate = new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, "date-time": true },
+    }).compile(schema);
+    expect(validate(packet), JSON.stringify(validate.errors)).toBe(true);
+
+    const duplicate = await handler(new Request("https://example.test/agent/task-packets", {
+      method: "POST",
+      headers: { authorization: "Bearer task-packet-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        actions: [
+          { operationId: applicableDecision.operationId, input: { amount: { currency: "USD", amount: "1.00" } } },
+          { operationId: applicableDecision.operationId, input: { amount: { currency: "USD", amount: "2.00" } } },
+        ],
+        observations: [],
+      }),
+    }));
+    expect(duplicate.status).toBe(400);
+    expect(assessOperation).toHaveBeenCalledTimes(1);
+
+    const commandMetadata = await handler(new Request("https://example.test/agent/task-packets", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer task-packet-token",
+        "content-type": "application/json",
+        "if-match": `"${applicableDecision.revision}"`,
+      },
+      body: JSON.stringify({
+        actions: [{ operationId: applicableDecision.operationId, input: { amount: { currency: "USD", amount: "1.00" } } }],
+        observations: [],
+      }),
+    }));
+    expect(commandMetadata.status).toBe(400);
+    expect(assessOperation).toHaveBeenCalledTimes(1);
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {

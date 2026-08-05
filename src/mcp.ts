@@ -1,5 +1,6 @@
 import type { AgentToolCatalog } from "./agent-tool-catalog.js";
 import type { GeneratedFiles } from "./build.js";
+import type { TaskPacketSchemas } from "./task-packet.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -39,11 +40,12 @@ interface McpToolBinding {
 
 export interface McpAdapterManifest {
   $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
-  adapterVersion: 1;
+  adapterVersion: 2;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
-  catalogVersion: 3;
+  catalogVersion: 4;
   resourceEnvelopeVersion: 1;
+  taskPacketVersion: 1;
   model: AgentToolCatalog["model"];
   transport: {
     kind: "streamableHttp";
@@ -73,8 +75,35 @@ export interface McpAdapterManifest {
       subscriptions: false;
       listChanged: false;
     };
+    taskPackets: {
+      modelLangContract: true;
+      mcpTasks: false;
+      delivery: "embeddedToolResult";
+      maxAgeSeconds: 0;
+    };
     prompts: false;
     tasks: false;
+  };
+  taskPacket: {
+    name: "modellang_task_packet";
+    kind: "taskPacketAssembler";
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+    annotations: {
+      readOnlyHint: true;
+      destructiveHint: false;
+      idempotentHint: false;
+      openWorldHint: false;
+    };
+    resource: {
+      delivery: "embeddedToolResult";
+      packetVersion: 1;
+      mimeType: "application/vnd.modellang.agent-task-packet+json";
+      uriContainsInput: false;
+      freshness: { mode: "pointInTime"; maxAgeSeconds: 0; revalidate: "beforeReuse" };
+      grantsAuthority: false;
+    };
   };
   tools: McpToolBinding[];
 }
@@ -88,14 +117,18 @@ function stableMcpName(operationId: string): string {
   return name;
 }
 
-export function generateMcpAdapterManifest(catalog: AgentToolCatalog): McpAdapterManifest {
+export function generateMcpAdapterManifest(
+  catalog: AgentToolCatalog,
+  taskPacketSchemas: TaskPacketSchemas,
+): McpAdapterManifest {
   return {
     $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
-    adapterVersion: 1,
+    adapterVersion: 2,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
     catalogVersion: catalog.catalogVersion,
     resourceEnvelopeVersion: 1,
+    taskPacketVersion: 1,
     model: { ...catalog.model },
     transport: {
       kind: "streamableHttp",
@@ -125,8 +158,35 @@ export function generateMcpAdapterManifest(catalog: AgentToolCatalog): McpAdapte
         subscriptions: false,
         listChanged: false,
       },
+      taskPackets: {
+        modelLangContract: true,
+        mcpTasks: false,
+        delivery: "embeddedToolResult",
+        maxAgeSeconds: 0,
+      },
       prompts: false,
       tasks: false,
+    },
+    taskPacket: {
+      name: "modellang_task_packet",
+      kind: "taskPacketAssembler",
+      description: "Assemble authenticated exact action applicability and caller-selected current-state observations into a non-authoritative bounded task packet with explicit closure gaps.",
+      inputSchema: structuredClone(taskPacketSchemas.inputSchema),
+      outputSchema: structuredClone(taskPacketSchemas.outputSchema),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+      resource: {
+        delivery: "embeddedToolResult",
+        packetVersion: 1,
+        mimeType: "application/vnd.modellang.agent-task-packet+json",
+        uriContainsInput: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        grantsAuthority: false,
+      },
     },
     tools: catalog.tools.map((tool): McpToolBinding => ({
       name: stableMcpName(tool.id),
@@ -180,7 +240,11 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import type { ExecutionOptions } from "./types.js";
-import type { ${modelName}OperationExecutor, ${modelName}OperationId } from "./http-server.js";
+import {
+  assemble${modelName}TaskPacket,
+  type ${modelName}OperationExecutor,
+  type ${modelName}OperationId,
+} from "./http-server.js";
 import { ModelOperationError } from "./errors.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -215,6 +279,8 @@ const toolDefinitions = ${JSON.stringify(manifest.tools.map((tool) => ({
     annotations: tool.annotations,
     executionMetadata: { idempotency: tool.executionMetadata.idempotency },
   })), null, 2)} as const satisfies readonly McpToolDefinition[];
+
+const taskPacketDefinition = ${JSON.stringify(manifest.taskPacket, null, 2)} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -282,7 +348,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 3 as const,
+    catalogVersion: 4 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.operationId,
     kind: "queryResult" as const,
@@ -331,7 +397,7 @@ function build${modelName}McpServer(
   const server = new McpServer(
     { name: ${JSON.stringify(`${modelName}-ModelLang`)}, version: ${JSON.stringify(manifest.model.version)} },
     {
-      instructions: "Tool discovery grants no authority. Every call is authenticated and runtime authorization remains authoritative. Query resource envelopes have zero reusable lifetime and must be re-read before reuse.",
+      instructions: "Tool discovery and task packets grant no authority. Every call is authenticated and runtime authorization remains authoritative. Query resources and task packets have zero reusable lifetime and must be re-read before reuse.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -405,6 +471,65 @@ function build${modelName}McpServer(
       },
     );
   }
+  server.registerTool(
+    taskPacketDefinition.name,
+    {
+      title: "Assemble ModelLang task packet",
+      description: taskPacketDefinition.description,
+      inputSchema: fromJsonSchema<Record<string, unknown>>(taskPacketDefinition.inputSchema),
+      outputSchema: fromJsonSchema<unknown>(taskPacketDefinition.outputSchema),
+      annotations: taskPacketDefinition.annotations,
+      _meta: {
+        "dev.modellang/kind": taskPacketDefinition.kind,
+        "dev.modellang/taskPacketVersion": 1,
+        "dev.modellang/closure": "explicitPartial",
+        "dev.modellang/mcpTasks": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/runtimeAuthorizationRequired": true,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    },
+    async (input, ctx): Promise<CallToolResult> => {
+      try {
+        if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new Error("Command metadata is not accepted by task packet assembly");
+        }
+        const packet = await assemble${modelName}TaskPacket(executor, input, now);
+        const uri = \`modellang:///models/${encodeURIComponent(manifest.model.id)}/task-packets/\${packet.packetId}\`;
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(packet) },
+            {
+              type: "resource",
+              resource: {
+                uri,
+                mimeType: "application/vnd.modellang.agent-task-packet+json",
+                text: JSON.stringify(packet),
+                _meta: {
+                  "dev.modellang/cacheControl": "no-store",
+                  "dev.modellang/maxAgeSeconds": 0,
+                  "dev.modellang/revalidate": "beforeReuse",
+                  "dev.modellang/mcpTasks": false,
+                },
+              },
+            },
+          ],
+          structuredContent: packet as never,
+          _meta: {
+            "dev.modellang/resourceUri": uri,
+            "dev.modellang/cacheControl": "no-store",
+            "dev.modellang/maxAgeSeconds": 0,
+            "dev.modellang/mcpTasks": false,
+          },
+        };
+      } catch (error) {
+        if (!(error instanceof ModelOperationError)) {
+          onerror?.(error instanceof Error ? error : new Error(String(error)));
+        }
+        return safeToolError(error);
+      }
+    },
+  );
   return server;
 }
 
@@ -514,8 +639,8 @@ export function create${modelName}McpHandler(
 `;
 }
 
-export function generateMcp(catalog: AgentToolCatalog): GeneratedFiles {
-  const manifest = generateMcpAdapterManifest(catalog);
+export function generateMcp(catalog: AgentToolCatalog, taskPacketSchemas: TaskPacketSchemas): GeneratedFiles {
+  const manifest = generateMcpAdapterManifest(catalog, taskPacketSchemas);
   return {
     "mcp.json": `${JSON.stringify(manifest, null, 2)}\n`,
     "typescript/mcp-server.ts": generateMcpServer(manifest),

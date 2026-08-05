@@ -8,7 +8,12 @@ import type { CapabilityManifest } from "../capability-manifest.js";
 import {
   SUBJECT_CAPABILITY_MAX_CANDIDATES,
   SUBJECT_CAPABILITY_ROUTE,
+  TASK_PACKET_MAX_ACTIONS,
+  TASK_PACKET_MAX_OBSERVATIONS,
+  TASK_PACKET_ROUTE,
 } from "../agent-routes.js";
+import type { TaskPacketActionContract, TaskPacketSchemas } from "../task-packet.js";
+import { TASK_PACKET_CLOSURE, TASK_PACKET_VIEW } from "../task-packet.js";
 
 export interface HttpOutput {
   "openapi.json": string;
@@ -192,7 +197,7 @@ function agentResourceSchema(manifest: OperationManifest, operation: ManifestOpe
     properties: {
       $schema: { const: "https://modellang.dev/schemas/agent-resource.schema.json" },
       resourceVersion: { const: 1 },
-      catalogVersion: { const: 3 },
+      catalogVersion: { const: 4 },
       model: {
         type: "object",
         additionalProperties: false,
@@ -234,7 +239,11 @@ function agentResourceSchema(manifest: OperationManifest, operation: ManifestOpe
   };
 }
 
-export function generateOpenApi(manifest: OperationManifest, capabilities: CapabilityManifest): Record<string, unknown> {
+export function generateOpenApi(
+  manifest: OperationManifest,
+  capabilities: CapabilityManifest,
+  taskPacketSchemas: TaskPacketSchemas,
+): Record<string, unknown> {
   const actions = manifest.operations.filter((operation) => operation.kind === "action");
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
     entity.name,
@@ -427,7 +436,42 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       },
     },
   ];
-  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths, ...resourcePaths, subjectCapabilityPath]);
+  const taskPacketPath = [
+    TASK_PACKET_ROUTE,
+    {
+      post: {
+        operationId: "modellang_task_packet",
+        summary: "Assemble an authenticated bounded task packet",
+        tags: ["Agent task packets"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-grants-authority": false,
+        "x-modellang-closure": "explicitPartial",
+        "x-modellang-atomic": false,
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: taskPacketSchemas.inputSchema } },
+        },
+        responses: {
+          "200": {
+            description: "Authenticated partial-closure task context; this grants no authority",
+            headers: { "Cache-Control": { description: "Task packets must not be stored or reused", schema: { const: "no-store" } } },
+            content: { "application/json": { schema: { $ref: "#/components/schemas/AgentTaskPacket" } } },
+          },
+          ...Object.fromEntries(["400", "401", "403", "405", "409", "413", "415", "500"].map((status) => [
+            status,
+            operationResponses(manifest.operations[0]!)[status] ?? operationResponses(manifest.operations[0]!)["500"],
+          ])),
+        },
+      },
+    },
+  ];
+  const paths = Object.fromEntries([
+    ...executionPaths,
+    ...applicabilityPaths,
+    ...resourcePaths,
+    subjectCapabilityPath,
+    taskPacketPath,
+  ]);
   const safeRuleIds = capabilities.actions.flatMap((action) => [
     action.explanation.authorizationRuleId,
     ...action.explanation.preconditionRuleIds,
@@ -542,6 +586,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
             },
           ],
         },
+        AgentTaskPacket: taskPacketSchemas.outputSchema,
         SubjectCapabilityView: {
           type: "object",
           additionalProperties: false,
@@ -549,7 +594,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
           properties: {
             $schema: { const: "https://modellang.dev/schemas/subject-capability-view.schema.json" },
             viewVersion: { const: 1 },
-            catalogVersion: { const: 3 },
+            catalogVersion: { const: 4 },
             model: {
               type: "object",
               additionalProperties: false,
@@ -735,6 +780,12 @@ function generateHttpClient(manifest: OperationManifest): string {
   const subjectCandidates = manifest.operations.filter((operation) => operation.kind === "action").map((operation) =>
     `  | { readonly operationId: ${JSON.stringify(operation.id)}; readonly input: ${operationInputName(operation)}; readonly expectedRevision?: string }`,
   ).join("\n");
+  const taskObservations = manifest.operations.filter((operation) => operation.kind === "query").map((operation) =>
+    `  | { readonly binding: string; readonly operationId: ${JSON.stringify(operation.id)}; readonly input: ${operationInputName(operation)} }`,
+  ).join("\n");
+  const taskObservationResults = manifest.operations.filter((operation) => operation.kind === "query").map((operation) =>
+    `  | { readonly binding: string; readonly operationId: ${JSON.stringify(operation.id)}; readonly resource: ${manifest.model.name}AgentResource<${returnType(manifest, operation)}, ${JSON.stringify(operation.id)}> }`,
+  ).join("\n");
   return `// Generated by ModelLang. Do not edit.
 import type { ${typeImports(manifest).join(", ")} } from "./types.js";
 import { AuthenticationError, mapHttpProblem } from "./errors.js";
@@ -751,10 +802,21 @@ export interface ${manifest.model.name}HttpClientOptions {
 export type ${manifest.model.name}SubjectCapabilityCandidate =
 ${subjectCandidates || "  never"};
 
+export type ${manifest.model.name}TaskPacketActionCandidate =
+${subjectCandidates || "  never"};
+
+export type ${manifest.model.name}TaskPacketObservationRequest =
+${taskObservations || "  never"};
+
+export interface ${manifest.model.name}TaskPacketRequest {
+  readonly actions: readonly ${manifest.model.name}TaskPacketActionCandidate[];
+  readonly observations: readonly ${manifest.model.name}TaskPacketObservationRequest[];
+}
+
 export interface ${manifest.model.name}SubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -795,7 +857,7 @@ export interface ${manifest.model.name}SubjectCapabilityView {
 export interface ${manifest.model.name}AgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -818,6 +880,88 @@ export interface ${manifest.model.name}AgentResource<Data, OperationId extends s
     readonly revalidate: "beforeReuse";
   };
   readonly data: Data;
+}
+
+export type ${manifest.model.name}TaskPacketObservation =
+${taskObservationResults || "  never"};
+
+export interface ${manifest.model.name}AgentTaskPacket {
+  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly packetVersion: 1;
+  readonly catalogVersion: 4;
+  readonly resourceVersion: 1;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly packetId: string;
+  readonly kind: "boundedTaskContext";
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsCurrentState: true;
+    readonly containsOperationInput: false;
+    readonly containsObservationInput: false;
+    readonly containsRequestBindings: true;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExpressions: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly assembledAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly snapshot: { readonly atomic: false; readonly observations: "independentReads" };
+  readonly closure: {
+    readonly status: "partial";
+    readonly dimensions: {
+      readonly identity: "bounded";
+      readonly type: "complete";
+      readonly applicability: "evaluated";
+      readonly effect: "bounded";
+      readonly lifecycle: "bounded";
+      readonly observation: "callerSelected";
+      readonly version: "complete";
+      readonly recovery: "absent";
+    };
+    readonly gaps: readonly [
+      "declarationIdentityClosureNotPublished",
+      "taskGoalNotModeled",
+      "observationRelevanceNotProven",
+      "stateWriteEffectsNotPublished",
+      "externalEffectsNotPublished",
+      "reversibilityNotPublished",
+      "recoveryNotPublished",
+    ];
+  };
+  readonly actions: readonly {
+    readonly operationId: string;
+    readonly name: string;
+    readonly description: string;
+    readonly inputSchema: Readonly<Record<string, unknown>>;
+    readonly outputSchema: Readonly<Record<string, unknown>>;
+    readonly errors: readonly string[];
+    readonly reliability: {
+      readonly idempotency: "required" | "unsupported";
+      readonly scope: "authenticatedPrincipal";
+      readonly replay: "storedResult" | "none";
+      readonly fingerprint: "canonicalSha256" | "none";
+    };
+    readonly emittedEventIds: readonly string[];
+    readonly workflowTransitions: readonly {
+      readonly workflowId: string;
+      readonly transitionId: string;
+      readonly fromMemberId: string;
+      readonly toMemberId: string;
+      readonly targetParameterId: string;
+    }[];
+    readonly applicability: ApplicabilityDecision;
+  }[];
+  readonly observations: readonly ${manifest.model.name}TaskPacketObservation[];
 }
 
 export class ${manifest.model.name}HttpClient {
@@ -859,6 +1003,10 @@ export class ${manifest.model.name}HttpClient {
     return this.call(${JSON.stringify(SUBJECT_CAPABILITY_ROUTE)}, { candidates });
   }
 
+  async taskPacket(request: ${manifest.model.name}TaskPacketRequest): Promise<${manifest.model.name}AgentTaskPacket> {
+    return this.call(${JSON.stringify(TASK_PACKET_ROUTE)}, request);
+  }
+
 ${methods}
 
 ${assessments}
@@ -868,7 +1016,11 @@ ${resources}
 `;
 }
 
-function generateHttpServer(manifest: OperationManifest, capabilities: CapabilityManifest): string {
+function generateHttpServer(
+  manifest: OperationManifest,
+  capabilities: CapabilityManifest,
+  taskActionContracts: readonly TaskPacketActionContract[],
+): string {
   const definitions = manifest.operations.map((operation) => ({
     id: operation.id,
     route: operationRoute(operation),
@@ -935,8 +1087,10 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
   return `// Generated by ModelLang. Do not edit.
 import type { ${[...inputImports, "ApplicabilityDecision", "ApplicabilityOptions", "ExecutionOptions"].join(", ")} } from "./types.js";
 import type {
+  ${manifest.model.name}AgentTaskPacket,
   ${manifest.model.name}SubjectCapabilityCandidate,
   ${manifest.model.name}SubjectCapabilityView,
+  ${manifest.model.name}TaskPacketRequest,
 } from "./http-client.js";
 import { ${manifest.model.name}Client } from "./client.js";
 import {
@@ -1000,6 +1154,7 @@ const safeExplanations = ${JSON.stringify(safeExplanations, null, 2)} as Readonl
   ${manifest.model.name}ActionOperationId,
   { authorization: string; requirements: readonly string[]; revision: string }
 >>;
+const taskActionContracts = ${JSON.stringify(taskActionContracts, null, 2)} as Readonly<Record<string, unknown>[]>;
 
 export interface ${manifest.model.name}OperationExecutor {
   execute(operationId: ${manifest.model.name}OperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
@@ -1277,6 +1432,162 @@ function validateSubjectCandidates(value: unknown): readonly ${manifest.model.na
   });
 }
 
+function validateTaskPacketRequest(value: unknown): ${manifest.model.name}TaskPacketRequest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("Task packet input must be a JSON object", "ML_VALIDATION", "agent:task-packet");
+  }
+  const request = value as Record<string, unknown>;
+  if (Object.keys(request).some((key) => key !== "actions" && key !== "observations")
+    || !Array.isArray(request.actions) || !Array.isArray(request.observations)
+    || request.actions.length < ${manifest.operations.some((operation) => operation.kind === "action") ? 1 : 0}
+    || request.actions.length > ${manifest.operations.some((operation) => operation.kind === "action") ? TASK_PACKET_MAX_ACTIONS : 0}
+    || request.observations.length < ${manifest.operations.some((operation) => operation.kind === "action") || !manifest.operations.some((operation) => operation.kind === "query") ? 0 : 1}
+    || request.observations.length > ${manifest.operations.some((operation) => operation.kind === "query") ? TASK_PACKET_MAX_OBSERVATIONS : 0}) {
+    throw new ValidationError("Task packet actions or observations are outside declared bounds", "ML_VALIDATION", "agent:task-packet");
+  }
+  const seenActions = new Set<string>();
+  const actions = request.actions.map((rawCandidate) => {
+    if (!rawCandidate || typeof rawCandidate !== "object" || Array.isArray(rawCandidate)) {
+      throw new ValidationError("Task packet action must be an object", "ML_VALIDATION", "agent:task-packet-action");
+    }
+    const candidate = rawCandidate as Record<string, unknown>;
+    if (Object.keys(candidate).some((key) => key !== "operationId" && key !== "input" && key !== "expectedRevision")
+      || typeof candidate.operationId !== "string" || !Object.hasOwn(candidate, "input")) {
+      throw new ValidationError("Task packet action is not closed", "ML_VALIDATION", "agent:task-packet-action");
+    }
+    const definition = operationDefinitions.find((item) =>
+      item.endpoint === "execution" && item.action && item.id === candidate.operationId);
+    if (!definition || seenActions.has(definition.id)) {
+      throw new ValidationError("Task packet actions must name distinct declared actions", "ML_VALIDATION", "agent:task-packet-action");
+    }
+    seenActions.add(definition.id);
+    if (candidate.expectedRevision !== undefined
+      && (typeof candidate.expectedRevision !== "string" || !/^rev:1:[0-9a-f]{32}$/.test(candidate.expectedRevision))) {
+      throw new ValidationError("Task packet expected revision is invalid", "ML_VALIDATION", "agent:task-packet-revision");
+    }
+    return {
+      operationId: definition.id,
+      input: validateInput(definition, candidate.input),
+      ...(candidate.expectedRevision === undefined ? {} : { expectedRevision: candidate.expectedRevision }),
+    };
+  });
+  const seenBindings = new Set<string>();
+  const observations = request.observations.map((rawObservation) => {
+    if (!rawObservation || typeof rawObservation !== "object" || Array.isArray(rawObservation)) {
+      throw new ValidationError("Task packet observation must be an object", "ML_VALIDATION", "agent:task-packet-observation");
+    }
+    const observation = rawObservation as Record<string, unknown>;
+    if (Object.keys(observation).some((key) => key !== "binding" && key !== "operationId" && key !== "input")
+      || typeof observation.binding !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(observation.binding)
+      || typeof observation.operationId !== "string" || !Object.hasOwn(observation, "input")) {
+      throw new ValidationError("Task packet observation is not closed", "ML_VALIDATION", "agent:task-packet-observation");
+    }
+    if (seenBindings.has(observation.binding)) {
+      throw new ValidationError("Task packet observation bindings must be unique", "ML_VALIDATION", "agent:task-packet-binding");
+    }
+    seenBindings.add(observation.binding);
+    const definition = operationDefinitions.find((item) =>
+      item.endpoint === "execution" && !item.action && item.id === observation.operationId);
+    if (!definition) {
+      throw new ValidationError("Task packet observation must name a declared query", "ML_VALIDATION", "agent:task-packet-observation");
+    }
+    return {
+      binding: observation.binding,
+      operationId: definition.id,
+      input: validateInput(definition, observation.input),
+    };
+  });
+  return { actions, observations } as unknown as ${manifest.model.name}TaskPacketRequest;
+}
+
+function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
+  return {
+    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    resourceVersion: 1 as const,
+    catalogVersion: 4 as const,
+    model: ${JSON.stringify(manifest.model)},
+    operationId: definition.id,
+    kind: "queryResult" as const,
+    authority: "none" as const,
+    view: {
+      audience: "agent" as const,
+      subjectSpecific: true as const,
+      authorizationFiltered: true as const,
+      containsCurrentState: true as const,
+      containsInput: false as const,
+      containsAuthenticatedIdentity: false as const,
+      containsExtensions: false as const,
+      grantsAuthority: false as const,
+      runtimeAuthorizationRequired: true as const,
+    },
+    freshness: {
+      mode: "pointInTime" as const,
+      retrievedAt,
+      maxAgeSeconds: 0 as const,
+      revalidate: "beforeReuse" as const,
+    },
+    data,
+  };
+}
+
+export async function assemble${manifest.model.name}TaskPacket(
+  executor: ${manifest.model.name}OperationExecutor,
+  value: unknown,
+  now: () => Date = () => new Date(),
+): Promise<${manifest.model.name}AgentTaskPacket> {
+  const request = validateTaskPacketRequest(value);
+  const actions: ${manifest.model.name}AgentTaskPacket["actions"][number][] = [];
+  for (const candidate of request.actions) {
+    const definition = operationDefinitions.find((item) =>
+      item.endpoint === "execution" && item.action && item.id === candidate.operationId)!;
+    const decision = validateDecision(
+      definition,
+      await executor.assess(candidate.operationId, candidate.input as unknown as Readonly<Record<string, unknown>>, {
+        expectedRevision: candidate.expectedRevision,
+      }),
+    );
+    const contract = taskActionContracts.find((item) => item.operationId === candidate.operationId)!;
+    actions.push({ ...contract, applicability: decision } as unknown as ${manifest.model.name}AgentTaskPacket["actions"][number]);
+  }
+  const observations: ${manifest.model.name}AgentTaskPacket["observations"][number][] = [];
+  for (const observation of request.observations) {
+    const definition = operationDefinitions.find((item) =>
+      item.endpoint === "execution" && !item.action && item.id === observation.operationId)!;
+    const data = await executor.execute(
+      definition.id,
+      observation.input as unknown as Readonly<Record<string, unknown>>,
+      {},
+    );
+    validateOutput(definition, data);
+    observations.push({
+      binding: observation.binding,
+      operationId: definition.id,
+      resource: currentStateResource(definition, data, now().toISOString()),
+    } as ${manifest.model.name}AgentTaskPacket["observations"][number]);
+  }
+  return {
+    $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
+    packetVersion: 1,
+    catalogVersion: 4,
+    resourceVersion: 1,
+    model: ${JSON.stringify(manifest.model)},
+    packetId: globalThis.crypto.randomUUID(),
+    kind: "boundedTaskContext",
+    authority: "none",
+    view: ${JSON.stringify(TASK_PACKET_VIEW)},
+    freshness: {
+      mode: "pointInTime",
+      assembledAt: now().toISOString(),
+      maxAgeSeconds: 0,
+      revalidate: "beforeReuse",
+    },
+    snapshot: { atomic: false, observations: "independentReads" },
+    closure: ${JSON.stringify(TASK_PACKET_CLOSURE)},
+    actions,
+    observations,
+  };
+}
+
 function normalizedRuleId(error: ModelOperationError): string | undefined {
   return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency|cursor|sort-profile):/.test(error.ruleId)
     ? error.ruleId
@@ -1365,8 +1676,9 @@ export function create${manifest.model.name}HttpHandler(
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === \`\${basePath}${SUBJECT_CAPABILITY_ROUTE}\`;
+    const taskPacketRequest = path === \`\${basePath}${TASK_PACKET_ROUTE}\`;
     const definition = operationDefinitions.find((candidate) => \`\${basePath}\${candidate.route}\` === path);
-    if (!definition && !subjectCapabilityRequest) {
+    if (!definition && !subjectCapabilityRequest && !taskPacketRequest) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
@@ -1386,6 +1698,18 @@ export function create${manifest.model.name}HttpHandler(
       const executor = await authenticate(bearer);
       if (!executor) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
       const body = await readJson(request, maxBodyBytes);
+      if (taskPacketRequest) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by task packets", "ML_VALIDATION", "agent:task-packet");
+          }
+        }
+        const packet = await assemble${manifest.model.name}TaskPacket(executor, body, now);
+        return Response.json(packet, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (subjectCapabilityRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -1426,7 +1750,7 @@ export function create${manifest.model.name}HttpHandler(
         const view: ${manifest.model.name}SubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 3,
+          catalogVersion: 4,
           model: ${JSON.stringify(manifest.model)},
           view: {
             audience: "agent",
@@ -1462,33 +1786,7 @@ export function create${manifest.model.name}HttpHandler(
         const input = validateInput(definition!, body);
         const data = await executor.execute(definition!.id, input, {});
         validateOutput(definition!, data);
-        const resource = {
-          $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
-          resourceVersion: 1 as const,
-          catalogVersion: 3 as const,
-          model: ${JSON.stringify(manifest.model)},
-          operationId: definition!.id,
-          kind: "queryResult" as const,
-          authority: "none" as const,
-          view: {
-            audience: "agent" as const,
-            subjectSpecific: true as const,
-            authorizationFiltered: true as const,
-            containsCurrentState: true as const,
-            containsInput: false as const,
-            containsAuthenticatedIdentity: false as const,
-            containsExtensions: false as const,
-            grantsAuthority: false as const,
-            runtimeAuthorizationRequired: true as const,
-          },
-          freshness: {
-            mode: "pointInTime" as const,
-            retrievedAt: now().toISOString(),
-            maxAgeSeconds: 0 as const,
-            revalidate: "beforeReuse" as const,
-          },
-          data,
-        };
+        const resource = currentStateResource(definition!, data, now().toISOString());
         return Response.json(resource, {
           status: 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
@@ -1527,11 +1825,16 @@ export function create${manifest.model.name}HttpHandler(
 `;
 }
 
-export function generateHttp(manifest: OperationManifest, capabilities: CapabilityManifest): HttpOutput {
+export function generateHttp(
+  manifest: OperationManifest,
+  capabilities: CapabilityManifest,
+  taskPacketSchemas: TaskPacketSchemas,
+  taskActionContracts: readonly TaskPacketActionContract[],
+): HttpOutput {
   return {
-    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities), null, 2)}\n`,
+    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities, taskPacketSchemas), null, 2)}\n`,
     "typescript/http-client.ts": generateHttpClient(manifest),
-    "typescript/http-server.ts": generateHttpServer(manifest, capabilities),
+    "typescript/http-server.ts": generateHttpServer(manifest, capabilities, taskActionContracts),
     "typescript/browser.ts": `export * from "./types.js";
 export {
   ModelOperationError,

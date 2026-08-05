@@ -273,7 +273,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.41.0",
+      model_version: "0.42.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -338,7 +338,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.41.0",
+      model_version: "0.42.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1207,7 +1207,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.41.0', $1,
+        VALUES ('model:Procurement', '0.42.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2077,6 +2077,59 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [approveOperationId, low.id],
       );
       expect(discoveryAudit.rows[0]!.count).toBe("0");
+      const packetReadAuditBefore = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+           AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+      );
+      const managerPacket = await manager.taskPacket({ actions: candidate, observations: [] });
+      expect(managerPacket).toMatchObject({
+        authority: "none",
+        freshness: { maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        snapshot: { atomic: false, observations: "independentReads" },
+        closure: { status: "partial" },
+        actions: [{ operationId: approveOperationId, applicability: { status: "applicable", authority: "none" } }],
+        observations: [],
+      });
+      expect(JSON.stringify(managerPacket)).not.toContain(low.id);
+      const employeePacket = await employee.taskPacket({
+        actions: candidate,
+        observations: [{
+          binding: "my-submitted-requests",
+          operationId: "query:qry_4406b045404a48449282db804f6167a8",
+          input: {},
+        }],
+      });
+      expect(employeePacket).toMatchObject({
+        authority: "none",
+        view: {
+          containsOperationInput: false,
+          containsObservationInput: false,
+          containsAuthenticatedIdentity: false,
+          grantsAuthority: false,
+        },
+        actions: [{ operationId: approveOperationId, applicability: { status: "denied", authority: "none" } }],
+        observations: [{
+          binding: "my-submitted-requests",
+          operationId: "query:qry_4406b045404a48449282db804f6167a8",
+          resource: {
+            authority: "none",
+            freshness: { maxAgeSeconds: 0, revalidate: "beforeReuse" },
+            data: expect.arrayContaining([expect.objectContaining({ id: low.id, status: "SUBMITTED" })]),
+          },
+        }],
+      });
+      const packetEvidence = await admin.query<{ action_count: string; read_count: string }>(
+        `SELECT
+          (SELECT count(*)::text FROM model_procurement_internal.action_audit
+           WHERE action_id = $1 AND target_id = $2) AS action_count,
+          (SELECT count(*)::text FROM model_procurement_internal.query_audit
+           WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+             AND principal_id = '00000000-0000-4000-8000-000000000001') AS read_count`,
+        [approveOperationId, low.id],
+      );
+      expect(packetEvidence.rows[0]!.action_count).toBe("0");
+      expect(Number(packetEvidence.rows[0]!.read_count)).toBe(Number(packetReadAuditBefore.rows[0]!.count) + 1);
       const readAuditBefore = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
          WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
@@ -2174,7 +2227,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     try {
       await mcp.connect(transport);
       const tools = await mcp.listTools();
-      expect(tools.tools).toHaveLength(4);
+      expect(tools.tools).toHaveLength(5);
 
       const opened = await mcp.callTool({
         name: "act_1e35db0451b1461e941af6283d86dca2",
@@ -2230,13 +2283,54 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
           "dev.modellang/maxAgeSeconds": 0,
         });
       }
+      const actionAuditBeforePacket = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = 'action:act_1e35db0451b1461e941af6283d86dca2'`,
+      );
+      const packet = await mcp.callTool({
+        name: "modellang_task_packet",
+        arguments: {
+          actions: [{
+            operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+            input: { amount: usd("765432.10") },
+          }],
+          observations: [{ binding: "current", operationId: queryId, input: {} }],
+        },
+      });
+      expect(packet.isError, unexpectedError?.stack ?? JSON.stringify(packet)).not.toBe(true);
+      expect(packet.structuredContent).toMatchObject({
+        packetVersion: 1,
+        authority: "none",
+        closure: { status: "partial" },
+        actions: [{
+          operationId: "action:act_1e35db0451b1461e941af6283d86dca2",
+          applicability: { status: "applicable", authority: "none" },
+        }],
+        observations: [{ binding: "current", operationId: queryId }],
+      });
+      expect(JSON.stringify(packet)).not.toContain("765432.10");
+      const packetResource = packet.content.find((content) => content.type === "resource");
+      expect(packetResource?.type).toBe("resource");
+      if (packetResource?.type === "resource") {
+        expect(packetResource.resource.mimeType).toBe("application/vnd.modellang.agent-task-packet+json");
+        expect(packetResource.resource._meta).toMatchObject({
+          "dev.modellang/cacheControl": "no-store",
+          "dev.modellang/maxAgeSeconds": 0,
+          "dev.modellang/mcpTasks": false,
+        });
+      }
+      const actionAuditAfterPacket = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = 'action:act_1e35db0451b1461e941af6283d86dca2'`,
+      );
+      expect(actionAuditAfterPacket.rows[0]!.count).toBe(actionAuditBeforePacket.rows[0]!.count);
       const auditAfter = await admin.query<{ count: string }>(
         `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
          WHERE query_id = $1 AND principal_id = '00000000-0000-4000-8000-000000000001'`,
         [queryId],
       );
-      expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 1);
-      expect(authenticationCount).toBeGreaterThanOrEqual(6);
+      expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 2);
+      expect(authenticationCount).toBeGreaterThanOrEqual(7);
     } finally {
       await Promise.all([mcp.close(), handler.close()]);
     }

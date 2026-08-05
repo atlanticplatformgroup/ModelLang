@@ -303,8 +303,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 5,
-      targetProfile: "target:postgresql-http-ui-mcp/5",
+      profileVersion: 6,
+      targetProfile: "target:postgresql-http-ui-agent-task-packets/6",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -333,6 +333,12 @@ describe("backends", () => {
       support: "native",
       enforcement: ["mcp", "agent-tool-catalog", "postgresql-runtime"],
     });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.taskPackets",
+      required: true,
+      support: "native",
+      enforcement: ["agent-task-packet", "http", "mcp", "postgresql-runtime"],
+    });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
       expect(output[path]).not.toContain("supplier-risk/review");
@@ -352,7 +358,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-mcp/5" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-task-packets/6" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -375,6 +381,7 @@ describe("backends", () => {
       adapter: { compatibility: string; directProtocolConformance: boolean };
       authentication: { required: boolean; source: string; callerInput: boolean };
       subjectView: Record<string, boolean | string | number | string[]>;
+      taskPackets: Record<string, unknown>;
       tools: {
         id: string;
         kind: "action" | "query";
@@ -394,7 +401,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 3,
+      catalogVersion: 4,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -421,6 +428,27 @@ describe("backends", () => {
         maxCandidates: 32,
         queryTools: "separateResourceBindings",
         containsResourceState: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      taskPackets: {
+        protocol: "http",
+        method: "POST",
+        path: "/agent/task-packets",
+        packetVersion: 1,
+        authenticated: true,
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        actionCandidates: "exact",
+        observations: "callerSelectedQueries",
+        maxActions: 32,
+        maxObservations: 32,
+        containsCurrentState: true,
+        containsOperationInput: false,
+        containsObservationInput: false,
+        containsAuthenticatedIdentity: false,
+        closure: "explicitPartial",
+        atomic: false,
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
       },
@@ -497,10 +525,12 @@ describe("backends", () => {
       adapterVersion: number;
       protocolVersion: string;
       catalogVersion: number;
+      taskPacketVersion: number;
       transport: { kind: string; stateless: boolean };
       authentication: Record<string, unknown>;
       discovery: Record<string, unknown>;
-      capabilities: { embeddedResources: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      taskPacket: { name: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
       tools: {
         name: string;
         operationId: string;
@@ -514,9 +544,10 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      adapterVersion: 1,
+      adapterVersion: 2,
       protocolVersion: "2026-07-28",
-      catalogVersion: 3,
+      catalogVersion: 4,
+      taskPacketVersion: 1,
       transport: { kind: "streamableHttp", stateless: true },
       authentication: {
         requiredPerRequest: true,
@@ -534,10 +565,42 @@ describe("backends", () => {
       },
       capabilities: {
         embeddedResources: { delivery: "embeddedToolResult", templates: false, subscriptions: false },
+        taskPackets: { modelLangContract: true, mcpTasks: false, delivery: "embeddedToolResult", maxAgeSeconds: 0 },
         prompts: false,
         tasks: false,
       },
     });
+    expect(manifest.taskPacket).toMatchObject({
+      name: "modellang_task_packet",
+      resource: {
+        delivery: "embeddedToolResult",
+        packetVersion: 1,
+        mimeType: "application/vnd.modellang.agent-task-packet+json",
+        uriContainsInput: false,
+        grantsAuthority: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      },
+    });
+    const taskPacketSchema = JSON.parse(await readFile("schemas/agent-task-packet.schema.json", "utf8")) as object;
+    expect(() => new Ajv2020({
+      allErrors: true,
+      strict: true,
+      formats: { uuid: true, "date-time": true },
+    }).compile(taskPacketSchema)).not.toThrow();
+    for (const exactSchema of [manifest.taskPacket.inputSchema, manifest.taskPacket.outputSchema]) {
+      expect(() => new Ajv2020({
+        allErrors: true,
+        strict: true,
+        formats: { uuid: true, "date-time": true },
+      }).compile(exactSchema)).not.toThrow();
+    }
+    const openapi = JSON.parse(output["openapi.json"]!) as {
+      paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: object } } } } }>;
+      components: { schemas: { AgentTaskPacket: object } };
+    };
+    expect(openapi.paths["/agent/task-packets"]!.post.requestBody.content["application/json"].schema)
+      .toEqual(manifest.taskPacket.inputSchema);
+    expect(openapi.components.schemas.AgentTaskPacket).toEqual(manifest.taskPacket.outputSchema);
     expect(manifest.tools).toHaveLength(catalog.tools.length);
     for (const tool of manifest.tools) {
       const catalogTool = catalog.tools.find((candidate) => candidate.id === tool.operationId)!;
@@ -745,6 +808,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
       "/operations/actions/act_11111111111111111111111111111111",
       "/operations/actions/act_11111111111111111111111111111111/applicability",
       "/agent/capabilities",
+      "/agent/task-packets",
     ]);
     const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
@@ -1068,7 +1132,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.41.0'");
+    expect(sql).toContain("'modelVersion', '0.42.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1231,7 +1295,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.41.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.42.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

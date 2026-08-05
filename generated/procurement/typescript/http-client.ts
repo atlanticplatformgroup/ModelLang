@@ -16,10 +16,23 @@ export type ProcurementSubjectCapabilityCandidate =
   | { readonly operationId: "action:act_ed2374e822704c51a2925338253d05d2"; readonly input: SubmitRequestInput; readonly expectedRevision?: string }
   | { readonly operationId: "action:act_d39dbb883b5f4019b9027b85add3de47"; readonly input: ApproveRequestInput; readonly expectedRevision?: string };
 
+export type ProcurementTaskPacketActionCandidate =
+  | { readonly operationId: "action:act_1e35db0451b1461e941af6283d86dca2"; readonly input: OpenRequestInput; readonly expectedRevision?: string }
+  | { readonly operationId: "action:act_ed2374e822704c51a2925338253d05d2"; readonly input: SubmitRequestInput; readonly expectedRevision?: string }
+  | { readonly operationId: "action:act_d39dbb883b5f4019b9027b85add3de47"; readonly input: ApproveRequestInput; readonly expectedRevision?: string };
+
+export type ProcurementTaskPacketObservationRequest =
+  | { readonly binding: string; readonly operationId: "query:qry_4406b045404a48449282db804f6167a8"; readonly input: MyRequestsInput };
+
+export interface ProcurementTaskPacketRequest {
+  readonly actions: readonly ProcurementTaskPacketActionCandidate[];
+  readonly observations: readonly ProcurementTaskPacketObservationRequest[];
+}
+
 export interface ProcurementSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -60,7 +73,7 @@ export interface ProcurementSubjectCapabilityView {
 export interface ProcurementAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 3;
+  readonly catalogVersion: 4;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -83,6 +96,88 @@ export interface ProcurementAgentResource<Data, OperationId extends string = str
     readonly revalidate: "beforeReuse";
   };
   readonly data: Data;
+}
+
+export type ProcurementTaskPacketObservation =
+  | { readonly binding: string; readonly operationId: "query:qry_4406b045404a48449282db804f6167a8"; readonly resource: ProcurementAgentResource<RequestSummary[], "query:qry_4406b045404a48449282db804f6167a8"> };
+
+export interface ProcurementAgentTaskPacket {
+  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly packetVersion: 1;
+  readonly catalogVersion: 4;
+  readonly resourceVersion: 1;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly packetId: string;
+  readonly kind: "boundedTaskContext";
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsCurrentState: true;
+    readonly containsOperationInput: false;
+    readonly containsObservationInput: false;
+    readonly containsRequestBindings: true;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExpressions: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly assembledAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly snapshot: { readonly atomic: false; readonly observations: "independentReads" };
+  readonly closure: {
+    readonly status: "partial";
+    readonly dimensions: {
+      readonly identity: "bounded";
+      readonly type: "complete";
+      readonly applicability: "evaluated";
+      readonly effect: "bounded";
+      readonly lifecycle: "bounded";
+      readonly observation: "callerSelected";
+      readonly version: "complete";
+      readonly recovery: "absent";
+    };
+    readonly gaps: readonly [
+      "declarationIdentityClosureNotPublished",
+      "taskGoalNotModeled",
+      "observationRelevanceNotProven",
+      "stateWriteEffectsNotPublished",
+      "externalEffectsNotPublished",
+      "reversibilityNotPublished",
+      "recoveryNotPublished",
+    ];
+  };
+  readonly actions: readonly {
+    readonly operationId: string;
+    readonly name: string;
+    readonly description: string;
+    readonly inputSchema: Readonly<Record<string, unknown>>;
+    readonly outputSchema: Readonly<Record<string, unknown>>;
+    readonly errors: readonly string[];
+    readonly reliability: {
+      readonly idempotency: "required" | "unsupported";
+      readonly scope: "authenticatedPrincipal";
+      readonly replay: "storedResult" | "none";
+      readonly fingerprint: "canonicalSha256" | "none";
+    };
+    readonly emittedEventIds: readonly string[];
+    readonly workflowTransitions: readonly {
+      readonly workflowId: string;
+      readonly transitionId: string;
+      readonly fromMemberId: string;
+      readonly toMemberId: string;
+      readonly targetParameterId: string;
+    }[];
+    readonly applicability: ApplicabilityDecision;
+  }[];
+  readonly observations: readonly ProcurementTaskPacketObservation[];
 }
 
 export class ProcurementHttpClient {
@@ -122,6 +217,10 @@ export class ProcurementHttpClient {
     candidates: readonly ProcurementSubjectCapabilityCandidate[],
   ): Promise<ProcurementSubjectCapabilityView> {
     return this.call("/agent/capabilities", { candidates });
+  }
+
+  async taskPacket(request: ProcurementTaskPacketRequest): Promise<ProcurementAgentTaskPacket> {
+    return this.call("/agent/task-packets", request);
   }
 
   async openRequest(input: OpenRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {

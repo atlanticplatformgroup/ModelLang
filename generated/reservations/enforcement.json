@@ -2,8 +2,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.41.0",
-    "sourceHash": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d",
+    "version": "0.42.0",
+    "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6",
     "sourceFile": "examples/reservations.model",
     "naming": {
       "sqlSchema": "model_reservations",
@@ -912,7 +912,7 @@
       "purpose": "Report the canonical generator target's supported semantics and every model requirement that remains externally implemented.",
       "layer": "ModelLang target conformance",
       "artifact": "target-capabilities.json",
-      "objectName": "target:postgresql-http-ui-mcp/5"
+      "objectName": "target:postgresql-http-ui-agent-task-packets/6"
     },
     {
       "id": "boundary:audit",

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.42.0
+
+- Added authenticated bounded task packet v1 assembly over exact action candidates and caller-selected declared query observations, available through generated HTTP clients/servers and a stable `/agent/task-packets` route.
+- Reused authoritative action applicability and query execution paths so authorization, preconditions, row policies, projection disclosure, sorting, bounds, pagination, validation, concurrency revisions, and private transactional read evidence remain enforced at assembly time.
+- Published selected static action schemas, safe failure/reliability/event/workflow metadata, current applicability decisions, and unchanged zero-age resource envelopes without executing actions or disclosing action/query input values or authenticated identity.
+- Made closure limits explicit: packets declare independent reads, non-authority, zero reusable lifetime, no-store transport, partial closure, caller-selected rather than proven-relevant observations, and absent complete effect, reversibility, and recovery semantics.
+- Advanced agent catalog to v4 and MCP adapter manifest to v2; MCP exposes the same exact assembler through `modellang_task_packet` and embedded task-packet resources without advertising MCP Tasks, prompts, templates, subscriptions, or delegated authority.
+- Added standalone schema, OpenAPI, generated TypeScript, catalog/MCP bindings, specification, whitepaper status, deterministic goldens, unit tests, and live PostgreSQL tests proving subject-specific applicability, preserved query evidence, input omission, and absence of action audit writes.
+- Advanced compiler/examples to 0.42.0, target capability profile to v6, target to `target:postgresql-http-ui-agent-task-packets/6`, and generator profile to `postgresql-http-ui-agent-task-packets/26`; canonical IR1, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.41.0
 
 - Added deterministic MCP adapter manifest v1 and generated stateless Streamable HTTP server adapters for MCP revision `2026-07-28`.

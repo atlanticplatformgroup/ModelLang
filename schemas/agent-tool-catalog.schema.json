@@ -5,11 +5,11 @@
   "type": "object",
   "required": [
     "$schema", "catalogVersion", "compilerVersion", "operationManifestVersion",
-    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "tools"
+    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
-    "catalogVersion": { "const": 3 },
+    "catalogVersion": { "const": 4 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },
     "capabilityManifestVersion": { "const": 10 },
@@ -86,6 +86,38 @@
         "maxCandidates": { "const": 32 },
         "queryTools": { "const": "separateResourceBindings" },
         "containsResourceState": { "const": false },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "taskPackets": {
+      "type": "object",
+      "required": [
+        "protocol", "method", "path", "packetVersion", "authenticated", "subjectSpecific", "authorizationFiltered", "inputSpecific",
+        "actionCandidates", "observations", "maxActions", "maxObservations", "containsCurrentState",
+        "containsOperationInput", "containsObservationInput", "containsAuthenticatedIdentity", "closure", "atomic",
+        "grantsAuthority", "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "protocol": { "const": "http" },
+        "method": { "const": "POST" },
+        "path": { "const": "/agent/task-packets" },
+        "packetVersion": { "const": 1 },
+        "authenticated": { "const": true },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "inputSpecific": { "const": true },
+        "actionCandidates": { "const": "exact" },
+        "observations": { "const": "callerSelectedQueries" },
+        "maxActions": { "const": 32 },
+        "maxObservations": { "const": 32 },
+        "containsCurrentState": { "const": true },
+        "containsOperationInput": { "const": false },
+        "containsObservationInput": { "const": false },
+        "containsAuthenticatedIdentity": { "const": false },
+        "closure": { "const": "explicitPartial" },
+        "atomic": { "const": false },
         "grantsAuthority": { "const": false },
         "runtimeAuthorizationRequired": { "const": true }
       },

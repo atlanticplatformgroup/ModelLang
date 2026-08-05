@@ -5,16 +5,17 @@
   "type": "object",
   "required": [
     "$schema", "adapterVersion", "compilerVersion", "protocolVersion",
-    "catalogVersion", "resourceEnvelopeVersion", "model", "transport",
-    "authentication", "discovery", "capabilities", "tools"
+    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "model", "transport",
+    "authentication", "discovery", "capabilities", "taskPacket", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
-    "adapterVersion": { "const": 1 },
+    "adapterVersion": { "const": 2 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },
-    "catalogVersion": { "const": 3 },
+    "catalogVersion": { "const": 4 },
     "resourceEnvelopeVersion": { "const": 1 },
+    "taskPacketVersion": { "const": 1 },
     "model": { "$ref": "#/$defs/model" },
     "transport": {
       "type": "object",
@@ -56,7 +57,7 @@
     },
     "capabilities": {
       "type": "object",
-      "required": ["tools", "embeddedResources", "prompts", "tasks"],
+      "required": ["tools", "embeddedResources", "taskPackets", "prompts", "tasks"],
       "properties": {
         "tools": {
           "type": "object",
@@ -78,11 +79,23 @@
           },
           "additionalProperties": false
         },
+        "taskPackets": {
+          "type": "object",
+          "required": ["modelLangContract", "mcpTasks", "delivery", "maxAgeSeconds"],
+          "properties": {
+            "modelLangContract": { "const": true },
+            "mcpTasks": { "const": false },
+            "delivery": { "const": "embeddedToolResult" },
+            "maxAgeSeconds": { "const": 0 }
+          },
+          "additionalProperties": false
+        },
         "prompts": { "const": false },
         "tasks": { "const": false }
       },
       "additionalProperties": false
     },
+    "taskPacket": { "$ref": "#/$defs/taskPacket" },
     "tools": {
       "type": "array",
       "items": { "$ref": "#/$defs/tool" }
@@ -160,6 +173,51 @@
           "additionalProperties": false
         },
         "grantsAuthority": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "taskPacket": {
+      "type": "object",
+      "required": ["name", "kind", "description", "inputSchema", "outputSchema", "annotations", "resource"],
+      "properties": {
+        "name": { "const": "modellang_task_packet" },
+        "kind": { "const": "taskPacketAssembler" },
+        "description": { "type": "string", "minLength": 1 },
+        "inputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "outputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "annotations": {
+          "type": "object",
+          "required": ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"],
+          "properties": {
+            "readOnlyHint": { "const": true },
+            "destructiveHint": { "const": false },
+            "idempotentHint": { "const": false },
+            "openWorldHint": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "resource": {
+          "type": "object",
+          "required": ["delivery", "packetVersion", "mimeType", "uriContainsInput", "freshness", "grantsAuthority"],
+          "properties": {
+            "delivery": { "const": "embeddedToolResult" },
+            "packetVersion": { "const": 1 },
+            "mimeType": { "const": "application/vnd.modellang.agent-task-packet+json" },
+            "uriContainsInput": { "const": false },
+            "freshness": {
+              "type": "object",
+              "required": ["mode", "maxAgeSeconds", "revalidate"],
+              "properties": {
+                "mode": { "const": "pointInTime" },
+                "maxAgeSeconds": { "const": 0 },
+                "revalidate": { "const": "beforeReuse" }
+              },
+              "additionalProperties": false
+            },
+            "grantsAuthority": { "const": false }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

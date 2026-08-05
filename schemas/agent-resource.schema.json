@@ -10,7 +10,7 @@
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-resource.schema.json" },
     "resourceVersion": { "const": 1 },
-    "catalogVersion": { "const": 3 },
+    "catalogVersion": { "const": 4 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

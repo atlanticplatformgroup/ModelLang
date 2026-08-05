@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 describe("generated MCP adapter", () => {
-  it("serves catalog v3 tools with stable names and exact JSON schemas", async () => {
+  it("serves catalog v4 tools and the task-packet assembler with exact JSON schemas", async () => {
     const execute = vi.fn(async () => []);
     const authenticate = vi.fn<ProcurementMcpAuthenticator>(async () => ({
       authInfo: authInfo(),
@@ -64,6 +64,7 @@ describe("generated MCP adapter", () => {
     expect(capabilities).not.toHaveProperty("tasks");
     const result = await client.listTools();
     const manifest = JSON.parse(await readFile("generated/procurement/mcp.json", "utf8")) as {
+      taskPacket: { name: string; inputSchema: object; outputSchema: object };
       tools: { name: string; inputSchema: object; outputSchema: object }[];
     };
     expect(result.tools.map((tool) => tool.name)).toEqual([
@@ -71,9 +72,12 @@ describe("generated MCP adapter", () => {
       "act_ed2374e822704c51a2925338253d05d2",
       "act_d39dbb883b5f4019b9027b85add3de47",
       queryToolName,
+      "modellang_task_packet",
     ]);
     for (const tool of result.tools) {
-      const binding = manifest.tools.find((candidate) => candidate.name === tool.name)!;
+      const binding = tool.name === manifest.taskPacket.name
+        ? manifest.taskPacket
+        : manifest.tools.find((candidate) => candidate.name === tool.name)!;
       expect(tool.inputSchema).toEqual(binding.inputSchema);
       expect(tool.outputSchema).toEqual(binding.outputSchema);
     }
@@ -146,8 +150,8 @@ describe("generated MCP adapter", () => {
     );
     expect(envelope).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 3,
-      model: { id: "model:Procurement", version: "0.41.0" },
+      catalogVersion: 4,
+      model: { id: "model:Procurement", version: "0.42.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -171,6 +175,90 @@ describe("generated MCP adapter", () => {
     expect(JSON.stringify(envelope)).not.toMatch(/valid-token|mcp-test-client|query_audit/);
     expect(cacheControl).toBe("no-store");
     expect(execute).toHaveBeenCalledWith(queryId, {}, {});
+  });
+
+  it("assembles task packets as a read-only MCP tool without claiming MCP Tasks authority", async () => {
+    const data = [{
+      id: "00000000-0000-4000-8000-000000000010",
+      createdAt: "2026-07-30T12:00:00Z",
+      amount: null,
+      status: "DRAFT",
+      approvedBy: null,
+    }];
+    const execute = vi.fn(async () => data);
+    const assess = vi.fn(async () => ({
+      operationId: actionId,
+      status: "applicable" as const,
+      applicable: true,
+      authority: "none" as const,
+      revision: "rev:1:0123456789abcdef0123456789abcdef",
+    }));
+    const handler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute, assess },
+    }), {
+      resourceServerUrl: endpoint.href,
+      now: () => new Date(retrievedAt),
+    });
+    let cacheControl: string | null = null;
+    const { client, transport } = createClient(async (input, init) => {
+      const response = await handler.fetch(new Request(input, init));
+      cacheControl = response.headers.get("cache-control");
+      return response;
+    });
+    closeables.push(client, handler);
+    await client.connect(transport);
+    const listed = await client.listTools();
+    const taskTool = listed.tools.find((tool) => tool.name === "modellang_task_packet")!;
+    expect(taskTool).toMatchObject({
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+      _meta: {
+        "dev.modellang/taskPacketVersion": 1,
+        "dev.modellang/closure": "explicitPartial",
+        "dev.modellang/mcpTasks": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    });
+
+    const result = await client.callTool({
+      name: "modellang_task_packet",
+      arguments: {
+        actions: [{ operationId: actionId, input: { amount: { currency: "USD", amount: "765432.10" } } }],
+        observations: [{ binding: "current", operationId: queryId, input: {} }],
+      },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      packetVersion: 1,
+      authority: "none",
+      closure: { status: "partial" },
+      actions: [{ operationId: actionId, applicability: { status: "applicable", authority: "none" } }],
+      observations: [{ binding: "current", operationId: queryId, resource: { data } }],
+    });
+    const embedded = result.content.find((content) => content.type === "resource");
+    expect(embedded).toBeDefined();
+    if (!embedded || embedded.type !== "resource" || !("text" in embedded.resource)) return;
+    expect(embedded.resource.mimeType).toBe("application/vnd.modellang.agent-task-packet+json");
+    expect(embedded.resource.uri).toMatch(/^modellang:\/\/\/models\/model%3AProcurement\/task-packets\/[0-9a-f-]{36}$/);
+    expect(JSON.parse(embedded.resource.text)).toEqual(result.structuredContent);
+    expect(JSON.stringify(result)).not.toMatch(/765432\.10|valid-token|mcp-test-client/);
+    expect(cacheControl).toBe("no-store");
+    expect(assess).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledWith(queryId, {}, {});
+
+    const commandMetadata = await client.callTool({
+      name: "modellang_task_packet",
+      arguments: {
+        actions: [{ operationId: actionId, input: { amount: { currency: "USD", amount: "1.00" } } }],
+        observations: [],
+      },
+      _meta: { "dev.modellang/idempotencyKey": "not-a-command" },
+    });
+    expect(commandMetadata.isError).toBe(true);
+    expect(assess).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("passes namespaced command metadata while preserving the closed action input schema", async () => {

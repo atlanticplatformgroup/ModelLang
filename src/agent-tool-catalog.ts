@@ -9,6 +9,9 @@ import { MODELLANG_COMPILER_VERSION } from "./version.js";
 import {
   SUBJECT_CAPABILITY_MAX_CANDIDATES,
   SUBJECT_CAPABILITY_ROUTE,
+  TASK_PACKET_MAX_ACTIONS,
+  TASK_PACKET_MAX_OBSERVATIONS,
+  TASK_PACKET_ROUTE,
 } from "./agent-routes.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -30,7 +33,7 @@ interface AgentToolBase {
   annotations: { readOnly: boolean };
 }
 
-type AgentTool =
+export type AgentTool =
   | (AgentToolBase & {
       kind: "action";
       applicability: {
@@ -71,7 +74,7 @@ type AgentTool =
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 3;
+  catalogVersion: 4;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -107,6 +110,28 @@ export interface AgentToolCatalog {
     maxCandidates: 32;
     queryTools: "separateResourceBindings";
     containsResourceState: false;
+    grantsAuthority: false;
+    runtimeAuthorizationRequired: true;
+  };
+  taskPackets: {
+    protocol: "http";
+    method: "POST";
+    path: "/agent/task-packets";
+    packetVersion: 1;
+    authenticated: true;
+    subjectSpecific: true;
+    authorizationFiltered: true;
+    inputSpecific: true;
+    actionCandidates: "exact";
+    observations: "callerSelectedQueries";
+    maxActions: 32;
+    maxObservations: 32;
+    containsCurrentState: true;
+    containsOperationInput: false;
+    containsObservationInput: false;
+    containsAuthenticatedIdentity: false;
+    closure: "explicitPartial";
+    atomic: false;
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
   };
@@ -320,7 +345,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 3,
+    catalogVersion: 4,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -349,6 +374,28 @@ export function generateAgentToolCatalog(
       maxCandidates: SUBJECT_CAPABILITY_MAX_CANDIDATES,
       queryTools: "separateResourceBindings",
       containsResourceState: false,
+      grantsAuthority: false,
+      runtimeAuthorizationRequired: true,
+    },
+    taskPackets: {
+      protocol: "http",
+      method: "POST",
+      path: TASK_PACKET_ROUTE,
+      packetVersion: 1,
+      authenticated: true,
+      subjectSpecific: true,
+      authorizationFiltered: true,
+      inputSpecific: true,
+      actionCandidates: "exact",
+      observations: "callerSelectedQueries",
+      maxActions: TASK_PACKET_MAX_ACTIONS,
+      maxObservations: TASK_PACKET_MAX_OBSERVATIONS,
+      containsCurrentState: true,
+      containsOperationInput: false,
+      containsObservationInput: false,
+      containsAuthenticatedIdentity: false,
+      closure: "explicitPartial",
+      atomic: false,
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,
     },

@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.41.0",
+    "compilerVersion": "0.42.0",
     "irVersion": 1,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.41.0",
-    "sourceHash": "sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44",
+    "version": "0.42.0",
+    "sourceHash": "sha256:2617ba67063b988d3891db5200de5d8ac9e1a2a7d2ddf6e4353f2d044ccc4db2",
     "sourceFile": "examples/procurement.model"
   },
   "principal": {

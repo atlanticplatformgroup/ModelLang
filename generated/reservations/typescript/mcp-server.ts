@@ -11,7 +11,11 @@ import {
   type ServerContext,
 } from "@modelcontextprotocol/server";
 import type { ExecutionOptions } from "./types.js";
-import type { ReservationsOperationExecutor, ReservationsOperationId } from "./http-server.js";
+import {
+  assembleReservationsTaskPacket,
+  type ReservationsOperationExecutor,
+  type ReservationsOperationId,
+} from "./http-server.js";
 import { ModelOperationError } from "./errors.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -245,6 +249,781 @@ const toolDefinitions = [
   }
 ] as const satisfies readonly McpToolDefinition[];
 
+const taskPacketDefinition = {
+  "name": "modellang_task_packet",
+  "kind": "taskPacketAssembler",
+  "description": "Assemble authenticated exact action applicability and caller-selected current-state observations into a non-authoritative bounded task packet with explicit closure gaps.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "actions",
+      "observations"
+    ],
+    "properties": {
+      "actions": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "input"
+              ],
+              "properties": {
+                "operationId": {
+                  "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                },
+                "input": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "resource",
+                    "startsAt",
+                    "endsAt"
+                  ],
+                  "properties": {
+                    "resource": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                },
+                "expectedRevision": {
+                  "type": "string",
+                  "pattern": "^rev:1:[0-9a-f]{32}$"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "observations": {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 32,
+        "uniqueItems": true,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "binding",
+                "operationId",
+                "input"
+              ],
+              "properties": {
+                "binding": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                },
+                "operationId": {
+                  "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                },
+                "input": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "resource"
+                  ],
+                  "properties": {
+                    "resource": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "startsAtOrAfter": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "sort": {
+                      "type": "string",
+                      "enum": [
+                        "default",
+                        "latestFirst",
+                        "endingSoonest"
+                      ]
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 4096,
+                      "pattern": "^[A-Za-z0-9_-]+$"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "outputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "$schema",
+      "packetVersion",
+      "catalogVersion",
+      "resourceVersion",
+      "model",
+      "packetId",
+      "kind",
+      "authority",
+      "view",
+      "freshness",
+      "snapshot",
+      "closure",
+      "actions",
+      "observations"
+    ],
+    "properties": {
+      "$schema": {
+        "const": "https://modellang.dev/schemas/agent-task-packet.schema.json"
+      },
+      "packetVersion": {
+        "const": 1
+      },
+      "catalogVersion": {
+        "const": 4
+      },
+      "resourceVersion": {
+        "const": 1
+      },
+      "model": {
+        "const": {
+          "id": "model:Reservations",
+          "name": "Reservations",
+          "version": "0.42.0",
+          "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+        }
+      },
+      "packetId": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "kind": {
+        "const": "boundedTaskContext"
+      },
+      "authority": {
+        "const": "none"
+      },
+      "view": {
+        "const": {
+          "audience": "agent",
+          "subjectSpecific": true,
+          "authorizationFiltered": true,
+          "inputSpecific": true,
+          "containsCurrentState": true,
+          "containsOperationInput": false,
+          "containsObservationInput": false,
+          "containsRequestBindings": true,
+          "containsAuthenticatedIdentity": false,
+          "containsExpressions": false,
+          "containsExtensions": false,
+          "grantsAuthority": false,
+          "runtimeAuthorizationRequired": true
+        }
+      },
+      "freshness": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "assembledAt",
+          "maxAgeSeconds",
+          "revalidate"
+        ],
+        "properties": {
+          "mode": {
+            "const": "pointInTime"
+          },
+          "assembledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maxAgeSeconds": {
+            "const": 0
+          },
+          "revalidate": {
+            "const": "beforeReuse"
+          }
+        }
+      },
+      "snapshot": {
+        "const": {
+          "atomic": false,
+          "observations": "independentReads"
+        }
+      },
+      "closure": {
+        "const": {
+          "status": "partial",
+          "dimensions": {
+            "identity": "bounded",
+            "type": "complete",
+            "applicability": "evaluated",
+            "effect": "bounded",
+            "lifecycle": "bounded",
+            "observation": "callerSelected",
+            "version": "complete",
+            "recovery": "absent"
+          },
+          "gaps": [
+            "declarationIdentityClosureNotPublished",
+            "taskGoalNotModeled",
+            "observationRelevanceNotProven",
+            "stateWriteEffectsNotPublished",
+            "externalEffectsNotPublished",
+            "reversibilityNotPublished",
+            "recoveryNotPublished"
+          ]
+        }
+      },
+      "actions": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 1,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "name",
+                "description",
+                "inputSchema",
+                "outputSchema",
+                "errors",
+                "reliability",
+                "emittedEventIds",
+                "workflowTransitions",
+                "applicability"
+              ],
+              "properties": {
+                "operationId": {
+                  "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                },
+                "name": {
+                  "const": "reserve"
+                },
+                "description": {
+                  "const": "Execute the reserve domain action. Runtime authorization and preconditions remain authoritative."
+                },
+                "inputSchema": {
+                  "const": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "resource",
+                      "startsAt",
+                      "endsAt"
+                    ],
+                    "properties": {
+                      "resource": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "startsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "endsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                },
+                "outputSchema": {
+                  "const": {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "id",
+                      "createdAt",
+                      "resource",
+                      "reservedBy",
+                      "startsAt",
+                      "endsAt",
+                      "indexed"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "resource": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "reservedBy": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "startsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "endsAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "indexed": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
+                "errors": {
+                  "const": [
+                    "identityBinding",
+                    "authorization",
+                    "idempotency",
+                    "precondition",
+                    "invariant",
+                    "conflict"
+                  ]
+                },
+                "reliability": {
+                  "const": {
+                    "idempotency": "required",
+                    "scope": "authenticatedPrincipal",
+                    "replay": "storedResult",
+                    "fingerprint": "canonicalSha256"
+                  }
+                },
+                "emittedEventIds": {
+                  "const": [
+                    "event:evt_40d694c9a0a274dc79c6168e47d25968"
+                  ]
+                },
+                "workflowTransitions": {
+                  "const": []
+                },
+                "applicability": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "operationId",
+                    "status",
+                    "applicable",
+                    "authority"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                    },
+                    "status": {
+                      "enum": [
+                        "applicable",
+                        "denied",
+                        "notApplicable",
+                        "stale"
+                      ]
+                    },
+                    "applicable": {
+                      "type": "boolean"
+                    },
+                    "authority": {
+                      "const": "none"
+                    },
+                    "revision": {
+                      "type": "string",
+                      "pattern": "^rev:1:[0-9a-f]{32}$"
+                    },
+                    "explanation": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "ruleId"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "authorization",
+                            "requirement",
+                            "revision"
+                          ]
+                        },
+                        "ruleId": {
+                          "type": "string",
+                          "pattern": "^(authorize|require|revision):"
+                        }
+                      }
+                    }
+                  },
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "const": "applicable"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "revision"
+                        ],
+                        "properties": {
+                          "applicable": {
+                            "const": true
+                          },
+                          "revision": true,
+                          "explanation": false
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "const": "denied"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "explanation"
+                        ],
+                        "properties": {
+                          "applicable": {
+                            "const": false
+                          },
+                          "revision": false,
+                          "explanation": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "const": "authorization"
+                              },
+                              "ruleId": {
+                                "type": "string",
+                                "pattern": "^authorize:"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "const": "notApplicable"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "revision",
+                          "explanation"
+                        ],
+                        "properties": {
+                          "applicable": {
+                            "const": false
+                          },
+                          "revision": true,
+                          "explanation": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "const": "requirement"
+                              },
+                              "ruleId": {
+                                "type": "string",
+                                "pattern": "^require:"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "if": {
+                        "properties": {
+                          "status": {
+                            "const": "stale"
+                          }
+                        },
+                        "required": [
+                          "status"
+                        ]
+                      },
+                      "then": {
+                        "required": [
+                          "revision",
+                          "explanation"
+                        ],
+                        "properties": {
+                          "applicable": {
+                            "const": false
+                          },
+                          "revision": true,
+                          "explanation": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "const": "revision"
+                              },
+                              "ruleId": {
+                                "type": "string",
+                                "pattern": "^revision:"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      },
+      "observations": {
+        "type": "array",
+        "maxItems": 32,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "binding",
+                "operationId",
+                "resource"
+              ],
+              "properties": {
+                "binding": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                },
+                "operationId": {
+                  "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                },
+                "resource": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "$schema",
+                    "resourceVersion",
+                    "catalogVersion",
+                    "model",
+                    "operationId",
+                    "kind",
+                    "authority",
+                    "view",
+                    "freshness",
+                    "data"
+                  ],
+                  "properties": {
+                    "$schema": {
+                      "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                    },
+                    "resourceVersion": {
+                      "const": 1
+                    },
+                    "catalogVersion": {
+                      "const": 4
+                    },
+                    "model": {
+                      "const": {
+                        "id": "model:Reservations",
+                        "name": "Reservations",
+                        "version": "0.42.0",
+                        "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                      }
+                    },
+                    "operationId": {
+                      "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                    },
+                    "kind": {
+                      "const": "queryResult"
+                    },
+                    "authority": {
+                      "const": "none"
+                    },
+                    "view": {
+                      "const": {
+                        "audience": "agent",
+                        "subjectSpecific": true,
+                        "authorizationFiltered": true,
+                        "containsCurrentState": true,
+                        "containsInput": false,
+                        "containsAuthenticatedIdentity": false,
+                        "containsExtensions": false,
+                        "grantsAuthority": false,
+                        "runtimeAuthorizationRequired": true
+                      }
+                    },
+                    "freshness": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "retrievedAt",
+                        "maxAgeSeconds",
+                        "revalidate"
+                      ],
+                      "properties": {
+                        "mode": {
+                          "const": "pointInTime"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "maxAgeSeconds": {
+                          "const": 0
+                        },
+                        "revalidate": {
+                          "const": "beforeReuse"
+                        }
+                      }
+                    },
+                    "data": {
+                      "$schema": "https://json-schema.org/draft/2020-12/schema",
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "items",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "maxItems": 2,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "id",
+                              "resource",
+                              "startsAt",
+                              "endsAt"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "resource": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "name"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "startsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "endsAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            }
+                          }
+                        },
+                        "nextCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096,
+                              "pattern": "^[A-Za-z0-9_-]+$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": false,
+    "openWorldHint": false
+  },
+  "resource": {
+    "delivery": "embeddedToolResult",
+    "packetVersion": 1,
+    "mimeType": "application/vnd.modellang.agent-task-packet+json",
+    "uriContainsInput": false,
+    "freshness": {
+      "mode": "pointInTime",
+      "maxAgeSeconds": 0,
+      "revalidate": "beforeReuse"
+    },
+    "grantsAuthority": false
+  }
+} as const;
+
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
 const correlationIdKey = "dev.modellang/correlationId";
@@ -311,8 +1090,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 3 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.41.0","sourceHash":"sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"},
+    catalogVersion: 4 as const,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.42.0","sourceHash":"sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -358,9 +1137,9 @@ function buildReservationsMcpServer(
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.41.0" },
+    { name: "Reservations-ModelLang", version: "0.42.0" },
     {
-      instructions: "Tool discovery grants no authority. Every call is authenticated and runtime authorization remains authoritative. Query resource envelopes have zero reusable lifetime and must be re-read before reuse.",
+      instructions: "Tool discovery and task packets grant no authority. Every call is authenticated and runtime authorization remains authoritative. Query resources and task packets have zero reusable lifetime and must be re-read before reuse.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -434,6 +1213,65 @@ function buildReservationsMcpServer(
       },
     );
   }
+  server.registerTool(
+    taskPacketDefinition.name,
+    {
+      title: "Assemble ModelLang task packet",
+      description: taskPacketDefinition.description,
+      inputSchema: fromJsonSchema<Record<string, unknown>>(taskPacketDefinition.inputSchema),
+      outputSchema: fromJsonSchema<unknown>(taskPacketDefinition.outputSchema),
+      annotations: taskPacketDefinition.annotations,
+      _meta: {
+        "dev.modellang/kind": taskPacketDefinition.kind,
+        "dev.modellang/taskPacketVersion": 1,
+        "dev.modellang/closure": "explicitPartial",
+        "dev.modellang/mcpTasks": false,
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/runtimeAuthorizationRequired": true,
+        "dev.modellang/maxAgeSeconds": 0,
+      },
+    },
+    async (input, ctx): Promise<CallToolResult> => {
+      try {
+        if (commandMetadataKeys.some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+          throw new Error("Command metadata is not accepted by task packet assembly");
+        }
+        const packet = await assembleReservationsTaskPacket(executor, input, now);
+        const uri = `modellang:///models/model%3AReservations/task-packets/${packet.packetId}`;
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(packet) },
+            {
+              type: "resource",
+              resource: {
+                uri,
+                mimeType: "application/vnd.modellang.agent-task-packet+json",
+                text: JSON.stringify(packet),
+                _meta: {
+                  "dev.modellang/cacheControl": "no-store",
+                  "dev.modellang/maxAgeSeconds": 0,
+                  "dev.modellang/revalidate": "beforeReuse",
+                  "dev.modellang/mcpTasks": false,
+                },
+              },
+            },
+          ],
+          structuredContent: packet as never,
+          _meta: {
+            "dev.modellang/resourceUri": uri,
+            "dev.modellang/cacheControl": "no-store",
+            "dev.modellang/maxAgeSeconds": 0,
+            "dev.modellang/mcpTasks": false,
+          },
+        };
+      } catch (error) {
+        if (!(error instanceof ModelOperationError)) {
+          onerror?.(error instanceof Error ? error : new Error(String(error)));
+        }
+        return safeToolError(error);
+      }
+    },
+  );
   return server;
 }
 

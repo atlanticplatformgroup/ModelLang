@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.41.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d)."
+    "version": "0.42.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -587,7 +587,7 @@
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 3
+                      "const": 4
                     },
                     "model": {
                       "type": "object",
@@ -606,10 +606,10 @@
                           "const": "Reservations"
                         },
                         "version": {
-                          "const": "0.41.0"
+                          "const": "0.42.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
+                          "const": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
                         }
                       }
                     },
@@ -920,6 +920,259 @@
           },
           "405": {
             "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/task-packets": {
+      "post": {
+        "operationId": "modellang_task_packet",
+        "summary": "Assemble an authenticated bounded task packet",
+        "tags": [
+          "Agent task packets"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-grants-authority": false,
+        "x-modellang-closure": "explicitPartial",
+        "x-modellang-atomic": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "actions",
+                  "observations"
+                ],
+                "properties": {
+                  "actions": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "operationId": {
+                              "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                            },
+                            "input": {
+                              "$schema": "https://json-schema.org/draft/2020-12/schema",
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "resource",
+                                "startsAt",
+                                "endsAt"
+                              ],
+                              "properties": {
+                                "resource": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "startsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "endsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              }
+                            },
+                            "expectedRevision": {
+                              "type": "string",
+                              "pattern": "^rev:1:[0-9a-f]{32}$"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "observations": {
+                    "type": "array",
+                    "minItems": 0,
+                    "maxItems": 32,
+                    "uniqueItems": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "binding",
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "binding": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                            },
+                            "operationId": {
+                              "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                            },
+                            "input": {
+                              "$schema": "https://json-schema.org/draft/2020-12/schema",
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "resource"
+                              ],
+                              "properties": {
+                                "resource": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "startsAtOrAfter": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "date-time"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "sort": {
+                                  "type": "string",
+                                  "enum": [
+                                    "default",
+                                    "latestFirst",
+                                    "endingSoonest"
+                                  ]
+                                },
+                                "cursor": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4096,
+                                  "pattern": "^[A-Za-z0-9_-]+$"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated partial-closure task context; this grants no authority",
+            "headers": {
+              "Cache-Control": {
+                "description": "Task packets must not be stored or reused",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTaskPacket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The operation conflicts with current model state",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1345,6 +1598,628 @@
           }
         ]
       },
+      "AgentTaskPacket": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "packetVersion",
+          "catalogVersion",
+          "resourceVersion",
+          "model",
+          "packetId",
+          "kind",
+          "authority",
+          "view",
+          "freshness",
+          "snapshot",
+          "closure",
+          "actions",
+          "observations"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/agent-task-packet.schema.json"
+          },
+          "packetVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 4
+          },
+          "resourceVersion": {
+            "const": 1
+          },
+          "model": {
+            "const": {
+              "id": "model:Reservations",
+              "name": "Reservations",
+              "version": "0.42.0",
+              "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+            }
+          },
+          "packetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "const": "boundedTaskContext"
+          },
+          "authority": {
+            "const": "none"
+          },
+          "view": {
+            "const": {
+              "audience": "agent",
+              "subjectSpecific": true,
+              "authorizationFiltered": true,
+              "inputSpecific": true,
+              "containsCurrentState": true,
+              "containsOperationInput": false,
+              "containsObservationInput": false,
+              "containsRequestBindings": true,
+              "containsAuthenticatedIdentity": false,
+              "containsExpressions": false,
+              "containsExtensions": false,
+              "grantsAuthority": false,
+              "runtimeAuthorizationRequired": true
+            }
+          },
+          "freshness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "assembledAt",
+              "maxAgeSeconds",
+              "revalidate"
+            ],
+            "properties": {
+              "mode": {
+                "const": "pointInTime"
+              },
+              "assembledAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "maxAgeSeconds": {
+                "const": 0
+              },
+              "revalidate": {
+                "const": "beforeReuse"
+              }
+            }
+          },
+          "snapshot": {
+            "const": {
+              "atomic": false,
+              "observations": "independentReads"
+            }
+          },
+          "closure": {
+            "const": {
+              "status": "partial",
+              "dimensions": {
+                "identity": "bounded",
+                "type": "complete",
+                "applicability": "evaluated",
+                "effect": "bounded",
+                "lifecycle": "bounded",
+                "observation": "callerSelected",
+                "version": "complete",
+                "recovery": "absent"
+              },
+              "gaps": [
+                "declarationIdentityClosureNotPublished",
+                "taskGoalNotModeled",
+                "observationRelevanceNotProven",
+                "stateWriteEffectsNotPublished",
+                "externalEffectsNotPublished",
+                "reversibilityNotPublished",
+                "recoveryNotPublished"
+              ]
+            }
+          },
+          "actions": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 1,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "operationId",
+                    "name",
+                    "description",
+                    "inputSchema",
+                    "outputSchema",
+                    "errors",
+                    "reliability",
+                    "emittedEventIds",
+                    "workflowTransitions",
+                    "applicability"
+                  ],
+                  "properties": {
+                    "operationId": {
+                      "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                    },
+                    "name": {
+                      "const": "reserve"
+                    },
+                    "description": {
+                      "const": "Execute the reserve domain action. Runtime authorization and preconditions remain authoritative."
+                    },
+                    "inputSchema": {
+                      "const": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "resource",
+                          "startsAt",
+                          "endsAt"
+                        ],
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "startsAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "endsAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "outputSchema": {
+                      "const": {
+                        "$schema": "https://json-schema.org/draft/2020-12/schema",
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "id",
+                          "createdAt",
+                          "resource",
+                          "reservedBy",
+                          "startsAt",
+                          "endsAt",
+                          "indexed"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "resource": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "reservedBy": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "startsAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "endsAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "indexed": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "errors": {
+                      "const": [
+                        "identityBinding",
+                        "authorization",
+                        "idempotency",
+                        "precondition",
+                        "invariant",
+                        "conflict"
+                      ]
+                    },
+                    "reliability": {
+                      "const": {
+                        "idempotency": "required",
+                        "scope": "authenticatedPrincipal",
+                        "replay": "storedResult",
+                        "fingerprint": "canonicalSha256"
+                      }
+                    },
+                    "emittedEventIds": {
+                      "const": [
+                        "event:evt_40d694c9a0a274dc79c6168e47d25968"
+                      ]
+                    },
+                    "workflowTransitions": {
+                      "const": []
+                    },
+                    "applicability": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "operationId",
+                        "status",
+                        "applicable",
+                        "authority"
+                      ],
+                      "properties": {
+                        "operationId": {
+                          "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                        },
+                        "status": {
+                          "enum": [
+                            "applicable",
+                            "denied",
+                            "notApplicable",
+                            "stale"
+                          ]
+                        },
+                        "applicable": {
+                          "type": "boolean"
+                        },
+                        "authority": {
+                          "const": "none"
+                        },
+                        "revision": {
+                          "type": "string",
+                          "pattern": "^rev:1:[0-9a-f]{32}$"
+                        },
+                        "explanation": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "kind",
+                            "ruleId"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "authorization",
+                                "requirement",
+                                "revision"
+                              ]
+                            },
+                            "ruleId": {
+                              "type": "string",
+                              "pattern": "^(authorize|require|revision):"
+                            }
+                          }
+                        }
+                      },
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "status": {
+                                "const": "applicable"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "revision"
+                            ],
+                            "properties": {
+                              "applicable": {
+                                "const": true
+                              },
+                              "revision": true,
+                              "explanation": false
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "properties": {
+                              "status": {
+                                "const": "denied"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "explanation"
+                            ],
+                            "properties": {
+                              "applicable": {
+                                "const": false
+                              },
+                              "revision": false,
+                              "explanation": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "authorization"
+                                  },
+                                  "ruleId": {
+                                    "type": "string",
+                                    "pattern": "^authorize:"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "properties": {
+                              "status": {
+                                "const": "notApplicable"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "revision",
+                              "explanation"
+                            ],
+                            "properties": {
+                              "applicable": {
+                                "const": false
+                              },
+                              "revision": true,
+                              "explanation": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "requirement"
+                                  },
+                                  "ruleId": {
+                                    "type": "string",
+                                    "pattern": "^require:"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "if": {
+                            "properties": {
+                              "status": {
+                                "const": "stale"
+                              }
+                            },
+                            "required": [
+                              "status"
+                            ]
+                          },
+                          "then": {
+                            "required": [
+                              "revision",
+                              "explanation"
+                            ],
+                            "properties": {
+                              "applicable": {
+                                "const": false
+                              },
+                              "revision": true,
+                              "explanation": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "const": "revision"
+                                  },
+                                  "ruleId": {
+                                    "type": "string",
+                                    "pattern": "^revision:"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "observations": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "binding",
+                    "operationId",
+                    "resource"
+                  ],
+                  "properties": {
+                    "binding": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                    },
+                    "operationId": {
+                      "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                    },
+                    "resource": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "$schema",
+                        "resourceVersion",
+                        "catalogVersion",
+                        "model",
+                        "operationId",
+                        "kind",
+                        "authority",
+                        "view",
+                        "freshness",
+                        "data"
+                      ],
+                      "properties": {
+                        "$schema": {
+                          "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                        },
+                        "resourceVersion": {
+                          "const": 1
+                        },
+                        "catalogVersion": {
+                          "const": 4
+                        },
+                        "model": {
+                          "const": {
+                            "id": "model:Reservations",
+                            "name": "Reservations",
+                            "version": "0.42.0",
+                            "sourceHash": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
+                          }
+                        },
+                        "operationId": {
+                          "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                        },
+                        "kind": {
+                          "const": "queryResult"
+                        },
+                        "authority": {
+                          "const": "none"
+                        },
+                        "view": {
+                          "const": {
+                            "audience": "agent",
+                            "subjectSpecific": true,
+                            "authorizationFiltered": true,
+                            "containsCurrentState": true,
+                            "containsInput": false,
+                            "containsAuthenticatedIdentity": false,
+                            "containsExtensions": false,
+                            "grantsAuthority": false,
+                            "runtimeAuthorizationRequired": true
+                          }
+                        },
+                        "freshness": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "mode",
+                            "retrievedAt",
+                            "maxAgeSeconds",
+                            "revalidate"
+                          ],
+                          "properties": {
+                            "mode": {
+                              "const": "pointInTime"
+                            },
+                            "retrievedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "maxAgeSeconds": {
+                              "const": 0
+                            },
+                            "revalidate": {
+                              "const": "beforeReuse"
+                            }
+                          }
+                        },
+                        "data": {
+                          "$schema": "https://json-schema.org/draft/2020-12/schema",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "items",
+                            "nextCursor"
+                          ],
+                          "properties": {
+                            "items": {
+                              "type": "array",
+                              "maxItems": 2,
+                              "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": [
+                                  "id",
+                                  "resource",
+                                  "startsAt",
+                                  "endsAt"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "format": "uuid"
+                                  },
+                                  "resource": {
+                                    "type": "object",
+                                    "additionalProperties": false,
+                                    "required": [
+                                      "id",
+                                      "name"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "startsAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "endsAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                }
+                              }
+                            },
+                            "nextCursor": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 4096,
+                                  "pattern": "^[A-Za-z0-9_-]+$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "SubjectCapabilityView": {
         "type": "object",
         "additionalProperties": false,
@@ -1366,7 +2241,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 3
+            "const": 4
           },
           "model": {
             "type": "object",
@@ -1385,10 +2260,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.41.0"
+                "const": "0.42.0"
               },
               "sourceHash": {
-                "const": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
+                "const": "sha256:5bb8a030a1e8f9b56ab7059d652835cef72d1ba3fbb90a9cf156021401e31fb6"
               }
             }
           },
