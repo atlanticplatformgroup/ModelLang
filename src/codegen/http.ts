@@ -29,6 +29,12 @@ export function applicabilityRoute(operation: Pick<ManifestOperation, "id" | "ki
   return `${operationRoute(operation)}/applicability`;
 }
 
+export function agentResourceRoute(operation: Pick<ManifestOperation, "id" | "kind">): string {
+  if (operation.kind !== "query") throw new Error(`E6106 Actions do not have agent resource routes.`);
+  const stableId = operation.id.slice(operation.id.indexOf(":") + 1);
+  return `/agent/resources/queries/${stableId}`;
+}
+
 function componentName(manifest: OperationManifest, type: OperationValueType): string {
   if (type.kind === "entity") {
     return manifest.entities.find((entity) => entity.id === type.entityId)?.name ?? "UnknownEntity";
@@ -134,6 +140,100 @@ function subjectCandidateSchema(manifest: OperationManifest, operation: Manifest
   };
 }
 
+function operationInputSchema(manifest: OperationManifest, operation: ManifestOperation): JsonSchema {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: operation.input.filter((parameter) => !parameter.optional).map((parameter) => parameter.name),
+    properties: Object.fromEntries([
+      ...operation.input.map((parameter) => [parameter.name, parameter.optional
+        ? nullable(valueSchema(manifest, parameter.type))
+        : valueSchema(manifest, parameter.type)] as const),
+      ...(operation.kind === "query" && operation.sorting
+        ? [[operation.sorting.input, { type: "string", enum: operation.sorting.profiles.map((profile) => profile.name) }] as const]
+        : []),
+      ...(operation.kind === "query" && operation.output.cardinality === "page"
+        ? [[operation.output.pagination.cursorInput, { type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }] as const]
+        : []),
+    ]),
+  };
+}
+
+function operationResultSchema(manifest: OperationManifest, operation: ManifestOperation): JsonSchema {
+  if (operation.kind === "action") {
+    const outputEntity = manifest.entities.find((entity) => entity.id === operation.output.entityId);
+    if (!outputEntity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
+    return { $ref: `#/components/schemas/${outputEntity.name}` };
+  }
+  const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
+  if (!projection) throw new Error(`E6104 Missing output projection '${operation.output.projectionId}'.`);
+  const items = {
+    type: "array",
+    maxItems: operation.output.maxItems,
+    items: { $ref: `#/components/schemas/${projection.name}` },
+  };
+  return operation.output.cardinality === "page" ? {
+    type: "object",
+    additionalProperties: false,
+    required: ["items", "nextCursor"],
+    properties: {
+      items,
+      nextCursor: { anyOf: [{ type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }, { type: "null" }] },
+    },
+  } : items;
+}
+
+function agentResourceSchema(manifest: OperationManifest, operation: ManifestOperation): JsonSchema {
+  if (operation.kind !== "query") throw new Error(`E6107 Agent resources must be query-backed.`);
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["$schema", "resourceVersion", "catalogVersion", "model", "operationId", "kind", "authority", "view", "freshness", "data"],
+    properties: {
+      $schema: { const: "https://modellang.dev/schemas/agent-resource.schema.json" },
+      resourceVersion: { const: 1 },
+      catalogVersion: { const: 3 },
+      model: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name", "version", "sourceHash"],
+        properties: Object.fromEntries(Object.entries(manifest.model).map(([key, value]) => [key, { const: value }])),
+      },
+      operationId: { const: operation.id },
+      kind: { const: "queryResult" },
+      authority: { const: "none" },
+      view: {
+        type: "object",
+        additionalProperties: false,
+        required: ["audience", "subjectSpecific", "authorizationFiltered", "containsCurrentState", "containsInput", "containsAuthenticatedIdentity", "containsExtensions", "grantsAuthority", "runtimeAuthorizationRequired"],
+        properties: {
+          audience: { const: "agent" },
+          subjectSpecific: { const: true },
+          authorizationFiltered: { const: true },
+          containsCurrentState: { const: true },
+          containsInput: { const: false },
+          containsAuthenticatedIdentity: { const: false },
+          containsExtensions: { const: false },
+          grantsAuthority: { const: false },
+          runtimeAuthorizationRequired: { const: true },
+        },
+      },
+      freshness: {
+        type: "object",
+        additionalProperties: false,
+        required: ["mode", "retrievedAt", "maxAgeSeconds", "revalidate"],
+        properties: {
+          mode: { const: "pointInTime" },
+          retrievedAt: { type: "string", format: "date-time" },
+          maxAgeSeconds: { const: 0 },
+          revalidate: { const: "beforeReuse" },
+        },
+      },
+      data: operationResultSchema(manifest, operation),
+    },
+  };
+}
+
 export function generateOpenApi(manifest: OperationManifest, capabilities: CapabilityManifest): Record<string, unknown> {
   const actions = manifest.operations.filter((operation) => operation.kind === "action");
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
@@ -178,29 +278,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
     },
   ]));
   const executionPaths = manifest.operations.map((operation) => {
-    let outputSchema: JsonSchema;
-    if (operation.kind === "action") {
-      const outputEntity = manifest.entities.find((entity) => entity.id === operation.output.entityId);
-      if (!outputEntity) throw new Error(`E6102 Missing output entity '${operation.output.entityId}'.`);
-      outputSchema = { $ref: `#/components/schemas/${outputEntity.name}` };
-    } else {
-      const projection = manifest.projections.find((candidate) => candidate.id === operation.output.projectionId);
-      if (!projection) throw new Error(`E6104 Missing output projection '${operation.output.projectionId}'.`);
-      const items = {
-        type: "array",
-        maxItems: operation.output.maxItems,
-        items: { $ref: `#/components/schemas/${projection.name}` },
-      };
-      outputSchema = operation.output.cardinality === "page" ? {
-        type: "object",
-        additionalProperties: false,
-        required: ["items", "nextCursor"],
-        properties: {
-          items,
-          nextCursor: { anyOf: [{ type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }, { type: "null" }] },
-        },
-      } : items;
-    }
+    const outputSchema = operationResultSchema(manifest, operation);
     return [
       operationRoute(operation),
       {
@@ -226,22 +304,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
             required: true,
             content: {
               "application/json": {
-                schema: {
-                  type: "object",
-                  additionalProperties: false,
-                  required: operation.input.filter((parameter) => !parameter.optional).map((parameter) => parameter.name),
-                  properties: Object.fromEntries([
-                    ...operation.input.map((parameter) => [parameter.name, parameter.optional
-                      ? nullable(valueSchema(manifest, parameter.type))
-                      : valueSchema(manifest, parameter.type)] as const),
-                    ...(operation.kind === "query" && operation.sorting
-                      ? [[operation.sorting.input, { type: "string", enum: operation.sorting.profiles.map((profile) => profile.name) }] as const]
-                      : []),
-                    ...(operation.kind === "query" && operation.output.cardinality === "page"
-                      ? [[operation.output.pagination.cursorInput, { type: "string", minLength: 1, maxLength: 4096, pattern: "^[A-Za-z0-9_-]+$" }] as const]
-                      : []),
-                  ]),
-                },
+                schema: operationInputSchema(manifest, operation),
               },
             },
           },
@@ -294,6 +357,32 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       },
     },
   ]);
+  const resourcePaths = manifest.operations.filter((operation) => operation.kind === "query").map((operation) => [
+    agentResourceRoute(operation),
+    {
+      post: {
+        operationId: `resource_${operation.id.slice(operation.id.indexOf(":") + 1)}`,
+        summary: `Read ${operation.name} as an authenticated agent resource`,
+        tags: ["Agent resources"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-operation-id": operation.id,
+        "x-modellang-grants-authority": false,
+        "x-modellang-freshness": { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: operationInputSchema(manifest, operation) } },
+        },
+        responses: {
+          "200": {
+            description: "Authenticated current-state query resource; this grants no authority",
+            headers: { "Cache-Control": { description: "Current-state resources must not be stored", schema: { const: "no-store" } } },
+            content: { "application/json": { schema: agentResourceSchema(manifest, operation) } },
+          },
+          ...Object.fromEntries(["400", "401", "403", "405", "413", "415", "500"].map((status) => [status, operationResponses(operation)[status]])),
+        },
+      },
+    },
+  ]);
   const subjectCapabilityPath = [
     SUBJECT_CAPABILITY_ROUTE,
     {
@@ -338,7 +427,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       },
     },
   ];
-  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths, subjectCapabilityPath]);
+  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths, ...resourcePaths, subjectCapabilityPath]);
   const safeRuleIds = capabilities.actions.flatMap((action) => [
     action.explanation.authorizationRuleId,
     ...action.explanation.preconditionRuleIds,
@@ -460,7 +549,7 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
           properties: {
             $schema: { const: "https://modellang.dev/schemas/subject-capability-view.schema.json" },
             viewVersion: { const: 1 },
-            catalogVersion: { const: 2 },
+            catalogVersion: { const: 3 },
             model: {
               type: "object",
               additionalProperties: false,
@@ -638,6 +727,11 @@ function generateHttpClient(manifest: OperationManifest): string {
     return this.call(${JSON.stringify(applicabilityRoute(operation))}, input, { expectedRevision: options.expectedRevision });
   }`,
   ).join("\n\n");
+  const resources = manifest.operations.filter((operation) => operation.kind === "query").map((operation) =>
+    `  async read${operation.name[0]!.toUpperCase()}${operation.name.slice(1)}Resource(input: ${operationInputName(operation)}): Promise<${manifest.model.name}AgentResource<${returnType(manifest, operation)}, ${JSON.stringify(operation.id)}>> {
+    return this.call(${JSON.stringify(agentResourceRoute(operation))}, input);
+  }`,
+  ).join("\n\n");
   const subjectCandidates = manifest.operations.filter((operation) => operation.kind === "action").map((operation) =>
     `  | { readonly operationId: ${JSON.stringify(operation.id)}; readonly input: ${operationInputName(operation)}; readonly expectedRevision?: string }`,
   ).join("\n");
@@ -660,7 +754,7 @@ ${subjectCandidates || "  never"};
 export interface ${manifest.model.name}SubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 2;
+  readonly catalogVersion: 3;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -696,6 +790,34 @@ export interface ${manifest.model.name}SubjectCapabilityView {
     readonly revision?: string;
     readonly explanation: { readonly kind: "authorization" | "requirement" | "revision"; readonly ruleId: string };
   }[];
+}
+
+export interface ${manifest.model.name}AgentResource<Data, OperationId extends string = string> {
+  readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
+  readonly resourceVersion: 1;
+  readonly catalogVersion: 3;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly operationId: OperationId;
+  readonly kind: "queryResult";
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly containsCurrentState: true;
+    readonly containsInput: false;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly retrievedAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly data: Data;
 }
 
 export class ${manifest.model.name}HttpClient {
@@ -740,6 +862,8 @@ export class ${manifest.model.name}HttpClient {
 ${methods}
 
 ${assessments}
+
+${resources}
 }
 `;
 }
@@ -762,6 +886,15 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
     output: operation.output,
     sorting: undefined,
     action: true,
+    idempotency: "unsupported",
+  }))).concat(manifest.operations.filter((operation) => operation.kind === "query").map((operation) => ({
+    id: operation.id,
+    route: agentResourceRoute(operation),
+    endpoint: "resource",
+    input: operation.input,
+    output: operation.output,
+    sorting: operation.sorting,
+    action: false,
     idempotency: "unsupported",
   })));
   const enumValues = Object.fromEntries(manifest.enums.map((enumeration) => [
@@ -837,7 +970,7 @@ interface RuntimeValueType {
 interface OperationDefinition {
   id: ${manifest.model.name}OperationId;
   route: string;
-  endpoint: "execution" | "applicability";
+  endpoint: "execution" | "applicability" | "resource";
   input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   sorting?: { input: "sort"; defaultProfile: "default"; profiles: readonly { name: string }[] };
   output:
@@ -880,6 +1013,7 @@ export type ${manifest.model.name}Authenticator = (
 export interface ${manifest.model.name}HttpHandlerOptions {
   basePath?: string;
   maxBodyBytes?: number;
+  now?: () => Date;
 }
 
 export function create${manifest.model.name}DatabaseExecutor(
@@ -1227,6 +1361,7 @@ export function create${manifest.model.name}HttpHandler(
 ): (request: Request) => Promise<Response> {
   const basePath = options.basePath?.replace(/\\/$/, "") ?? "";
   const maxBodyBytes = options.maxBodyBytes ?? 1_048_576;
+  const now = options.now ?? (() => new Date());
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === \`\${basePath}${SUBJECT_CAPABILITY_ROUTE}\`;
@@ -1291,7 +1426,7 @@ export function create${manifest.model.name}HttpHandler(
         const view: ${manifest.model.name}SubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 2,
+          catalogVersion: 3,
           model: ${JSON.stringify(manifest.model)},
           view: {
             audience: "agent",
@@ -1314,6 +1449,47 @@ export function create${manifest.model.name}HttpHandler(
           unavailable,
         };
         return Response.json(view, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+      if (definition!.endpoint === "resource") {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by agent resources", "ML_VALIDATION", "agent:resource");
+          }
+        }
+        const input = validateInput(definition!, body);
+        const data = await executor.execute(definition!.id, input, {});
+        validateOutput(definition!, data);
+        const resource = {
+          $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+          resourceVersion: 1 as const,
+          catalogVersion: 3 as const,
+          model: ${JSON.stringify(manifest.model)},
+          operationId: definition!.id,
+          kind: "queryResult" as const,
+          authority: "none" as const,
+          view: {
+            audience: "agent" as const,
+            subjectSpecific: true as const,
+            authorizationFiltered: true as const,
+            containsCurrentState: true as const,
+            containsInput: false as const,
+            containsAuthenticatedIdentity: false as const,
+            containsExtensions: false as const,
+            grantsAuthority: false as const,
+            runtimeAuthorizationRequired: true as const,
+          },
+          freshness: {
+            mode: "pointInTime" as const,
+            retrievedAt: now().toISOString(),
+            maxAgeSeconds: 0 as const,
+            revalidate: "beforeReuse" as const,
+          },
+          data,
+        };
+        return Response.json(resource, {
           status: 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });

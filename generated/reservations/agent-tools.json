@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 2,
-  "compilerVersion": "0.39.0",
+  "catalogVersion": 3,
+  "compilerVersion": "0.40.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.39.0",
-    "sourceHash": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"
+    "version": "0.40.0",
+    "sourceHash": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"
   },
   "view": {
     "audience": "agent",
@@ -41,7 +41,7 @@
       "action"
     ],
     "maxCandidates": 32,
-    "queryTools": "staticCatalogOnly",
+    "queryTools": "separateResourceBindings",
     "containsResourceState": false,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
@@ -296,6 +296,22 @@
       "bounds": {
         "cardinality": "page",
         "maxItems": 2
+      },
+      "resource": {
+        "protocol": "http",
+        "method": "POST",
+        "path": "/agent/resources/queries/qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "authenticated": true,
+        "subjectSpecific": true,
+        "authorizationFiltered": true,
+        "containsCurrentState": true,
+        "freshness": {
+          "mode": "pointInTime",
+          "maxAgeSeconds": 0,
+          "revalidate": "beforeReuse"
+        },
+        "grantsAuthority": false,
+        "runtimeAuthorizationRequired": true
       },
       "sorting": {
         "input": "sort",

@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.39.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa)."
+    "version": "0.40.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -995,6 +995,263 @@
         }
       }
     },
+    "/agent/resources/queries/qry_4406b045404a48449282db804f6167a8": {
+      "post": {
+        "operationId": "resource_qry_4406b045404a48449282db804f6167a8",
+        "summary": "Read myRequests as an authenticated agent resource",
+        "tags": [
+          "Agent resources"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "query:qry_4406b045404a48449282db804f6167a8",
+        "x-modellang-grants-authority": false,
+        "x-modellang-freshness": {
+          "mode": "pointInTime",
+          "maxAgeSeconds": 0,
+          "revalidate": "beforeReuse"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [],
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated current-state query resource; this grants no authority",
+            "headers": {
+              "Cache-Control": {
+                "description": "Current-state resources must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "$schema",
+                    "resourceVersion",
+                    "catalogVersion",
+                    "model",
+                    "operationId",
+                    "kind",
+                    "authority",
+                    "view",
+                    "freshness",
+                    "data"
+                  ],
+                  "properties": {
+                    "$schema": {
+                      "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                    },
+                    "resourceVersion": {
+                      "const": 1
+                    },
+                    "catalogVersion": {
+                      "const": 3
+                    },
+                    "model": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "name",
+                        "version",
+                        "sourceHash"
+                      ],
+                      "properties": {
+                        "id": {
+                          "const": "model:Procurement"
+                        },
+                        "name": {
+                          "const": "Procurement"
+                        },
+                        "version": {
+                          "const": "0.40.0"
+                        },
+                        "sourceHash": {
+                          "const": "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"
+                        }
+                      }
+                    },
+                    "operationId": {
+                      "const": "query:qry_4406b045404a48449282db804f6167a8"
+                    },
+                    "kind": {
+                      "const": "queryResult"
+                    },
+                    "authority": {
+                      "const": "none"
+                    },
+                    "view": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "audience",
+                        "subjectSpecific",
+                        "authorizationFiltered",
+                        "containsCurrentState",
+                        "containsInput",
+                        "containsAuthenticatedIdentity",
+                        "containsExtensions",
+                        "grantsAuthority",
+                        "runtimeAuthorizationRequired"
+                      ],
+                      "properties": {
+                        "audience": {
+                          "const": "agent"
+                        },
+                        "subjectSpecific": {
+                          "const": true
+                        },
+                        "authorizationFiltered": {
+                          "const": true
+                        },
+                        "containsCurrentState": {
+                          "const": true
+                        },
+                        "containsInput": {
+                          "const": false
+                        },
+                        "containsAuthenticatedIdentity": {
+                          "const": false
+                        },
+                        "containsExtensions": {
+                          "const": false
+                        },
+                        "grantsAuthority": {
+                          "const": false
+                        },
+                        "runtimeAuthorizationRequired": {
+                          "const": true
+                        }
+                      }
+                    },
+                    "freshness": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "retrievedAt",
+                        "maxAgeSeconds",
+                        "revalidate"
+                      ],
+                      "properties": {
+                        "mode": {
+                          "const": "pointInTime"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "maxAgeSeconds": {
+                          "const": 0
+                        },
+                        "revalidate": {
+                          "const": "beforeReuse"
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/RequestSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent/capabilities": {
       "post": {
         "operationId": "modellang_subject_capabilities",
@@ -1708,7 +1965,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 2
+            "const": 3
           },
           "model": {
             "type": "object",
@@ -1727,10 +1984,10 @@
                 "const": "Procurement"
               },
               "version": {
-                "const": "0.39.0"
+                "const": "0.40.0"
               },
               "sourceHash": {
-                "const": "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa"
+                "const": "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"
               }
             }
           },

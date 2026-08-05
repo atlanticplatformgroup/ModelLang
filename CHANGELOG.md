@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.40.0
+
+- Added one authenticated current-state agent-resource route per declared query, reusing the existing query executor for authorization, row filtering, disclosure, sorting, bounds, pagination, output validation, and private read evidence.
+- Added resource envelope v1 with exact model/query identity, validated current query data, `authority: none`, and no echoed input, authenticated identity, extensions, expressions, runtime internals, or private evidence.
+- Established a conservative freshness baseline: transport `retrievedAt`, point-in-time mode, zero reusable lifetime, revalidation before reuse, and `Cache-Control: no-store`; no commit-time, frozen-snapshot, as-of, cache, or authority claim is made.
+- Added catalog v3 query resource bindings, generated OpenAPI/client/server support, standalone schema validation, command-metadata rejection, and live PostgreSQL coverage proving disclosure and transactional read evidence remain intact.
+- Advanced compiler/examples to 0.40.0, target capability profile to v4, target to `target:postgresql-http-ui-agent-resources/4`, and generator profile to `postgresql-http-ui-agent-resources/24`; canonical IR1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.39.0
 
 - Added authenticated `POST /agent/capabilities` subject views that filter exact action candidates through the existing authoritative applicability evaluator without executing actions or granting authority.

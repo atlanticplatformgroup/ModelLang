@@ -1,5 +1,5 @@
 import type { CapabilityManifest } from "./capability-manifest.js";
-import { applicabilityRoute, operationRoute } from "./codegen/http.js";
+import { agentResourceRoute, applicabilityRoute, operationRoute } from "./codegen/http.js";
 import type {
   ManifestOperation,
   OperationManifest,
@@ -55,11 +55,23 @@ type AgentTool =
       sorting?: Extract<ManifestOperation, { kind: "query" }>["sorting"];
       disclosure?: Extract<ManifestOperation, { kind: "query" }>["disclosure"];
       readEvidence?: Extract<ManifestOperation, { kind: "query" }>["readEvidence"];
+      resource: {
+        protocol: "http";
+        method: "POST";
+        path: string;
+        authenticated: true;
+        subjectSpecific: true;
+        authorizationFiltered: true;
+        containsCurrentState: true;
+        freshness: { mode: "pointInTime"; maxAgeSeconds: 0; revalidate: "beforeReuse" };
+        grantsAuthority: false;
+        runtimeAuthorizationRequired: true;
+      };
     });
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 2;
+  catalogVersion: 3;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -93,7 +105,7 @@ export interface AgentToolCatalog {
     inputSpecific: true;
     candidateKinds: ["action"];
     maxCandidates: 32;
-    queryTools: "staticCatalogOnly";
+    queryTools: "separateResourceBindings";
     containsResourceState: false;
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
@@ -270,6 +282,18 @@ export function generateAgentToolCatalog(
         ...base,
         kind: "query",
         bounds: { cardinality: operation.output.cardinality, maxItems: operation.output.maxItems },
+        resource: {
+          protocol: "http",
+          method: "POST",
+          path: agentResourceRoute(operation),
+          authenticated: true,
+          subjectSpecific: true,
+          authorizationFiltered: true,
+          containsCurrentState: true,
+          freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+          grantsAuthority: false,
+          runtimeAuthorizationRequired: true,
+        },
         ...(operation.sorting ? { sorting: operation.sorting } : {}),
         ...(operation.disclosure ? { disclosure: operation.disclosure } : {}),
         ...(operation.readEvidence ? { readEvidence: operation.readEvidence } : {}),
@@ -296,7 +320,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 2,
+    catalogVersion: 3,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -323,7 +347,7 @@ export function generateAgentToolCatalog(
       inputSpecific: true,
       candidateKinds: ["action"],
       maxCandidates: SUBJECT_CAPABILITY_MAX_CANDIDATES,
-      queryTools: "staticCatalogOnly",
+      queryTools: "separateResourceBindings",
       containsResourceState: false,
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,

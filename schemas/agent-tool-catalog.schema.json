@@ -9,7 +9,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
-    "catalogVersion": { "const": 2 },
+    "catalogVersion": { "const": 3 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },
     "capabilityManifestVersion": { "const": 10 },
@@ -84,7 +84,7 @@
           "maxItems": 1
         },
         "maxCandidates": { "const": 32 },
-        "queryTools": { "const": "staticCatalogOnly" },
+        "queryTools": { "const": "separateResourceBindings" },
         "containsResourceState": { "const": false },
         "grantsAuthority": { "const": false },
         "runtimeAuthorizationRequired": { "const": true }
@@ -163,6 +163,36 @@
       "properties": {
         "cardinality": { "enum": ["many", "page"] },
         "maxItems": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "protocol", "method", "path", "authenticated", "subjectSpecific",
+        "authorizationFiltered", "containsCurrentState", "freshness",
+        "grantsAuthority", "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "protocol": { "const": "http" },
+        "method": { "const": "POST" },
+        "path": { "type": "string", "pattern": "^/agent/resources/queries/[A-Za-z0-9_]+$" },
+        "authenticated": { "const": true },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "containsCurrentState": { "const": true },
+        "freshness": {
+          "type": "object",
+          "required": ["mode", "maxAgeSeconds", "revalidate"],
+          "properties": {
+            "mode": { "const": "pointInTime" },
+            "maxAgeSeconds": { "const": 0 },
+            "revalidate": { "const": "beforeReuse" }
+          },
+          "additionalProperties": false
+        },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
       },
       "additionalProperties": false
     },
@@ -252,6 +282,7 @@
         "reliability": { "$ref": "#/$defs/reliability" },
         "emittedEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^event:" } },
         "bounds": { "$ref": "#/$defs/bounds" },
+        "resource": { "$ref": "#/$defs/resource" },
         "sorting": { "$ref": "#/$defs/sorting" },
         "disclosure": { "$ref": "#/$defs/disclosure" },
         "readEvidence": { "$ref": "#/$defs/readEvidence" }
@@ -266,6 +297,7 @@
               "reliability": true,
               "emittedEventIds": true,
               "bounds": false,
+              "resource": false,
               "sorting": false,
               "disclosure": false,
               "readEvidence": false
@@ -275,9 +307,10 @@
         {
           "if": { "properties": { "kind": { "const": "query" } }, "required": ["kind"] },
           "then": {
-            "required": ["bounds"],
+            "required": ["bounds", "resource"],
             "properties": {
               "bounds": true,
+              "resource": true,
               "applicability": false,
               "reliability": false,
               "emittedEventIds": false

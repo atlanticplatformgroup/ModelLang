@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/agent-resource.schema.json",
+  "title": "ModelLang authenticated current-state agent resource",
+  "type": "object",
+  "required": [
+    "$schema", "resourceVersion", "catalogVersion", "model", "operationId",
+    "kind", "authority", "view", "freshness", "data"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/agent-resource.schema.json" },
+    "resourceVersion": { "const": 1 },
+    "catalogVersion": { "const": 3 },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "operationId": { "type": "string", "pattern": "^query:" },
+    "kind": { "const": "queryResult" },
+    "authority": { "const": "none" },
+    "view": {
+      "type": "object",
+      "required": [
+        "audience", "subjectSpecific", "authorizationFiltered", "containsCurrentState",
+        "containsInput", "containsAuthenticatedIdentity", "containsExtensions", "grantsAuthority",
+        "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "audience": { "const": "agent" },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "containsCurrentState": { "const": true },
+        "containsInput": { "const": false },
+        "containsAuthenticatedIdentity": { "const": false },
+        "containsExtensions": { "const": false },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "freshness": {
+      "type": "object",
+      "required": ["mode", "retrievedAt", "maxAgeSeconds", "revalidate"],
+      "properties": {
+        "mode": { "const": "pointInTime" },
+        "retrievedAt": { "type": "string", "format": "date-time" },
+        "maxAgeSeconds": { "const": 0 },
+        "revalidate": { "const": "beforeReuse" }
+      },
+      "additionalProperties": false
+    },
+    "data": true
+  },
+  "additionalProperties": false
+}

@@ -36,7 +36,7 @@ interface RuntimeValueType {
 interface OperationDefinition {
   id: ProcurementOperationId;
   route: string;
-  endpoint: "execution" | "applicability";
+  endpoint: "execution" | "applicability" | "resource";
   input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   sorting?: { input: "sort"; defaultProfile: "default"; profiles: readonly { name: string }[] };
   output:
@@ -194,6 +194,19 @@ const operationDefinitions = [
       "cardinality": "one"
     },
     "action": true,
+    "idempotency": "unsupported"
+  },
+  {
+    "id": "query:qry_4406b045404a48449282db804f6167a8",
+    "route": "/agent/resources/queries/qry_4406b045404a48449282db804f6167a8",
+    "endpoint": "resource",
+    "input": [],
+    "output": {
+      "projectionId": "projection:prj_70d694c9a0a274dc79c6168e47d25968",
+      "cardinality": "many",
+      "maxItems": 100
+    },
+    "action": false,
     "idempotency": "unsupported"
   }
 ] as unknown as readonly OperationDefinition[];
@@ -415,6 +428,7 @@ export type ProcurementAuthenticator = (
 export interface ProcurementHttpHandlerOptions {
   basePath?: string;
   maxBodyBytes?: number;
+  now?: () => Date;
 }
 
 export function createProcurementDatabaseExecutor(
@@ -767,6 +781,7 @@ export function createProcurementHttpHandler(
 ): (request: Request) => Promise<Response> {
   const basePath = options.basePath?.replace(/\/$/, "") ?? "";
   const maxBodyBytes = options.maxBodyBytes ?? 1_048_576;
+  const now = options.now ?? (() => new Date());
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === `${basePath}/agent/capabilities`;
@@ -831,8 +846,8 @@ export function createProcurementHttpHandler(
         const view: ProcurementSubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 2,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.39.0","sourceHash":"sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa"},
+          catalogVersion: 3,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.40.0","sourceHash":"sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -854,6 +869,47 @@ export function createProcurementHttpHandler(
           unavailable,
         };
         return Response.json(view, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+      if (definition!.endpoint === "resource") {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by agent resources", "ML_VALIDATION", "agent:resource");
+          }
+        }
+        const input = validateInput(definition!, body);
+        const data = await executor.execute(definition!.id, input, {});
+        validateOutput(definition!, data);
+        const resource = {
+          $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+          resourceVersion: 1 as const,
+          catalogVersion: 3 as const,
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.40.0","sourceHash":"sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"},
+          operationId: definition!.id,
+          kind: "queryResult" as const,
+          authority: "none" as const,
+          view: {
+            audience: "agent" as const,
+            subjectSpecific: true as const,
+            authorizationFiltered: true as const,
+            containsCurrentState: true as const,
+            containsInput: false as const,
+            containsAuthenticatedIdentity: false as const,
+            containsExtensions: false as const,
+            grantsAuthority: false as const,
+            runtimeAuthorizationRequired: true as const,
+          },
+          freshness: {
+            mode: "pointInTime" as const,
+            retrievedAt: now().toISOString(),
+            maxAgeSeconds: 0 as const,
+            revalidate: "beforeReuse" as const,
+          },
+          data,
+        };
+        return Response.json(resource, {
           status: 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });

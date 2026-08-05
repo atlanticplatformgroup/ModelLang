@@ -271,7 +271,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.39.0",
+      model_version: "0.40.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -336,7 +336,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.39.0",
+      model_version: "0.40.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1205,7 +1205,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.39.0', $1,
+        VALUES ('model:Procurement', '0.40.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2075,6 +2075,27 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [approveOperationId, low.id],
       );
       expect(discoveryAudit.rows[0]!.count).toBe("0");
+      const readAuditBefore = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+           AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+      );
+      const currentRequests = await employee.readMyRequestsResource({});
+      expect(currentRequests).toMatchObject({
+        operationId: "query:qry_4406b045404a48449282db804f6167a8",
+        authority: "none",
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      });
+      expect(currentRequests.data).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: low.id, status: "SUBMITTED" }),
+      ]));
+      expect(JSON.stringify(currentRequests)).not.toMatch(/requester|identity_subject|query_audit/);
+      const readAuditAfter = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+           AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+      );
+      expect(Number(readAuditAfter.rows[0]!.count)).toBe(Number(readAuditBefore.rows[0]!.count) + 1);
       const approve = managerWorkflow.available(workflow.workflowId, submitted.status)[0]!;
       expect(await managerWorkflow.assessTransition(approve.transitionId, low.id, {}))
         .toMatchObject({ status: "applicable", authority: "none" });

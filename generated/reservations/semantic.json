@@ -9,15 +9,15 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.39.0",
+    "compilerVersion": "0.40.0",
     "irVersion": 1,
     "generator": "semantic-manifest"
   },
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.39.0",
-    "sourceHash": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40",
+    "version": "0.40.0",
+    "sourceHash": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306",
     "sourceFile": "examples/reservations.model"
   },
   "principal": {

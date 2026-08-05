@@ -24,12 +24,12 @@ export type EventProducer =
 export type DomainEventEnvelope<EventId extends string, EventName extends string, ModelId extends string, ModelVersion extends string, SourceHash extends string, Payload> =
   DomainEventEnvelopeBase<EventId, EventName, ModelId, ModelVersion, SourceHash, Payload> & EventProducer;
 
-export type RequestOpenedEvent = DomainEventEnvelope<"event:evt_10d694c9a0a274dc79c6168e47d25968", "RequestOpened", "model:Procurement", "0.39.0", "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa", PurchaseRequest>;
+export type RequestOpenedEvent = DomainEventEnvelope<"event:evt_10d694c9a0a274dc79c6168e47d25968", "RequestOpened", "model:Procurement", "0.40.0", "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5", PurchaseRequest>;
 
-export type RequestSubmittedEvent = DomainEventEnvelope<"event:evt_20d694c9a0a274dc79c6168e47d25968", "RequestSubmitted", "model:Procurement", "0.39.0", "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa", PurchaseRequest>;
+export type RequestSubmittedEvent = DomainEventEnvelope<"event:evt_20d694c9a0a274dc79c6168e47d25968", "RequestSubmitted", "model:Procurement", "0.40.0", "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5", PurchaseRequest>;
 
-export type RequestApprovedEvent = DomainEventEnvelope<"event:evt_30d694c9a0a274dc79c6168e47d25968", "RequestApproved", "model:Procurement", "0.39.0", "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa", PurchaseRequest>;
+export type RequestApprovedEvent = DomainEventEnvelope<"event:evt_30d694c9a0a274dc79c6168e47d25968", "RequestApproved", "model:Procurement", "0.40.0", "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5", PurchaseRequest>;
 
-export type ApprovalObservedEvent = DomainEventEnvelope<"event:evt_50d694c9a0a274dc79c6168e47d25968", "ApprovalObserved", "model:Procurement", "0.39.0", "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa", PurchaseRequest>;
+export type ApprovalObservedEvent = DomainEventEnvelope<"event:evt_50d694c9a0a274dc79c6168e47d25968", "ApprovalObserved", "model:Procurement", "0.40.0", "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5", PurchaseRequest>;
 
 export type ProcurementDomainEvent = RequestOpenedEvent | RequestSubmittedEvent | RequestApprovedEvent | ApprovalObservedEvent;

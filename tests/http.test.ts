@@ -339,7 +339,7 @@ describe("generated HTTP boundary", () => {
     expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
     expect(view).toMatchObject({
       viewVersion: 1,
-      catalogVersion: 2,
+      catalogVersion: 3,
       model: { id: "model:Procurement" },
       view: {
         subjectSpecific: true,
@@ -405,6 +405,78 @@ describe("generated HTTP boundary", () => {
     }));
     expect(unauthenticated.status).toBe(401);
     expect(assessOperation).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns an authenticated no-store current-state resource with explicit zero-age freshness", async () => {
+    const retrievedAt = "2026-08-04T20:00:00.000Z";
+    const data = [{
+      id: purchaseRequest.id,
+      createdAt: purchaseRequest.createdAt,
+      amount: purchaseRequest.amount,
+      status: purchaseRequest.status,
+      approvedBy: null,
+    }];
+    const execute = vi.fn(async () => data);
+    const handler = createProcurementHttpHandler(async () => ({ execute, assess }), {
+      now: () => new Date(retrievedAt),
+    });
+    const responses: Response[] = [];
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "resource-token",
+      fetch: async (input, init) => {
+        const response = await handler(new Request(input, init));
+        responses.push(response.clone());
+        return response;
+      },
+    });
+    const resource = await client.readMyRequestsResource({});
+
+    expect(resource).toMatchObject({
+      resourceVersion: 1,
+      catalogVersion: 3,
+      model: { id: "model:Procurement", version: "0.40.0" },
+      operationId: "query:qry_4406b045404a48449282db804f6167a8",
+      kind: "queryResult",
+      authority: "none",
+      view: {
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        containsCurrentState: true,
+        containsInput: false,
+        containsAuthenticatedIdentity: false,
+        grantsAuthority: false,
+      },
+      freshness: {
+        mode: "pointInTime",
+        retrievedAt,
+        maxAgeSeconds: 0,
+        revalidate: "beforeReuse",
+      },
+      data,
+    });
+    expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
+    expect(JSON.stringify(resource)).not.toMatch(/resource-token|requester|roles|query_audit/);
+    expect(execute).toHaveBeenCalledWith(
+      "query:qry_4406b045404a48449282db804f6167a8",
+      {},
+      {},
+    );
+    const schema = JSON.parse(await readFile("schemas/agent-resource.schema.json", "utf8"));
+    const validate = new Ajv2020({ allErrors: true, strict: true, formats: { "date-time": true } }).compile(schema);
+    expect(validate(resource), JSON.stringify(validate.errors)).toBe(true);
+
+    const metadata = await handler(new Request("https://example.test/agent/resources/queries/qry_4406b045404a48449282db804f6167a8", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer resource-token",
+        "content-type": "application/json",
+        "if-match": '"rev:1:0123456789abcdef0123456789abcdef"',
+      },
+      body: "{}",
+    }));
+    expect(metadata.status).toBe(400);
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {

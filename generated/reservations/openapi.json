@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.39.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40)."
+    "version": "0.40.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -436,6 +436,318 @@
           },
           "401": {
             "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/resources/queries/qry_94d8a56f4c2640fab58a4c2190c35c69": {
+      "post": {
+        "operationId": "resource_qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "summary": "Read reservationsForResource as an authenticated agent resource",
+        "tags": [
+          "Agent resources"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-operation-id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+        "x-modellang-grants-authority": false,
+        "x-modellang-freshness": {
+          "mode": "pointInTime",
+          "maxAgeSeconds": 0,
+          "revalidate": "beforeReuse"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "resource"
+                ],
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "startsAtOrAfter": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sort": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "latestFirst",
+                      "endingSoonest"
+                    ]
+                  },
+                  "cursor": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4096,
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated current-state query resource; this grants no authority",
+            "headers": {
+              "Cache-Control": {
+                "description": "Current-state resources must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "$schema",
+                    "resourceVersion",
+                    "catalogVersion",
+                    "model",
+                    "operationId",
+                    "kind",
+                    "authority",
+                    "view",
+                    "freshness",
+                    "data"
+                  ],
+                  "properties": {
+                    "$schema": {
+                      "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                    },
+                    "resourceVersion": {
+                      "const": 1
+                    },
+                    "catalogVersion": {
+                      "const": 3
+                    },
+                    "model": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "id",
+                        "name",
+                        "version",
+                        "sourceHash"
+                      ],
+                      "properties": {
+                        "id": {
+                          "const": "model:Reservations"
+                        },
+                        "name": {
+                          "const": "Reservations"
+                        },
+                        "version": {
+                          "const": "0.40.0"
+                        },
+                        "sourceHash": {
+                          "const": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"
+                        }
+                      }
+                    },
+                    "operationId": {
+                      "const": "query:qry_94d8a56f4c2640fab58a4c2190c35c69"
+                    },
+                    "kind": {
+                      "const": "queryResult"
+                    },
+                    "authority": {
+                      "const": "none"
+                    },
+                    "view": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "audience",
+                        "subjectSpecific",
+                        "authorizationFiltered",
+                        "containsCurrentState",
+                        "containsInput",
+                        "containsAuthenticatedIdentity",
+                        "containsExtensions",
+                        "grantsAuthority",
+                        "runtimeAuthorizationRequired"
+                      ],
+                      "properties": {
+                        "audience": {
+                          "const": "agent"
+                        },
+                        "subjectSpecific": {
+                          "const": true
+                        },
+                        "authorizationFiltered": {
+                          "const": true
+                        },
+                        "containsCurrentState": {
+                          "const": true
+                        },
+                        "containsInput": {
+                          "const": false
+                        },
+                        "containsAuthenticatedIdentity": {
+                          "const": false
+                        },
+                        "containsExtensions": {
+                          "const": false
+                        },
+                        "grantsAuthority": {
+                          "const": false
+                        },
+                        "runtimeAuthorizationRequired": {
+                          "const": true
+                        }
+                      }
+                    },
+                    "freshness": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "mode",
+                        "retrievedAt",
+                        "maxAgeSeconds",
+                        "revalidate"
+                      ],
+                      "properties": {
+                        "mode": {
+                          "const": "pointInTime"
+                        },
+                        "retrievedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "maxAgeSeconds": {
+                          "const": 0
+                        },
+                        "revalidate": {
+                          "const": "beforeReuse"
+                        }
+                      }
+                    },
+                    "data": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "items",
+                        "nextCursor"
+                      ],
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "maxItems": 2,
+                          "items": {
+                            "$ref": "#/components/schemas/ReservationSummary"
+                          }
+                        },
+                        "nextCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096,
+                              "pattern": "^[A-Za-z0-9_-]+$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1054,7 +1366,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 2
+            "const": 3
           },
           "model": {
             "type": "object",
@@ -1073,10 +1385,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.39.0"
+                "const": "0.40.0"
               },
               "sourceHash": {
-                "const": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"
+                "const": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"
               }
             }
           },

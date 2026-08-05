@@ -19,7 +19,7 @@ export type ProcurementSubjectCapabilityCandidate =
 export interface ProcurementSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 2;
+  readonly catalogVersion: 3;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -55,6 +55,34 @@ export interface ProcurementSubjectCapabilityView {
     readonly revision?: string;
     readonly explanation: { readonly kind: "authorization" | "requirement" | "revision"; readonly ruleId: string };
   }[];
+}
+
+export interface ProcurementAgentResource<Data, OperationId extends string = string> {
+  readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
+  readonly resourceVersion: 1;
+  readonly catalogVersion: 3;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly operationId: OperationId;
+  readonly kind: "queryResult";
+  readonly authority: "none";
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly containsCurrentState: true;
+    readonly containsInput: false;
+    readonly containsAuthenticatedIdentity: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly freshness: {
+    readonly mode: "pointInTime";
+    readonly retrievedAt: string;
+    readonly maxAgeSeconds: 0;
+    readonly revalidate: "beforeReuse";
+  };
+  readonly data: Data;
 }
 
 export class ProcurementHttpClient {
@@ -122,5 +150,9 @@ export class ProcurementHttpClient {
 
   async assessApproveRequest(input: ApproveRequestInput, options: ApplicabilityOptions = {}): Promise<ApplicabilityDecision> {
     return this.call("/operations/actions/act_d39dbb883b5f4019b9027b85add3de47/applicability", input, { expectedRevision: options.expectedRevision });
+  }
+
+  async readMyRequestsResource(input: MyRequestsInput): Promise<ProcurementAgentResource<RequestSummary[], "query:qry_4406b045404a48449282db804f6167a8">> {
+    return this.call("/agent/resources/queries/qry_4406b045404a48449282db804f6167a8", input);
   }
 }

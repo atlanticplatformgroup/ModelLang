@@ -120,6 +120,12 @@ describe("backends", () => {
       storage: "private",
       payloadRetention: "none",
     });
+    const resourcePost = openapi.paths["/agent/resources/queries/qry_4406b045404a48449282db804f6167a8"]?.post as unknown as Record<string, unknown>;
+    expect(resourcePost).toMatchObject({
+      "x-modellang-operation-id": "query:qry_4406b045404a48449282db804f6167a8",
+      "x-modellang-grants-authority": false,
+      "x-modellang-freshness": { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+    });
     const subjectRequest = openapi.paths["/agent/capabilities"]!.post.requestBody.content["application/json"].schema as unknown as {
       additionalProperties: boolean;
       properties: { candidates: { minItems: number; maxItems: number; uniqueItems: boolean; items: { oneOf: object[] } } };
@@ -297,8 +303,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 3,
-      targetProfile: "target:postgresql-http-ui-agent-subject-view/3",
+      profileVersion: 4,
+      targetProfile: "target:postgresql-http-ui-agent-resources/4",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -314,6 +320,12 @@ describe("backends", () => {
       required: true,
       support: "native",
       enforcement: ["agent-tool-catalog", "http", "postgresql-applicability"],
+    });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.currentStateResources",
+      required: true,
+      support: "native",
+      enforcement: ["agent-tool-catalog", "http", "postgresql-query"],
     });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
@@ -334,7 +346,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-subject-view/3" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-resources/4" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -367,6 +379,7 @@ describe("backends", () => {
         reliability?: { idempotency: string };
         emittedEventIds?: string[];
         bounds?: { cardinality: string; maxItems: number };
+        resource?: { path: string; containsCurrentState: boolean; grantsAuthority: boolean; freshness: { mode: string; maxAgeSeconds: number; revalidate: string } };
         annotations: { readOnly: boolean };
       }[];
     };
@@ -374,7 +387,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 2,
+      catalogVersion: 3,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -399,7 +412,7 @@ describe("backends", () => {
         inputSpecific: true,
         candidateKinds: ["action"],
         maxCandidates: 32,
-        queryTools: "staticCatalogOnly",
+        queryTools: "separateResourceBindings",
         containsResourceState: false,
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
@@ -433,7 +446,16 @@ describe("backends", () => {
       },
     });
     const query = catalog.tools.find((tool) => tool.name === "myRequests")!;
-    expect(query).toMatchObject({ kind: "query", bounds: { cardinality: "many", maxItems: 100 } });
+    expect(query).toMatchObject({
+      kind: "query",
+      bounds: { cardinality: "many", maxItems: 100 },
+      resource: {
+        path: "/agent/resources/queries/qry_4406b045404a48449282db804f6167a8",
+        containsCurrentState: true,
+        grantsAuthority: false,
+        freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+      },
+    });
     expect(JSON.stringify(query.outputSchema)).not.toContain("$ref");
     expect(JSON.stringify(catalog)).not.toMatch(/supplier-risk\/review|extension:|expression|sqlFunction|currentValue|commandReceipt|event_outbox|query_audit/);
 
@@ -646,6 +668,32 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(beforeUi.actions[0]!.operationId).toBe(afterUi.actions[0]!.operationId);
     expect(beforeUi.actions[0]!.label).toBe("First name");
     expect(afterUi.actions[0]!.label).toBe("Second name");
+  });
+
+  it("keeps query-backed agent resource routes unchanged across query renames", () => {
+    const source = (name: string) => `model ResourceRouteProof version "1";
+      entity User @stableId("ent_11111111111111111111111111111111") {
+        id: UUID @id @stableId("fld_11111111111111111111111111111111");
+      }
+      entity Item @stableId("ent_22222222222222222222222222222222") {
+        id: UUID @id @stableId("fld_22222222222222222222222222222222");
+      }
+      projection ItemSummary @stableId("prj_11111111111111111111111111111111") from Item {
+        id @stableId("pfd_11111111111111111111111111111111");
+      }
+      query ${name} @stableId("qry_11111111111111111111111111111111")(caller actor: User)
+        returns ItemSummary from Item as row {
+        authorize true; where true; orderBy row.id asc; limit 10;
+      }`;
+    const before = generateAll(compileText(source("firstName")));
+    const after = generateAll(compileText(source("secondName")));
+    const resourcePath = "/agent/resources/queries/qry_11111111111111111111111111111111";
+    expect(JSON.parse(before["openapi.json"]!).paths).toHaveProperty(resourcePath);
+    expect(JSON.parse(after["openapi.json"]!).paths).toHaveProperty(resourcePath);
+    const beforeCatalog = JSON.parse(before["agent-tools.json"]!) as { tools: { resource?: { path: string } }[] };
+    const afterCatalog = JSON.parse(after["agent-tools.json"]!) as typeof beforeCatalog;
+    expect(beforeCatalog.tools[0]!.resource?.path).toBe(resourcePath);
+    expect(afterCatalog.tools[0]!.resource?.path).toBe(resourcePath);
   });
 
   it("emits atomic half-open temporal exclusion enforcement", async () => {
@@ -937,7 +985,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.39.0'");
+    expect(sql).toContain("'modelVersion', '0.40.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1100,7 +1148,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.39.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.40.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

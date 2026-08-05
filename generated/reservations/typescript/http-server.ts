@@ -36,7 +36,7 @@ interface RuntimeValueType {
 interface OperationDefinition {
   id: ReservationsOperationId;
   route: string;
-  endpoint: "execution" | "applicability";
+  endpoint: "execution" | "applicability" | "resource";
   input: readonly { name: string; type: RuntimeValueType; optional?: true }[];
   sorting?: { input: "sort"; defaultProfile: "default"; profiles: readonly { name: string }[] };
   output:
@@ -189,6 +189,70 @@ const operationDefinitions = [
       "cardinality": "one"
     },
     "action": true,
+    "idempotency": "unsupported"
+  },
+  {
+    "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+    "route": "/agent/resources/queries/qry_94d8a56f4c2640fab58a4c2190c35c69",
+    "endpoint": "resource",
+    "input": [
+      {
+        "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.resource",
+        "name": "resource",
+        "type": {
+          "kind": "entity",
+          "entityId": "entity:ent_7cb2307972954d83a6f344764faaae39"
+        }
+      },
+      {
+        "id": "parameter:query:qry_94d8a56f4c2640fab58a4c2190c35c69.startsAtOrAfter",
+        "name": "startsAtOrAfter",
+        "type": {
+          "kind": "scalar",
+          "name": "DateTime"
+        },
+        "optional": true
+      }
+    ],
+    "output": {
+      "projectionId": "projection:prj_80d694c9a0a274dc79c6168e47d25968",
+      "cardinality": "page",
+      "maxItems": 2,
+      "pagination": {
+        "kind": "cursor",
+        "cursorVersion": 1,
+        "queryRevision": "sha256:23312df0fdb9b20a5017fc04c6d33d8c36a15cba50996185e419265746099d9a",
+        "cursorInput": "cursor"
+      }
+    },
+    "sorting": {
+      "input": "sort",
+      "defaultProfile": "default",
+      "profiles": [
+        {
+          "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.default",
+          "name": "default",
+          "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "direction": "asc",
+          "identityTieBreaker": true
+        },
+        {
+          "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.latestFirst",
+          "name": "latestFirst",
+          "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
+          "direction": "desc",
+          "identityTieBreaker": true
+        },
+        {
+          "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.endingSoonest",
+          "name": "endingSoonest",
+          "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
+          "direction": "asc",
+          "identityTieBreaker": true
+        }
+      ]
+    },
+    "action": false,
     "idempotency": "unsupported"
   }
 ] as unknown as readonly OperationDefinition[];
@@ -375,6 +439,7 @@ export type ReservationsAuthenticator = (
 export interface ReservationsHttpHandlerOptions {
   basePath?: string;
   maxBodyBytes?: number;
+  now?: () => Date;
 }
 
 export function createReservationsDatabaseExecutor(
@@ -723,6 +788,7 @@ export function createReservationsHttpHandler(
 ): (request: Request) => Promise<Response> {
   const basePath = options.basePath?.replace(/\/$/, "") ?? "";
   const maxBodyBytes = options.maxBodyBytes ?? 1_048_576;
+  const now = options.now ?? (() => new Date());
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
     const subjectCapabilityRequest = path === `${basePath}/agent/capabilities`;
@@ -787,8 +853,8 @@ export function createReservationsHttpHandler(
         const view: ReservationsSubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 2,
-          model: {"id":"model:Reservations","name":"Reservations","version":"0.39.0","sourceHash":"sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"},
+          catalogVersion: 3,
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.40.0","sourceHash":"sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -810,6 +876,47 @@ export function createReservationsHttpHandler(
           unavailable,
         };
         return Response.json(view, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+      if (definition!.endpoint === "resource") {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by agent resources", "ML_VALIDATION", "agent:resource");
+          }
+        }
+        const input = validateInput(definition!, body);
+        const data = await executor.execute(definition!.id, input, {});
+        validateOutput(definition!, data);
+        const resource = {
+          $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+          resourceVersion: 1 as const,
+          catalogVersion: 3 as const,
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.40.0","sourceHash":"sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"},
+          operationId: definition!.id,
+          kind: "queryResult" as const,
+          authority: "none" as const,
+          view: {
+            audience: "agent" as const,
+            subjectSpecific: true as const,
+            authorizationFiltered: true as const,
+            containsCurrentState: true as const,
+            containsInput: false as const,
+            containsAuthenticatedIdentity: false as const,
+            containsExtensions: false as const,
+            grantsAuthority: false as const,
+            runtimeAuthorizationRequired: true as const,
+          },
+          freshness: {
+            mode: "pointInTime" as const,
+            retrievedAt: now().toISOString(),
+            maxAgeSeconds: 0 as const,
+            revalidate: "beforeReuse" as const,
+          },
+          data,
+        };
+        return Response.json(resource, {
           status: 200,
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });

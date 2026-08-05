@@ -10,7 +10,7 @@
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/subject-capability-view.schema.json" },
     "viewVersion": { "const": 1 },
-    "catalogVersion": { "const": 2 },
+    "catalogVersion": { "const": 3 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
