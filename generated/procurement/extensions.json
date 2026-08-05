@@ -1,15 +1,15 @@
 {
   "$schema": "https://modellang.dev/schemas/extension-ledger.schema.json",
   "ledgerVersion": 1,
-  "compilerVersion": "0.44.0",
+  "compilerVersion": "0.45.0",
   "irVersion": 1,
   "audience": "engineering",
   "public": false,
   "executable": false,
   "model": {
     "id": "model:Procurement",
-    "version": "0.44.0",
-    "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+    "version": "0.45.0",
+    "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
   },
   "extensions": [
     {

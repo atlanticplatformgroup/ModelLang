@@ -6,10 +6,10 @@
   "required": ["$schema", "profileVersion", "compilerVersion", "generatorProfile", "targetProfile", "irVersion", "model", "conformance", "authority", "capabilities", "gaps"],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/target-capability-profile.schema.json" },
-    "profileVersion": { "const": 8 },
+    "profileVersion": { "const": 9 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-public-decision-traces/28" },
-    "targetProfile": { "const": "target:postgresql-http-ui-public-decision-traces/8" },
+    "generatorProfile": { "const": "postgresql-http-ui-extension-tools/29" },
+    "targetProfile": { "const": "target:postgresql-http-ui-extension-tools/9" },
     "irVersion": { "const": 1 },
     "model": {
       "type": "object",

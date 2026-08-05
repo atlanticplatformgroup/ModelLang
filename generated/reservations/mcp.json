@@ -1,18 +1,19 @@
 {
   "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
-  "adapterVersion": 4,
-  "compilerVersion": "0.44.0",
+  "adapterVersion": 5,
+  "compilerVersion": "0.45.0",
   "protocolVersion": "2026-07-28",
-  "catalogVersion": 6,
+  "catalogVersion": 7,
   "resourceEnvelopeVersion": 1,
   "taskPacketVersion": 1,
   "delegatedCapabilityVersion": 1,
   "publicDecisionTraceVersion": 1,
+  "extensionToolResultVersion": 1,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.44.0",
-    "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+    "version": "0.45.0",
+    "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
   },
   "transport": {
     "kind": "streamableHttp",
@@ -64,6 +65,14 @@
       "scope": "applicability",
       "maxAgeSeconds": 0,
       "durableEvidence": false
+    },
+    "extensionTools": {
+      "modelLangContract": true,
+      "hostAdapterRequired": true,
+      "hostAuthorizationRequired": true,
+      "generatedImplementations": 0,
+      "implementationVerification": "hostResponsibility",
+      "testVerification": "hostResponsibility"
     },
     "prompts": false,
     "tasks": false
@@ -229,7 +238,7 @@
           "const": 1
         },
         "catalogVersion": {
-          "const": 6
+          "const": 7
         },
         "resourceVersion": {
           "const": 1
@@ -238,8 +247,8 @@
           "const": {
             "id": "model:Reservations",
             "name": "Reservations",
-            "version": "0.44.0",
-            "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+            "version": "0.45.0",
+            "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
           }
         },
         "packetId": {
@@ -688,14 +697,14 @@
                         "const": 1
                       },
                       "catalogVersion": {
-                        "const": 6
+                        "const": 7
                       },
                       "model": {
                         "const": {
                           "id": "model:Reservations",
                           "name": "Reservations",
-                          "version": "0.44.0",
-                          "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+                          "version": "0.45.0",
+                          "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
                         }
                       },
                       "operationId": {
@@ -962,14 +971,14 @@
           "const": 1
         },
         "catalogVersion": {
-          "const": 6
+          "const": 7
         },
         "model": {
           "const": {
             "id": "model:Reservations",
             "name": "Reservations",
-            "version": "0.44.0",
-            "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+            "version": "0.45.0",
+            "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
           }
         },
         "grantId": {
@@ -1183,14 +1192,14 @@
               "const": 1
             },
             "catalogVersion": {
-              "const": 6
+              "const": 7
             },
             "model": {
               "const": {
                 "id": "model:Reservations",
                 "name": "Reservations",
-                "version": "0.44.0",
-                "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+                "version": "0.45.0",
+                "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
               }
             },
             "traceId": {
@@ -1855,5 +1864,6 @@
         "grantsAuthority": false
       }
     }
-  ]
+  ],
+  "extensionTools": []
 }

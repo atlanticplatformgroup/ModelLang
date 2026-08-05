@@ -23,6 +23,7 @@ import { generateMcp } from "./mcp.js";
 import { generateTaskPacketSchemas, taskPacketActionContracts } from "./task-packet.js";
 import { generateDelegatedCapabilitySchemas } from "./delegated-capability.js";
 import { generatePublicDecisionTraceSchemas, publicDecisionTraceActionContracts } from "./public-decision-trace.js";
+import { generateAgentExtensionTools } from "./extension-tool.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -35,7 +36,8 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   const uiManifest = generateUiManifest(operationManifest);
   const semanticManifest = generateSemanticManifest(ir, operationManifest);
   const eventManifest = generateEventManifest(ir);
-  const agentToolCatalog = generateAgentToolCatalog(operationManifest, capabilityManifest);
+  const extensionTools = generateAgentExtensionTools(ir);
+  const agentToolCatalog = generateAgentToolCatalog(operationManifest, capabilityManifest, extensionTools);
   const taskPacketSchemas = generateTaskPacketSchemas(agentToolCatalog, operationManifest);
   const delegatedCapabilitySchemas = generateDelegatedCapabilitySchemas(agentToolCatalog);
   const publicDecisionTraceSchemas = generatePublicDecisionTraceSchemas(agentToolCatalog);
@@ -65,6 +67,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     delegatedCapabilitySchemas,
     publicDecisionTraceSchemas,
     publicDecisionTraceActionContracts(agentToolCatalog),
+    extensionTools,
   ));
   Object.assign(files, generateUi(operationManifest, uiManifest));
   files["provenance.json"] = stableJson(generateArtifactProvenance(ir, files));

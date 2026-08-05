@@ -148,7 +148,7 @@ function traceSchema(catalog: AgentToolCatalog, contract: PublicDecisionTraceAct
     properties: {
       $schema: { const: "https://modellang.dev/schemas/public-decision-trace.schema.json" },
       traceVersion: { const: 1 },
-      catalogVersion: { const: 6 },
+      catalogVersion: { const: 7 },
       model: { const: catalog.model },
       traceId: { type: "string", format: "uuid" },
       kind: { const: "applicabilityDecisionTrace" },

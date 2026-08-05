@@ -17,6 +17,7 @@ import {
   DELEGATION_REVOKE_ROUTE_PREFIX,
   PUBLIC_DECISION_TRACE_ROUTE,
 } from "./agent-routes.js";
+import type { AgentExtensionTool } from "./extension-tool.js";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -78,7 +79,7 @@ export type AgentTool =
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 6;
+  catalogVersion: 7;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -89,7 +90,7 @@ export interface AgentToolCatalog {
     authorizationFiltered: false;
     containsExpressions: false;
     containsCurrentState: false;
-    containsExtensions: false;
+    containsExtensions: boolean;
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
   };
@@ -181,7 +182,18 @@ export interface AgentToolCatalog {
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
   };
+  extensionToolAdapter: {
+    version: 1;
+    registration: "hostRequired";
+    authorization: "hostRequired";
+    implementationVerification: "hostResponsibility";
+    testVerification: "hostResponsibility";
+    generatedImplementations: 0;
+    discoveryGrantsAuthority: false;
+    runtimeAuthorizationRequired: true;
+  };
   tools: AgentTool[];
+  extensionTools: AgentExtensionTool[];
 }
 
 function enumValues(manifest: OperationManifest, enumId: string): string[] {
@@ -334,6 +346,7 @@ function execution(operation: ManifestOperation): AgentToolBase["execution"] {
 export function generateAgentToolCatalog(
   manifest: OperationManifest,
   capabilities: CapabilityManifest,
+  extensionTools: readonly AgentExtensionTool[],
 ): AgentToolCatalog {
   const tools = manifest.operations.map((operation): AgentTool => {
     const base: AgentToolBase = {
@@ -391,7 +404,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 6,
+    catalogVersion: 7,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -402,7 +415,7 @@ export function generateAgentToolCatalog(
       authorizationFiltered: false,
       containsExpressions: false,
       containsCurrentState: false,
-      containsExtensions: false,
+      containsExtensions: extensionTools.length > 0,
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,
     },
@@ -487,6 +500,17 @@ export function generateAgentToolCatalog(
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,
     },
+    extensionToolAdapter: {
+      version: 1,
+      registration: "hostRequired",
+      authorization: "hostRequired",
+      implementationVerification: "hostResponsibility",
+      testVerification: "hostResponsibility",
+      generatedImplementations: 0,
+      discoveryGrantsAuthority: false,
+      runtimeAuthorizationRequired: true,
+    },
     tools,
+    extensionTools: extensionTools.map((tool) => structuredClone(tool)),
   };
 }

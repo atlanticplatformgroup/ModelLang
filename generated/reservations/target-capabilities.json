@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
-  "profileVersion": 8,
-  "compilerVersion": "0.44.0",
-  "generatorProfile": "postgresql-http-ui-public-decision-traces/28",
-  "targetProfile": "target:postgresql-http-ui-public-decision-traces/8",
+  "profileVersion": 9,
+  "compilerVersion": "0.45.0",
+  "generatorProfile": "postgresql-http-ui-extension-tools/29",
+  "targetProfile": "target:postgresql-http-ui-extension-tools/9",
   "irVersion": 1,
   "model": {
     "id": "model:Reservations",
-    "version": "0.44.0",
-    "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+    "version": "0.45.0",
+    "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
   },
   "conformance": "complete",
   "authority": "none",
@@ -216,6 +216,18 @@
         "http",
         "mcp",
         "postgresql-applicability"
+      ]
+    },
+    {
+      "id": "agents.extensionToolAdapter",
+      "required": false,
+      "support": "native",
+      "enforcement": [
+        "agent-tool-catalog",
+        "http",
+        "mcp",
+        "host-extension-adapter",
+        "host-contract-tests"
       ]
     },
     {

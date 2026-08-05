@@ -28,6 +28,7 @@ import {
 
 export type ReservationsOperationId = "action:act_508ad810a19d4b79a5009871de5cd26b" | "query:qry_94d8a56f4c2640fab58a4c2190c35c69";
 export type ReservationsActionOperationId = "action:act_508ad810a19d4b79a5009871de5cd26b";
+export type ReservationsExtensionOperationId = never;
 
 interface RuntimeValueType {
   kind: "scalar" | "entity" | "enum" | "enumSet" | "money";
@@ -56,6 +57,17 @@ interface OperationDefinition {
       };
   action: boolean;
   idempotency: "required" | "unsupported";
+}
+
+interface ExtensionDefinition {
+  id: ReservationsExtensionOperationId;
+  name: string;
+  contractRevision: string;
+  route: string;
+  input: readonly { name: string; type: RuntimeValueType; optional: boolean }[];
+  result: { type: RuntimeValueType; optional: boolean };
+  authorization: { declaredContext: "authenticatedCaller" | "serviceIdentity" | "none" };
+  reliability: { deterministic: boolean; idempotent: boolean; retry: "none" | "hostManaged" };
 }
 
 const operationDefinitions = [
@@ -534,10 +546,33 @@ const publicDecisionTraceActionContracts = [
     "revisionRuleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b"
   }
 ] as const;
+const extensionDefinitions = [] as unknown as readonly ExtensionDefinition[];
 
 export interface ReservationsOperationExecutor {
   execute(operationId: ReservationsOperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
   assess(operationId: ReservationsActionOperationId, input: Readonly<Record<string, unknown>>, options?: ApplicabilityOptions): Promise<ApplicabilityDecision>;
+}
+
+export interface ReservationsExtensionInvocationOptions {
+  readonly invocationId: string;
+  readonly contractRevision: string;
+  readonly declaredAuthorizationContext: "authenticatedCaller" | "serviceIdentity" | "none";
+  readonly retry: "none" | "hostManaged";
+}
+
+/**
+ * Host adapter bound to the identity authenticated for this request. supports is
+ * an explicit registration assertion, not compiler verification. authorize must
+ * enforce caller and service policy before invoke crosses the external boundary.
+ */
+export interface ReservationsExtensionRuntime {
+  supports(extensionId: ReservationsExtensionOperationId, contractRevision: string): boolean | Promise<boolean>;
+  authorize(extensionId: ReservationsExtensionOperationId, input: Readonly<Record<string, unknown>>): boolean | Promise<boolean>;
+  invoke(
+    extensionId: ReservationsExtensionOperationId,
+    input: Readonly<Record<string, unknown>>,
+    options: ReservationsExtensionInvocationOptions,
+  ): Promise<unknown>;
 }
 
 export type ReservationsDelegatedCapabilityClaim = Omit<ReservationsDelegatedCapability, "credential" | "view">;
@@ -575,6 +610,7 @@ export interface ReservationsDelegationRuntime {
 export interface ReservationsAuthenticatedContext {
   readonly executor: ReservationsOperationExecutor;
   readonly delegation?: ReservationsDelegationRuntime;
+  readonly extensions?: ReservationsExtensionRuntime;
 }
 
 export type ReservationsAuthenticationResult = ReservationsOperationExecutor | ReservationsAuthenticatedContext;
@@ -690,6 +726,39 @@ function validateInput(
     }
   }
   return input;
+}
+
+function validateExtensionInput(
+  definition: ExtensionDefinition,
+  value: unknown,
+): Readonly<Record<string, unknown>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("Extension input must be a JSON object", "ML_VALIDATION", "extension:input");
+  }
+  const input = value as Record<string, unknown>;
+  const allowed = new Set(definition.input.map((parameter) => parameter.name));
+  if (Object.keys(input).some((name) => !allowed.has(name))) {
+    throw new ValidationError("Extension input contains an unknown property", "ML_VALIDATION", "extension:input");
+  }
+  for (const parameter of definition.input) {
+    const present = Object.hasOwn(input, parameter.name);
+    if (parameter.optional && (!present || input[parameter.name] === null)) continue;
+    if (!present || !validValue(input[parameter.name], parameter.type)) {
+      throw new ValidationError(
+        `Invalid extension input property '${parameter.name}'`,
+        "ML_VALIDATION",
+        `extension:parameter:${parameter.name}`,
+      );
+    }
+  }
+  return input;
+}
+
+function validateExtensionResult(definition: ExtensionDefinition, value: unknown): void {
+  if (value === null && definition.result.optional) return;
+  if (!validValue(value, definition.result.type)) {
+    throw new Error(`Host extension returned an invalid result for '${definition.id}'`);
+  }
 }
 
 function validEntity(value: unknown, entityId: string): boolean {
@@ -1015,11 +1084,11 @@ function validateDelegatedClaim(
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
     && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
-    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 6
+    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === "model:Reservations"
     && model?.name === "Reservations"
-    && model?.version === "0.44.0"
-    && model?.sourceHash === "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+    && model?.version === "0.45.0"
+    && model?.sourceHash === "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
     && Object.keys(model).length === 4
     && validGrantId(claim.grantId)
     && operationDefinitions.some((item) => item.endpoint === "execution" && item.action && item.id === claim.operationId)
@@ -1077,12 +1146,61 @@ export async function invokeReservationsDelegatedCapability(
   return result;
 }
 
+class ExtensionAdapterError extends ModelOperationError {}
+
+export async function invokeReservationsExtension(
+  runtime: ReservationsExtensionRuntime | undefined,
+  extensionId: ReservationsExtensionOperationId,
+  value: unknown,
+): Promise<never> {
+  const definition = extensionDefinitions.find((candidate) => candidate.id === extensionId);
+  if (!definition) {
+    throw new ValidationError("Unknown extension tool", "ML_VALIDATION", "extension:operation");
+  }
+  const input = validateExtensionInput(definition, value);
+  if (!runtime || !await runtime.supports(definition.id, definition.contractRevision)) {
+    throw new ExtensionAdapterError(
+      "The host has not registered this exact extension contract",
+      "ML_EXTENSION_UNAVAILABLE",
+      "extension:registration",
+    );
+  }
+  if (!await runtime.authorize(definition.id, input)) {
+    throw new AuthorizationError("The caller is not authorized for this extension", "ML_EXTENSION_AUTHORIZATION", "extension:authorization");
+  }
+  const result = await runtime.invoke(definition.id, input, {
+    invocationId: globalThis.crypto.randomUUID(),
+    contractRevision: definition.contractRevision,
+    declaredAuthorizationContext: definition.authorization.declaredContext,
+    retry: definition.reliability.retry,
+  });
+  validateExtensionResult(definition, result);
+  return {
+    $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+    extensionToolResultVersion: 1,
+    catalogVersion: 7,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    extensionId: definition.id,
+    contractRevision: definition.contractRevision,
+    kind: "hostExtensionResult",
+    authority: "none",
+    execution: {
+      implementation: "hostProvided",
+      generatedImplementation: false,
+      authorization: "hostEnforced",
+      contractConformance: "hostAsserted",
+      evidence: "hostOwned",
+    },
+    result,
+  } as never;
+}
+
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 6 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+    catalogVersion: 7 as const,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
     operationId: definition.id,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1134,8 +1252,8 @@ export async function assembleReservationsPublicDecisionTrace(
   return {
     $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
-    catalogVersion: 6,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+    catalogVersion: 7,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
     traceId: globalThis.crypto.randomUUID(),
     kind: "applicabilityDecisionTrace",
     operationId: candidate.operationId,
@@ -1205,9 +1323,9 @@ export async function assembleReservationsTaskPacket(
   return {
     $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
-    catalogVersion: 6,
+    catalogVersion: 7,
     resourceVersion: 1,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
     packetId: globalThis.crypto.randomUUID(),
     kind: "boundedTaskContext",
     authority: "none",
@@ -1244,6 +1362,8 @@ function problem(error: unknown): { status: number; body: Record<string, unknown
     status = 415; kind = "unsupported-media-type"; title = "Content-Type must be application/json."; code = "ML_UNSUPPORTED_MEDIA_TYPE";
   } else if (error instanceof AuthenticationError) {
     status = 401; kind = "authentication"; title = "Authentication is required."; code = "ML_AUTHENTICATION";
+  } else if (error instanceof ExtensionAdapterError) {
+    status = 503; kind = "extension-unavailable"; title = "The host extension implementation is unavailable."; code = "ML_EXTENSION_UNAVAILABLE";
   } else if (error instanceof IdentityBindingError) {
     status = 401; kind = "identity-binding"; title = "The authenticated identity is not bound."; code = "ML_IDENTITY_UNBOUND";
   } else if (error instanceof AuthorizationError) {
@@ -1320,33 +1440,34 @@ export function createReservationsHttpHandler(
     const subjectCapabilityRequest = path === `${basePath}/agent/capabilities`;
     const taskPacketRequest = path === `${basePath}/agent/task-packets`;
     const publicDecisionTraceRequest = path === `${basePath}/agent/decision-traces`;
-    const publicDecisionTraceHeaders: Record<string, string> = publicDecisionTraceRequest
+    const extensionDefinition = extensionDefinitions.find((candidate) => `${basePath}${candidate.route}` === path);
+    const agentNoStoreHeaders: Record<string, string> = publicDecisionTraceRequest || extensionDefinition
       ? { "cache-control": "no-store" }
       : {};
     const delegationIssueRequest = path === `${basePath}/agent/delegations`;
     const delegationRevokeMatch = new RegExp(`^${escapeRegExp(basePath)}/agent/delegations/([0-9a-fA-F-]{36})/revoke$`).exec(path);
     const definition = operationDefinitions.find((candidate) => `${basePath}${candidate.route}` === path);
-    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
+    if (!definition && !extensionDefinition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
       && !delegationIssueRequest && !delegationRevokeMatch) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
       return problemResponse(
         new ValidationError("ModelLang HTTP operations require POST", "ML_METHOD_NOT_ALLOWED", "transport:method"),
-        { allow: "POST", ...publicDecisionTraceHeaders },
+        { allow: "POST", ...agentNoStoreHeaders },
       );
     }
     const authorization = request.headers.get("authorization");
     const bearer = authorization && /^Bearer\s+(.+)$/i.exec(authorization)?.[1];
     if (!bearer) return problemResponse(
       new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"),
-      publicDecisionTraceHeaders,
+      agentNoStoreHeaders,
     );
     const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
     if (contentType !== "application/json") {
       return problemResponse(
         new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"),
-        publicDecisionTraceHeaders,
+        agentNoStoreHeaders,
       );
     }
     try {
@@ -1407,8 +1528,8 @@ export function createReservationsHttpHandler(
         const result: ReservationsDelegatedCapability = {
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
-          catalogVersion: 6,
-          model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+          catalogVersion: 7,
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
           inputHash,
@@ -1490,6 +1611,18 @@ export function createReservationsHttpHandler(
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });
       }
+      if (extensionDefinition) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("ModelLang command metadata is not accepted by host extension tools", "ML_VALIDATION", "extension:metadata");
+          }
+        }
+        const result = await invokeReservationsExtension(context.extensions, extensionDefinition.id, body);
+        return Response.json(result, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (publicDecisionTraceRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -1542,8 +1675,8 @@ export function createReservationsHttpHandler(
         const view: ReservationsSubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 6,
-          model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+          catalogVersion: 7,
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -1610,7 +1743,7 @@ export function createReservationsHttpHandler(
         },
       });
     } catch (error) {
-      return problemResponse(error, publicDecisionTraceRequest || delegationIssueRequest || delegationRevokeMatch
+      return problemResponse(error, publicDecisionTraceRequest || extensionDefinition || delegationIssueRequest || delegationRevokeMatch
         || request.headers.has("delegated-capability")
         ? { "cache-control": "no-store" }
         : {});

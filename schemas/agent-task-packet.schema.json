@@ -10,7 +10,7 @@
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-task-packet.schema.json" },
     "packetVersion": { "const": 1 },
-    "catalogVersion": { "const": 6 },
+    "catalogVersion": { "const": 7 },
     "resourceVersion": { "const": 1 },
     "model": { "$ref": "#/$defs/model" },
     "packetId": { "type": "string", "format": "uuid" },
@@ -218,7 +218,7 @@
       "properties": {
         "$schema": { "const": "https://modellang.dev/schemas/agent-resource.schema.json" },
         "resourceVersion": { "const": 1 },
-        "catalogVersion": { "const": 6 },
+        "catalogVersion": { "const": 7 },
         "model": { "$ref": "#/$defs/model" },
         "operationId": { "type": "string", "pattern": "^query:" },
         "kind": { "const": "queryResult" },

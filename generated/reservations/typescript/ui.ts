@@ -11,8 +11,8 @@ export const ReservationsUiManifest = {
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.44.0",
-    "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037",
+    "version": "0.45.0",
+    "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499",
     "label": "Reservations"
   },
   "authentication": {

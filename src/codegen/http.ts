@@ -22,6 +22,7 @@ import type { DelegatedCapabilitySchemas } from "../delegated-capability.js";
 import { DELEGATED_CAPABILITY_CONSTRAINTS, DELEGATED_CAPABILITY_VIEW } from "../delegated-capability.js";
 import type { PublicDecisionTraceActionContract, PublicDecisionTraceSchemas } from "../public-decision-trace.js";
 import { PUBLIC_DECISION_TRACE_CLOSURE, PUBLIC_DECISION_TRACE_VIEW } from "../public-decision-trace.js";
+import type { AgentExtensionTool } from "../extension-tool.js";
 
 export interface HttpOutput {
   "openapi.json": string;
@@ -253,6 +254,7 @@ export function generateOpenApi(
   taskPacketSchemas: TaskPacketSchemas,
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
   publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
+  extensionTools: readonly AgentExtensionTool[],
 ): Record<string, unknown> {
   const actions = manifest.operations.filter((operation) => operation.kind === "action");
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
@@ -573,6 +575,43 @@ export function generateOpenApi(
       },
     },
   ];
+  const extensionPaths = extensionTools.map((tool) => [
+    tool.execution.path,
+    {
+      post: {
+        operationId: tool.id,
+        summary: tool.description,
+        tags: ["Host extension tools"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-extension-contract-version": 1,
+        "x-modellang-extension-contract-revision": tool.contractRevision,
+        "x-modellang-host-adapter-required": true,
+        "x-modellang-generated-implementation": false,
+        "x-modellang-runtime-authorization-required": true,
+        "x-modellang-grants-authority": false,
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: tool.inputSchema } },
+        },
+        responses: {
+          "200": {
+            description: "Host-authorized extension result; implementation conformance and evidence remain host responsibilities",
+            headers: { "Cache-Control": { description: "Host extension results must not be stored by intermediaries", schema: { const: "no-store" } } },
+            content: { "application/json": { schema: tool.outputSchema } },
+          },
+          ...Object.fromEntries(["400", "401", "403", "405", "413", "415", "500"].map((status) => [
+            status,
+            operationResponses(manifest.operations[0]!)[status] ?? operationResponses(manifest.operations[0]!)["500"],
+          ])),
+          "503": {
+            description: "The host has not registered the exact generated extension contract revision",
+            headers: { "Cache-Control": { description: "Extension availability failures must not be stored", schema: { const: "no-store" } } },
+            content: { "application/problem+json": { schema: { $ref: "#/components/schemas/ModelProblem" } } },
+          },
+        },
+      },
+    },
+  ]);
   const paths = Object.fromEntries([
     ...executionPaths,
     ...applicabilityPaths,
@@ -582,6 +621,7 @@ export function generateOpenApi(
     delegationPath,
     delegationRevokePath,
     publicDecisionTracePath,
+    ...extensionPaths,
   ]);
   const safeRuleIds = capabilities.actions.flatMap((action) => [
     action.explanation.authorizationRuleId,
@@ -879,7 +919,38 @@ function returnType(manifest: OperationManifest, operation: ManifestOperation): 
   return operation.output.cardinality === "page" ? `CursorPage<${projection.name}>` : `${projection.name}[]`;
 }
 
-function generateHttpClient(manifest: OperationManifest): string {
+function pascalCase(value: string): string {
+  return value.length ? `${value[0]!.toUpperCase()}${value.slice(1)}` : value;
+}
+
+function schemaTypeScript(schema: unknown): string {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return "unknown";
+  const value = schema as Record<string, unknown>;
+  if (Array.isArray(value.anyOf)) return value.anyOf.map(schemaTypeScript).join(" | ");
+  if (Object.hasOwn(value, "const")) return JSON.stringify(value.const);
+  if (Array.isArray(value.enum)) return value.enum.map((item) => JSON.stringify(item)).join(" | ") || "never";
+  if (value.type === "string") return "string";
+  if (value.type === "integer" || value.type === "number") return "number";
+  if (value.type === "boolean") return "boolean";
+  if (value.type === "null") return "null";
+  if (value.type === "array") return `readonly ${schemaTypeScript(value.items)}[]`;
+  if (value.type === "object") {
+    const properties = value.properties && typeof value.properties === "object" && !Array.isArray(value.properties)
+      ? value.properties as Record<string, unknown>
+      : {};
+    const required = new Set(Array.isArray(value.required) ? value.required as string[] : []);
+    return `{ ${Object.entries(properties).map(([name, property]) =>
+      `readonly ${JSON.stringify(name)}${required.has(name) ? "" : "?"}: ${schemaTypeScript(property)}`,
+    ).join("; ")} }`;
+  }
+  return "unknown";
+}
+
+function extensionClientTypeName(modelName: string, tool: AgentExtensionTool): string {
+  return `${modelName}${pascalCase(tool.name)}Extension`;
+}
+
+function generateHttpClient(manifest: OperationManifest, extensionTools: readonly AgentExtensionTool[]): string {
   const methods = manifest.operations.map((operation) => operation.kind === "action"
     ? `  async ${operation.name}(input: ${operationInputName(operation)}, options: ExecutionOptions = {}): Promise<${returnType(manifest, operation)}> {
     return this.call(${JSON.stringify(operationRoute(operation))}, input, options);
@@ -909,6 +980,38 @@ function generateHttpClient(manifest: OperationManifest): string {
   const taskObservationResults = manifest.operations.filter((operation) => operation.kind === "query").map((operation) =>
     `  | { readonly binding: string; readonly operationId: ${JSON.stringify(operation.id)}; readonly resource: ${manifest.model.name}AgentResource<${returnType(manifest, operation)}, ${JSON.stringify(operation.id)}> }`,
   ).join("\n");
+  const extensionTypes = extensionTools.map((tool) => {
+    const name = extensionClientTypeName(manifest.model.name, tool);
+    const resultSchema = (tool.outputSchema.properties as Record<string, unknown>).result;
+    return `export type ${name}Input = ${schemaTypeScript(tool.inputSchema)};
+
+export interface ${name}Result {
+  readonly $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json";
+  readonly extensionToolResultVersion: 1;
+  readonly catalogVersion: 7;
+  readonly model: ${schemaTypeScript({ type: "object", required: ["id", "name", "version", "sourceHash"], properties: {
+    id: { const: manifest.model.id }, name: { const: manifest.model.name }, version: { const: manifest.model.version }, sourceHash: { const: manifest.model.sourceHash },
+  } })};
+  readonly extensionId: ${JSON.stringify(tool.id)};
+  readonly contractRevision: ${JSON.stringify(tool.contractRevision)};
+  readonly kind: "hostExtensionResult";
+  readonly authority: "none";
+  readonly execution: {
+    readonly implementation: "hostProvided";
+    readonly generatedImplementation: false;
+    readonly authorization: "hostEnforced";
+    readonly contractConformance: "hostAsserted";
+    readonly evidence: "hostOwned";
+  };
+  readonly result: ${schemaTypeScript(resultSchema)};
+}`;
+  }).join("\n\n");
+  const extensionMethods = extensionTools.map((tool) => {
+    const name = extensionClientTypeName(manifest.model.name, tool);
+    return `  async ${tool.name}Extension(input: ${name}Input): Promise<${name}Result> {
+    return this.call(${JSON.stringify(tool.execution.path)}, input);
+  }`;
+  }).join("\n\n");
   return `// Generated by ModelLang. Do not edit.
 import type { ${typeImports(manifest).join(", ")} } from "./types.js";
 import { AuthenticationError, mapHttpProblem } from "./errors.js";
@@ -949,7 +1052,7 @@ export interface ${manifest.model.name}DelegationRequest {
 export interface ${manifest.model.name}DelegatedCapability {
   readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly grantId: string;
   readonly operationId: ${manifest.model.name}DelegatedActionCandidate["operationId"];
@@ -990,7 +1093,7 @@ export interface ${manifest.model.name}DelegationRevocation {
 export interface ${manifest.model.name}PublicDecisionTrace {
   readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly traceId: string;
   readonly kind: "applicabilityDecisionTrace";
@@ -1036,7 +1139,7 @@ export interface ${manifest.model.name}PublicDecisionTrace {
 export interface ${manifest.model.name}SubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -1077,7 +1180,7 @@ export interface ${manifest.model.name}SubjectCapabilityView {
 export interface ${manifest.model.name}AgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -1108,7 +1211,7 @@ ${taskObservationResults || "  never"};
 export interface ${manifest.model.name}AgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -1184,6 +1287,8 @@ export interface ${manifest.model.name}AgentTaskPacket {
   readonly observations: readonly ${manifest.model.name}TaskPacketObservation[];
 }
 
+${extensionTypes}
+
 export class ${manifest.model.name}HttpClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
@@ -1244,6 +1349,8 @@ ${methods}
 ${assessments}
 
 ${resources}
+
+${extensionMethods}
 }
 `;
 }
@@ -1253,6 +1360,7 @@ function generateHttpServer(
   capabilities: CapabilityManifest,
   taskActionContracts: readonly TaskPacketActionContract[],
   publicDecisionTraceActionContracts: readonly PublicDecisionTraceActionContract[],
+  extensionTools: readonly AgentExtensionTool[],
 ): string {
   const definitions = manifest.operations.map((operation) => ({
     id: operation.id,
@@ -1305,6 +1413,20 @@ function generateHttpServer(
   ]));
   const operationIds = manifest.operations.map((operation) => JSON.stringify(operation.id)).join(" | ");
   const actionIds = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => JSON.stringify(operation.id)).join(" | ") || "never";
+  const extensionIds = extensionTools.map((tool) => JSON.stringify(tool.id)).join(" | ") || "never";
+  const extensionResultImports = extensionTools.map((tool) => `${extensionClientTypeName(manifest.model.name, tool)}Result`);
+  const extensionResultUnion = extensionResultImports.join(" | ") || "never";
+  const httpClientImports = [
+    `${manifest.model.name}AgentTaskPacket`,
+    `${manifest.model.name}DelegatedCapability`,
+    `${manifest.model.name}DelegationRequest`,
+    `${manifest.model.name}DelegationRevocation`,
+    `${manifest.model.name}PublicDecisionTrace`,
+    `${manifest.model.name}SubjectCapabilityCandidate`,
+    `${manifest.model.name}SubjectCapabilityView`,
+    `${manifest.model.name}TaskPacketRequest`,
+    ...extensionResultImports,
+  ];
   const inputImports = manifest.operations.map(operationInputName);
   const dispatch = manifest.operations.map((operation) => operation.kind === "action"
     ? `      case ${JSON.stringify(operation.id)}: return client.${operation.name}(input as unknown as ${operationInputName(operation)}, options);`
@@ -1320,14 +1442,7 @@ function generateHttpServer(
   return `// Generated by ModelLang. Do not edit.
 import type { ${[...inputImports, "ApplicabilityDecision", "ApplicabilityOptions", "ExecutionOptions"].join(", ")} } from "./types.js";
 import type {
-  ${manifest.model.name}AgentTaskPacket,
-  ${manifest.model.name}DelegatedCapability,
-  ${manifest.model.name}DelegationRequest,
-  ${manifest.model.name}DelegationRevocation,
-  ${manifest.model.name}PublicDecisionTrace,
-  ${manifest.model.name}SubjectCapabilityCandidate,
-  ${manifest.model.name}SubjectCapabilityView,
-  ${manifest.model.name}TaskPacketRequest,
+${httpClientImports.map((name) => `  ${name},`).join("\n")}
 } from "./http-client.js";
 import { ${manifest.model.name}Client } from "./client.js";
 import {
@@ -1347,6 +1462,7 @@ import {
 
 export type ${manifest.model.name}OperationId = ${operationIds};
 export type ${manifest.model.name}ActionOperationId = ${actionIds};
+export type ${manifest.model.name}ExtensionOperationId = ${extensionIds};
 
 interface RuntimeValueType {
   kind: "scalar" | "entity" | "enum" | "enumSet" | "money";
@@ -1377,6 +1493,17 @@ interface OperationDefinition {
   idempotency: "required" | "unsupported";
 }
 
+interface ExtensionDefinition {
+  id: ${manifest.model.name}ExtensionOperationId;
+  name: string;
+  contractRevision: string;
+  route: string;
+  input: readonly { name: string; type: RuntimeValueType; optional: boolean }[];
+  result: { type: RuntimeValueType; optional: boolean };
+  authorization: { declaredContext: "authenticatedCaller" | "serviceIdentity" | "none" };
+  reliability: { deterministic: boolean; idempotent: boolean; retry: "none" | "hostManaged" };
+}
+
 const operationDefinitions = ${JSON.stringify(definitions, null, 2)} as unknown as readonly OperationDefinition[];
 const enumValues = ${JSON.stringify(enumValues, null, 2)} as Readonly<Record<string, readonly string[]>>;
 const entityDefinitions = ${JSON.stringify(entityDefinitions, null, 2)} as Readonly<Record<
@@ -1393,10 +1520,42 @@ const safeExplanations = ${JSON.stringify(safeExplanations, null, 2)} as Readonl
 >>;
 const taskActionContracts = ${JSON.stringify(taskActionContracts, null, 2)} as Readonly<Record<string, unknown>[]>;
 const publicDecisionTraceActionContracts = ${JSON.stringify(publicDecisionTraceActionContracts, null, 2)} as const;
+const extensionDefinitions = ${JSON.stringify(extensionTools.map((tool) => ({
+    id: tool.id,
+    name: tool.name,
+    contractRevision: tool.contractRevision,
+    route: tool.execution.path,
+    input: tool.input,
+    result: tool.result,
+    authorization: { declaredContext: tool.authorization.declaredContext },
+    reliability: tool.reliability,
+  })), null, 2)} as unknown as readonly ExtensionDefinition[];
 
 export interface ${manifest.model.name}OperationExecutor {
   execute(operationId: ${manifest.model.name}OperationId, input: Readonly<Record<string, unknown>>, options?: ExecutionOptions): Promise<unknown>;
   assess(operationId: ${manifest.model.name}ActionOperationId, input: Readonly<Record<string, unknown>>, options?: ApplicabilityOptions): Promise<ApplicabilityDecision>;
+}
+
+export interface ${manifest.model.name}ExtensionInvocationOptions {
+  readonly invocationId: string;
+  readonly contractRevision: string;
+  readonly declaredAuthorizationContext: "authenticatedCaller" | "serviceIdentity" | "none";
+  readonly retry: "none" | "hostManaged";
+}
+
+/**
+ * Host adapter bound to the identity authenticated for this request. supports is
+ * an explicit registration assertion, not compiler verification. authorize must
+ * enforce caller and service policy before invoke crosses the external boundary.
+ */
+export interface ${manifest.model.name}ExtensionRuntime {
+  supports(extensionId: ${manifest.model.name}ExtensionOperationId, contractRevision: string): boolean | Promise<boolean>;
+  authorize(extensionId: ${manifest.model.name}ExtensionOperationId, input: Readonly<Record<string, unknown>>): boolean | Promise<boolean>;
+  invoke(
+    extensionId: ${manifest.model.name}ExtensionOperationId,
+    input: Readonly<Record<string, unknown>>,
+    options: ${manifest.model.name}ExtensionInvocationOptions,
+  ): Promise<unknown>;
 }
 
 export type ${manifest.model.name}DelegatedCapabilityClaim = Omit<${manifest.model.name}DelegatedCapability, "credential" | "view">;
@@ -1434,6 +1593,7 @@ export interface ${manifest.model.name}DelegationRuntime {
 export interface ${manifest.model.name}AuthenticatedContext {
   readonly executor: ${manifest.model.name}OperationExecutor;
   readonly delegation?: ${manifest.model.name}DelegationRuntime;
+  readonly extensions?: ${manifest.model.name}ExtensionRuntime;
 }
 
 export type ${manifest.model.name}AuthenticationResult = ${manifest.model.name}OperationExecutor | ${manifest.model.name}AuthenticatedContext;
@@ -1548,6 +1708,39 @@ function validateInput(
     }
   }
   return input;
+}
+
+function validateExtensionInput(
+  definition: ExtensionDefinition,
+  value: unknown,
+): Readonly<Record<string, unknown>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("Extension input must be a JSON object", "ML_VALIDATION", "extension:input");
+  }
+  const input = value as Record<string, unknown>;
+  const allowed = new Set(definition.input.map((parameter) => parameter.name));
+  if (Object.keys(input).some((name) => !allowed.has(name))) {
+    throw new ValidationError("Extension input contains an unknown property", "ML_VALIDATION", "extension:input");
+  }
+  for (const parameter of definition.input) {
+    const present = Object.hasOwn(input, parameter.name);
+    if (parameter.optional && (!present || input[parameter.name] === null)) continue;
+    if (!present || !validValue(input[parameter.name], parameter.type)) {
+      throw new ValidationError(
+        \`Invalid extension input property '\${parameter.name}'\`,
+        "ML_VALIDATION",
+        \`extension:parameter:\${parameter.name}\`,
+      );
+    }
+  }
+  return input;
+}
+
+function validateExtensionResult(definition: ExtensionDefinition, value: unknown): void {
+  if (value === null && definition.result.optional) return;
+  if (!validValue(value, definition.result.type)) {
+    throw new Error(\`Host extension returned an invalid result for '\${definition.id}'\`);
+  }
 }
 
 function validEntity(value: unknown, entityId: string): boolean {
@@ -1873,7 +2066,7 @@ function validateDelegatedClaim(
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
     && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
-    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 6
+    && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === ${JSON.stringify(manifest.model.id)}
     && model?.name === ${JSON.stringify(manifest.model.name)}
     && model?.version === ${JSON.stringify(manifest.model.version)}
@@ -1935,11 +2128,60 @@ export async function invoke${manifest.model.name}DelegatedCapability(
   return result;
 }
 
+class ExtensionAdapterError extends ModelOperationError {}
+
+export async function invoke${manifest.model.name}Extension(
+  runtime: ${manifest.model.name}ExtensionRuntime | undefined,
+  extensionId: ${manifest.model.name}ExtensionOperationId,
+  value: unknown,
+): Promise<${extensionResultUnion}> {
+  const definition = extensionDefinitions.find((candidate) => candidate.id === extensionId);
+  if (!definition) {
+    throw new ValidationError("Unknown extension tool", "ML_VALIDATION", "extension:operation");
+  }
+  const input = validateExtensionInput(definition, value);
+  if (!runtime || !await runtime.supports(definition.id, definition.contractRevision)) {
+    throw new ExtensionAdapterError(
+      "The host has not registered this exact extension contract",
+      "ML_EXTENSION_UNAVAILABLE",
+      "extension:registration",
+    );
+  }
+  if (!await runtime.authorize(definition.id, input)) {
+    throw new AuthorizationError("The caller is not authorized for this extension", "ML_EXTENSION_AUTHORIZATION", "extension:authorization");
+  }
+  const result = await runtime.invoke(definition.id, input, {
+    invocationId: globalThis.crypto.randomUUID(),
+    contractRevision: definition.contractRevision,
+    declaredAuthorizationContext: definition.authorization.declaredContext,
+    retry: definition.reliability.retry,
+  });
+  validateExtensionResult(definition, result);
+  return {
+    $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+    extensionToolResultVersion: 1,
+    catalogVersion: 7,
+    model: ${JSON.stringify(manifest.model)},
+    extensionId: definition.id,
+    contractRevision: definition.contractRevision,
+    kind: "hostExtensionResult",
+    authority: "none",
+    execution: {
+      implementation: "hostProvided",
+      generatedImplementation: false,
+      authorization: "hostEnforced",
+      contractConformance: "hostAsserted",
+      evidence: "hostOwned",
+    },
+    result,
+  } as ${extensionResultUnion};
+}
+
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 6 as const,
+    catalogVersion: 7 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.id,
     kind: "queryResult" as const,
@@ -1992,7 +2234,7 @@ export async function assemble${manifest.model.name}PublicDecisionTrace(
   return {
     $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
-    catalogVersion: 6,
+    catalogVersion: 7,
     model: ${JSON.stringify(manifest.model)},
     traceId: globalThis.crypto.randomUUID(),
     kind: "applicabilityDecisionTrace",
@@ -2063,7 +2305,7 @@ export async function assemble${manifest.model.name}TaskPacket(
   return {
     $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
-    catalogVersion: 6,
+    catalogVersion: 7,
     resourceVersion: 1,
     model: ${JSON.stringify(manifest.model)},
     packetId: globalThis.crypto.randomUUID(),
@@ -2102,6 +2344,8 @@ function problem(error: unknown): { status: number; body: Record<string, unknown
     status = 415; kind = "unsupported-media-type"; title = "Content-Type must be application/json."; code = "ML_UNSUPPORTED_MEDIA_TYPE";
   } else if (error instanceof AuthenticationError) {
     status = 401; kind = "authentication"; title = "Authentication is required."; code = "ML_AUTHENTICATION";
+  } else if (error instanceof ExtensionAdapterError) {
+    status = 503; kind = "extension-unavailable"; title = "The host extension implementation is unavailable."; code = "ML_EXTENSION_UNAVAILABLE";
   } else if (error instanceof IdentityBindingError) {
     status = 401; kind = "identity-binding"; title = "The authenticated identity is not bound."; code = "ML_IDENTITY_UNBOUND";
   } else if (error instanceof AuthorizationError) {
@@ -2178,33 +2422,34 @@ export function create${manifest.model.name}HttpHandler(
     const subjectCapabilityRequest = path === \`\${basePath}${SUBJECT_CAPABILITY_ROUTE}\`;
     const taskPacketRequest = path === \`\${basePath}${TASK_PACKET_ROUTE}\`;
     const publicDecisionTraceRequest = path === \`\${basePath}${PUBLIC_DECISION_TRACE_ROUTE}\`;
-    const publicDecisionTraceHeaders: Record<string, string> = publicDecisionTraceRequest
+    const extensionDefinition = extensionDefinitions.find((candidate) => \`\${basePath}\${candidate.route}\` === path);
+    const agentNoStoreHeaders: Record<string, string> = publicDecisionTraceRequest || extensionDefinition
       ? { "cache-control": "no-store" }
       : {};
     const delegationIssueRequest = path === \`\${basePath}${DELEGATION_ROUTE}\`;
     const delegationRevokeMatch = new RegExp(\`^\${escapeRegExp(basePath)}${DELEGATION_REVOKE_ROUTE_PREFIX}([0-9a-fA-F-]{36})/revoke$\`).exec(path);
     const definition = operationDefinitions.find((candidate) => \`\${basePath}\${candidate.route}\` === path);
-    if (!definition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
+    if (!definition && !extensionDefinition && !subjectCapabilityRequest && !taskPacketRequest && !publicDecisionTraceRequest
       && !delegationIssueRequest && !delegationRevokeMatch) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
       return problemResponse(
         new ValidationError("ModelLang HTTP operations require POST", "ML_METHOD_NOT_ALLOWED", "transport:method"),
-        { allow: "POST", ...publicDecisionTraceHeaders },
+        { allow: "POST", ...agentNoStoreHeaders },
       );
     }
     const authorization = request.headers.get("authorization");
     const bearer = authorization && /^Bearer\\s+(.+)$/i.exec(authorization)?.[1];
     if (!bearer) return problemResponse(
       new AuthenticationError("Bearer authentication is required", "ML_AUTHENTICATION"),
-      publicDecisionTraceHeaders,
+      agentNoStoreHeaders,
     );
     const contentType = request.headers.get("content-type")?.split(";", 1)[0]?.trim().toLowerCase();
     if (contentType !== "application/json") {
       return problemResponse(
         new ValidationError("Content-Type must be application/json", "ML_UNSUPPORTED_MEDIA_TYPE", "transport:content_type"),
-        publicDecisionTraceHeaders,
+        agentNoStoreHeaders,
       );
     }
     try {
@@ -2265,7 +2510,7 @@ export function create${manifest.model.name}HttpHandler(
         const result: ${manifest.model.name}DelegatedCapability = {
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
-          catalogVersion: 6,
+          catalogVersion: 7,
           model: ${JSON.stringify(manifest.model)},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
@@ -2348,6 +2593,18 @@ export function create${manifest.model.name}HttpHandler(
           headers: { "content-type": "application/json", "cache-control": "no-store" },
         });
       }
+      if (extensionDefinition) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("ModelLang command metadata is not accepted by host extension tools", "ML_VALIDATION", "extension:metadata");
+          }
+        }
+        const result = await invoke${manifest.model.name}Extension(context.extensions, extensionDefinition.id, body);
+        return Response.json(result, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
       if (publicDecisionTraceRequest) {
         for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
           if (request.headers.has(header)) {
@@ -2400,7 +2657,7 @@ export function create${manifest.model.name}HttpHandler(
         const view: ${manifest.model.name}SubjectCapabilityView = {
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
-          catalogVersion: 6,
+          catalogVersion: 7,
           model: ${JSON.stringify(manifest.model)},
           view: {
             audience: "agent",
@@ -2468,7 +2725,7 @@ export function create${manifest.model.name}HttpHandler(
         },
       });
     } catch (error) {
-      return problemResponse(error, publicDecisionTraceRequest || delegationIssueRequest || delegationRevokeMatch
+      return problemResponse(error, publicDecisionTraceRequest || extensionDefinition || delegationIssueRequest || delegationRevokeMatch
         || request.headers.has("delegated-capability")
         ? { "cache-control": "no-store" }
         : {});
@@ -2486,11 +2743,12 @@ export function generateHttp(
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
   publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
   publicDecisionTraceActionContracts: readonly PublicDecisionTraceActionContract[],
+  extensionTools: readonly AgentExtensionTool[],
 ): HttpOutput {
   return {
-    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities, taskPacketSchemas, delegatedCapabilitySchemas, publicDecisionTraceSchemas), null, 2)}\n`,
-    "typescript/http-client.ts": generateHttpClient(manifest),
-    "typescript/http-server.ts": generateHttpServer(manifest, capabilities, taskActionContracts, publicDecisionTraceActionContracts),
+    "openapi.json": `${JSON.stringify(generateOpenApi(manifest, capabilities, taskPacketSchemas, delegatedCapabilitySchemas, publicDecisionTraceSchemas, extensionTools), null, 2)}\n`,
+    "typescript/http-client.ts": generateHttpClient(manifest, extensionTools),
+    "typescript/http-server.ts": generateHttpServer(manifest, capabilities, taskActionContracts, publicDecisionTraceActionContracts, extensionTools),
     "typescript/browser.ts": `export * from "./types.js";
 export {
   ModelOperationError,

@@ -1,18 +1,19 @@
 {
   "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
-  "adapterVersion": 4,
-  "compilerVersion": "0.44.0",
+  "adapterVersion": 5,
+  "compilerVersion": "0.45.0",
   "protocolVersion": "2026-07-28",
-  "catalogVersion": 6,
+  "catalogVersion": 7,
   "resourceEnvelopeVersion": 1,
   "taskPacketVersion": 1,
   "delegatedCapabilityVersion": 1,
   "publicDecisionTraceVersion": 1,
+  "extensionToolResultVersion": 1,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.44.0",
-    "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+    "version": "0.45.0",
+    "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
   },
   "transport": {
     "kind": "streamableHttp",
@@ -64,6 +65,14 @@
       "scope": "applicability",
       "maxAgeSeconds": 0,
       "durableEvidence": false
+    },
+    "extensionTools": {
+      "modelLangContract": true,
+      "hostAdapterRequired": true,
+      "hostAuthorizationRequired": true,
+      "generatedImplementations": 0,
+      "implementationVerification": "hostResponsibility",
+      "testVerification": "hostResponsibility"
     },
     "prompts": false,
     "tasks": false
@@ -263,7 +272,7 @@
           "const": 1
         },
         "catalogVersion": {
-          "const": 6
+          "const": 7
         },
         "resourceVersion": {
           "const": 1
@@ -272,8 +281,8 @@
           "const": {
             "id": "model:Procurement",
             "name": "Procurement",
-            "version": "0.44.0",
-            "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+            "version": "0.45.0",
+            "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
           }
         },
         "packetId": {
@@ -1477,14 +1486,14 @@
                         "const": 1
                       },
                       "catalogVersion": {
-                        "const": 6
+                        "const": 7
                       },
                       "model": {
                         "const": {
                           "id": "model:Procurement",
                           "name": "Procurement",
-                          "version": "0.44.0",
-                          "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                          "version": "0.45.0",
+                          "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                         }
                       },
                       "operationId": {
@@ -1823,14 +1832,14 @@
           "const": 1
         },
         "catalogVersion": {
-          "const": 6
+          "const": 7
         },
         "model": {
           "const": {
             "id": "model:Procurement",
             "name": "Procurement",
-            "version": "0.44.0",
-            "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+            "version": "0.45.0",
+            "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
           }
         },
         "grantId": {
@@ -2112,14 +2121,14 @@
               "const": 1
             },
             "catalogVersion": {
-              "const": 6
+              "const": 7
             },
             "model": {
               "const": {
                 "id": "model:Procurement",
                 "name": "Procurement",
-                "version": "0.44.0",
-                "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                "version": "0.45.0",
+                "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
               }
             },
             "traceId": {
@@ -2558,14 +2567,14 @@
               "const": 1
             },
             "catalogVersion": {
-              "const": 6
+              "const": 7
             },
             "model": {
               "const": {
                 "id": "model:Procurement",
                 "name": "Procurement",
-                "version": "0.44.0",
-                "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                "version": "0.45.0",
+                "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
               }
             },
             "traceId": {
@@ -3004,14 +3013,14 @@
               "const": 1
             },
             "catalogVersion": {
-              "const": 6
+              "const": 7
             },
             "model": {
               "const": {
                 "id": "model:Procurement",
                 "name": "Procurement",
-                "version": "0.44.0",
-                "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                "version": "0.45.0",
+                "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
               }
             },
             "traceId": {
@@ -3950,6 +3959,108 @@
           "maxAgeSeconds": 0,
           "revalidate": "beforeReuse"
         },
+        "grantsAuthority": false
+      }
+    }
+  ],
+  "extensionTools": [
+    {
+      "name": "ext_54d694c9a0a274dc79c6168e47d25968",
+      "operationId": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      "authoredName": "supplierRiskReview",
+      "kind": "extension",
+      "description": "Invoke the host-provided supplierRiskReview extension contract. The implementation, authorization, tests, and effects remain host responsibilities.",
+      "contractVersion": 1,
+      "contractRevision": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request",
+          "requestedBy"
+        ],
+        "properties": {
+          "request": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedBy": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "extensionToolResultVersion",
+          "catalogVersion",
+          "model",
+          "extensionId",
+          "contractRevision",
+          "kind",
+          "authority",
+          "execution",
+          "result"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/extension-tool-result.schema.json"
+          },
+          "extensionToolResultVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 7
+          },
+          "model": {
+            "const": {
+              "id": "model:Procurement",
+              "name": "Procurement",
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
+            }
+          },
+          "extensionId": {
+            "const": "extension:ext_54d694c9a0a274dc79c6168e47d25968"
+          },
+          "contractRevision": {
+            "const": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099"
+          },
+          "kind": {
+            "const": "hostExtensionResult"
+          },
+          "authority": {
+            "const": "none"
+          },
+          "execution": {
+            "const": {
+              "implementation": "hostProvided",
+              "generatedImplementation": false,
+              "authorization": "hostEnforced",
+              "contractConformance": "hostAsserted",
+              "evidence": "hostOwned"
+            }
+          },
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "implementation": "hostAdapterRequired",
+        "generatedImplementation": false,
+        "runtimeAuthorizationRequired": true,
         "grantsAuthority": false
       }
     }

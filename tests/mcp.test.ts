@@ -1,4 +1,5 @@
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -9,6 +10,7 @@ import {
 import type {
   ProcurementDelegatedCapabilityClaim,
   ProcurementDelegationRuntime,
+  ProcurementExtensionRuntime,
 } from "../generated/procurement/typescript/http-server.js";
 
 const endpoint = new URL("https://mcp.example.test/mcp");
@@ -17,6 +19,8 @@ const queryId = "query:qry_4406b045404a48449282db804f6167a8" as const;
 const queryToolName = "qry_4406b045404a48449282db804f6167a8";
 const actionId = "action:act_1e35db0451b1461e941af6283d86dca2" as const;
 const actionToolName = "act_1e35db0451b1461e941af6283d86dca2";
+const extensionId = "extension:ext_54d694c9a0a274dc79c6168e47d25968" as const;
+const extensionToolName = "ext_54d694c9a0a274dc79c6168e47d25968";
 const retrievedAt = "2026-08-04T20:00:00.000Z";
 
 function authInfo(token = "valid-token") {
@@ -47,7 +51,7 @@ afterEach(async () => {
 });
 
 describe("generated MCP adapter", () => {
-  it("serves catalog v6 tools, task packets, and public decision traces with exact JSON schemas", async () => {
+  it("serves catalog v7 core and extension tools with exact JSON schemas", async () => {
     const execute = vi.fn(async () => []);
     const authenticate = vi.fn<ProcurementMcpAuthenticator>(async () => ({
       authInfo: authInfo(),
@@ -72,12 +76,14 @@ describe("generated MCP adapter", () => {
       taskPacket: { name: string; inputSchema: object; outputSchema: object };
       publicDecisionTrace: { name: string; inputSchema: object; outputSchema: object };
       tools: { name: string; inputSchema: object; outputSchema: object }[];
+      extensionTools: { name: string; inputSchema: object; outputSchema: object }[];
     };
     expect(result.tools.map((tool) => tool.name)).toEqual([
       "act_1e35db0451b1461e941af6283d86dca2",
       "act_ed2374e822704c51a2925338253d05d2",
       "act_d39dbb883b5f4019b9027b85add3de47",
       queryToolName,
+      extensionToolName,
       "modellang_task_packet",
       "modellang_public_decision_trace",
     ]);
@@ -86,7 +92,8 @@ describe("generated MCP adapter", () => {
         ? manifest.taskPacket
         : tool.name === manifest.publicDecisionTrace.name
           ? manifest.publicDecisionTrace
-          : manifest.tools.find((candidate) => candidate.name === tool.name)!;
+          : manifest.extensionTools.find((candidate) => candidate.name === tool.name)
+            ?? manifest.tools.find((candidate) => candidate.name === tool.name)!;
       expect(tool.inputSchema).toEqual(binding.inputSchema);
       expect(tool.outputSchema).toEqual(binding.outputSchema);
     }
@@ -118,6 +125,29 @@ describe("generated MCP adapter", () => {
       $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
       additionalProperties: false,
+    });
+    const extension = result.tools.find((tool) => tool.name === extensionToolName)!;
+    expect(extension).toMatchObject({
+      name: extensionToolName,
+      title: "supplierRiskReview",
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+      _meta: {
+        "dev.modellang/kind": "extension",
+        "dev.modellang/operationId": extensionId,
+        "dev.modellang/extensionContractVersion": 1,
+        "dev.modellang/extensionContractRevision": expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        "dev.modellang/hostAdapterRequired": true,
+        "dev.modellang/generatedImplementation": false,
+        "dev.modellang/implementationVerification": "hostResponsibility",
+        "dev.modellang/testVerification": "hostResponsibility",
+        "dev.modellang/grantsAuthority": false,
+        "dev.modellang/runtimeAuthorizationRequired": true,
+      },
     });
     expect(authenticate).toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
@@ -161,8 +191,8 @@ describe("generated MCP adapter", () => {
     );
     expect(envelope).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 6,
-      model: { id: "model:Procurement", version: "0.44.0" },
+      catalogVersion: 7,
+      model: { id: "model:Procurement", version: "0.45.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -320,7 +350,7 @@ describe("generated MCP adapter", () => {
     expect(result.isError, JSON.stringify(result)).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
       traceVersion: 1,
-      catalogVersion: 6,
+      catalogVersion: 7,
       kind: "applicabilityDecisionTrace",
       operationId: actionId,
       authority: "none",
@@ -410,12 +440,12 @@ describe("generated MCP adapter", () => {
     const claim: ProcurementDelegatedCapabilityClaim = {
       $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
       delegatedCapabilityVersion: 1,
-      catalogVersion: 6,
+      catalogVersion: 7,
       model: {
         id: "model:Procurement",
         name: "Procurement",
-        version: "0.44.0",
-        sourceHash: "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61",
+        version: "0.45.0",
+        sourceHash: "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0",
       },
       grantId,
       operationId: actionId,
@@ -526,6 +556,100 @@ describe("generated MCP adapter", () => {
     });
     expect(callerMetadata.isError).toBe(true);
     expect(invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("invokes extension tools only through an exact, authorized host adapter", async () => {
+    const input = {
+      request: "00000000-0000-4000-8000-000000000010",
+      requestedBy: "00000000-0000-4000-8000-000000000001",
+    };
+    const supports = vi.fn<ProcurementExtensionRuntime["supports"]>(async () => true);
+    const authorize = vi.fn<ProcurementExtensionRuntime["authorize"]>(async () => true);
+    const invoke = vi.fn<ProcurementExtensionRuntime["invoke"]>(async () => true);
+    const handler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute: vi.fn(), assess: vi.fn() },
+      extensions: { supports, authorize, invoke },
+    }), {
+      resourceServerUrl: endpoint.href,
+      now: () => new Date(retrievedAt),
+    });
+    const { client, transport } = createClient((requestInput, init) => handler.fetch(new Request(requestInput, init)));
+    closeables.push(client, handler);
+    await client.connect(transport);
+
+    const result = await client.callTool({ name: extensionToolName, arguments: input });
+    expect(result.isError, JSON.stringify(result)).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+      extensionToolResultVersion: 1,
+      catalogVersion: 7,
+      extensionId,
+      contractRevision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      kind: "hostExtensionResult",
+      authority: "none",
+      execution: {
+        implementation: "hostProvided",
+        generatedImplementation: false,
+        authorization: "hostEnforced",
+        contractConformance: "hostAsserted",
+        evidence: "hostOwned",
+      },
+      result: true,
+    });
+    expect(result.content).toHaveLength(1);
+    expect(result.content[0]?.type).toBe("text");
+    expect(result._meta).toMatchObject({
+      "dev.modellang/cacheControl": "no-store",
+      "dev.modellang/hostAdapterRequired": true,
+      "dev.modellang/generatedImplementation": false,
+      "dev.modellang/grantsAuthority": false,
+    });
+    const envelope = result.structuredContent as { contractRevision: string };
+    expect(supports).toHaveBeenCalledWith(extensionId, envelope.contractRevision);
+    expect(authorize).toHaveBeenCalledWith(extensionId, input);
+    expect(invoke).toHaveBeenCalledWith(extensionId, input, {
+      invocationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      contractRevision: envelope.contractRevision,
+      declaredAuthorizationContext: "serviceIdentity",
+      retry: "hostManaged",
+    });
+
+    const extensionSchema = JSON.parse(await readFile("schemas/extension-tool-result.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true } }).compile(extensionSchema);
+    expect(validate(result.structuredContent), JSON.stringify(validate.errors)).toBe(true);
+
+    const metadata = await client.callTool({
+      name: extensionToolName,
+      arguments: input,
+      _meta: { "dev.modellang/idempotencyKey": "caller-owned-command" },
+    });
+    expect(metadata.isError).toBe(true);
+    const delegated = await client.callTool({
+      name: extensionToolName,
+      arguments: input,
+      _meta: { "dev.modellang/delegatedCapability": "not-valid-for-extensions" },
+    });
+    expect(delegated.isError).toBe(true);
+    expect(invoke).toHaveBeenCalledTimes(1);
+
+    authorize.mockResolvedValueOnce(false);
+    expect((await client.callTool({ name: extensionToolName, arguments: input })).isError).toBe(true);
+    supports.mockResolvedValueOnce(false);
+    expect((await client.callTool({ name: extensionToolName, arguments: input })).isError).toBe(true);
+    invoke.mockResolvedValueOnce("not-a-boolean");
+    expect((await client.callTool({ name: extensionToolName, arguments: input })).isError).toBe(true);
+
+    const missingHandler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute: vi.fn(), assess: vi.fn() },
+    }), { resourceServerUrl: endpoint.href, now: () => new Date(retrievedAt) });
+    const missingClient = createClient((requestInput, init) => missingHandler.fetch(new Request(requestInput, init)));
+    closeables.push(missingClient.client, missingHandler);
+    await missingClient.client.connect(missingClient.transport);
+    const unavailable = await missingClient.client.callTool({ name: extensionToolName, arguments: input });
+    expect(unavailable.isError).toBe(true);
+    expect(JSON.stringify(unavailable.content)).toContain("ML_EXTENSION_UNAVAILABLE");
   });
 
   it("authenticates every protocol request and rejects expired or wrong-audience tokens", async () => {

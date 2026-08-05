@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.45.0
+
+- Added catalog v7 extension-tool bindings for declared external extensions, with stable IDs, exact closed input schemas, exact result-envelope schemas, opaque semantic contract revisions, declared authorization context, conservative effects/reliability annotations, and explicit host responsibility.
+- Added generated authenticated HTTP routes and typed client methods plus a request-bound host adapter that must affirm the exact contract revision, authorize every validated invocation, provide the implementation, and return a schema-valid result.
+- Added MCP adapter v5 registration of extension tools under stable ID suffixes while keeping them separate from core action/query tools, resources, task packets, delegated capabilities, and public traces.
+- Added extension tool result v1 with model/extension/revision identity, `authority: none`, explicit host-provided implementation/conformance/evidence markers, and no-store HTTP/MCP behavior; extension results are not current-state resources and produce no MCP embedded resource.
+- Failed closed for missing or revision-mismatched adapters, host denial, malformed inputs, invalid host results, command metadata, and delegated credentials; discovery and successful invocation grant no ModelLang action authority.
+- Preserved extension ledger v1 as private and non-executable with zero generated implementations and retained every external implementation target gap; ModelLang does not verify host implementation, effects, evidence, or tests.
+- Added standalone/catalog/MCP schemas, OpenAPI, generated TypeScript, specification, whitepaper status, deterministic goldens, adversarial unit coverage, and live PostgreSQL HTTP/MCP composition tests.
+- Advanced compiler/examples to 0.45.0, catalog to v7, MCP adapter to v5, target capability profile to v9, target to `target:postgresql-http-ui-extension-tools/9`, and generator profile to `postgresql-http-ui-extension-tools/29`; canonical IR1, extension ledger v1, public decision trace v1, delegated capability v1, task packet v1, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.44.0
 
 - Added public decision trace v1 as an authenticated, exact-input explanation of current action applicability through generated `POST /agent/decision-traces` clients/servers and the read-only MCP tool `modellang_public_decision_trace`.

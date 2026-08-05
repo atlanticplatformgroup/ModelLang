@@ -5,19 +5,20 @@
   "type": "object",
   "required": [
     "$schema", "adapterVersion", "compilerVersion", "protocolVersion",
-    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "delegatedCapabilityVersion", "publicDecisionTraceVersion", "model", "transport",
-    "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "publicDecisionTrace", "tools"
+    "catalogVersion", "resourceEnvelopeVersion", "taskPacketVersion", "delegatedCapabilityVersion", "publicDecisionTraceVersion", "extensionToolResultVersion", "model", "transport",
+    "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "publicDecisionTrace", "tools", "extensionTools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
-    "adapterVersion": { "const": 4 },
+    "adapterVersion": { "const": 5 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },
-    "catalogVersion": { "const": 6 },
+    "catalogVersion": { "const": 7 },
     "resourceEnvelopeVersion": { "const": 1 },
     "taskPacketVersion": { "const": 1 },
     "delegatedCapabilityVersion": { "const": 1 },
     "publicDecisionTraceVersion": { "const": 1 },
+    "extensionToolResultVersion": { "const": 1 },
     "model": { "$ref": "#/$defs/model" },
     "transport": {
       "type": "object",
@@ -59,7 +60,7 @@
     },
     "capabilities": {
       "type": "object",
-      "required": ["tools", "embeddedResources", "taskPackets", "delegatedCapabilities", "publicDecisionTraces", "prompts", "tasks"],
+      "required": ["tools", "embeddedResources", "taskPackets", "delegatedCapabilities", "publicDecisionTraces", "extensionTools", "prompts", "tasks"],
       "properties": {
         "tools": {
           "type": "object",
@@ -116,6 +117,22 @@
           },
           "additionalProperties": false
         },
+        "extensionTools": {
+          "type": "object",
+          "required": [
+            "modelLangContract", "hostAdapterRequired", "hostAuthorizationRequired", "generatedImplementations",
+            "implementationVerification", "testVerification"
+          ],
+          "properties": {
+            "modelLangContract": { "const": true },
+            "hostAdapterRequired": { "const": true },
+            "hostAuthorizationRequired": { "const": true },
+            "generatedImplementations": { "const": 0 },
+            "implementationVerification": { "const": "hostResponsibility" },
+            "testVerification": { "const": "hostResponsibility" }
+          },
+          "additionalProperties": false
+        },
         "prompts": { "const": false },
         "tasks": { "const": false }
       },
@@ -127,6 +144,10 @@
     "tools": {
       "type": "array",
       "items": { "$ref": "#/$defs/tool" }
+    },
+    "extensionTools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/extensionTool" }
     }
   },
   "additionalProperties": false,
@@ -368,6 +389,47 @@
           }
         }
       ],
+      "additionalProperties": false
+    },
+    "extensionTool": {
+      "type": "object",
+      "required": [
+        "name", "operationId", "authoredName", "kind", "description", "contractVersion", "contractRevision",
+        "inputSchema", "outputSchema", "annotations", "execution"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^ext_[0-9a-f]{32}$" },
+        "operationId": { "type": "string", "pattern": "^extension:ext_[0-9a-f]{32}$" },
+        "authoredName": { "type": "string", "minLength": 1 },
+        "kind": { "const": "extension" },
+        "description": { "type": "string", "minLength": 1 },
+        "contractVersion": { "const": 1 },
+        "contractRevision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "inputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "outputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "annotations": {
+          "type": "object",
+          "required": ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"],
+          "properties": {
+            "readOnlyHint": { "type": "boolean" },
+            "destructiveHint": { "type": "boolean" },
+            "idempotentHint": { "type": "boolean" },
+            "openWorldHint": { "const": true }
+          },
+          "additionalProperties": false
+        },
+        "execution": {
+          "type": "object",
+          "required": ["implementation", "generatedImplementation", "runtimeAuthorizationRequired", "grantsAuthority"],
+          "properties": {
+            "implementation": { "const": "hostAdapterRequired" },
+            "generatedImplementation": { "const": false },
+            "runtimeAuthorizationRequired": { "const": true },
+            "grantsAuthority": { "const": false }
+          },
+          "additionalProperties": false
+        }
+      },
       "additionalProperties": false
     }
   }

@@ -40,16 +40,41 @@ interface McpToolBinding {
   };
 }
 
+interface McpExtensionToolBinding {
+  name: string;
+  operationId: string;
+  authoredName: string;
+  kind: "extension";
+  description: string;
+  contractVersion: 1;
+  contractRevision: string;
+  inputSchema: JsonSchema;
+  outputSchema: JsonSchema;
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    idempotentHint: boolean;
+    openWorldHint: true;
+  };
+  execution: {
+    implementation: "hostAdapterRequired";
+    generatedImplementation: false;
+    runtimeAuthorizationRequired: true;
+    grantsAuthority: false;
+  };
+}
+
 export interface McpAdapterManifest {
   $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
-  adapterVersion: 4;
+  adapterVersion: 5;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
-  catalogVersion: 6;
+  catalogVersion: 7;
   resourceEnvelopeVersion: 1;
   taskPacketVersion: 1;
   delegatedCapabilityVersion: 1;
   publicDecisionTraceVersion: 1;
+  extensionToolResultVersion: 1;
   model: AgentToolCatalog["model"];
   transport: {
     kind: "streamableHttp";
@@ -98,6 +123,14 @@ export interface McpAdapterManifest {
       scope: "applicability";
       maxAgeSeconds: 0;
       durableEvidence: false;
+    };
+    extensionTools: {
+      modelLangContract: true;
+      hostAdapterRequired: true;
+      hostAuthorizationRequired: true;
+      generatedImplementations: 0;
+      implementationVerification: "hostResponsibility";
+      testVerification: "hostResponsibility";
     };
     prompts: false;
     tasks: false;
@@ -158,6 +191,7 @@ export interface McpAdapterManifest {
     };
   };
   tools: McpToolBinding[];
+  extensionTools: McpExtensionToolBinding[];
 }
 
 function stableMcpName(operationId: string): string {
@@ -177,7 +211,7 @@ export function generateMcpAdapterManifest(
 ): McpAdapterManifest {
   return {
     $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
-    adapterVersion: 4,
+    adapterVersion: 5,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
     catalogVersion: catalog.catalogVersion,
@@ -185,6 +219,7 @@ export function generateMcpAdapterManifest(
     taskPacketVersion: 1,
     delegatedCapabilityVersion: 1,
     publicDecisionTraceVersion: 1,
+    extensionToolResultVersion: 1,
     model: { ...catalog.model },
     transport: {
       kind: "streamableHttp",
@@ -233,6 +268,14 @@ export function generateMcpAdapterManifest(
         scope: "applicability",
         maxAgeSeconds: 0,
         durableEvidence: false,
+      },
+      extensionTools: {
+        modelLangContract: true,
+        hostAdapterRequired: true,
+        hostAuthorizationRequired: true,
+        generatedImplementations: 0,
+        implementationVerification: "hostResponsibility",
+        testVerification: "hostResponsibility",
       },
       prompts: false,
       tasks: false,
@@ -326,6 +369,29 @@ export function generateMcpAdapterManifest(
         },
       } : {}),
     })),
+    extensionTools: catalog.extensionTools.map((tool): McpExtensionToolBinding => ({
+      name: stableMcpName(tool.id),
+      operationId: tool.id,
+      authoredName: tool.name,
+      kind: "extension",
+      description: tool.description,
+      contractVersion: 1,
+      contractRevision: tool.contractRevision,
+      inputSchema: structuredClone(tool.inputSchema),
+      outputSchema: structuredClone(tool.outputSchema),
+      annotations: {
+        readOnlyHint: tool.annotations.readOnly,
+        destructiveHint: tool.annotations.destructive,
+        idempotentHint: tool.annotations.idempotent,
+        openWorldHint: true,
+      },
+      execution: {
+        implementation: "hostAdapterRequired",
+        generatedImplementation: false,
+        runtimeAuthorizationRequired: true,
+        grantsAuthority: false,
+      },
+    })),
   };
 }
 
@@ -347,9 +413,12 @@ import type { ExecutionOptions } from "./types.js";
 import {
   assemble${modelName}PublicDecisionTrace,
   assemble${modelName}TaskPacket,
+  invoke${modelName}Extension,
   invoke${modelName}DelegatedCapability,
   type ${modelName}ActionOperationId,
   type ${modelName}DelegationRuntime,
+  type ${modelName}ExtensionOperationId,
+  type ${modelName}ExtensionRuntime,
   type ${modelName}OperationExecutor,
   type ${modelName}OperationId,
 } from "./http-server.js";
@@ -386,7 +455,9 @@ const toolDefinitions = ${JSON.stringify(manifest.tools.map((tool) => ({
     outputSchema: tool.outputSchema,
     annotations: tool.annotations,
     executionMetadata: { idempotency: tool.executionMetadata.idempotency },
-  })), null, 2)} as const satisfies readonly McpToolDefinition[];
+})), null, 2)} as const satisfies readonly McpToolDefinition[];
+
+const extensionToolDefinitions = ${JSON.stringify(manifest.extensionTools, null, 2)} as const;
 
 const taskPacketDefinition = ${JSON.stringify(manifest.taskPacket, null, 2)} as const;
 const delegatedCapabilityDefinition = ${JSON.stringify(manifest.delegatedCapabilities, null, 2)} as const;
@@ -404,6 +475,7 @@ export interface ${modelName}AuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ${modelName}OperationExecutor;
   readonly delegation?: ${modelName}DelegationRuntime;
+  readonly extensions?: ${modelName}ExtensionRuntime;
 }
 
 export type ${modelName}McpAuthenticator = (
@@ -460,7 +532,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 6 as const,
+    catalogVersion: 7 as const,
     model: ${JSON.stringify(manifest.model)},
     operationId: definition.operationId,
     kind: "queryResult" as const,
@@ -504,6 +576,7 @@ function safeToolError(error: unknown): CallToolResult {
 function build${modelName}McpServer(
   executor: ${modelName}OperationExecutor,
   delegation: ${modelName}DelegationRuntime | undefined,
+  extensions: ${modelName}ExtensionRuntime | undefined,
   delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
@@ -511,7 +584,7 @@ function build${modelName}McpServer(
   const server = new McpServer(
     { name: ${JSON.stringify(`${modelName}-ModelLang`)}, version: ${JSON.stringify(manifest.model.version)} },
     {
-      instructions: "Tool discovery, task packets, and public applicability traces grant no authority. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
+      instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -597,6 +670,57 @@ function build${modelName}McpServer(
               "dev.modellang/resourceUri": uri,
               "dev.modellang/cacheControl": "no-store",
               "dev.modellang/maxAgeSeconds": 0,
+            },
+          };
+        } catch (error) {
+          if (!(error instanceof ModelOperationError)) {
+            onerror?.(error instanceof Error ? error : new Error(String(error)));
+          }
+          return safeToolError(error);
+        }
+      },
+    );
+  }
+  for (const definition of extensionToolDefinitions) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.authoredName,
+        description: definition.description,
+        inputSchema: fromJsonSchema<Record<string, unknown>>(definition.inputSchema),
+        outputSchema: fromJsonSchema<unknown>(definition.outputSchema),
+        annotations: definition.annotations,
+        _meta: {
+          "dev.modellang/kind": "extension",
+          "dev.modellang/operationId": definition.operationId,
+          "dev.modellang/extensionContractVersion": 1,
+          "dev.modellang/extensionContractRevision": definition.contractRevision,
+          "dev.modellang/hostAdapterRequired": true,
+          "dev.modellang/generatedImplementation": false,
+          "dev.modellang/implementationVerification": "hostResponsibility",
+          "dev.modellang/testVerification": "hostResponsibility",
+          "dev.modellang/grantsAuthority": false,
+          "dev.modellang/runtimeAuthorizationRequired": true,
+        },
+      },
+      async (input, ctx): Promise<CallToolResult> => {
+        try {
+          if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+            throw new ValidationError("ModelLang command or delegated metadata is not accepted by host extension tools", "ML_VALIDATION", "extension:metadata");
+          }
+          const result = await invoke${modelName}Extension(
+            extensions,
+            definition.operationId as ${modelName}ExtensionOperationId,
+            input,
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result as never,
+            _meta: {
+              "dev.modellang/cacheControl": "no-store",
+              "dev.modellang/hostAdapterRequired": true,
+              "dev.modellang/generatedImplementation": false,
+              "dev.modellang/grantsAuthority": false,
             },
           };
         } catch (error) {
@@ -782,7 +906,7 @@ export function create${modelName}McpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const contexts = new WeakMap<AuthInfo, { executor: ${modelName}OperationExecutor; delegation?: ${modelName}DelegationRuntime }>();
+  const contexts = new WeakMap<AuthInfo, { executor: ${modelName}OperationExecutor; delegation?: ${modelName}DelegationRuntime; extensions?: ${modelName}ExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
@@ -791,6 +915,7 @@ export function create${modelName}McpHandler(
       return build${modelName}McpServer(
         authenticated.executor,
         authenticated.delegation,
+        authenticated.extensions,
         resourceServerUrl.href,
         now,
         options.onerror,
@@ -831,6 +956,7 @@ export function create${modelName}McpHandler(
       contexts.set(authInfo, {
         executor: authenticated.executor,
         ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+        ...(authenticated.extensions ? { extensions: authenticated.extensions } : {}),
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });

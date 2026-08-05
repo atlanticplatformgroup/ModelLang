@@ -10,6 +10,7 @@ import {
   type ProcurementDelegatedCapabilityClaim,
   type ProcurementDelegationIssueRequest,
   type ProcurementDelegationRuntime,
+  type ProcurementExtensionRuntime,
   type ProcurementOperationExecutor,
 } from "../generated/procurement/typescript/http-server.js";
 import {
@@ -24,6 +25,7 @@ import {
 } from "../generated/reservations/typescript/http-server.js";
 
 const openRoute = "https://example.test/operations/actions/act_1e35db0451b1461e941af6283d86dca2";
+const extensionRoute = "https://example.test/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968";
 const purchaseRequest = {
   id: "00000000-0000-4000-8000-000000000010",
   createdAt: "2026-07-30T12:00:00Z",
@@ -345,7 +347,7 @@ describe("generated HTTP boundary", () => {
     expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
     expect(view).toMatchObject({
       viewVersion: 1,
-      catalogVersion: 6,
+      catalogVersion: 7,
       model: { id: "model:Procurement" },
       view: {
         subjectSpecific: true,
@@ -440,8 +442,8 @@ describe("generated HTTP boundary", () => {
 
     expect(resource).toMatchObject({
       resourceVersion: 1,
-      catalogVersion: 6,
-      model: { id: "model:Procurement", version: "0.44.0" },
+      catalogVersion: 7,
+      model: { id: "model:Procurement", version: "0.45.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",
@@ -527,9 +529,9 @@ describe("generated HTTP boundary", () => {
 
     expect(packet).toMatchObject({
       packetVersion: 1,
-      catalogVersion: 6,
+      catalogVersion: 7,
       resourceVersion: 1,
-      model: { id: "model:Procurement", version: "0.44.0" },
+      model: { id: "model:Procurement", version: "0.45.0" },
       kind: "boundedTaskContext",
       authority: "none",
       view: {
@@ -675,8 +677,8 @@ describe("generated HTTP boundary", () => {
 
     expect(applicable).toMatchObject({
       traceVersion: 1,
-      catalogVersion: 6,
-      model: { id: "model:Procurement", version: "0.44.0" },
+      catalogVersion: 7,
+      model: { id: "model:Procurement", version: "0.45.0" },
       kind: "applicabilityDecisionTrace",
       operationId,
       authority: "none",
@@ -854,7 +856,7 @@ describe("generated HTTP boundary", () => {
     });
     expect(capability).toMatchObject({
       delegatedCapabilityVersion: 1,
-      catalogVersion: 6,
+      catalogVersion: 7,
       grantId,
       operationId: applicableDecision.operationId,
       authority: "delegated",
@@ -958,6 +960,128 @@ describe("generated HTTP boundary", () => {
     claim = expiringClaim;
     currentTime = new Date(currentTime.getTime() + 1_000);
     await expect(delegate.openRequest(delegatedInput)).rejects.toBeInstanceOf(AuthorizationError);
+  });
+
+  it("invokes an exact host extension contract with host authorization and fail-closed registration", async () => {
+    const input = {
+      request: "00000000-0000-4000-8000-000000000010",
+      requestedBy: "00000000-0000-4000-8000-000000000001",
+    };
+    const supports = vi.fn<ProcurementExtensionRuntime["supports"]>(async () => true);
+    const authorize = vi.fn<ProcurementExtensionRuntime["authorize"]>(async () => true);
+    const invoke = vi.fn<ProcurementExtensionRuntime["invoke"]>(async () => true);
+    const extensions = { supports, authorize, invoke } satisfies ProcurementExtensionRuntime;
+    const executor = { execute: vi.fn(), assess } satisfies ProcurementOperationExecutor;
+    const handler = createProcurementHttpHandler(async () => ({ executor, extensions }));
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "valid",
+      fetch: (requestInput, init) => handler(new Request(requestInput, init)),
+    });
+
+    const result = await client.supplierRiskReviewExtension(input);
+    expect(result).toMatchObject({
+      $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+      extensionToolResultVersion: 1,
+      catalogVersion: 7,
+      model: { id: "model:Procurement", name: "Procurement", version: "0.45.0" },
+      extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      contractRevision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      kind: "hostExtensionResult",
+      authority: "none",
+      execution: {
+        implementation: "hostProvided",
+        generatedImplementation: false,
+        authorization: "hostEnforced",
+        contractConformance: "hostAsserted",
+        evidence: "hostOwned",
+      },
+      result: true,
+    });
+    expect(supports).toHaveBeenCalledWith(result.extensionId, result.contractRevision);
+    expect(authorize).toHaveBeenCalledWith(result.extensionId, input);
+    expect(invoke).toHaveBeenCalledWith(result.extensionId, input, {
+      invocationId: expect.stringMatching(/^[0-9a-f-]{36}$/),
+      contractRevision: result.contractRevision,
+      declaredAuthorizationContext: "serviceIdentity",
+      retry: "hostManaged",
+    });
+    expect(executor.execute).not.toHaveBeenCalled();
+
+    const raw = await handler(new Request(
+      extensionRoute,
+      {
+        method: "POST",
+        headers: { authorization: "Bearer valid", "content-type": "application/json" },
+        body: JSON.stringify(input),
+      },
+    ));
+    expect(raw.status).toBe(200);
+    expect(raw.headers.get("cache-control")).toBe("no-store");
+
+    const schema = JSON.parse(await readFile("schemas/extension-tool-result.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true } }).compile(schema);
+    expect(validate(result), JSON.stringify(validate.errors)).toBe(true);
+
+    const malformed = await handler(new Request(extensionRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify({ ...input, actor: input.requestedBy }),
+    }));
+    expect(malformed.status).toBe(400);
+    expect(malformed.headers.get("cache-control")).toBe("no-store");
+
+    const metadata = await handler(new Request(extensionRoute, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer valid",
+        "content-type": "application/json",
+        "idempotency-key": "caller-command-metadata",
+      },
+      body: JSON.stringify(input),
+    }));
+    expect(metadata.status).toBe(400);
+
+    const missing = createProcurementHttpHandler(async () => executor);
+    const unavailable = await missing(new Request(extensionRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify(input),
+    }));
+    expect(unavailable.status).toBe(503);
+    expect(unavailable.headers.get("cache-control")).toBe("no-store");
+    expect(await unavailable.json()).toMatchObject({ code: "ML_EXTENSION_UNAVAILABLE" });
+
+    supports.mockResolvedValueOnce(false);
+    const wrongRevision = await handler(new Request(extensionRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify(input),
+    }));
+    expect(wrongRevision.status).toBe(503);
+    authorize.mockResolvedValueOnce(false);
+    const denied = await handler(new Request(extensionRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify(input),
+    }));
+    expect(denied.status).toBe(403);
+
+    const invalidResultHandler = createProcurementHttpHandler(async () => ({
+      executor,
+      extensions: {
+        supports: async () => true,
+        authorize: async () => true,
+        invoke: async () => "not-a-boolean",
+      },
+    }));
+    const invalidResult = await invalidResultHandler(new Request(extensionRoute, {
+      method: "POST",
+      headers: { authorization: "Bearer valid", "content-type": "application/json" },
+      body: JSON.stringify(input),
+    }));
+    expect(invalidResult.status).toBe(500);
+    expect(JSON.stringify(await invalidResult.json())).not.toContain("not-a-boolean");
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {

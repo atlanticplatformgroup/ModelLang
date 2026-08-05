@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.44.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61)."
+    "version": "0.45.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1106,10 +1106,10 @@
                           "const": "Procurement"
                         },
                         "version": {
-                          "const": "0.44.0"
+                          "const": "0.45.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                          "const": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                         }
                       }
                     },
@@ -2448,6 +2448,217 @@
           }
         }
       }
+    },
+    "/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968": {
+      "post": {
+        "operationId": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+        "summary": "Invoke the host-provided supplierRiskReview extension contract. The implementation, authorization, tests, and effects remain host responsibilities.",
+        "tags": [
+          "Host extension tools"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-extension-contract-version": 1,
+        "x-modellang-extension-contract-revision": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099",
+        "x-modellang-host-adapter-required": true,
+        "x-modellang-generated-implementation": false,
+        "x-modellang-runtime-authorization-required": true,
+        "x-modellang-grants-authority": false,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "request",
+                  "requestedBy"
+                ],
+                "properties": {
+                  "request": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "requestedBy": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Host-authorized extension result; implementation conformance and evidence remain host responsibilities",
+            "headers": {
+              "Cache-Control": {
+                "description": "Host extension results must not be stored by intermediaries",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$schema": "https://json-schema.org/draft/2020-12/schema",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "$schema",
+                    "extensionToolResultVersion",
+                    "catalogVersion",
+                    "model",
+                    "extensionId",
+                    "contractRevision",
+                    "kind",
+                    "authority",
+                    "execution",
+                    "result"
+                  ],
+                  "properties": {
+                    "$schema": {
+                      "const": "https://modellang.dev/schemas/extension-tool-result.schema.json"
+                    },
+                    "extensionToolResultVersion": {
+                      "const": 1
+                    },
+                    "catalogVersion": {
+                      "const": 7
+                    },
+                    "model": {
+                      "const": {
+                        "id": "model:Procurement",
+                        "name": "Procurement",
+                        "version": "0.45.0",
+                        "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
+                      }
+                    },
+                    "extensionId": {
+                      "const": "extension:ext_54d694c9a0a274dc79c6168e47d25968"
+                    },
+                    "contractRevision": {
+                      "const": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099"
+                    },
+                    "kind": {
+                      "const": "hostExtensionResult"
+                    },
+                    "authority": {
+                      "const": "none"
+                    },
+                    "execution": {
+                      "const": {
+                        "implementation": "hostProvided",
+                        "generatedImplementation": false,
+                        "authorization": "hostEnforced",
+                        "contractConformance": "hostAsserted",
+                        "evidence": "hostOwned"
+                      }
+                    },
+                    "result": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The authenticated caller is not authorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The host has not registered the exact generated extension contract revision",
+            "headers": {
+              "Cache-Control": {
+                "description": "Extension availability failures must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2954,7 +3165,7 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "resourceVersion": {
             "const": 1
@@ -2963,8 +3174,8 @@
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.44.0",
-              "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
             }
           },
           "packetId": {
@@ -4168,14 +4379,14 @@
                           "const": 1
                         },
                         "catalogVersion": {
-                          "const": 6
+                          "const": 7
                         },
                         "model": {
                           "const": {
                             "id": "model:Procurement",
                             "name": "Procurement",
-                            "version": "0.44.0",
-                            "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                            "version": "0.45.0",
+                            "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                           }
                         },
                         "operationId": {
@@ -4347,14 +4558,14 @@
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "model": {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.44.0",
-              "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
             }
           },
           "grantId": {
@@ -4477,14 +4688,14 @@
                 "const": 1
               },
               "catalogVersion": {
-                "const": 6
+                "const": 7
               },
               "model": {
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.44.0",
-                  "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                  "version": "0.45.0",
+                  "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                 }
               },
               "traceId": {
@@ -4923,14 +5134,14 @@
                 "const": 1
               },
               "catalogVersion": {
-                "const": 6
+                "const": 7
               },
               "model": {
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.44.0",
-                  "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                  "version": "0.45.0",
+                  "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                 }
               },
               "traceId": {
@@ -5369,14 +5580,14 @@
                 "const": 1
               },
               "catalogVersion": {
-                "const": 6
+                "const": 7
               },
               "model": {
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.44.0",
-                  "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                  "version": "0.45.0",
+                  "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                 }
               },
               "traceId": {
@@ -5831,10 +6042,10 @@
                 "const": "Procurement"
               },
               "version": {
-                "const": "0.44.0"
+                "const": "0.45.0"
               },
               "sourceHash": {
-                "const": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                "const": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
               }
             }
           },

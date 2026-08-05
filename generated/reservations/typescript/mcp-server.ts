@@ -14,9 +14,12 @@ import type { ExecutionOptions } from "./types.js";
 import {
   assembleReservationsPublicDecisionTrace,
   assembleReservationsTaskPacket,
+  invokeReservationsExtension,
   invokeReservationsDelegatedCapability,
   type ReservationsActionOperationId,
   type ReservationsDelegationRuntime,
+  type ReservationsExtensionOperationId,
+  type ReservationsExtensionRuntime,
   type ReservationsOperationExecutor,
   type ReservationsOperationId,
 } from "./http-server.js";
@@ -253,6 +256,8 @@ const toolDefinitions = [
   }
 ] as const satisfies readonly McpToolDefinition[];
 
+const extensionToolDefinitions = [] as const;
+
 const taskPacketDefinition = {
   "name": "modellang_task_packet",
   "kind": "taskPacketAssembler",
@@ -414,7 +419,7 @@ const taskPacketDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 6
+        "const": 7
       },
       "resourceVersion": {
         "const": 1
@@ -423,8 +428,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.44.0",
-          "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+          "version": "0.45.0",
+          "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
         }
       },
       "packetId": {
@@ -873,14 +878,14 @@ const taskPacketDefinition = {
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 6
+                      "const": 7
                     },
                     "model": {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.44.0",
-                        "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+                        "version": "0.45.0",
+                        "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
                       }
                     },
                     "operationId": {
@@ -1147,14 +1152,14 @@ const delegatedCapabilityDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 6
+        "const": 7
       },
       "model": {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.44.0",
-          "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+          "version": "0.45.0",
+          "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
         }
       },
       "grantId": {
@@ -1368,14 +1373,14 @@ const publicDecisionTraceDefinition = {
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "model": {
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.44.0",
-              "sourceHash": "sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"
+              "version": "0.45.0",
+              "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
             }
           },
           "traceId": {
@@ -1822,6 +1827,7 @@ export interface ReservationsAuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ReservationsOperationExecutor;
   readonly delegation?: ReservationsDelegationRuntime;
+  readonly extensions?: ReservationsExtensionRuntime;
 }
 
 export type ReservationsMcpAuthenticator = (
@@ -1878,8 +1884,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 6 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.44.0","sourceHash":"sha256:54f941510bc17153f3049a1e662ff993718a7d5ef53ecd90f6ae1c6a23449037"},
+    catalogVersion: 7 as const,
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1922,14 +1928,15 @@ function safeToolError(error: unknown): CallToolResult {
 function buildReservationsMcpServer(
   executor: ReservationsOperationExecutor,
   delegation: ReservationsDelegationRuntime | undefined,
+  extensions: ReservationsExtensionRuntime | undefined,
   delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.44.0" },
+    { name: "Reservations-ModelLang", version: "0.45.0" },
     {
-      instructions: "Tool discovery, task packets, and public applicability traces grant no authority. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
+      instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -2015,6 +2022,57 @@ function buildReservationsMcpServer(
               "dev.modellang/resourceUri": uri,
               "dev.modellang/cacheControl": "no-store",
               "dev.modellang/maxAgeSeconds": 0,
+            },
+          };
+        } catch (error) {
+          if (!(error instanceof ModelOperationError)) {
+            onerror?.(error instanceof Error ? error : new Error(String(error)));
+          }
+          return safeToolError(error);
+        }
+      },
+    );
+  }
+  for (const definition of extensionToolDefinitions) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.authoredName,
+        description: definition.description,
+        inputSchema: fromJsonSchema<Record<string, unknown>>(definition.inputSchema),
+        outputSchema: fromJsonSchema<unknown>(definition.outputSchema),
+        annotations: definition.annotations,
+        _meta: {
+          "dev.modellang/kind": "extension",
+          "dev.modellang/operationId": definition.operationId,
+          "dev.modellang/extensionContractVersion": 1,
+          "dev.modellang/extensionContractRevision": definition.contractRevision,
+          "dev.modellang/hostAdapterRequired": true,
+          "dev.modellang/generatedImplementation": false,
+          "dev.modellang/implementationVerification": "hostResponsibility",
+          "dev.modellang/testVerification": "hostResponsibility",
+          "dev.modellang/grantsAuthority": false,
+          "dev.modellang/runtimeAuthorizationRequired": true,
+        },
+      },
+      async (input, ctx): Promise<CallToolResult> => {
+        try {
+          if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+            throw new ValidationError("ModelLang command or delegated metadata is not accepted by host extension tools", "ML_VALIDATION", "extension:metadata");
+          }
+          const result = await invokeReservationsExtension(
+            extensions,
+            definition.operationId as ReservationsExtensionOperationId,
+            input,
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result as never,
+            _meta: {
+              "dev.modellang/cacheControl": "no-store",
+              "dev.modellang/hostAdapterRequired": true,
+              "dev.modellang/generatedImplementation": false,
+              "dev.modellang/grantsAuthority": false,
             },
           };
         } catch (error) {
@@ -2200,7 +2258,7 @@ export function createReservationsMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const contexts = new WeakMap<AuthInfo, { executor: ReservationsOperationExecutor; delegation?: ReservationsDelegationRuntime }>();
+  const contexts = new WeakMap<AuthInfo, { executor: ReservationsOperationExecutor; delegation?: ReservationsDelegationRuntime; extensions?: ReservationsExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
@@ -2209,6 +2267,7 @@ export function createReservationsMcpHandler(
       return buildReservationsMcpServer(
         authenticated.executor,
         authenticated.delegation,
+        authenticated.extensions,
         resourceServerUrl.href,
         now,
         options.onerror,
@@ -2249,6 +2308,7 @@ export function createReservationsMcpHandler(
       contexts.set(authInfo, {
         executor: authenticated.executor,
         ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+        ...(authenticated.extensions ? { extensions: authenticated.extensions } : {}),
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });

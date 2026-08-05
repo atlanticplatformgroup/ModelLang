@@ -44,7 +44,7 @@ export interface ProcurementDelegationRequest {
 export interface ProcurementDelegatedCapability {
   readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly grantId: string;
   readonly operationId: ProcurementDelegatedActionCandidate["operationId"];
@@ -85,7 +85,7 @@ export interface ProcurementDelegationRevocation {
 export interface ProcurementPublicDecisionTrace {
   readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly traceId: string;
   readonly kind: "applicabilityDecisionTrace";
@@ -131,7 +131,7 @@ export interface ProcurementPublicDecisionTrace {
 export interface ProcurementSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -172,7 +172,7 @@ export interface ProcurementSubjectCapabilityView {
 export interface ProcurementAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -203,7 +203,7 @@ export type ProcurementTaskPacketObservation =
 export interface ProcurementAgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -277,6 +277,27 @@ export interface ProcurementAgentTaskPacket {
     readonly applicability: ApplicabilityDecision;
   }[];
   readonly observations: readonly ProcurementTaskPacketObservation[];
+}
+
+export type ProcurementSupplierRiskReviewExtensionInput = { readonly "request": string; readonly "requestedBy": string };
+
+export interface ProcurementSupplierRiskReviewExtensionResult {
+  readonly $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json";
+  readonly extensionToolResultVersion: 1;
+  readonly catalogVersion: 7;
+  readonly model: { readonly "id": "model:Procurement"; readonly "name": "Procurement"; readonly "version": "0.45.0"; readonly "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0" };
+  readonly extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968";
+  readonly contractRevision: "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099";
+  readonly kind: "hostExtensionResult";
+  readonly authority: "none";
+  readonly execution: {
+    readonly implementation: "hostProvided";
+    readonly generatedImplementation: false;
+    readonly authorization: "hostEnforced";
+    readonly contractConformance: "hostAsserted";
+    readonly evidence: "hostOwned";
+  };
+  readonly result: boolean;
 }
 
 export class ProcurementHttpClient {
@@ -364,5 +385,9 @@ export class ProcurementHttpClient {
 
   async readMyRequestsResource(input: MyRequestsInput): Promise<ProcurementAgentResource<RequestSummary[], "query:qry_4406b045404a48449282db804f6167a8">> {
     return this.call("/agent/resources/queries/qry_4406b045404a48449282db804f6167a8", input);
+  }
+
+  async supplierRiskReviewExtension(input: ProcurementSupplierRiskReviewExtensionInput): Promise<ProcurementSupplierRiskReviewExtensionResult> {
+    return this.call("/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968", input);
   }
 }

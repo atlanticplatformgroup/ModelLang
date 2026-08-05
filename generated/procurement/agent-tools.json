@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 6,
-  "compilerVersion": "0.44.0",
+  "catalogVersion": 7,
+  "compilerVersion": "0.45.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.44.0",
-    "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+    "version": "0.45.0",
+    "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
   },
   "view": {
     "audience": "agent",
@@ -16,7 +16,7 @@
     "authorizationFiltered": false,
     "containsExpressions": false,
     "containsCurrentState": false,
-    "containsExtensions": false,
+    "containsExtensions": true,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
   },
@@ -118,6 +118,16 @@
       "revalidate": "beforeReuse"
     },
     "grantsAuthority": false,
+    "runtimeAuthorizationRequired": true
+  },
+  "extensionToolAdapter": {
+    "version": 1,
+    "registration": "hostRequired",
+    "authorization": "hostRequired",
+    "implementationVerification": "hostResponsibility",
+    "testVerification": "hostResponsibility",
+    "generatedImplementations": 0,
+    "discoveryGrantsAuthority": false,
     "runtimeAuthorizationRequired": true
   },
   "tools": [
@@ -738,6 +748,157 @@
         "responseBinding": "canonicalSha256",
         "payloadRetention": "none",
         "revision": "sha256:f232c790851adcfb9b1395335cb412593c83f92ca199f3bc29f832074c4511c7"
+      }
+    }
+  ],
+  "extensionTools": [
+    {
+      "id": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      "name": "supplierRiskReview",
+      "description": "Invoke the host-provided supplierRiskReview extension contract. The implementation, authorization, tests, and effects remain host responsibilities.",
+      "kind": "extension",
+      "contractVersion": 1,
+      "contractRevision": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099",
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request",
+          "requestedBy"
+        ],
+        "properties": {
+          "request": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestedBy": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "extensionToolResultVersion",
+          "catalogVersion",
+          "model",
+          "extensionId",
+          "contractRevision",
+          "kind",
+          "authority",
+          "execution",
+          "result"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/extension-tool-result.schema.json"
+          },
+          "extensionToolResultVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 7
+          },
+          "model": {
+            "const": {
+              "id": "model:Procurement",
+              "name": "Procurement",
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
+            }
+          },
+          "extensionId": {
+            "const": "extension:ext_54d694c9a0a274dc79c6168e47d25968"
+          },
+          "contractRevision": {
+            "const": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099"
+          },
+          "kind": {
+            "const": "hostExtensionResult"
+          },
+          "authority": {
+            "const": "none"
+          },
+          "execution": {
+            "const": {
+              "implementation": "hostProvided",
+              "generatedImplementation": false,
+              "authorization": "hostEnforced",
+              "contractConformance": "hostAsserted",
+              "evidence": "hostOwned"
+            }
+          },
+          "result": {
+            "type": "boolean"
+          }
+        }
+      },
+      "input": [
+        {
+          "name": "request",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_9bc680209327484c8e98f5f740bcc702"
+          },
+          "optional": false
+        },
+        {
+          "name": "requestedBy",
+          "type": {
+            "kind": "entity",
+            "entityId": "entity:ent_66c16684f17e4b4ca79eb7d916cbf725"
+          },
+          "optional": false
+        }
+      ],
+      "result": {
+        "type": {
+          "kind": "scalar",
+          "name": "Boolean"
+        },
+        "optional": false
+      },
+      "execution": {
+        "protocol": "http",
+        "method": "POST",
+        "path": "/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968",
+        "authenticated": true,
+        "implementation": "hostAdapterRequired",
+        "generatedImplementation": false,
+        "runtimeAuthorizationRequired": true
+      },
+      "authorization": {
+        "enforcement": "hostRequired",
+        "declaredContext": "serviceIdentity",
+        "callerInput": false
+      },
+      "effects": {
+        "readsModelState": true,
+        "writesModelState": false,
+        "callsExternalSystems": true,
+        "emitsEvents": false
+      },
+      "reliability": {
+        "deterministic": false,
+        "idempotent": true,
+        "retry": "hostManaged"
+      },
+      "annotations": {
+        "readOnly": false,
+        "destructive": false,
+        "idempotent": true,
+        "openWorld": true
+      },
+      "conformance": {
+        "implementationVerification": "hostResponsibility",
+        "testVerification": "hostResponsibility",
+        "discoveryGrantsAuthority": false,
+        "resultGrantsAuthority": false
       }
     }
   ]

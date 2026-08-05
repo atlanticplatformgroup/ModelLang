@@ -38,7 +38,7 @@ export interface ReservationsDelegationRequest {
 export interface ReservationsDelegatedCapability {
   readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly grantId: string;
   readonly operationId: ReservationsDelegatedActionCandidate["operationId"];
@@ -79,7 +79,7 @@ export interface ReservationsDelegationRevocation {
 export interface ReservationsPublicDecisionTrace {
   readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly traceId: string;
   readonly kind: "applicabilityDecisionTrace";
@@ -125,7 +125,7 @@ export interface ReservationsPublicDecisionTrace {
 export interface ReservationsSubjectCapabilityView {
   readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly view: {
     readonly audience: "agent";
@@ -166,7 +166,7 @@ export interface ReservationsSubjectCapabilityView {
 export interface ReservationsAgentResource<Data, OperationId extends string = string> {
   readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly operationId: OperationId;
   readonly kind: "queryResult";
@@ -197,7 +197,7 @@ export type ReservationsTaskPacketObservation =
 export interface ReservationsAgentTaskPacket {
   readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
-  readonly catalogVersion: 6;
+  readonly catalogVersion: 7;
   readonly resourceVersion: 1;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
   readonly packetId: string;
@@ -273,6 +273,8 @@ export interface ReservationsAgentTaskPacket {
   readonly observations: readonly ReservationsTaskPacketObservation[];
 }
 
+
+
 export class ReservationsHttpClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
@@ -343,4 +345,6 @@ export class ReservationsHttpClient {
   async readReservationsForResourceResource(input: ReservationsForResourceInput): Promise<ReservationsAgentResource<CursorPage<ReservationSummary>, "query:qry_94d8a56f4c2640fab58a4c2190c35c69">> {
     return this.call("/agent/resources/queries/qry_94d8a56f4c2640fab58a4c2190c35c69", input);
   }
+
+
 }

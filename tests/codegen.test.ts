@@ -21,6 +21,26 @@ describe("backends", () => {
     expect(generateAll(ir)).toEqual(generateAll(ir));
   });
 
+  it("binds extension adapters to semantic contract revisions rather than source locations", async () => {
+    const ir = await procurement();
+    const revision = (candidate: typeof ir) => (JSON.parse(generateAll(candidate)["agent-tools.json"]!) as {
+      extensionTools: { contractRevision: string }[];
+    }).extensionTools[0]!.contractRevision;
+    const baseline = revision(ir);
+    const shifted = structuredClone(ir);
+    shifted.extensions[0]!.span.line += 100;
+    shifted.extensions[0]!.span.endLine += 100;
+    for (const parameter of shifted.extensions[0]!.contract.parameters) {
+      parameter.span.line += 100;
+      parameter.span.endLine += 100;
+    }
+    expect(revision(shifted)).toBe(baseline);
+
+    const changed = structuredClone(ir);
+    changed.extensions[0]!.reliability.idempotent = false;
+    expect(revision(changed)).not.toBe(baseline);
+  });
+
   it("matches every committed golden artifact byte-for-byte", async () => {
     const output = generateAll(await procurement());
     for (const [path, expected] of Object.entries(output)) {
@@ -308,8 +328,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 8,
-      targetProfile: "target:postgresql-http-ui-public-decision-traces/8",
+      profileVersion: 9,
+      targetProfile: "target:postgresql-http-ui-extension-tools/9",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -356,10 +376,18 @@ describe("backends", () => {
       support: "native",
       enforcement: ["public-decision-trace", "http", "mcp", "postgresql-applicability"],
     });
-    for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
+    expect(target.capabilities).toContainEqual({
+      id: "agents.extensionToolAdapter",
+      required: true,
+      support: "native",
+      enforcement: ["agent-tool-catalog", "http", "mcp", "host-extension-adapter", "host-contract-tests"],
+    });
+    for (const path of ["operations.json", "capabilities.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
       expect(output[path]).not.toContain("supplier-risk/review");
     }
+    expect(output["openapi.json"]).toContain("/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968");
+    expect(output["openapi.json"]).not.toContain("supplier-risk/review");
     expect(output["postgres/003_actions.sql"]).not.toContain("supplier-risk/review");
     expect(output["typescript/client.ts"]).not.toContain("supplierRiskReview");
     const reservationTarget = JSON.parse(generateAll(await reservations())["target-capabilities.json"]!);
@@ -375,7 +403,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-public-decision-traces/8" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-extension-tools/9" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -401,6 +429,20 @@ describe("backends", () => {
       taskPackets: Record<string, unknown>;
       delegatedCapabilities: Record<string, unknown>;
       publicDecisionTraces: Record<string, unknown>;
+      extensionToolAdapter: Record<string, unknown>;
+      extensionTools: {
+        id: string;
+        name: string;
+        kind: "extension";
+        contractVersion: number;
+        contractRevision: string;
+        inputSchema: object;
+        outputSchema: object;
+        execution: Record<string, unknown>;
+        authorization: Record<string, unknown>;
+        annotations: Record<string, unknown>;
+        conformance: Record<string, unknown>;
+      }[];
       tools: {
         id: string;
         kind: "action" | "query";
@@ -420,7 +462,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 6,
+      catalogVersion: 7,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -429,7 +471,7 @@ describe("backends", () => {
         authorizationFiltered: false,
         containsExpressions: false,
         containsCurrentState: false,
-        containsExtensions: false,
+        containsExtensions: true,
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
       },
@@ -513,6 +555,16 @@ describe("backends", () => {
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
       },
+      extensionToolAdapter: {
+        version: 1,
+        registration: "hostRequired",
+        authorization: "hostRequired",
+        implementationVerification: "hostResponsibility",
+        testVerification: "hostResponsibility",
+        generatedImplementations: 0,
+        discoveryGrantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
     });
     expect(catalog.tools).toHaveLength(4);
     for (const tool of catalog.tools) {
@@ -553,10 +605,45 @@ describe("backends", () => {
       },
     });
     expect(JSON.stringify(query.outputSchema)).not.toContain("$ref");
-    expect(JSON.stringify(catalog)).not.toMatch(/supplier-risk\/review|extension:|expression|sqlFunction|currentValue|commandReceipt|event_outbox|query_audit/);
+    expect(catalog.extensionTools).toHaveLength(1);
+    const extensionTool = catalog.extensionTools[0]!;
+    expect(extensionTool).toMatchObject({
+      id: "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+      name: "supplierRiskReview",
+      kind: "extension",
+      contractVersion: 1,
+      contractRevision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+      execution: {
+        protocol: "http",
+        method: "POST",
+        path: "/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968",
+        authenticated: true,
+        implementation: "hostAdapterRequired",
+        generatedImplementation: false,
+        runtimeAuthorizationRequired: true,
+      },
+      authorization: { enforcement: "hostRequired", declaredContext: "serviceIdentity", callerInput: false },
+      annotations: { readOnly: false, destructive: false, idempotent: true, openWorld: true },
+      conformance: {
+        implementationVerification: "hostResponsibility",
+        testVerification: "hostResponsibility",
+        discoveryGrantsAuthority: false,
+        resultGrantsAuthority: false,
+      },
+    });
+    expect(extensionTool.inputSchema).toMatchObject({
+      additionalProperties: false,
+      required: ["request", "requestedBy"],
+    });
+    const extensionAjv = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true } });
+    expect(() => extensionAjv.compile(extensionTool.inputSchema)).not.toThrow();
+    expect(() => extensionAjv.compile(extensionTool.outputSchema)).not.toThrow();
+    expect(JSON.stringify(catalog)).not.toMatch(/supplier-risk\/review|expression|sqlFunction|currentValue|commandReceipt|event_outbox|query_audit|tests\/procurement|ProcurementService/);
 
     const reservationCatalog = JSON.parse(generateAll(await reservations())["agent-tools.json"]!) as typeof catalog;
     expect(validate(reservationCatalog), JSON.stringify(validate.errors)).toBe(true);
+    expect(reservationCatalog.view.containsExtensions).toBe(false);
+    expect(reservationCatalog.extensionTools).toEqual([]);
     const paged = reservationCatalog.tools.find((tool) => tool.name === "reservationsForResource")!;
     expect(paged).toMatchObject({
       kind: "query",
@@ -581,6 +668,7 @@ describe("backends", () => {
     const output = generateAll(await procurement());
     const catalog = JSON.parse(output["agent-tools.json"]!) as {
       tools: { id: string; kind: "action" | "query"; inputSchema: object; outputSchema: object }[];
+      extensionTools: { id: string; inputSchema: object; outputSchema: object }[];
     };
     const manifest = JSON.parse(output["mcp.json"]!) as {
       adapterVersion: number;
@@ -589,13 +677,25 @@ describe("backends", () => {
       taskPacketVersion: number;
       delegatedCapabilityVersion: number;
       publicDecisionTraceVersion: number;
+      extensionToolResultVersion: number;
       transport: { kind: string; stateless: boolean };
       authentication: Record<string, unknown>;
       discovery: Record<string, unknown>;
-      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; publicDecisionTraces: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; publicDecisionTraces: Record<string, unknown>; extensionTools: Record<string, unknown>; prompts: boolean; tasks: boolean };
       taskPacket: { name: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
       delegatedCapabilities: { issueInputSchema: object; issueOutputSchema: object; revokeOutputSchema: object } & Record<string, unknown>;
       publicDecisionTrace: { name: string; kind: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
+      extensionTools: {
+        name: string;
+        operationId: string;
+        kind: "extension";
+        contractVersion: number;
+        contractRevision: string;
+        inputSchema: object;
+        outputSchema: object;
+        annotations: Record<string, boolean>;
+        execution: Record<string, unknown>;
+      }[];
       tools: {
         name: string;
         operationId: string;
@@ -609,12 +709,13 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      adapterVersion: 4,
+      adapterVersion: 5,
       protocolVersion: "2026-07-28",
-      catalogVersion: 6,
+      catalogVersion: 7,
       taskPacketVersion: 1,
       delegatedCapabilityVersion: 1,
       publicDecisionTraceVersion: 1,
+      extensionToolResultVersion: 1,
       transport: { kind: "streamableHttp", stateless: true },
       authentication: {
         requiredPerRequest: true,
@@ -646,6 +747,14 @@ describe("backends", () => {
           scope: "applicability",
           maxAgeSeconds: 0,
           durableEvidence: false,
+        },
+        extensionTools: {
+          modelLangContract: true,
+          hostAdapterRequired: true,
+          hostAuthorizationRequired: true,
+          generatedImplementations: 0,
+          implementationVerification: "hostResponsibility",
+          testVerification: "hostResponsibility",
         },
         prompts: false,
         tasks: false,
@@ -720,6 +829,35 @@ describe("backends", () => {
         formats: { uuid: true, "date-time": true },
       }).compile(exactSchema)).not.toThrow();
     }
+    const extensionResultSchema = JSON.parse(await readFile("schemas/extension-tool-result.schema.json", "utf8")) as object;
+    expect(() => new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true } }).compile(extensionResultSchema)).not.toThrow();
+    expect(manifest.extensionTools).toHaveLength(catalog.extensionTools.length);
+    for (const tool of manifest.extensionTools) {
+      const catalogTool = catalog.extensionTools.find((candidate) => candidate.id === tool.operationId)!;
+      expect(tool).toMatchObject({
+        name: tool.operationId.slice(tool.operationId.indexOf(":") + 1),
+        kind: "extension",
+        contractVersion: 1,
+        contractRevision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+        execution: {
+          implementation: "hostAdapterRequired",
+          generatedImplementation: false,
+          runtimeAuthorizationRequired: true,
+          grantsAuthority: false,
+        },
+      });
+      expect(tool.inputSchema).toEqual(catalogTool.inputSchema);
+      expect(tool.outputSchema).toEqual(catalogTool.outputSchema);
+      const ajv = new Ajv2020({ allErrors: true, strict: true, formats: { uuid: true } });
+      expect(() => ajv.compile(tool.inputSchema)).not.toThrow();
+      expect(() => ajv.compile(tool.outputSchema)).not.toThrow();
+    }
     const openapi = JSON.parse(output["openapi.json"]!) as {
       paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: object } } } } }>;
       components: { schemas: { AgentTaskPacket: object; PublicDecisionTrace: object } };
@@ -730,6 +868,9 @@ describe("backends", () => {
     expect(openapi.paths["/agent/decision-traces"]!.post.requestBody.content["application/json"].schema)
       .toEqual(manifest.publicDecisionTrace.inputSchema);
     expect(openapi.components.schemas.PublicDecisionTrace).toEqual(manifest.publicDecisionTrace.outputSchema);
+    const extension = manifest.extensionTools[0]!;
+    const extensionOperation = openapi.paths["/agent/extensions/ext_54d694c9a0a274dc79c6168e47d25968"]!.post;
+    expect(extensionOperation.requestBody.content["application/json"].schema).toEqual(extension.inputSchema);
     expect(manifest.tools).toHaveLength(catalog.tools.length);
     for (const tool of manifest.tools) {
       const catalogTool = catalog.tools.find((candidate) => candidate.id === tool.operationId)!;
@@ -751,8 +892,9 @@ describe("backends", () => {
     }
     expect(output["typescript/mcp-server.ts"]).toContain("createProcurementMcpHandler");
     expect(output["typescript/index.ts"]).toContain('export * from "./mcp-server.js"');
+    expect(`${output["mcp.json"]}\n${output["typescript/mcp-server.ts"]}`).toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
     expect(`${output["mcp.json"]}\n${output["typescript/mcp-server.ts"]}`).not.toMatch(
-      /supplier-risk\/review|extension:ext_|query_audit|event_outbox/,
+      /supplier-risk\/review|query_audit|event_outbox|tests\/procurement|ProcurementService/,
     );
   });
 
@@ -1264,7 +1406,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.44.0'");
+    expect(sql).toContain("'modelVersion', '0.45.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1427,7 +1569,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.44.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.45.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

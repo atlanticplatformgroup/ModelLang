@@ -14,9 +14,12 @@ import type { ExecutionOptions } from "./types.js";
 import {
   assembleProcurementPublicDecisionTrace,
   assembleProcurementTaskPacket,
+  invokeProcurementExtension,
   invokeProcurementDelegatedCapability,
   type ProcurementActionOperationId,
   type ProcurementDelegationRuntime,
+  type ProcurementExtensionOperationId,
+  type ProcurementExtensionRuntime,
   type ProcurementOperationExecutor,
   type ProcurementOperationId,
 } from "./http-server.js";
@@ -520,6 +523,109 @@ const toolDefinitions = [
   }
 ] as const satisfies readonly McpToolDefinition[];
 
+const extensionToolDefinitions = [
+  {
+    "name": "ext_54d694c9a0a274dc79c6168e47d25968",
+    "operationId": "extension:ext_54d694c9a0a274dc79c6168e47d25968",
+    "authoredName": "supplierRiskReview",
+    "kind": "extension",
+    "description": "Invoke the host-provided supplierRiskReview extension contract. The implementation, authorization, tests, and effects remain host responsibilities.",
+    "contractVersion": 1,
+    "contractRevision": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request",
+        "requestedBy"
+      ],
+      "properties": {
+        "request": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "requestedBy": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "outputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "$schema",
+        "extensionToolResultVersion",
+        "catalogVersion",
+        "model",
+        "extensionId",
+        "contractRevision",
+        "kind",
+        "authority",
+        "execution",
+        "result"
+      ],
+      "properties": {
+        "$schema": {
+          "const": "https://modellang.dev/schemas/extension-tool-result.schema.json"
+        },
+        "extensionToolResultVersion": {
+          "const": 1
+        },
+        "catalogVersion": {
+          "const": 7
+        },
+        "model": {
+          "const": {
+            "id": "model:Procurement",
+            "name": "Procurement",
+            "version": "0.45.0",
+            "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
+          }
+        },
+        "extensionId": {
+          "const": "extension:ext_54d694c9a0a274dc79c6168e47d25968"
+        },
+        "contractRevision": {
+          "const": "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099"
+        },
+        "kind": {
+          "const": "hostExtensionResult"
+        },
+        "authority": {
+          "const": "none"
+        },
+        "execution": {
+          "const": {
+            "implementation": "hostProvided",
+            "generatedImplementation": false,
+            "authorization": "hostEnforced",
+            "contractConformance": "hostAsserted",
+            "evidence": "hostOwned"
+          }
+        },
+        "result": {
+          "type": "boolean"
+        }
+      }
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "execution": {
+      "implementation": "hostAdapterRequired",
+      "generatedImplementation": false,
+      "runtimeAuthorizationRequired": true,
+      "grantsAuthority": false
+    }
+  }
+] as const;
+
 const taskPacketDefinition = {
   "name": "modellang_task_packet",
   "kind": "taskPacketAssembler",
@@ -715,7 +821,7 @@ const taskPacketDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 6
+        "const": 7
       },
       "resourceVersion": {
         "const": 1
@@ -724,8 +830,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Procurement",
           "name": "Procurement",
-          "version": "0.44.0",
-          "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+          "version": "0.45.0",
+          "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
         }
       },
       "packetId": {
@@ -1929,14 +2035,14 @@ const taskPacketDefinition = {
                       "const": 1
                     },
                     "catalogVersion": {
-                      "const": 6
+                      "const": 7
                     },
                     "model": {
                       "const": {
                         "id": "model:Procurement",
                         "name": "Procurement",
-                        "version": "0.44.0",
-                        "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+                        "version": "0.45.0",
+                        "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
                       }
                     },
                     "operationId": {
@@ -2275,14 +2381,14 @@ const delegatedCapabilityDefinition = {
         "const": 1
       },
       "catalogVersion": {
-        "const": 6
+        "const": 7
       },
       "model": {
         "const": {
           "id": "model:Procurement",
           "name": "Procurement",
-          "version": "0.44.0",
-          "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+          "version": "0.45.0",
+          "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
         }
       },
       "grantId": {
@@ -2564,14 +2670,14 @@ const publicDecisionTraceDefinition = {
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "model": {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.44.0",
-              "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
             }
           },
           "traceId": {
@@ -3010,14 +3116,14 @@ const publicDecisionTraceDefinition = {
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "model": {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.44.0",
-              "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
             }
           },
           "traceId": {
@@ -3456,14 +3562,14 @@ const publicDecisionTraceDefinition = {
             "const": 1
           },
           "catalogVersion": {
-            "const": 6
+            "const": 7
           },
           "model": {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.44.0",
-              "sourceHash": "sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"
+              "version": "0.45.0",
+              "sourceHash": "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
             }
           },
           "traceId": {
@@ -3910,6 +4016,7 @@ export interface ProcurementAuthenticatedMcpContext {
   readonly authInfo: AuthInfo;
   readonly executor: ProcurementOperationExecutor;
   readonly delegation?: ProcurementDelegationRuntime;
+  readonly extensions?: ProcurementExtensionRuntime;
 }
 
 export type ProcurementMcpAuthenticator = (
@@ -3966,8 +4073,8 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
   return {
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
-    catalogVersion: 6 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.44.0","sourceHash":"sha256:84e7abae9beb6cd7f0466bf493c9b80166817a6e2718f7762ca3a3b7ab7d4c61"},
+    catalogVersion: 7 as const,
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -4010,14 +4117,15 @@ function safeToolError(error: unknown): CallToolResult {
 function buildProcurementMcpServer(
   executor: ProcurementOperationExecutor,
   delegation: ProcurementDelegationRuntime | undefined,
+  extensions: ProcurementExtensionRuntime | undefined,
   delegationAudience: string,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Procurement-ModelLang", version: "0.44.0" },
+    { name: "Procurement-ModelLang", version: "0.45.0" },
     {
-      instructions: "Tool discovery, task packets, and public applicability traces grant no authority. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
+      instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
         "tools/list": { ttlMs: 0, cacheScope: "private" },
       },
@@ -4103,6 +4211,57 @@ function buildProcurementMcpServer(
               "dev.modellang/resourceUri": uri,
               "dev.modellang/cacheControl": "no-store",
               "dev.modellang/maxAgeSeconds": 0,
+            },
+          };
+        } catch (error) {
+          if (!(error instanceof ModelOperationError)) {
+            onerror?.(error instanceof Error ? error : new Error(String(error)));
+          }
+          return safeToolError(error);
+        }
+      },
+    );
+  }
+  for (const definition of extensionToolDefinitions) {
+    server.registerTool(
+      definition.name,
+      {
+        title: definition.authoredName,
+        description: definition.description,
+        inputSchema: fromJsonSchema<Record<string, unknown>>(definition.inputSchema),
+        outputSchema: fromJsonSchema<unknown>(definition.outputSchema),
+        annotations: definition.annotations,
+        _meta: {
+          "dev.modellang/kind": "extension",
+          "dev.modellang/operationId": definition.operationId,
+          "dev.modellang/extensionContractVersion": 1,
+          "dev.modellang/extensionContractRevision": definition.contractRevision,
+          "dev.modellang/hostAdapterRequired": true,
+          "dev.modellang/generatedImplementation": false,
+          "dev.modellang/implementationVerification": "hostResponsibility",
+          "dev.modellang/testVerification": "hostResponsibility",
+          "dev.modellang/grantsAuthority": false,
+          "dev.modellang/runtimeAuthorizationRequired": true,
+        },
+      },
+      async (input, ctx): Promise<CallToolResult> => {
+        try {
+          if ([...commandMetadataKeys, delegatedCapabilityKey].some((key) => Object.hasOwn(ctx.mcpReq._meta ?? {}, key))) {
+            throw new ValidationError("ModelLang command or delegated metadata is not accepted by host extension tools", "ML_VALIDATION", "extension:metadata");
+          }
+          const result = await invokeProcurementExtension(
+            extensions,
+            definition.operationId as ProcurementExtensionOperationId,
+            input,
+          );
+          return {
+            content: [{ type: "text", text: JSON.stringify(result) }],
+            structuredContent: result as never,
+            _meta: {
+              "dev.modellang/cacheControl": "no-store",
+              "dev.modellang/hostAdapterRequired": true,
+              "dev.modellang/generatedImplementation": false,
+              "dev.modellang/grantsAuthority": false,
             },
           };
         } catch (error) {
@@ -4288,7 +4447,7 @@ export function createProcurementMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
-  const contexts = new WeakMap<AuthInfo, { executor: ProcurementOperationExecutor; delegation?: ProcurementDelegationRuntime }>();
+  const contexts = new WeakMap<AuthInfo, { executor: ProcurementOperationExecutor; delegation?: ProcurementDelegationRuntime; extensions?: ProcurementExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
       const authInfo = ctx.authInfo;
@@ -4297,6 +4456,7 @@ export function createProcurementMcpHandler(
       return buildProcurementMcpServer(
         authenticated.executor,
         authenticated.delegation,
+        authenticated.extensions,
         resourceServerUrl.href,
         now,
         options.onerror,
@@ -4337,6 +4497,7 @@ export function createProcurementMcpHandler(
       contexts.set(authInfo, {
         executor: authenticated.executor,
         ...(authenticated.delegation ? { delegation: authenticated.delegation } : {}),
+        ...(authenticated.extensions ? { extensions: authenticated.extensions } : {}),
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });

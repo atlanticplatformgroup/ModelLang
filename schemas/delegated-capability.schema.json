@@ -11,7 +11,7 @@
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/delegated-capability.schema.json" },
     "delegatedCapabilityVersion": { "const": 1 },
-    "catalogVersion": { "const": 6 },
+    "catalogVersion": { "const": 7 },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],
