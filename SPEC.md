@@ -1,6 +1,11 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.38](./spec/0.38/LANGUAGE.md). It retains the complete 0.37 language and adds a static, filtered agent tool catalog.
+The current normative specification is [ModelLang 0.39](./spec/0.39/LANGUAGE.md). It retains the complete 0.38 language and adds authenticated, subject-specific action capability views.
+
+- [Subject capability view semantics](./spec/0.39/SUBJECT_CAPABILITY_VIEWS.md)
+- [0.39 grammar](./spec/0.39/GRAMMAR.ebnf)
+- [0.39 conformance requirements](./spec/0.39/CONFORMANCE.md)
+- [0.39 unstable agent boundaries](./spec/0.39/UNSTABLE.md)
 
 - [Agent tool catalog semantics](./spec/0.38/AGENT_TOOL_CATALOG.md)
 - [0.38 grammar](./spec/0.38/GRAMMAR.ebnf)

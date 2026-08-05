@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/target-capability-profile.schema.json",
-  "profileVersion": 2,
-  "compilerVersion": "0.38.0",
-  "generatorProfile": "postgresql-http-ui-agent-tool-catalog/22",
-  "targetProfile": "target:postgresql-http-ui-agent-catalog/2",
+  "profileVersion": 3,
+  "compilerVersion": "0.39.0",
+  "generatorProfile": "postgresql-http-ui-agent-subject-view/23",
+  "targetProfile": "target:postgresql-http-ui-agent-subject-view/3",
   "irVersion": 1,
   "model": {
     "id": "model:Reservations",
-    "version": "0.38.0",
-    "sourceHash": "sha256:5f0b992c074ed9f55c60da8288ce0df2f4f193401085ca0eb8058957c7979a7b"
+    "version": "0.39.0",
+    "sourceHash": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"
   },
   "conformance": "complete",
   "authority": "none",
@@ -152,6 +152,16 @@
       "enforcement": [
         "agent-tool-catalog",
         "http"
+      ]
+    },
+    {
+      "id": "agents.subjectCapabilityView",
+      "required": true,
+      "support": "native",
+      "enforcement": [
+        "agent-tool-catalog",
+        "http",
+        "postgresql-applicability"
       ]
     },
     {

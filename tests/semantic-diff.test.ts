@@ -286,7 +286,7 @@ action make @stableId("act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
     expect(validate(report), JSON.stringify(validate.errors)).toBe(true);
     expect(report).toMatchObject({
       diffVersion: 19,
-      compilerVersion: "0.38.0",
+      compilerVersion: "0.39.0",
       irVersion: 1,
       migrationAuthority: "separateGuardedMigrationPlanners",
     });

@@ -11,8 +11,8 @@
     "$schema": { "const": "https://modellang.dev/schemas/artifact-provenance.schema.json" },
     "provenanceVersion": { "const": 2 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-agent-tool-catalog/22" },
-    "targetProfile": { "const": "target:postgresql-http-ui-agent-catalog/2" },
+    "generatorProfile": { "const": "postgresql-http-ui-agent-subject-view/23" },
+    "targetProfile": { "const": "target:postgresql-http-ui-agent-subject-view/3" },
     "model": {
       "type": "object",
       "required": ["id", "name", "version", "sourceHash"],

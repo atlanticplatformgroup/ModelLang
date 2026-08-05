@@ -5,10 +5,10 @@ export type TargetCapabilitySupport = "native" | "externalImplementationRequired
 
 export interface TargetCapabilityReport {
   $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json";
-  profileVersion: 2;
+  profileVersion: 3;
   compilerVersion: string;
   generatorProfile: string;
-  targetProfile: "target:postgresql-http-ui-agent-catalog/2";
+  targetProfile: "target:postgresql-http-ui-agent-subject-view/3";
   irVersion: 1;
   model: { id: string; version: string; sourceHash: string };
   conformance: "complete" | "requiresExternalImplementations";
@@ -44,6 +44,7 @@ export function generateTargetCapabilityReport(ir: ModelIR): TargetCapabilityRep
     { id: "queries.conditionalDisclosure", required: ir.queries.some((query) => Boolean(query.disclosures?.length)), support: "native", enforcement: ["compiler", "postgresql", "http"] },
     { id: "queries.transactionalReadEvidence", required: ir.queries.some((query) => Boolean(query.readEvidence)), support: "native", enforcement: ["postgresql"] },
     { id: "agents.staticToolCatalog", required: true, support: "native", enforcement: ["agent-tool-catalog", "http"] },
+    { id: "agents.subjectCapabilityView", required: ir.actions.length > 0, support: "native", enforcement: ["agent-tool-catalog", "http", "postgresql-applicability"] },
     { id: "extensions.declaredExternal", required: ir.extensions.length > 0, support: "externalImplementationRequired", enforcement: ["extension-ledger", "host-conformance-tests"] },
   ];
   const gaps = ir.extensions.map((extension) => ({
@@ -54,7 +55,7 @@ export function generateTargetCapabilityReport(ir: ModelIR): TargetCapabilityRep
   }));
   return {
     $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json",
-    profileVersion: 2,
+    profileVersion: 3,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     generatorProfile: MODELLANG_GENERATOR_PROFILE,
     targetProfile: MODELLANG_TARGET_PROFILE,

@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.38.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:5f0b992c074ed9f55c60da8288ce0df2f4f193401085ca0eb8058957c7979a7b)."
+    "version": "0.39.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -486,6 +486,168 @@
           }
         }
       }
+    },
+    "/agent/capabilities": {
+      "post": {
+        "operationId": "modellang_subject_capabilities",
+        "summary": "Filter action tools for the authenticated subject and exact candidate inputs",
+        "tags": [
+          "Agent capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-grants-authority": false,
+        "x-modellang-input-specific": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "candidates"
+                ],
+                "properties": {
+                  "candidates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "operationId": {
+                              "const": "action:act_508ad810a19d4b79a5009871de5cd26b"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "resource",
+                                "startsAt",
+                                "endsAt"
+                              ],
+                              "properties": {
+                                "resource": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "startsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "endsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              }
+                            },
+                            "expectedRevision": {
+                              "type": "string",
+                              "pattern": "^rev:1:[0-9a-f]{32}$"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated input-specific action capability view; this grants no authority",
+            "headers": {
+              "Cache-Control": {
+                "description": "Subject views must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectCapabilityView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -870,6 +1032,330 @@
             }
           }
         ]
+      },
+      "SubjectCapabilityView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "viewVersion",
+          "catalogVersion",
+          "model",
+          "view",
+          "authentication",
+          "available",
+          "unavailable"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/subject-capability-view.schema.json"
+          },
+          "viewVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 2
+          },
+          "model": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "version",
+              "sourceHash"
+            ],
+            "properties": {
+              "id": {
+                "const": "model:Reservations"
+              },
+              "name": {
+                "const": "Reservations"
+              },
+              "version": {
+                "const": "0.39.0"
+              },
+              "sourceHash": {
+                "const": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"
+              }
+            }
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "audience",
+              "subjectSpecific",
+              "authorizationFiltered",
+              "inputSpecific",
+              "containsExpressions",
+              "containsResourceState",
+              "containsExtensions",
+              "grantsAuthority",
+              "runtimeAuthorizationRequired"
+            ],
+            "properties": {
+              "audience": {
+                "const": "agent"
+              },
+              "subjectSpecific": {
+                "const": true
+              },
+              "authorizationFiltered": {
+                "const": true
+              },
+              "inputSpecific": {
+                "const": true
+              },
+              "containsExpressions": {
+                "const": false
+              },
+              "containsResourceState": {
+                "const": false
+              },
+              "containsExtensions": {
+                "const": false
+              },
+              "grantsAuthority": {
+                "const": false
+              },
+              "runtimeAuthorizationRequired": {
+                "const": true
+              }
+            }
+          },
+          "authentication": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "source",
+              "callerInput",
+              "identityDisclosed"
+            ],
+            "properties": {
+              "required": {
+                "const": true
+              },
+              "source": {
+                "const": "authenticatedContext"
+              },
+              "callerInput": {
+                "const": false
+              },
+              "identityDisclosed": {
+                "const": false
+              }
+            }
+          },
+          "available": {
+            "type": "array",
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "kind",
+                "status",
+                "applicable",
+                "authority",
+                "revision"
+              ],
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "pattern": "^action:"
+                },
+                "kind": {
+                  "const": "action"
+                },
+                "status": {
+                  "const": "applicable"
+                },
+                "applicable": {
+                  "const": true
+                },
+                "authority": {
+                  "const": "none"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^rev:1:[0-9a-f]{32}$"
+                }
+              }
+            }
+          },
+          "unavailable": {
+            "type": "array",
+            "maxItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "kind",
+                "status",
+                "applicable",
+                "authority",
+                "explanation"
+              ],
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "pattern": "^action:"
+                },
+                "kind": {
+                  "const": "action"
+                },
+                "status": {
+                  "enum": [
+                    "denied",
+                    "notApplicable",
+                    "stale"
+                  ]
+                },
+                "applicable": {
+                  "const": false
+                },
+                "authority": {
+                  "const": "none"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^rev:1:[0-9a-f]{32}$"
+                },
+                "explanation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "ruleId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "authorization",
+                        "requirement",
+                        "revision"
+                      ]
+                    },
+                    "ruleId": {
+                      "enum": [
+                        "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
+                        "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval",
+                        "revision:action:act_508ad810a19d4b79a5009871de5cd26b"
+                      ]
+                    }
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "denied"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "authorization"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^authorize:"
+                          }
+                        }
+                      },
+                      "revision": false
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "notApplicable"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "requirement"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^require:"
+                          }
+                        }
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      }
+                    },
+                    "required": [
+                      "revision"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "stale"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "revision"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^revision:"
+                          }
+                        }
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      }
+                    },
+                    "required": [
+                      "revision"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

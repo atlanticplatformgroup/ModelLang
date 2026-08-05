@@ -11,6 +11,52 @@ export interface ProcurementHttpClientOptions {
   headers?: Readonly<Record<string, string>>;
 }
 
+export type ProcurementSubjectCapabilityCandidate =
+  | { readonly operationId: "action:act_1e35db0451b1461e941af6283d86dca2"; readonly input: OpenRequestInput; readonly expectedRevision?: string }
+  | { readonly operationId: "action:act_ed2374e822704c51a2925338253d05d2"; readonly input: SubmitRequestInput; readonly expectedRevision?: string }
+  | { readonly operationId: "action:act_d39dbb883b5f4019b9027b85add3de47"; readonly input: ApproveRequestInput; readonly expectedRevision?: string };
+
+export interface ProcurementSubjectCapabilityView {
+  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly viewVersion: 1;
+  readonly catalogVersion: 2;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsExpressions: false;
+    readonly containsResourceState: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly authentication: {
+    readonly required: true;
+    readonly source: "authenticatedContext";
+    readonly callerInput: false;
+    readonly identityDisclosed: false;
+  };
+  readonly available: readonly {
+    readonly operationId: ProcurementSubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "applicable";
+    readonly applicable: true;
+    readonly authority: "none";
+    readonly revision: string;
+  }[];
+  readonly unavailable: readonly {
+    readonly operationId: ProcurementSubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "denied" | "notApplicable" | "stale";
+    readonly applicable: false;
+    readonly authority: "none";
+    readonly revision?: string;
+    readonly explanation: { readonly kind: "authorization" | "requirement" | "revision"; readonly ruleId: string };
+  }[];
+}
+
 export class ProcurementHttpClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
@@ -42,6 +88,12 @@ export class ProcurementHttpClient {
       throw mapHttpProblem(problem, response.status);
     }
     return await response.json() as Result;
+  }
+
+  async subjectCapabilities(
+    candidates: readonly ProcurementSubjectCapabilityCandidate[],
+  ): Promise<ProcurementSubjectCapabilityView> {
+    return this.call("/agent/capabilities", { candidates });
   }
 
   async openRequest(input: OpenRequestInput, options: ExecutionOptions = {}): Promise<PurchaseRequest> {

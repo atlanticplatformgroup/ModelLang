@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.39.0
+
+- Added authenticated `POST /agent/capabilities` subject views that filter exact action candidates through the existing authoritative applicability evaluator without executing actions or granting authority.
+- Added closed, bounded requests for up to 32 distinct action IDs with exact action input and optional opaque revision; query tools remain static-catalog-only, and query-only models accept an empty candidate set.
+- Added subject capability view v1 with only stable model/action identity, available or safe unavailable outcomes, and revisions where visibility permits; caller identity, candidate input, resource state, expressions, extensions, and private evidence are excluded.
+- Added generated OpenAPI, browser-safe HTTP client, authenticated server routing, response schema, catalog linkage, target capability reporting, deterministic provenance, unit coverage, and live PostgreSQL gateway tests proving different subjects receive different overlays without action-audit writes.
+- Advanced agent catalog to v2, target capability profile to v3, target to `target:postgresql-http-ui-agent-subject-view/3`, compiler/examples to 0.39.0, and generator profile to `postgresql-http-ui-agent-subject-view/23`; canonical IR1, operation manifest v11, and capability manifest v10 remain unchanged.
 - Removed pre-release PostgreSQL operational upgrade artifacts and the private runtime-profile ledger. Fresh builds now emit one complete current installation baseline while current-to-current model migrations remain supported.
 - Removed legacy event-envelope adaptation so consumers accept only the exact current envelope contract.
 

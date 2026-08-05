@@ -120,6 +120,15 @@ describe("backends", () => {
       storage: "private",
       payloadRetention: "none",
     });
+    const subjectRequest = openapi.paths["/agent/capabilities"]!.post.requestBody.content["application/json"].schema as unknown as {
+      additionalProperties: boolean;
+      properties: { candidates: { minItems: number; maxItems: number; uniqueItems: boolean; items: { oneOf: object[] } } };
+    };
+    expect(subjectRequest.additionalProperties).toBe(false);
+    expect(subjectRequest.properties.candidates).toMatchObject({ minItems: 1, maxItems: 3, uniqueItems: true });
+    expect(subjectRequest.properties.candidates.items.oneOf).toHaveLength(3);
+    expect(JSON.stringify(subjectRequest)).not.toContain("qry_4406b045404a48449282db804f6167a8");
+    expect(openapi.components.schemas).toHaveProperty("SubjectCapabilityView");
     expect(openapi.components.parameters.IdempotencyKey).toMatchObject({ name: "Idempotency-Key", required: true });
     expect(openapi.components.parameters.CorrelationId).toMatchObject({ name: "X-Correlation-ID", required: false });
     expect(openapi.components.parameters.CausationId).toMatchObject({ name: "X-Causation-ID", required: false });
@@ -288,8 +297,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 2,
-      targetProfile: "target:postgresql-http-ui-agent-catalog/2",
+      profileVersion: 3,
+      targetProfile: "target:postgresql-http-ui-agent-subject-view/3",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -299,6 +308,12 @@ describe("backends", () => {
       required: true,
       support: "native",
       enforcement: ["agent-tool-catalog", "http"],
+    });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.subjectCapabilityView",
+      required: true,
+      support: "native",
+      enforcement: ["agent-tool-catalog", "http", "postgresql-applicability"],
     });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
@@ -319,7 +334,7 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-catalog/2" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-subject-view/3" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -340,6 +355,7 @@ describe("backends", () => {
       view: Record<string, boolean | string>;
       adapter: { compatibility: string; directProtocolConformance: boolean };
       authentication: { required: boolean; source: string; callerInput: boolean };
+      subjectView: Record<string, boolean | string | number | string[]>;
       tools: {
         id: string;
         kind: "action" | "query";
@@ -358,7 +374,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(catalog), JSON.stringify(validate.errors)).toBe(true);
     expect(catalog).toMatchObject({
-      catalogVersion: 1,
+      catalogVersion: 2,
       operationManifestVersion: 11,
       capabilityManifestVersion: 10,
       view: {
@@ -373,6 +389,21 @@ describe("backends", () => {
       },
       adapter: { compatibility: "mcpTool", directProtocolConformance: false },
       authentication: { required: true, source: "authenticatedContext", callerInput: false },
+      subjectView: {
+        protocol: "http",
+        method: "POST",
+        path: "/agent/capabilities",
+        authenticated: true,
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        inputSpecific: true,
+        candidateKinds: ["action"],
+        maxCandidates: 32,
+        queryTools: "staticCatalogOnly",
+        containsResourceState: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
     });
     expect(catalog.tools).toHaveLength(4);
     for (const tool of catalog.tools) {
@@ -551,6 +582,13 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(output["postgres/003_queries.sql"]).toContain('WHERE (((v_row."archived" = FALSE)) IS TRUE)');
     expect(output["postgres/003_queries.sql"]).not.toContain("'owner'");
     expect(output["postgres/003_queries.sql"]).not.toContain("'archived'");
+    const openapi = JSON.parse(output["openapi.json"]!) as {
+      paths: Record<string, { post: { requestBody: { content: { "application/json": { schema: { properties: { candidates: object } } } } } } }>;
+    };
+    expect(openapi.paths["/agent/capabilities"]!.post.requestBody.content["application/json"].schema.properties.candidates)
+      .toEqual(expect.objectContaining({ minItems: 0, maxItems: 0, items: false }));
+    expect(output["typescript/http-client.ts"]).toContain("ProjectionReachabilitySubjectCapabilityCandidate =\n  never");
+    expect(output["typescript/http-server.ts"]).toContain("ProjectionReachabilityActionOperationId = never");
   });
 
   it("removes only the bound workflow target from transition fields", () => {
@@ -601,6 +639,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(Object.keys(after.paths)).toEqual([
       "/operations/actions/act_11111111111111111111111111111111",
       "/operations/actions/act_11111111111111111111111111111111/applicability",
+      "/agent/capabilities",
     ]);
     const beforeUi = JSON.parse(beforeOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
     const afterUi = JSON.parse(afterOutput["ui.json"]!) as { actions: { operationId: string; label: string }[] };
@@ -898,7 +937,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.38.0'");
+    expect(sql).toContain("'modelVersion', '0.39.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1061,7 +1100,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.38.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.39.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

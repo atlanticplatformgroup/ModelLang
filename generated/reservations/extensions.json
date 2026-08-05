@@ -1,15 +1,15 @@
 {
   "$schema": "https://modellang.dev/schemas/extension-ledger.schema.json",
   "ledgerVersion": 1,
-  "compilerVersion": "0.38.0",
+  "compilerVersion": "0.39.0",
   "irVersion": 1,
   "audience": "engineering",
   "public": false,
   "executable": false,
   "model": {
     "id": "model:Reservations",
-    "version": "0.38.0",
-    "sourceHash": "sha256:5f0b992c074ed9f55c60da8288ce0df2f4f193401085ca0eb8058957c7979a7b"
+    "version": "0.39.0",
+    "sourceHash": "sha256:1ef90ecc770da215ae2b058997228ba808322215a500001315753b3e70f7fc40"
   },
   "extensions": [],
   "summary": {

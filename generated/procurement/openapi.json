@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.38.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:a4a1c2c6f15a13da6049c57ef6d27ae86de48de2282303fe845c3d5b54e64a77)."
+    "version": "0.39.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -994,6 +994,232 @@
           }
         }
       }
+    },
+    "/agent/capabilities": {
+      "post": {
+        "operationId": "modellang_subject_capabilities",
+        "summary": "Filter action tools for the authenticated subject and exact candidate inputs",
+        "tags": [
+          "Agent capabilities"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-modellang-grants-authority": false,
+        "x-modellang-input-specific": true,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "candidates"
+                ],
+                "properties": {
+                  "candidates": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 3,
+                    "uniqueItems": true,
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "operationId": {
+                              "const": "action:act_1e35db0451b1461e941af6283d86dca2"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "amount"
+                              ],
+                              "properties": {
+                                "amount": {
+                                  "type": "object",
+                                  "additionalProperties": false,
+                                  "required": [
+                                    "currency",
+                                    "amount"
+                                  ],
+                                  "properties": {
+                                    "currency": {
+                                      "const": "USD"
+                                    },
+                                    "amount": {
+                                      "type": "string",
+                                      "pattern": "^-?(0|[1-9][0-9]*)(?:\\.[0-9]{1,2})?$",
+                                      "description": "Exact base-10 amount with at most 18 integral and 2 fractional digits."
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "expectedRevision": {
+                              "type": "string",
+                              "pattern": "^rev:1:[0-9a-f]{32}$"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "operationId": {
+                              "const": "action:act_ed2374e822704c51a2925338253d05d2"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "request"
+                              ],
+                              "properties": {
+                                "request": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "expectedRevision": {
+                              "type": "string",
+                              "pattern": "^rev:1:[0-9a-f]{32}$"
+                            }
+                          }
+                        },
+                        {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "operationId",
+                            "input"
+                          ],
+                          "properties": {
+                            "operationId": {
+                              "const": "action:act_d39dbb883b5f4019b9027b85add3de47"
+                            },
+                            "input": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "request"
+                              ],
+                              "properties": {
+                                "request": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                }
+                              }
+                            },
+                            "expectedRevision": {
+                              "type": "string",
+                              "pattern": "^rev:1:[0-9a-f]{32}$"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated input-specific action capability view; this grants no authority",
+            "headers": {
+              "Cache-Control": {
+                "description": "Subject views must not be stored",
+                "schema": {
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectCapabilityView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON request or operation input is invalid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or principal binding failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "The operation requires POST",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body exceeds the configured limit",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request media type is not supported",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected operation failure",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelProblem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1460,6 +1686,336 @@
             }
           }
         ]
+      },
+      "SubjectCapabilityView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "$schema",
+          "viewVersion",
+          "catalogVersion",
+          "model",
+          "view",
+          "authentication",
+          "available",
+          "unavailable"
+        ],
+        "properties": {
+          "$schema": {
+            "const": "https://modellang.dev/schemas/subject-capability-view.schema.json"
+          },
+          "viewVersion": {
+            "const": 1
+          },
+          "catalogVersion": {
+            "const": 2
+          },
+          "model": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name",
+              "version",
+              "sourceHash"
+            ],
+            "properties": {
+              "id": {
+                "const": "model:Procurement"
+              },
+              "name": {
+                "const": "Procurement"
+              },
+              "version": {
+                "const": "0.39.0"
+              },
+              "sourceHash": {
+                "const": "sha256:89e89237e4c93adaca962b74285b1277892bd4abd2f7f51e50ad90248006e8aa"
+              }
+            }
+          },
+          "view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "audience",
+              "subjectSpecific",
+              "authorizationFiltered",
+              "inputSpecific",
+              "containsExpressions",
+              "containsResourceState",
+              "containsExtensions",
+              "grantsAuthority",
+              "runtimeAuthorizationRequired"
+            ],
+            "properties": {
+              "audience": {
+                "const": "agent"
+              },
+              "subjectSpecific": {
+                "const": true
+              },
+              "authorizationFiltered": {
+                "const": true
+              },
+              "inputSpecific": {
+                "const": true
+              },
+              "containsExpressions": {
+                "const": false
+              },
+              "containsResourceState": {
+                "const": false
+              },
+              "containsExtensions": {
+                "const": false
+              },
+              "grantsAuthority": {
+                "const": false
+              },
+              "runtimeAuthorizationRequired": {
+                "const": true
+              }
+            }
+          },
+          "authentication": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "source",
+              "callerInput",
+              "identityDisclosed"
+            ],
+            "properties": {
+              "required": {
+                "const": true
+              },
+              "source": {
+                "const": "authenticatedContext"
+              },
+              "callerInput": {
+                "const": false
+              },
+              "identityDisclosed": {
+                "const": false
+              }
+            }
+          },
+          "available": {
+            "type": "array",
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "kind",
+                "status",
+                "applicable",
+                "authority",
+                "revision"
+              ],
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "pattern": "^action:"
+                },
+                "kind": {
+                  "const": "action"
+                },
+                "status": {
+                  "const": "applicable"
+                },
+                "applicable": {
+                  "const": true
+                },
+                "authority": {
+                  "const": "none"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^rev:1:[0-9a-f]{32}$"
+                }
+              }
+            }
+          },
+          "unavailable": {
+            "type": "array",
+            "maxItems": 3,
+            "uniqueItems": true,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operationId",
+                "kind",
+                "status",
+                "applicable",
+                "authority",
+                "explanation"
+              ],
+              "properties": {
+                "operationId": {
+                  "type": "string",
+                  "pattern": "^action:"
+                },
+                "kind": {
+                  "const": "action"
+                },
+                "status": {
+                  "enum": [
+                    "denied",
+                    "notApplicable",
+                    "stale"
+                  ]
+                },
+                "applicable": {
+                  "const": false
+                },
+                "authority": {
+                  "const": "none"
+                },
+                "revision": {
+                  "type": "string",
+                  "pattern": "^rev:1:[0-9a-f]{32}$"
+                },
+                "explanation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "ruleId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "enum": [
+                        "authorization",
+                        "requirement",
+                        "revision"
+                      ]
+                    },
+                    "ruleId": {
+                      "enum": [
+                        "authorize:action:act_1e35db0451b1461e941af6283d86dca2",
+                        "require:action:act_1e35db0451b1461e941af6283d86dca2.positive_amount",
+                        "revision:action:act_1e35db0451b1461e941af6283d86dca2",
+                        "authorize:action:act_ed2374e822704c51a2925338253d05d2",
+                        "require:action:act_ed2374e822704c51a2925338253d05d2.is_draft",
+                        "revision:action:act_ed2374e822704c51a2925338253d05d2",
+                        "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+                        "require:action:act_d39dbb883b5f4019b9027b85add3de47.is_submitted",
+                        "revision:action:act_d39dbb883b5f4019b9027b85add3de47"
+                      ]
+                    }
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "denied"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "authorization"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^authorize:"
+                          }
+                        }
+                      },
+                      "revision": false
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "notApplicable"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "requirement"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^require:"
+                          }
+                        }
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      }
+                    },
+                    "required": [
+                      "revision"
+                    ]
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "const": "stale"
+                      }
+                    },
+                    "required": [
+                      "status"
+                    ]
+                  },
+                  "then": {
+                    "properties": {
+                      "explanation": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "const": "revision"
+                          },
+                          "ruleId": {
+                            "type": "string",
+                            "pattern": "^revision:"
+                          }
+                        }
+                      },
+                      "revision": {
+                        "type": "string",
+                        "pattern": "^rev:1:[0-9a-f]{32}$"
+                      }
+                    },
+                    "required": [
+                      "revision"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }

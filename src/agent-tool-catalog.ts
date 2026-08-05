@@ -6,6 +6,10 @@ import type {
   OperationValueType,
 } from "./operation-manifest.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
+import {
+  SUBJECT_CAPABILITY_MAX_CANDIDATES,
+  SUBJECT_CAPABILITY_ROUTE,
+} from "./agent-routes.js";
 
 type JsonSchema = Record<string, unknown>;
 
@@ -55,7 +59,7 @@ type AgentTool =
 
 export interface AgentToolCatalog {
   $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
-  catalogVersion: 1;
+  catalogVersion: 2;
   compilerVersion: string;
   operationManifestVersion: 11;
   capabilityManifestVersion: 10;
@@ -78,6 +82,21 @@ export interface AgentToolCatalog {
     required: true;
     source: "authenticatedContext";
     callerInput: false;
+  };
+  subjectView: {
+    protocol: "http";
+    method: "POST";
+    path: "/agent/capabilities";
+    authenticated: true;
+    subjectSpecific: true;
+    authorizationFiltered: true;
+    inputSpecific: true;
+    candidateKinds: ["action"];
+    maxCandidates: 32;
+    queryTools: "staticCatalogOnly";
+    containsResourceState: false;
+    grantsAuthority: false;
+    runtimeAuthorizationRequired: true;
   };
   tools: AgentTool[];
 }
@@ -277,7 +296,7 @@ export function generateAgentToolCatalog(
   });
   return {
     $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-    catalogVersion: 1,
+    catalogVersion: 2,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,
     capabilityManifestVersion: capabilities.capabilityManifestVersion,
@@ -294,6 +313,21 @@ export function generateAgentToolCatalog(
     },
     adapter: { compatibility: "mcpTool", directProtocolConformance: false },
     authentication: { required: true, source: "authenticatedContext", callerInput: false },
+    subjectView: {
+      protocol: "http",
+      method: "POST",
+      path: SUBJECT_CAPABILITY_ROUTE,
+      authenticated: true,
+      subjectSpecific: true,
+      authorizationFiltered: true,
+      inputSpecific: true,
+      candidateKinds: ["action"],
+      maxCandidates: SUBJECT_CAPABILITY_MAX_CANDIDATES,
+      queryTools: "staticCatalogOnly",
+      containsResourceState: false,
+      grantsAuthority: false,
+      runtimeAuthorizationRequired: true,
+    },
     tools,
   };
 }

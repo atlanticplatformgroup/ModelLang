@@ -5,6 +5,10 @@ import type {
 } from "../operation-manifest.js";
 import { operationInputName } from "../operation-manifest.js";
 import type { CapabilityManifest } from "../capability-manifest.js";
+import {
+  SUBJECT_CAPABILITY_MAX_CANDIDATES,
+  SUBJECT_CAPABILITY_ROUTE,
+} from "../agent-routes.js";
 
 export interface HttpOutput {
   "openapi.json": string;
@@ -108,7 +112,30 @@ function applicabilityResponses(operation: ManifestOperation): Record<string, un
   return Object.fromEntries(["400", "401", "405", "413", "415", "500"].map((status) => [status, responses[status]]));
 }
 
+function subjectCandidateSchema(manifest: OperationManifest, operation: ManifestOperation): JsonSchema {
+  if (operation.kind !== "action") throw new Error("E6105 Subject capability candidates must be actions.");
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["operationId", "input"],
+    properties: {
+      operationId: { const: operation.id },
+      input: {
+        type: "object",
+        additionalProperties: false,
+        required: operation.input.filter((parameter) => !parameter.optional).map((parameter) => parameter.name),
+        properties: Object.fromEntries(operation.input.map((parameter) => [
+          parameter.name,
+          parameter.optional ? nullable(valueSchema(manifest, parameter.type)) : valueSchema(manifest, parameter.type),
+        ])),
+      },
+      expectedRevision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+    },
+  };
+}
+
 export function generateOpenApi(manifest: OperationManifest, capabilities: CapabilityManifest): Record<string, unknown> {
+  const actions = manifest.operations.filter((operation) => operation.kind === "action");
   const entitySchemas = Object.fromEntries(manifest.entities.map((entity) => [
     entity.name,
     {
@@ -267,7 +294,51 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
       },
     },
   ]);
-  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths]);
+  const subjectCapabilityPath = [
+    SUBJECT_CAPABILITY_ROUTE,
+    {
+      post: {
+        operationId: "modellang_subject_capabilities",
+        summary: "Filter action tools for the authenticated subject and exact candidate inputs",
+        tags: ["Agent capabilities"],
+        security: [{ bearerAuth: [] }],
+        "x-modellang-grants-authority": false,
+        "x-modellang-input-specific": true,
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                additionalProperties: false,
+                required: ["candidates"],
+                properties: {
+                  candidates: {
+                    type: "array",
+                    minItems: actions.length ? 1 : 0,
+                    maxItems: Math.min(actions.length, SUBJECT_CAPABILITY_MAX_CANDIDATES),
+                    uniqueItems: true,
+                    items: actions.length
+                      ? { oneOf: actions.map((operation) => subjectCandidateSchema(manifest, operation)) }
+                      : false,
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Authenticated input-specific action capability view; this grants no authority",
+            headers: { "Cache-Control": { description: "Subject views must not be stored", schema: { const: "no-store" } } },
+            content: { "application/json": { schema: { $ref: "#/components/schemas/SubjectCapabilityView" } } },
+          },
+          ...Object.fromEntries(["400", "401", "405", "413", "415", "500"].map((status) => [status, operationResponses(manifest.operations[0]!)[status]])),
+        },
+      },
+    },
+  ];
+  const paths = Object.fromEntries([...executionPaths, ...applicabilityPaths, subjectCapabilityPath]);
   const safeRuleIds = capabilities.actions.flatMap((action) => [
     action.explanation.authorizationRuleId,
     ...action.explanation.preconditionRuleIds,
@@ -347,7 +418,9 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
               required: ["kind", "ruleId"],
               properties: {
                 kind: { enum: ["authorization", "requirement", "revision"] },
-                ruleId: { enum: safeRuleIds },
+                ruleId: safeRuleIds.length
+                  ? { enum: safeRuleIds }
+                  : { type: "string", pattern: "^(authorize|require|revision):" },
               },
             },
           },
@@ -379,6 +452,150 @@ export function generateOpenApi(manifest: OperationManifest, capabilities: Capab
               },
             },
           ],
+        },
+        SubjectCapabilityView: {
+          type: "object",
+          additionalProperties: false,
+          required: ["$schema", "viewVersion", "catalogVersion", "model", "view", "authentication", "available", "unavailable"],
+          properties: {
+            $schema: { const: "https://modellang.dev/schemas/subject-capability-view.schema.json" },
+            viewVersion: { const: 1 },
+            catalogVersion: { const: 2 },
+            model: {
+              type: "object",
+              additionalProperties: false,
+              required: ["id", "name", "version", "sourceHash"],
+              properties: {
+                id: { const: manifest.model.id },
+                name: { const: manifest.model.name },
+                version: { const: manifest.model.version },
+                sourceHash: { const: manifest.model.sourceHash },
+              },
+            },
+            view: {
+              type: "object",
+              additionalProperties: false,
+              required: ["audience", "subjectSpecific", "authorizationFiltered", "inputSpecific", "containsExpressions", "containsResourceState", "containsExtensions", "grantsAuthority", "runtimeAuthorizationRequired"],
+              properties: {
+                audience: { const: "agent" },
+                subjectSpecific: { const: true },
+                authorizationFiltered: { const: true },
+                inputSpecific: { const: true },
+                containsExpressions: { const: false },
+                containsResourceState: { const: false },
+                containsExtensions: { const: false },
+                grantsAuthority: { const: false },
+                runtimeAuthorizationRequired: { const: true },
+              },
+            },
+            authentication: {
+              type: "object",
+              additionalProperties: false,
+              required: ["required", "source", "callerInput", "identityDisclosed"],
+              properties: {
+                required: { const: true },
+                source: { const: "authenticatedContext" },
+                callerInput: { const: false },
+                identityDisclosed: { const: false },
+              },
+            },
+            available: {
+              type: "array",
+              maxItems: Math.min(actions.length, SUBJECT_CAPABILITY_MAX_CANDIDATES),
+              uniqueItems: true,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["operationId", "kind", "status", "applicable", "authority", "revision"],
+                properties: {
+                  operationId: { type: "string", pattern: "^action:" },
+                  kind: { const: "action" },
+                  status: { const: "applicable" },
+                  applicable: { const: true },
+                  authority: { const: "none" },
+                  revision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+                },
+              },
+            },
+            unavailable: {
+              type: "array",
+              maxItems: Math.min(actions.length, SUBJECT_CAPABILITY_MAX_CANDIDATES),
+              uniqueItems: true,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["operationId", "kind", "status", "applicable", "authority", "explanation"],
+                properties: {
+                  operationId: { type: "string", pattern: "^action:" },
+                  kind: { const: "action" },
+                  status: { enum: ["denied", "notApplicable", "stale"] },
+                  applicable: { const: false },
+                  authority: { const: "none" },
+                  revision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+                  explanation: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["kind", "ruleId"],
+                    properties: {
+                      kind: { enum: ["authorization", "requirement", "revision"] },
+                      ruleId: safeRuleIds.length
+                        ? { enum: safeRuleIds }
+                        : { type: "string", pattern: "^(authorize|require|revision):" },
+                    },
+                  },
+                },
+                allOf: [
+                  {
+                    if: { properties: { status: { const: "denied" } }, required: ["status"] },
+                    then: {
+                      properties: {
+                        explanation: {
+                          type: "object",
+                          properties: {
+                            kind: { const: "authorization" },
+                            ruleId: { type: "string", pattern: "^authorize:" },
+                          },
+                        },
+                        revision: false,
+                      },
+                    },
+                  },
+                  {
+                    if: { properties: { status: { const: "notApplicable" } }, required: ["status"] },
+                    then: {
+                      properties: {
+                        explanation: {
+                          type: "object",
+                          properties: {
+                            kind: { const: "requirement" },
+                            ruleId: { type: "string", pattern: "^require:" },
+                          },
+                        },
+                        revision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+                      },
+                      required: ["revision"],
+                    },
+                  },
+                  {
+                    if: { properties: { status: { const: "stale" } }, required: ["status"] },
+                    then: {
+                      properties: {
+                        explanation: {
+                          type: "object",
+                          properties: {
+                            kind: { const: "revision" },
+                            ruleId: { type: "string", pattern: "^revision:" },
+                          },
+                        },
+                        revision: { type: "string", pattern: "^rev:1:[0-9a-f]{32}$" },
+                      },
+                      required: ["revision"],
+                    },
+                  },
+                ],
+              },
+            },
+          },
         },
       },
     },
@@ -421,6 +638,9 @@ function generateHttpClient(manifest: OperationManifest): string {
     return this.call(${JSON.stringify(applicabilityRoute(operation))}, input, { expectedRevision: options.expectedRevision });
   }`,
   ).join("\n\n");
+  const subjectCandidates = manifest.operations.filter((operation) => operation.kind === "action").map((operation) =>
+    `  | { readonly operationId: ${JSON.stringify(operation.id)}; readonly input: ${operationInputName(operation)}; readonly expectedRevision?: string }`,
+  ).join("\n");
   return `// Generated by ModelLang. Do not edit.
 import type { ${typeImports(manifest).join(", ")} } from "./types.js";
 import { AuthenticationError, mapHttpProblem } from "./errors.js";
@@ -432,6 +652,50 @@ export interface ${manifest.model.name}HttpClientOptions {
   accessToken: () => string | Promise<string>;
   fetch?: FetchLike;
   headers?: Readonly<Record<string, string>>;
+}
+
+export type ${manifest.model.name}SubjectCapabilityCandidate =
+${subjectCandidates || "  never"};
+
+export interface ${manifest.model.name}SubjectCapabilityView {
+  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly viewVersion: 1;
+  readonly catalogVersion: 2;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsExpressions: false;
+    readonly containsResourceState: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly authentication: {
+    readonly required: true;
+    readonly source: "authenticatedContext";
+    readonly callerInput: false;
+    readonly identityDisclosed: false;
+  };
+  readonly available: readonly {
+    readonly operationId: ${manifest.model.name}SubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "applicable";
+    readonly applicable: true;
+    readonly authority: "none";
+    readonly revision: string;
+  }[];
+  readonly unavailable: readonly {
+    readonly operationId: ${manifest.model.name}SubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "denied" | "notApplicable" | "stale";
+    readonly applicable: false;
+    readonly authority: "none";
+    readonly revision?: string;
+    readonly explanation: { readonly kind: "authorization" | "requirement" | "revision"; readonly ruleId: string };
+  }[];
 }
 
 export class ${manifest.model.name}HttpClient {
@@ -465,6 +729,12 @@ export class ${manifest.model.name}HttpClient {
       throw mapHttpProblem(problem, response.status);
     }
     return await response.json() as Result;
+  }
+
+  async subjectCapabilities(
+    candidates: readonly ${manifest.model.name}SubjectCapabilityCandidate[],
+  ): Promise<${manifest.model.name}SubjectCapabilityView> {
+    return this.call(${JSON.stringify(SUBJECT_CAPABILITY_ROUTE)}, { candidates });
   }
 
 ${methods}
@@ -516,7 +786,7 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
     })),
   ]));
   const operationIds = manifest.operations.map((operation) => JSON.stringify(operation.id)).join(" | ");
-  const actionIds = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => JSON.stringify(operation.id)).join(" | ");
+  const actionIds = manifest.operations.filter((operation) => operation.kind === "action").map((operation) => JSON.stringify(operation.id)).join(" | ") || "never";
   const inputImports = manifest.operations.map(operationInputName);
   const dispatch = manifest.operations.map((operation) => operation.kind === "action"
     ? `      case ${JSON.stringify(operation.id)}: return client.${operation.name}(input as unknown as ${operationInputName(operation)}, options);`
@@ -531,6 +801,10 @@ function generateHttpServer(manifest: OperationManifest, capabilities: Capabilit
   }]));
   return `// Generated by ModelLang. Do not edit.
 import type { ${[...inputImports, "ApplicabilityDecision", "ApplicabilityOptions", "ExecutionOptions"].join(", ")} } from "./types.js";
+import type {
+  ${manifest.model.name}SubjectCapabilityCandidate,
+  ${manifest.model.name}SubjectCapabilityView,
+} from "./http-client.js";
 import { ${manifest.model.name}Client } from "./client.js";
 import {
   AuthenticationError,
@@ -828,6 +1102,47 @@ function validateDecision(definition: OperationDefinition, value: unknown): Appl
   return value as ApplicabilityDecision;
 }
 
+function validateSubjectCandidates(value: unknown): readonly ${manifest.model.name}SubjectCapabilityCandidate[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ValidationError("Subject capability input must be a JSON object", "ML_VALIDATION", "agent:subject-capabilities");
+  }
+  const request = value as Record<string, unknown>;
+  if (Object.keys(request).length !== 1 || !Object.hasOwn(request, "candidates") || !Array.isArray(request.candidates)
+    || request.candidates.length < ${manifest.operations.some((operation) => operation.kind === "action") ? 1 : 0}
+    || request.candidates.length > ${manifest.operations.some((operation) => operation.kind === "action") ? SUBJECT_CAPABILITY_MAX_CANDIDATES : 0}) {
+    throw new ValidationError("Subject capability candidates are invalid for the declared action set", "ML_VALIDATION", "agent:subject-capabilities");
+  }
+  const seen = new Set<string>();
+  return request.candidates.map((rawCandidate) => {
+    if (!rawCandidate || typeof rawCandidate !== "object" || Array.isArray(rawCandidate)) {
+      throw new ValidationError("Subject capability candidate must be an object", "ML_VALIDATION", "agent:subject-capability-candidate");
+    }
+    const candidate = rawCandidate as Record<string, unknown>;
+    if (Object.keys(candidate).some((key) => key !== "operationId" && key !== "input" && key !== "expectedRevision")
+      || typeof candidate.operationId !== "string" || !Object.hasOwn(candidate, "input")) {
+      throw new ValidationError("Subject capability candidate is not closed", "ML_VALIDATION", "agent:subject-capability-candidate");
+    }
+    const definition = operationDefinitions.find((item) =>
+      item.endpoint === "execution" && item.action && item.id === candidate.operationId);
+    if (!definition) {
+      throw new ValidationError("Subject capability candidate must name a declared action", "ML_VALIDATION", "agent:subject-capability-operation");
+    }
+    if (seen.has(definition.id)) {
+      throw new ValidationError("Subject capability actions must be unique", "ML_VALIDATION", "agent:subject-capability-operation");
+    }
+    seen.add(definition.id);
+    if (candidate.expectedRevision !== undefined
+      && (typeof candidate.expectedRevision !== "string" || !/^rev:1:[0-9a-f]{32}$/.test(candidate.expectedRevision))) {
+      throw new ValidationError("Subject capability expected revision is invalid", "ML_VALIDATION", "agent:subject-capability-revision");
+    }
+    return {
+      operationId: definition.id as ${manifest.model.name}ActionOperationId,
+      input: validateInput(definition, candidate.input),
+      ...(candidate.expectedRevision === undefined ? {} : { expectedRevision: candidate.expectedRevision }),
+    } as unknown as ${manifest.model.name}SubjectCapabilityCandidate;
+  });
+}
+
 function normalizedRuleId(error: ModelOperationError): string | undefined {
   return error.ruleId && /^(?:authorize|require|revision|where|boundary|workflow|transition|money|transport|parameter|invariant|exclusion|idempotency|cursor|sort-profile):/.test(error.ruleId)
     ? error.ruleId
@@ -914,8 +1229,9 @@ export function create${manifest.model.name}HttpHandler(
   const maxBodyBytes = options.maxBodyBytes ?? 1_048_576;
   return async (request: Request): Promise<Response> => {
     const path = new URL(request.url).pathname;
+    const subjectCapabilityRequest = path === \`\${basePath}${SUBJECT_CAPABILITY_ROUTE}\`;
     const definition = operationDefinitions.find((candidate) => \`\${basePath}\${candidate.route}\` === path);
-    if (!definition) {
+    if (!definition && !subjectCapabilityRequest) {
       return problemResponse(new NotFoundError("Unknown ModelLang operation", "ML_OPERATION_NOT_FOUND", "transport:operation"));
     }
     if (request.method !== "POST") {
@@ -934,13 +1250,81 @@ export function create${manifest.model.name}HttpHandler(
     try {
       const executor = await authenticate(bearer);
       if (!executor) throw new AuthenticationError("Bearer authentication failed", "ML_AUTHENTICATION");
-      const input = validateInput(definition, await readJson(request, maxBodyBytes));
+      const body = await readJson(request, maxBodyBytes);
+      if (subjectCapabilityRequest) {
+        for (const header of ["if-match", "idempotency-key", "x-correlation-id", "x-causation-id"]) {
+          if (request.headers.has(header)) {
+            throw new ValidationError("Operation metadata is not accepted by subject capability views", "ML_VALIDATION", "agent:subject-capabilities");
+          }
+        }
+        const candidates = validateSubjectCandidates(body);
+        const available: ${manifest.model.name}SubjectCapabilityView["available"][number][] = [];
+        const unavailable: ${manifest.model.name}SubjectCapabilityView["unavailable"][number][] = [];
+        for (const candidate of candidates) {
+          const candidateDefinition = operationDefinitions.find((item) =>
+            item.endpoint === "execution" && item.action && item.id === candidate.operationId)!;
+          const decision = validateDecision(
+            candidateDefinition,
+            await executor.assess(candidate.operationId, candidate.input as unknown as Readonly<Record<string, unknown>>, { expectedRevision: candidate.expectedRevision }),
+          );
+          if (decision.status === "applicable") {
+            available.push({
+              operationId: candidate.operationId,
+              kind: "action",
+              status: "applicable",
+              applicable: true,
+              authority: "none",
+              revision: decision.revision!,
+            });
+          } else {
+            unavailable.push({
+              operationId: candidate.operationId,
+              kind: "action",
+              status: decision.status,
+              applicable: false,
+              authority: "none",
+              ...(decision.revision ? { revision: decision.revision } : {}),
+              explanation: decision.explanation!,
+            });
+          }
+        }
+        const view: ${manifest.model.name}SubjectCapabilityView = {
+          $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
+          viewVersion: 1,
+          catalogVersion: 2,
+          model: ${JSON.stringify(manifest.model)},
+          view: {
+            audience: "agent",
+            subjectSpecific: true,
+            authorizationFiltered: true,
+            inputSpecific: true,
+            containsExpressions: false,
+            containsResourceState: false,
+            containsExtensions: false,
+            grantsAuthority: false,
+            runtimeAuthorizationRequired: true,
+          },
+          authentication: {
+            required: true,
+            source: "authenticatedContext",
+            callerInput: false,
+            identityDisclosed: false,
+          },
+          available,
+          unavailable,
+        };
+        return Response.json(view, {
+          status: 200,
+          headers: { "content-type": "application/json", "cache-control": "no-store" },
+        });
+      }
+      const input = validateInput(definition!, body);
       const revision = expectedRevision(request);
-      const command = executionOptions(request, definition, revision);
-      if (definition.endpoint === "applicability") {
+      const command = executionOptions(request, definition!, revision);
+      if (definition!.endpoint === "applicability") {
         const decision = validateDecision(
-          definition,
-          await executor.assess(definition.id as ${manifest.model.name}ActionOperationId, input, { expectedRevision: command.expectedRevision }),
+          definition!,
+          await executor.assess(definition!.id as ${manifest.model.name}ActionOperationId, input, { expectedRevision: command.expectedRevision }),
         );
         return Response.json(decision, {
           status: 200,
@@ -950,13 +1334,13 @@ export function create${manifest.model.name}HttpHandler(
           },
         });
       }
-      const result = await executor.execute(definition.id, input, command);
-      validateOutput(definition, result);
+      const result = await executor.execute(definition!.id, input, command);
+      validateOutput(definition!, result);
       return Response.json(result, {
         status: 200,
         headers: {
           "content-type": "application/json",
-          ...(definition.action && command.correlationId ? { "x-correlation-id": command.correlationId } : {}),
+          ...(definition!.action && command.correlationId ? { "x-correlation-id": command.correlationId } : {}),
         },
       });
     } catch (error) {

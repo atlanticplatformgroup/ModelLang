@@ -11,6 +11,50 @@ export interface ReservationsHttpClientOptions {
   headers?: Readonly<Record<string, string>>;
 }
 
+export type ReservationsSubjectCapabilityCandidate =
+  | { readonly operationId: "action:act_508ad810a19d4b79a5009871de5cd26b"; readonly input: ReserveInput; readonly expectedRevision?: string };
+
+export interface ReservationsSubjectCapabilityView {
+  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly viewVersion: 1;
+  readonly catalogVersion: 2;
+  readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
+  readonly view: {
+    readonly audience: "agent";
+    readonly subjectSpecific: true;
+    readonly authorizationFiltered: true;
+    readonly inputSpecific: true;
+    readonly containsExpressions: false;
+    readonly containsResourceState: false;
+    readonly containsExtensions: false;
+    readonly grantsAuthority: false;
+    readonly runtimeAuthorizationRequired: true;
+  };
+  readonly authentication: {
+    readonly required: true;
+    readonly source: "authenticatedContext";
+    readonly callerInput: false;
+    readonly identityDisclosed: false;
+  };
+  readonly available: readonly {
+    readonly operationId: ReservationsSubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "applicable";
+    readonly applicable: true;
+    readonly authority: "none";
+    readonly revision: string;
+  }[];
+  readonly unavailable: readonly {
+    readonly operationId: ReservationsSubjectCapabilityCandidate["operationId"];
+    readonly kind: "action";
+    readonly status: "denied" | "notApplicable" | "stale";
+    readonly applicable: false;
+    readonly authority: "none";
+    readonly revision?: string;
+    readonly explanation: { readonly kind: "authorization" | "requirement" | "revision"; readonly ruleId: string };
+  }[];
+}
+
 export class ReservationsHttpClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: FetchLike;
@@ -42,6 +86,12 @@ export class ReservationsHttpClient {
       throw mapHttpProblem(problem, response.status);
     }
     return await response.json() as Result;
+  }
+
+  async subjectCapabilities(
+    candidates: readonly ReservationsSubjectCapabilityCandidate[],
+  ): Promise<ReservationsSubjectCapabilityView> {
+    return this.call("/agent/capabilities", { candidates });
   }
 
   async reserve(input: ReserveInput, options: ExecutionOptions = {}): Promise<Reservation> {

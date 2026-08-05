@@ -5,11 +5,11 @@
   "type": "object",
   "required": [
     "$schema", "catalogVersion", "compilerVersion", "operationManifestVersion",
-    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "tools"
+    "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "tools"
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
-    "catalogVersion": { "const": 1 },
+    "catalogVersion": { "const": 2 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },
     "capabilityManifestVersion": { "const": 10 },
@@ -58,6 +58,36 @@
         "required": { "const": true },
         "source": { "const": "authenticatedContext" },
         "callerInput": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "subjectView": {
+      "type": "object",
+      "required": [
+        "protocol", "method", "path", "authenticated", "subjectSpecific",
+        "authorizationFiltered", "inputSpecific", "candidateKinds", "maxCandidates",
+        "queryTools", "containsResourceState", "grantsAuthority", "runtimeAuthorizationRequired"
+      ],
+      "properties": {
+        "protocol": { "const": "http" },
+        "method": { "const": "POST" },
+        "path": { "const": "/agent/capabilities" },
+        "authenticated": { "const": true },
+        "subjectSpecific": { "const": true },
+        "authorizationFiltered": { "const": true },
+        "inputSpecific": { "const": true },
+        "candidateKinds": {
+          "type": "array",
+          "prefixItems": [{ "const": "action" }],
+          "items": false,
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "maxCandidates": { "const": 32 },
+        "queryTools": { "const": "staticCatalogOnly" },
+        "containsResourceState": { "const": false },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
       },
       "additionalProperties": false
     },

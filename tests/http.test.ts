@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFile } from "node:fs/promises";
+import { Ajv2020 } from "ajv/dist/2020.js";
 import { ProcurementHttpClient } from "../generated/procurement/typescript/http-client.js";
 import {
   createProcurementHttpHandler,
@@ -288,6 +290,121 @@ describe("generated HTTP boundary", () => {
       { "if-match": applicableDecision.revision },
     ));
     expect(malformed.status).toBe(400);
+  });
+
+  it("returns an authenticated input-specific action capability view without identity or state payloads", async () => {
+    const submitId = "action:act_ed2374e822704c51a2925338253d05d2" as const;
+    const execute = vi.fn(async () => purchaseRequest);
+    const assessOperation = vi.fn(async (operationId: string) => operationId === applicableDecision.operationId
+      ? applicableDecision
+      : {
+          operationId: submitId,
+          status: "denied" as const,
+          applicable: false,
+          authority: "none" as const,
+          explanation: { kind: "authorization" as const, ruleId: `authorize:${submitId}` },
+        });
+    const handler = createProcurementHttpHandler(async () => ({
+      execute,
+      assess: assessOperation,
+    }));
+    const requests: Request[] = [];
+    const responses: Response[] = [];
+    const client = new ProcurementHttpClient({
+      baseUrl: "https://example.test",
+      accessToken: () => "subject-token",
+      fetch: async (input, init) => {
+        const incoming = new Request(input, init);
+        requests.push(incoming.clone());
+        const response = await handler(incoming);
+        responses.push(response.clone());
+        return response;
+      },
+    });
+    const view = await client.subjectCapabilities([
+      {
+        operationId: applicableDecision.operationId,
+        input: { amount: { currency: "USD", amount: "10.00" } },
+        expectedRevision: applicableDecision.revision,
+      },
+      {
+        operationId: submitId,
+        input: { request: purchaseRequest.id },
+      },
+    ]);
+
+    expect(requests[0]!.url).toBe("https://example.test/agent/capabilities");
+    expect(requests[0]!.headers.get("authorization")).toBe("Bearer subject-token");
+    expect(requests[0]!.headers.get("if-match")).toBeNull();
+    expect(responses[0]!.headers.get("cache-control")).toBe("no-store");
+    expect(view).toMatchObject({
+      viewVersion: 1,
+      catalogVersion: 2,
+      model: { id: "model:Procurement" },
+      view: {
+        subjectSpecific: true,
+        authorizationFiltered: true,
+        inputSpecific: true,
+        containsResourceState: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      authentication: { callerInput: false, identityDisclosed: false },
+      available: [{
+        operationId: applicableDecision.operationId,
+        status: "applicable",
+        applicable: true,
+        authority: "none",
+        revision: applicableDecision.revision,
+      }],
+      unavailable: [{
+        operationId: submitId,
+        status: "denied",
+        applicable: false,
+        authority: "none",
+        explanation: { kind: "authorization", ruleId: `authorize:${submitId}` },
+      }],
+    });
+    expect(JSON.stringify(view)).not.toMatch(/subject-token|00000000-0000-4000-8000-000000000010|amount|requester|roles/);
+    expect(assessOperation).toHaveBeenNthCalledWith(
+      1,
+      applicableDecision.operationId,
+      { amount: { currency: "USD", amount: "10.00" } },
+      { expectedRevision: applicableDecision.revision },
+    );
+    const schema = JSON.parse(await readFile("schemas/subject-capability-view.schema.json", "utf8"));
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(view), JSON.stringify(validate.errors)).toBe(true);
+
+    const invalid = await handler(new Request("https://example.test/agent/capabilities", {
+      method: "POST",
+      headers: { authorization: "Bearer subject-token", "content-type": "application/json" },
+      body: JSON.stringify({
+        candidates: [{ operationId: "query:qry_4406b045404a48449282db804f6167a8", input: {} }],
+      }),
+    }));
+    expect(invalid.status).toBe(400);
+    expect(assessOperation).toHaveBeenCalledTimes(2);
+    expect(execute).not.toHaveBeenCalled();
+
+    const duplicate = await handler(new Request("https://example.test/agent/capabilities", {
+      method: "POST",
+      headers: { authorization: "Bearer subject-token", "content-type": "application/json" },
+      body: JSON.stringify({ candidates: [
+        { operationId: submitId, input: { request: purchaseRequest.id } },
+        { operationId: submitId, input: { request: purchaseRequest.id } },
+      ] }),
+    }));
+    expect(duplicate.status).toBe(400);
+    expect(assessOperation).toHaveBeenCalledTimes(2);
+
+    const unauthenticated = await handler(new Request("https://example.test/agent/capabilities", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ candidates: [] }),
+    }));
+    expect(unauthenticated.status).toBe(401);
+    expect(assessOperation).toHaveBeenCalledTimes(2);
   });
 
   it("rejects missing authentication and caller-shaped or malformed input before execution", async () => {
