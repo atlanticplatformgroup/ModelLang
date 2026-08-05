@@ -2140,7 +2140,7 @@ function buildEnforcement(
     purpose: "Report the canonical generator target's supported semantics and every model requirement that remains externally implemented.",
     layer: "ModelLang target conformance",
     artifact: "target-capabilities.json",
-    objectName: "target:postgresql-http-ui-agent-resources/4",
+    objectName: "target:postgresql-http-ui-mcp/5",
   });
   entries.push({ id: "boundary:audit", purpose: "Record each successful action with database and model principal identities plus gateway provenance when present.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit` });
   entries.push({ id: "boundary:decision_evidence", purpose: "Record private model/source identity, stable decision rule and policy authority, and executed outcome transactionally with action audit.", layer: "PostgreSQL audit", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.action_audit.decision_evidence` });

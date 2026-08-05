@@ -19,6 +19,7 @@ import { generateEventManifest } from "./event-manifest.js";
 import { generateExtensionLedger } from "./extension-ledger.js";
 import { generateTargetCapabilityReport } from "./target-capabilities.js";
 import { generateAgentToolCatalog } from "./agent-tool-catalog.js";
+import { generateMcp } from "./mcp.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -31,12 +32,13 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
   const uiManifest = generateUiManifest(operationManifest);
   const semanticManifest = generateSemanticManifest(ir, operationManifest);
   const eventManifest = generateEventManifest(ir);
+  const agentToolCatalog = generateAgentToolCatalog(operationManifest, capabilityManifest);
   const files: GeneratedFiles = {
     "model.ir.json": stableJson(ir),
     "operations.json": stableJson(operationManifest),
     "decisions.json": stableJson(decisionPlan),
     "capabilities.json": stableJson(capabilityManifest),
-    "agent-tools.json": stableJson(generateAgentToolCatalog(operationManifest, capabilityManifest)),
+    "agent-tools.json": stableJson(agentToolCatalog),
     "ui.json": stableJson(uiManifest),
     "semantic.json": stableJson(semanticManifest),
     "events.json": stableJson(eventManifest),
@@ -46,6 +48,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),
   };
+  Object.assign(files, generateMcp(agentToolCatalog));
   for (const [name, content] of Object.entries(generatePostgres(ir, decisionPlan))) files[`postgres/${name}`] = content;
   for (const [name, content] of Object.entries(generateTypeScript(ir, decisionPlan, capabilityManifest))) files[`typescript/${name}`] = content;
   Object.assign(files, generateHttp(operationManifest, capabilityManifest));

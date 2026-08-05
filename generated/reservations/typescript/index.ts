@@ -4,6 +4,7 @@ export * from "./client.js";
 export * from "./gateway.js";
 export * from "./http-client.js";
 export * from "./http-server.js";
+export * from "./mcp-server.js";
 export * from "./workflows.js";
 export * from "./events.js";
 export * from "./dispatcher.js";

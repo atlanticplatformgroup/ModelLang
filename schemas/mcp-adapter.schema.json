@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/mcp-adapter.schema.json",
+  "title": "ModelLang MCP adapter manifest",
+  "type": "object",
+  "required": [
+    "$schema", "adapterVersion", "compilerVersion", "protocolVersion",
+    "catalogVersion", "resourceEnvelopeVersion", "model", "transport",
+    "authentication", "discovery", "capabilities", "tools"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
+    "adapterVersion": { "const": 1 },
+    "compilerVersion": { "type": "string" },
+    "protocolVersion": { "const": "2026-07-28" },
+    "catalogVersion": { "const": 3 },
+    "resourceEnvelopeVersion": { "const": 1 },
+    "model": { "$ref": "#/$defs/model" },
+    "transport": {
+      "type": "object",
+      "required": ["kind", "stateless", "path", "legacyProtocol"],
+      "properties": {
+        "kind": { "const": "streamableHttp" },
+        "stateless": { "const": true },
+        "path": { "const": "/mcp" },
+        "legacyProtocol": { "const": "stateless" }
+      },
+      "additionalProperties": false
+    },
+    "authentication": {
+      "type": "object",
+      "required": [
+        "requiredPerRequest", "scheme", "oauthResourceServer", "audienceBound",
+        "callerInput", "tokenForwarding"
+      ],
+      "properties": {
+        "requiredPerRequest": { "const": true },
+        "scheme": { "const": "bearer" },
+        "oauthResourceServer": { "const": "hostProvided" },
+        "audienceBound": { "const": true },
+        "callerInput": { "const": false },
+        "tokenForwarding": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "discovery": {
+      "type": "object",
+      "required": ["static", "authorizationFiltered", "grantsAuthority", "runtimeAuthorizationRequired"],
+      "properties": {
+        "static": { "const": true },
+        "authorizationFiltered": { "const": false },
+        "grantsAuthority": { "const": false },
+        "runtimeAuthorizationRequired": { "const": true }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["tools", "embeddedResources", "prompts", "tasks"],
+      "properties": {
+        "tools": {
+          "type": "object",
+          "required": ["listChanged", "exactCatalogSchemas"],
+          "properties": {
+            "listChanged": { "const": false },
+            "exactCatalogSchemas": { "const": true }
+          },
+          "additionalProperties": false
+        },
+        "embeddedResources": {
+          "type": "object",
+          "required": ["delivery", "templates", "subscriptions", "listChanged"],
+          "properties": {
+            "delivery": { "const": "embeddedToolResult" },
+            "templates": { "const": false },
+            "subscriptions": { "const": false },
+            "listChanged": { "const": false }
+          },
+          "additionalProperties": false
+        },
+        "prompts": { "const": false },
+        "tasks": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "tools": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tool" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "schemaDocument": {
+      "type": "object",
+      "required": ["$schema", "type"],
+      "properties": {
+        "$schema": { "const": "https://json-schema.org/draft/2020-12/schema" },
+        "type": { "enum": ["object", "array"] }
+      },
+      "additionalProperties": true
+    },
+    "annotations": {
+      "type": "object",
+      "required": ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"],
+      "properties": {
+        "readOnlyHint": { "type": "boolean" },
+        "destructiveHint": { "const": false },
+        "idempotentHint": { "type": "boolean" },
+        "openWorldHint": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "executionMetadata": {
+      "type": "object",
+      "required": [
+        "location", "expectedRevision", "idempotencyKey", "correlationId",
+        "causationId", "idempotency"
+      ],
+      "properties": {
+        "location": { "const": "requestMeta" },
+        "expectedRevision": { "const": "dev.modellang/expectedRevision" },
+        "idempotencyKey": { "const": "dev.modellang/idempotencyKey" },
+        "correlationId": { "const": "dev.modellang/correlationId" },
+        "causationId": { "const": "dev.modellang/causationId" },
+        "idempotency": { "enum": ["required", "unsupported"] }
+      },
+      "additionalProperties": false
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "delivery", "envelopeVersion", "mimeType", "containsCurrentState",
+        "uriContainsInput", "freshness", "grantsAuthority"
+      ],
+      "properties": {
+        "delivery": { "const": "embeddedToolResult" },
+        "envelopeVersion": { "const": 1 },
+        "mimeType": { "const": "application/vnd.modellang.agent-resource+json" },
+        "containsCurrentState": { "const": true },
+        "uriContainsInput": { "const": false },
+        "freshness": {
+          "type": "object",
+          "required": ["mode", "maxAgeSeconds", "revalidate"],
+          "properties": {
+            "mode": { "const": "pointInTime" },
+            "maxAgeSeconds": { "const": 0 },
+            "revalidate": { "const": "beforeReuse" }
+          },
+          "additionalProperties": false
+        },
+        "grantsAuthority": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "tool": {
+      "type": "object",
+      "required": [
+        "name", "operationId", "authoredName", "kind", "description",
+        "inputSchema", "outputSchema", "annotations", "executionMetadata"
+      ],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[A-Za-z0-9_.-]{1,128}$" },
+        "operationId": { "type": "string", "pattern": "^(action|query):" },
+        "authoredName": { "type": "string", "minLength": 1 },
+        "kind": { "enum": ["action", "query"] },
+        "description": { "type": "string", "minLength": 1 },
+        "inputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "outputSchema": { "$ref": "#/$defs/schemaDocument" },
+        "annotations": { "$ref": "#/$defs/annotations" },
+        "executionMetadata": { "$ref": "#/$defs/executionMetadata" },
+        "resource": { "$ref": "#/$defs/resource" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "action" } }, "required": ["kind"] },
+          "then": {
+            "properties": {
+              "resource": false,
+              "annotations": {
+                "type": "object",
+                "properties": { "readOnlyHint": { "const": false } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "query" } }, "required": ["kind"] },
+          "then": {
+            "required": ["resource"],
+            "properties": {
+              "resource": true,
+              "annotations": {
+                "type": "object",
+                "properties": {
+                  "readOnlyHint": { "const": true },
+                  "idempotentHint": { "const": false }
+                }
+              },
+              "executionMetadata": {
+                "type": "object",
+                "properties": { "idempotency": { "const": "unsupported" } }
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

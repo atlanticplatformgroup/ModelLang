@@ -303,8 +303,8 @@ describe("backends", () => {
     const validateTarget = new Ajv2020({ allErrors: true, strict: true }).compile(targetSchema);
     expect(validateTarget(target), JSON.stringify(validateTarget.errors)).toBe(true);
     expect(target).toMatchObject({
-      profileVersion: 4,
-      targetProfile: "target:postgresql-http-ui-agent-resources/4",
+      profileVersion: 5,
+      targetProfile: "target:postgresql-http-ui-mcp/5",
       conformance: "requiresExternalImplementations",
       authority: "none",
       gaps: [{ extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968" }],
@@ -327,6 +327,12 @@ describe("backends", () => {
       support: "native",
       enforcement: ["agent-tool-catalog", "http", "postgresql-query"],
     });
+    expect(target.capabilities).toContainEqual({
+      id: "agents.mcpAdapter",
+      required: true,
+      support: "native",
+      enforcement: ["mcp", "agent-tool-catalog", "postgresql-runtime"],
+    });
     for (const path of ["operations.json", "capabilities.json", "openapi.json", "ui.json"]) {
       expect(output[path]).not.toContain("extension:ext_54d694c9a0a274dc79c6168e47d25968");
       expect(output[path]).not.toContain("supplier-risk/review");
@@ -346,13 +352,14 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-agent-resources/4" });
+    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-mcp/5" });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "decisions.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "capabilities.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "agent-tools.json")?.role).toBe("contract");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "mcp.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "extensions.json")?.role).toBe("assurance");
     expect(provenance.artifacts.find((artifact) => artifact.path === "target-capabilities.json")?.role).toBe("assurance");
     expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
@@ -479,6 +486,82 @@ describe("backends", () => {
         properties: { items: { type: "array", maxItems: 2 } },
       },
     });
+  });
+
+  it("emits a schema-valid MCP adapter with exact catalog schemas and distinct query resources", async () => {
+    const output = generateAll(await procurement());
+    const catalog = JSON.parse(output["agent-tools.json"]!) as {
+      tools: { id: string; kind: "action" | "query"; inputSchema: object; outputSchema: object }[];
+    };
+    const manifest = JSON.parse(output["mcp.json"]!) as {
+      adapterVersion: number;
+      protocolVersion: string;
+      catalogVersion: number;
+      transport: { kind: string; stateless: boolean };
+      authentication: Record<string, unknown>;
+      discovery: Record<string, unknown>;
+      capabilities: { embeddedResources: Record<string, unknown>; prompts: boolean; tasks: boolean };
+      tools: {
+        name: string;
+        operationId: string;
+        kind: "action" | "query";
+        inputSchema: object;
+        outputSchema: object;
+        resource?: Record<string, unknown>;
+      }[];
+    };
+    const schema = JSON.parse(await readFile("schemas/mcp-adapter.schema.json", "utf8")) as object;
+    const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
+    expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
+    expect(manifest).toMatchObject({
+      adapterVersion: 1,
+      protocolVersion: "2026-07-28",
+      catalogVersion: 3,
+      transport: { kind: "streamableHttp", stateless: true },
+      authentication: {
+        requiredPerRequest: true,
+        scheme: "bearer",
+        oauthResourceServer: "hostProvided",
+        audienceBound: true,
+        callerInput: false,
+        tokenForwarding: false,
+      },
+      discovery: {
+        static: true,
+        authorizationFiltered: false,
+        grantsAuthority: false,
+        runtimeAuthorizationRequired: true,
+      },
+      capabilities: {
+        embeddedResources: { delivery: "embeddedToolResult", templates: false, subscriptions: false },
+        prompts: false,
+        tasks: false,
+      },
+    });
+    expect(manifest.tools).toHaveLength(catalog.tools.length);
+    for (const tool of manifest.tools) {
+      const catalogTool = catalog.tools.find((candidate) => candidate.id === tool.operationId)!;
+      expect(tool.name).toBe(tool.operationId.slice(tool.operationId.indexOf(":") + 1));
+      expect(tool.inputSchema).toEqual(catalogTool.inputSchema);
+      expect(tool.outputSchema).toEqual(catalogTool.outputSchema);
+      if (tool.kind === "query") {
+        expect(tool.resource).toMatchObject({
+          delivery: "embeddedToolResult",
+          envelopeVersion: 1,
+          containsCurrentState: true,
+          uriContainsInput: false,
+          grantsAuthority: false,
+          freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        });
+      } else {
+        expect(tool).not.toHaveProperty("resource");
+      }
+    }
+    expect(output["typescript/mcp-server.ts"]).toContain("createProcurementMcpHandler");
+    expect(output["typescript/index.ts"]).toContain('export * from "./mcp-server.js"');
+    expect(`${output["mcp.json"]}\n${output["typescript/mcp-server.ts"]}`).not.toMatch(
+      /supplier-risk\/review|extension:ext_|query_audit|event_outbox/,
+    );
   });
 
   it("derives a schema-valid framework-neutral UI manifest from the operation boundary", async () => {
@@ -985,7 +1068,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.40.0'");
+    expect(sql).toContain("'modelVersion', '0.41.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1148,7 +1231,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.40.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.41.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

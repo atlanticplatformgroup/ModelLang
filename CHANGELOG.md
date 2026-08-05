@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.41.0
+
+- Added deterministic MCP adapter manifest v1 and generated stateless Streamable HTTP server adapters for MCP revision `2026-07-28`.
+- Exposed every agent catalog v3 action and query under its stable MCP-compatible ID suffix with the catalog's exact JSON Schema 2020-12 input and output documents.
+- Added per-request host-provided bearer authentication with expiry and exact resource-audience validation; verified identity stays in the authenticated executor context and every invocation retains authoritative runtime enforcement.
+- Kept actions and resources distinct: actions return tool results, while successful queries additionally return embedded resource envelope v1 with input-hiding URIs, zero reusable lifetime, revalidation before reuse, and no-store metadata.
+- Added namespaced MCP command metadata for revisions, idempotency, correlation, and causation without widening closed action inputs; query tools reject command metadata.
+- Added manifest/schema/golden documentation, official client protocol tests, and live PostgreSQL coverage for authenticated actions, runtime policy denial, current-state reads, and private transactional read evidence.
+- Advanced compiler/examples to 0.41.0, target capability profile to v5, target to `target:postgresql-http-ui-mcp/5`, and generator profile to `postgresql-http-ui-mcp/25`; canonical IR1, catalog v3, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.40.0
 
 - Added one authenticated current-state agent-resource route per declared query, reusing the existing query executor for authorization, row filtering, disclosure, sorting, bounds, pagination, output validation, and private read evidence.

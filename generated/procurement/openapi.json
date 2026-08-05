@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.40.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5)."
+    "version": "0.41.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1082,10 +1082,10 @@
                           "const": "Procurement"
                         },
                         "version": {
-                          "const": "0.40.0"
+                          "const": "0.41.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"
+                          "const": "sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44"
                         }
                       }
                     },
@@ -1984,10 +1984,10 @@
                 "const": "Procurement"
               },
               "version": {
-                "const": "0.40.0"
+                "const": "0.41.0"
               },
               "sourceHash": {
-                "const": "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"
+                "const": "sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44"
               }
             }
           },

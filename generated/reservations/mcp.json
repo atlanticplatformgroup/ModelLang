@@ -1,55 +1,56 @@
 {
-  "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
-  "catalogVersion": 3,
+  "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
+  "adapterVersion": 1,
   "compilerVersion": "0.41.0",
-  "operationManifestVersion": 11,
-  "capabilityManifestVersion": 10,
+  "protocolVersion": "2026-07-28",
+  "catalogVersion": 3,
+  "resourceEnvelopeVersion": 1,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
     "version": "0.41.0",
     "sourceHash": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
   },
-  "view": {
-    "audience": "agent",
-    "static": true,
-    "authorizationFiltered": false,
-    "containsExpressions": false,
-    "containsCurrentState": false,
-    "containsExtensions": false,
-    "grantsAuthority": false,
-    "runtimeAuthorizationRequired": true
-  },
-  "adapter": {
-    "compatibility": "mcpTool",
-    "directProtocolConformance": false
+  "transport": {
+    "kind": "streamableHttp",
+    "stateless": true,
+    "path": "/mcp",
+    "legacyProtocol": "stateless"
   },
   "authentication": {
-    "required": true,
-    "source": "authenticatedContext",
-    "callerInput": false
+    "requiredPerRequest": true,
+    "scheme": "bearer",
+    "oauthResourceServer": "hostProvided",
+    "audienceBound": true,
+    "callerInput": false,
+    "tokenForwarding": false
   },
-  "subjectView": {
-    "protocol": "http",
-    "method": "POST",
-    "path": "/agent/capabilities",
-    "authenticated": true,
-    "subjectSpecific": true,
-    "authorizationFiltered": true,
-    "inputSpecific": true,
-    "candidateKinds": [
-      "action"
-    ],
-    "maxCandidates": 32,
-    "queryTools": "separateResourceBindings",
-    "containsResourceState": false,
+  "discovery": {
+    "static": true,
+    "authorizationFiltered": false,
     "grantsAuthority": false,
     "runtimeAuthorizationRequired": true
+  },
+  "capabilities": {
+    "tools": {
+      "listChanged": false,
+      "exactCatalogSchemas": true
+    },
+    "embeddedResources": {
+      "delivery": "embeddedToolResult",
+      "templates": false,
+      "subscriptions": false,
+      "listChanged": false
+    },
+    "prompts": false,
+    "tasks": false
   },
   "tools": [
     {
-      "id": "action:act_508ad810a19d4b79a5009871de5cd26b",
-      "name": "reserve",
+      "name": "act_508ad810a19d4b79a5009871de5cd26b",
+      "operationId": "action:act_508ad810a19d4b79a5009871de5cd26b",
+      "authoredName": "reserve",
+      "kind": "action",
       "description": "Execute the reserve domain action. Runtime authorization and preconditions remain authoritative.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -118,55 +119,26 @@
           }
         }
       },
-      "execution": {
-        "protocol": "http",
-        "method": "POST",
-        "path": "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b",
-        "authenticated": true,
-        "runtimeAuthorizationRequired": true
-      },
-      "errors": [
-        "identityBinding",
-        "authorization",
-        "idempotency",
-        "precondition",
-        "invariant",
-        "conflict"
-      ],
       "annotations": {
-        "readOnly": false
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
       },
-      "kind": "action",
-      "applicability": {
-        "protocol": "http",
-        "method": "POST",
-        "path": "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b/applicability",
-        "outcomes": [
-          "applicable",
-          "denied",
-          "notApplicable",
-          "stale"
-        ],
-        "authorizationRuleId": "authorize:action:act_508ad810a19d4b79a5009871de5cd26b",
-        "preconditionRuleIds": [
-          "require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval"
-        ],
-        "revisionRuleId": "revision:action:act_508ad810a19d4b79a5009871de5cd26b",
-        "grantsAuthority": false
-      },
-      "reliability": {
-        "idempotency": "required",
-        "scope": "authenticatedPrincipal",
-        "replay": "storedResult",
-        "fingerprint": "canonicalSha256"
-      },
-      "emittedEventIds": [
-        "event:evt_40d694c9a0a274dc79c6168e47d25968"
-      ]
+      "executionMetadata": {
+        "location": "requestMeta",
+        "expectedRevision": "dev.modellang/expectedRevision",
+        "idempotencyKey": "dev.modellang/idempotencyKey",
+        "correlationId": "dev.modellang/correlationId",
+        "causationId": "dev.modellang/causationId",
+        "idempotency": "required"
+      }
     },
     {
-      "id": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
-      "name": "reservationsForResource",
+      "name": "qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "operationId": "query:qry_94d8a56f4c2640fab58a4c2190c35c69",
+      "authoredName": "reservationsForResource",
+      "kind": "query",
       "description": "Read the bounded reservationsForResource projection. Runtime authorization and row policy remain authoritative.",
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -276,69 +248,32 @@
           }
         }
       },
-      "execution": {
-        "protocol": "http",
-        "method": "POST",
-        "path": "/operations/queries/qry_94d8a56f4c2640fab58a4c2190c35c69",
-        "authenticated": true,
-        "runtimeAuthorizationRequired": true
-      },
-      "errors": [
-        "identityBinding",
-        "authorization",
-        "validation",
-        "stale"
-      ],
       "annotations": {
-        "readOnly": true
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
       },
-      "kind": "query",
-      "bounds": {
-        "cardinality": "page",
-        "maxItems": 2
+      "executionMetadata": {
+        "location": "requestMeta",
+        "expectedRevision": "dev.modellang/expectedRevision",
+        "idempotencyKey": "dev.modellang/idempotencyKey",
+        "correlationId": "dev.modellang/correlationId",
+        "causationId": "dev.modellang/causationId",
+        "idempotency": "unsupported"
       },
       "resource": {
-        "protocol": "http",
-        "method": "POST",
-        "path": "/agent/resources/queries/qry_94d8a56f4c2640fab58a4c2190c35c69",
-        "authenticated": true,
-        "subjectSpecific": true,
-        "authorizationFiltered": true,
+        "delivery": "embeddedToolResult",
+        "envelopeVersion": 1,
+        "mimeType": "application/vnd.modellang.agent-resource+json",
         "containsCurrentState": true,
+        "uriContainsInput": false,
         "freshness": {
           "mode": "pointInTime",
           "maxAgeSeconds": 0,
           "revalidate": "beforeReuse"
         },
-        "grantsAuthority": false,
-        "runtimeAuthorizationRequired": true
-      },
-      "sorting": {
-        "input": "sort",
-        "defaultProfile": "default",
-        "profiles": [
-          {
-            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.default",
-            "name": "default",
-            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
-            "direction": "asc",
-            "identityTieBreaker": true
-          },
-          {
-            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.latestFirst",
-            "name": "latestFirst",
-            "fieldId": "field:fld_59e1f90fae57481f921c5a81dfd3a234",
-            "direction": "desc",
-            "identityTieBreaker": true
-          },
-          {
-            "id": "sortProfile:query:qry_94d8a56f4c2640fab58a4c2190c35c69.endingSoonest",
-            "name": "endingSoonest",
-            "fieldId": "field:fld_fd818707952f4b388baea4c3132bce63",
-            "direction": "asc",
-            "identityTieBreaker": true
-          }
-        ]
+        "grantsAuthority": false
       }
     }
   ]

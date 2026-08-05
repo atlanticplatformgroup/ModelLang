@@ -1,11 +1,12 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.40](./spec/0.40/LANGUAGE.md). It retains the complete 0.39 language and adds authenticated current-state agent resources with explicit freshness.
+The current normative specification is [ModelLang 0.41](./spec/0.41/LANGUAGE.md). It retains the complete 0.40 language and adds direct MCP adapter integration over the stable catalog and resource contracts.
 
-- [Agent resource semantics](./spec/0.40/AGENT_RESOURCES.md)
-- [0.40 grammar](./spec/0.40/GRAMMAR.ebnf)
-- [0.40 conformance requirements](./spec/0.40/CONFORMANCE.md)
-- [0.40 unstable agent boundaries](./spec/0.40/UNSTABLE.md)
+- [Direct MCP integration](./spec/0.41/MCP_INTEGRATION.md)
+- [0.41 grammar](./spec/0.41/GRAMMAR.ebnf)
+- [0.41 conformance requirements](./spec/0.41/CONFORMANCE.md)
+- [0.41 unstable boundaries](./spec/0.41/UNSTABLE.md)
+- [0.40 agent resource semantics](./spec/0.40/AGENT_RESOURCES.md)
 
 - [Subject capability view semantics](./spec/0.39/SUBJECT_CAPABILITY_VIEWS.md)
 - [0.39 grammar](./spec/0.39/GRAMMAR.ebnf)

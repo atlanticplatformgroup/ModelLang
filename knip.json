@@ -18,5 +18,8 @@
     "src/**/*.ts",
     "scripts/**/*.ts",
     "tests/**/*.ts"
+  ],
+  "ignoreDependencies": [
+    "@modelcontextprotocol/server"
   ]
 }

@@ -3,8 +3,8 @@
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.40.0",
-    "sourceHash": "sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5",
+    "version": "0.41.0",
+    "sourceHash": "sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44",
     "sourceFile": "examples/procurement.model",
     "naming": {
       "sqlSchema": "model_procurement",
@@ -3764,7 +3764,7 @@
       "purpose": "Report the canonical generator target's supported semantics and every model requirement that remains externally implemented.",
       "layer": "ModelLang target conformance",
       "artifact": "target-capabilities.json",
-      "objectName": "target:postgresql-http-ui-agent-resources/4"
+      "objectName": "target:postgresql-http-ui-mcp/5"
     },
     {
       "id": "boundary:audit",

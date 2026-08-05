@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.40.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306)."
+    "version": "0.41.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -606,10 +606,10 @@
                           "const": "Reservations"
                         },
                         "version": {
-                          "const": "0.40.0"
+                          "const": "0.41.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"
+                          "const": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
                         }
                       }
                     },
@@ -1385,10 +1385,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.40.0"
+                "const": "0.41.0"
               },
               "sourceHash": {
-                "const": "sha256:21bac77583d44f710c105f22969a14bccba5576e9fc7b533eb10f3f55d471306"
+                "const": "sha256:55dd4e3cf827daa3a2b9cb0613d7bb0ed0d3bd4137ad88699f791b79fd5b1c0d"
               }
             }
           },

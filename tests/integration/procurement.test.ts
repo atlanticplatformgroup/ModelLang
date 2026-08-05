@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { Client as McpClient, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { Client, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ProcurementClient } from "../../generated/procurement/typescript/client.js";
@@ -10,6 +11,7 @@ import {
   type ProcurementAuthenticator,
 } from "../../generated/procurement/typescript/http-server.js";
 import { createProcurementGatewayExecutor } from "../../generated/procurement/typescript/gateway.js";
+import { createProcurementMcpHandler } from "../../generated/procurement/typescript/mcp-server.js";
 import { consumeObserveRequestApproval, deliverObserveRequestApproval, recoverObserveRequestApproval } from "../../generated/procurement/typescript/consumers.js";
 import type { RequestApprovedEvent } from "../../generated/procurement/typescript/events.js";
 import {
@@ -271,7 +273,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.40.0",
+      model_version: "0.41.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -336,7 +338,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.40.0",
+      model_version: "0.41.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1205,7 +1207,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.40.0', $1,
+        VALUES ('model:Procurement', '0.41.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2137,6 +2139,107 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       const invalid = new ProcurementHttpClient({ baseUrl, accessToken: () => "invalid" });
       await expect(invalid.myRequests({})).rejects.toBeInstanceOf(AuthenticationError);
     });
+  });
+
+  it("preserves authentication, runtime policy, and current-state evidence through MCP", async () => {
+    const endpoint = new URL("https://procurement.example.test/mcp");
+    let authenticationCount = 0;
+    let unexpectedError: Error | undefined;
+    const handler = createProcurementMcpHandler(async (token) => {
+      authenticationCount += 1;
+      if (token !== "employee-one") return null;
+      return {
+        authInfo: {
+          token,
+          clientId: "procurement-live-test",
+          scopes: ["modellang"],
+          expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          resource: new URL(endpoint.href),
+        },
+        executor: createProcurementGatewayExecutor(gateway, {
+          issuer: "https://auth.example.test",
+          subject: "employee-one",
+        }),
+      };
+    }, { resourceServerUrl: endpoint.href, onerror: (error) => { unexpectedError = error; } });
+    const transport = new StreamableHTTPClientTransport(endpoint, {
+      requestInit: { headers: { authorization: "Bearer employee-one" } },
+      fetch: (input, init) => handler.fetch(new Request(input, init)),
+    });
+    const mcp = new McpClient(
+      { name: "procurement-live-test", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+    );
+    const queryId = "query:qry_4406b045404a48449282db804f6167a8";
+    try {
+      await mcp.connect(transport);
+      const tools = await mcp.listTools();
+      expect(tools.tools).toHaveLength(4);
+
+      const opened = await mcp.callTool({
+        name: "act_1e35db0451b1461e941af6283d86dca2",
+        arguments: { amount: usd("654.32") },
+        _meta: { "dev.modellang/idempotencyKey": `mcp-live-open-${randomUUID()}` },
+      });
+      expect(opened.isError).not.toBe(true);
+      const request = opened.structuredContent as { id: string; requester: string; status: string };
+      expect(request).toMatchObject({
+        requester: "00000000-0000-4000-8000-000000000001",
+        status: "DRAFT",
+      });
+
+      const submitted = await mcp.callTool({
+        name: "act_ed2374e822704c51a2925338253d05d2",
+        arguments: { request: request.id },
+      });
+      expect(submitted.isError, unexpectedError?.stack ?? JSON.stringify(submitted)).not.toBe(true);
+      expect(submitted.structuredContent).toMatchObject({ status: "SUBMITTED" });
+
+      const denied = await mcp.callTool({
+        name: "act_d39dbb883b5f4019b9027b85add3de47",
+        arguments: { request: request.id },
+      });
+      expect(denied.isError).toBe(true);
+      expect(JSON.stringify(denied.content)).toContain(
+        "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
+      );
+
+      const auditBefore = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = $1 AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+        [queryId],
+      );
+      const current = await mcp.callTool({
+        name: "qry_4406b045404a48449282db804f6167a8",
+        arguments: {},
+      });
+      expect(current.isError).not.toBe(true);
+      expect(current.structuredContent).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: request.id, status: "SUBMITTED" }),
+      ]));
+      const embedded = current.content.find((content) => content.type === "resource");
+      expect(embedded?.type).toBe("resource");
+      if (embedded?.type === "resource" && "text" in embedded.resource) {
+        expect(JSON.parse(embedded.resource.text)).toMatchObject({
+          operationId: queryId,
+          authority: "none",
+          freshness: { mode: "pointInTime", maxAgeSeconds: 0, revalidate: "beforeReuse" },
+        });
+        expect(embedded.resource._meta).toMatchObject({
+          "dev.modellang/cacheControl": "no-store",
+          "dev.modellang/maxAgeSeconds": 0,
+        });
+      }
+      const auditAfter = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = $1 AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+        [queryId],
+      );
+      expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 1);
+      expect(authenticationCount).toBeGreaterThanOrEqual(6);
+    } finally {
+      await Promise.all([mcp.close(), handler.close()]);
+    }
   });
 
   it("binds gateway identity per transaction without leaking across pooled requests or rollbacks", async () => {

@@ -435,7 +435,7 @@ describe("generated HTTP boundary", () => {
     expect(resource).toMatchObject({
       resourceVersion: 1,
       catalogVersion: 3,
-      model: { id: "model:Procurement", version: "0.40.0" },
+      model: { id: "model:Procurement", version: "0.41.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",

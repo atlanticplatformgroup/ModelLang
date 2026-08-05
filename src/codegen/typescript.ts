@@ -903,6 +903,6 @@ export function generateTypeScript(ir: ModelIR, plan: DecisionPlan, capabilities
     "failure-acknowledgement.ts": generateFailureAcknowledgement(ir),
     "failure-claim.ts": generateFailureClaim(ir),
     "consumers.ts": generateConsumers(ir),
-    "index.ts": `export * from "./types.js";\nexport * from "./errors.js";\nexport * from "./client.js";\nexport * from "./gateway.js";\nexport * from "./http-client.js";\nexport * from "./http-server.js";\nexport * from "./workflows.js";\nexport * from "./events.js";\nexport * from "./dispatcher.js";\nexport * from "./publication-recovery.js";\nexport * from "./failure-observer.js";\nexport * from "./failure-acknowledgement.js";\nexport * from "./failure-claim.js";\nexport * from "./consumers.js";\nexport * from "./ui.js";\nexport * from "./capabilities.js";\n`,
+    "index.ts": `export * from "./types.js";\nexport * from "./errors.js";\nexport * from "./client.js";\nexport * from "./gateway.js";\nexport * from "./http-client.js";\nexport * from "./http-server.js";\nexport * from "./mcp-server.js";\nexport * from "./workflows.js";\nexport * from "./events.js";\nexport * from "./dispatcher.js";\nexport * from "./publication-recovery.js";\nexport * from "./failure-observer.js";\nexport * from "./failure-acknowledgement.js";\nexport * from "./failure-claim.js";\nexport * from "./consumers.js";\nexport * from "./ui.js";\nexport * from "./capabilities.js";\n`,
   };
 }

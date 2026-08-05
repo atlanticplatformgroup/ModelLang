@@ -847,7 +847,7 @@ export function createProcurementHttpHandler(
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 3,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.40.0","sourceHash":"sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"},
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.41.0","sourceHash":"sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44"},
           view: {
             audience: "agent",
             subjectSpecific: true,
@@ -886,7 +886,7 @@ export function createProcurementHttpHandler(
           $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
           resourceVersion: 1 as const,
           catalogVersion: 3 as const,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.40.0","sourceHash":"sha256:51281cba2655f2b2854d464aba904c05f2277fb86fba8b50d7174e4fc4703fe5"},
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.41.0","sourceHash":"sha256:b4bcdbda1196182f0c0815aebd832183bf2c520d8604dbe88f544fe2e6a17f44"},
           operationId: definition!.id,
           kind: "queryResult" as const,
           authority: "none" as const,
