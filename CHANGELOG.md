@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.46.0
+
+- Added generated SML-Agent assessment v1 as a conservative assurance artifact mapping all ten whitepaper criteria to supported, partial, or absent status with evidence and explicit gaps.
+- Kept the assessment non-authoritative and explicitly partial: it claims neither complete SML-Agent conformance, agent competence, test execution, nor included live-model evidence.
+- Added the deterministic `agent-adversarial-v1` suite for identity injection, operation-kind and metadata confusion, delegated-credential misuse, favorable-preflight replay, extension request-context isolation, private implementation disclosure, and MCP contract separation.
+- Added live PostgreSQL coverage proving that a caller cannot reuse another subject's favorable revision-bound preflight and that malformed identity-bearing reads create no query evidence; live MCP rejects command/delegation metadata on the wrong tool kinds.
+- Added provider-neutral agent evaluation suite and replay v1 formats, four canonical comparison conditions, six fixed Procurement scenarios, a driver interface, deterministic scoring, and a CLI validation/replay command.
+- Marked the committed scoring replay and all scorer reports non-empirical and added no model-quality claim; stochastic provider runs remain optional and outside release conformance and health checks.
+- Added schemas, specification, plan, whitepaper status, generated goldens, provenance classification, scorer unit tests, and model-generation coverage.
+- Advanced compiler/examples to 0.46.0 and generator profile to `postgresql-http-ui-agent-assurance/30`; canonical IR1, catalog v7, MCP adapter v5, target profile v9 and target `/9`, extension ledger/result v1, public trace v1, delegated capability v1, task packet v1, resource envelope v1, operation manifest v11, and capability manifest v10 remain unchanged.
+
 ## 0.45.0
 
 - Added catalog v7 extension-tool bindings for declared external extensions, with stable IDs, exact closed input schemas, exact result-envelope schemas, opaque semantic contract revisions, declared authorization context, conservative effects/reliability annotations, and explicit host responsibility.

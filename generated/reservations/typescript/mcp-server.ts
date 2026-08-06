@@ -428,8 +428,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.45.0",
-          "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
+          "version": "0.46.0",
+          "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
         }
       },
       "packetId": {
@@ -884,8 +884,8 @@ const taskPacketDefinition = {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.45.0",
-                        "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
+                        "version": "0.46.0",
+                        "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
                       }
                     },
                     "operationId": {
@@ -1158,8 +1158,8 @@ const delegatedCapabilityDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.45.0",
-          "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
+          "version": "0.46.0",
+          "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
         }
       },
       "grantId": {
@@ -1379,8 +1379,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.45.0",
-              "sourceHash": "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
+              "version": "0.46.0",
+              "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
             }
           },
           "traceId": {
@@ -1885,7 +1885,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1934,7 +1934,7 @@ function buildReservationsMcpServer(
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.45.0" },
+    { name: "Reservations-ModelLang", version: "0.46.0" },
     {
       instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {

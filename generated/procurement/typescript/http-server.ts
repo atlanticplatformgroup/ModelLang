@@ -1450,8 +1450,8 @@ function validateDelegatedClaim(
     && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === "model:Procurement"
     && model?.name === "Procurement"
-    && model?.version === "0.45.0"
-    && model?.sourceHash === "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"
+    && model?.version === "0.46.0"
+    && model?.sourceHash === "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
     && Object.keys(model).length === 4
     && validGrantId(claim.grantId)
     && operationDefinitions.some((item) => item.endpoint === "execution" && item.action && item.id === claim.operationId)
@@ -1542,7 +1542,7 @@ export async function invokeProcurementExtension(
     $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
     extensionToolResultVersion: 1,
     catalogVersion: 7,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
     extensionId: definition.id,
     contractRevision: definition.contractRevision,
     kind: "hostExtensionResult",
@@ -1563,7 +1563,7 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
     operationId: definition.id,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1616,7 +1616,7 @@ export async function assembleProcurementPublicDecisionTrace(
     $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
     catalogVersion: 7,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
     traceId: globalThis.crypto.randomUUID(),
     kind: "applicabilityDecisionTrace",
     operationId: candidate.operationId,
@@ -1688,7 +1688,7 @@ export async function assembleProcurementTaskPacket(
     packetVersion: 1,
     catalogVersion: 7,
     resourceVersion: 1,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
     packetId: globalThis.crypto.randomUUID(),
     kind: "boundedTaskContext",
     authority: "none",
@@ -1892,7 +1892,7 @@ export function createProcurementHttpHandler(
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
           catalogVersion: 7,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
           inputHash,
@@ -2039,7 +2039,7 @@ export function createProcurementHttpHandler(
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 7,
-          model: {"id":"model:Procurement","name":"Procurement","version":"0.45.0","sourceHash":"sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0"},
+          model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
           view: {
             audience: "agent",
             subjectSpecific: true,

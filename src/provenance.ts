@@ -33,7 +33,7 @@ function sha256(content: string): string {
 function artifactRole(path: string): ArtifactProvenance["artifacts"][number]["role"] {
   if (path === "model.ir.json") return "canonical";
   if (["operations.json", "decisions.json", "capabilities.json", "agent-tools.json", "mcp.json", "ui.json", "semantic.json", "events.json", "openapi.json"].includes(path)) return "contract";
-  if (["enforcement.json", "enforcement.md", "extensions.json", "target-capabilities.json"].includes(path)) return "assurance";
+  if (["enforcement.json", "enforcement.md", "extensions.json", "target-capabilities.json", "sml-agent-assessment.json"].includes(path)) return "assurance";
   return "projection";
 }
 

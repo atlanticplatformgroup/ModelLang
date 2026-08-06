@@ -1087,8 +1087,8 @@ function validateDelegatedClaim(
     && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === "model:Reservations"
     && model?.name === "Reservations"
-    && model?.version === "0.45.0"
-    && model?.sourceHash === "sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"
+    && model?.version === "0.46.0"
+    && model?.sourceHash === "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
     && Object.keys(model).length === 4
     && validGrantId(claim.grantId)
     && operationDefinitions.some((item) => item.endpoint === "execution" && item.action && item.id === claim.operationId)
@@ -1179,7 +1179,7 @@ export async function invokeReservationsExtension(
     $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
     extensionToolResultVersion: 1,
     catalogVersion: 7,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
     extensionId: definition.id,
     contractRevision: definition.contractRevision,
     kind: "hostExtensionResult",
@@ -1200,7 +1200,7 @@ function currentStateResource(definition: OperationDefinition, data: unknown, re
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
     operationId: definition.id,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1253,7 +1253,7 @@ export async function assembleReservationsPublicDecisionTrace(
     $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
     catalogVersion: 7,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
     traceId: globalThis.crypto.randomUUID(),
     kind: "applicabilityDecisionTrace",
     operationId: candidate.operationId,
@@ -1325,7 +1325,7 @@ export async function assembleReservationsTaskPacket(
     packetVersion: 1,
     catalogVersion: 7,
     resourceVersion: 1,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
     packetId: globalThis.crypto.randomUUID(),
     kind: "boundedTaskContext",
     authority: "none",
@@ -1529,7 +1529,7 @@ export function createReservationsHttpHandler(
           $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
           catalogVersion: 7,
-          model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
           grantId: issued.grantId,
           operationId: issueRequest.action.operationId,
           inputHash,
@@ -1676,7 +1676,7 @@ export function createReservationsHttpHandler(
           $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 7,
-          model: {"id":"model:Reservations","name":"Reservations","version":"0.45.0","sourceHash":"sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499"},
+          model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
           view: {
             audience: "agent",
             subjectSpecific: true,

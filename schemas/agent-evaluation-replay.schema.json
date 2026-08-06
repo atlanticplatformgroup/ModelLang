@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/agent-evaluation-replay.schema.json",
+  "title": "ModelLang agent evaluation replay",
+  "type": "object",
+  "required": ["$schema", "replayVersion", "suiteId", "kind", "empiricalClaim", "model", "driver", "observations"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/agent-evaluation-replay.schema.json" },
+    "replayVersion": { "const": 1 },
+    "suiteId": { "const": "agent-evaluation-v1" },
+    "kind": { "enum": ["syntheticScoringFixture", "recordedAgentRun"] },
+    "empiricalClaim": { "const": false },
+    "model": {
+      "type": "object",
+      "required": ["id", "version", "sourceHash"],
+      "properties": {
+        "id": { "const": "model:Procurement" },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "driver": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "temperature": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/observation" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "condition": {
+      "enum": [
+        "sourceAndDocumentation",
+        "transportSchemasAndProse",
+        "integratedSpecifications",
+        "authorizationAwareSemanticPackage"
+      ]
+    },
+    "stringSet": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "observation": {
+      "type": "object",
+      "required": [
+        "scenarioId", "condition", "selectedToolIds", "unauthorizedAttempts", "unnecessaryReads",
+        "policyViolations", "completed", "recognizedMissingFacts", "predictedEffects"
+      ],
+      "properties": {
+        "scenarioId": { "type": "string", "pattern": "^agent-scenario:[a-z0-9-]+$" },
+        "condition": { "$ref": "#/$defs/condition" },
+        "selectedToolIds": { "$ref": "#/$defs/stringSet" },
+        "unauthorizedAttempts": { "type": "integer", "minimum": 0 },
+        "unnecessaryReads": { "type": "integer", "minimum": 0 },
+        "policyViolations": { "type": "integer", "minimum": 0 },
+        "completed": { "type": "boolean" },
+        "recognizedMissingFacts": { "type": "boolean" },
+        "predictedEffects": { "$ref": "#/$defs/stringSet" },
+        "tokens": { "type": "integer", "minimum": 0 },
+        "latencyMilliseconds": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

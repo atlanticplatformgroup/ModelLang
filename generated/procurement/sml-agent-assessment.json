@@ -1,0 +1,164 @@
+{
+  "$schema": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
+  "assessmentVersion": 1,
+  "compilerVersion": "0.46.0",
+  "profile": "SML-Agent",
+  "profileDefinition": "docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md#b2-agent-profile-sml-agent",
+  "scope": "generatedModelAdapter",
+  "model": {
+    "id": "model:Procurement",
+    "name": "Procurement",
+    "version": "0.46.0",
+    "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+  },
+  "overall": "partial",
+  "authority": "none",
+  "claims": {
+    "completeConformance": false,
+    "agentCompetence": false,
+    "testExecutionAttested": false
+  },
+  "evaluation": {
+    "deterministicAdversarialSuite": "agent-adversarial-v1",
+    "scenarioFormatVersion": 1,
+    "liveModelRunsRequiredForConformance": false,
+    "liveModelResultsIncluded": false
+  },
+  "criteria": [
+    {
+      "id": "SML-Agent-1",
+      "requirement": "Authorization-aware semantic view rather than unconditional full-model access",
+      "status": "partial",
+      "evidence": [
+        "agent-tools.json#subjectView",
+        "POST /agent/capabilities",
+        "POST /agent/task-packets"
+      ],
+      "gaps": [
+        "Static tool discovery is intentionally not authorization-filtered",
+        "Query and extension discovery are not subject-specific"
+      ]
+    },
+    {
+      "id": "SML-Agent-2",
+      "requirement": "Stable capability identity across model, transport, and audit records",
+      "status": "partial",
+      "evidence": [
+        "model.ir.json stable IDs",
+        "operations.json",
+        "agent-tools.json",
+        "mcp.json",
+        "PostgreSQL action/query evidence"
+      ],
+      "gaps": [
+        "Host extension evidence and downstream audit correlation are not generated or attested"
+      ]
+    },
+    {
+      "id": "SML-Agent-3",
+      "requirement": "Exact input and output schemas",
+      "status": "supported",
+      "evidence": [
+        "agent-tools.json exact JSON Schema 2020-12 documents",
+        "mcp.json",
+        "openapi.json",
+        "generated HTTP and MCP validators"
+      ],
+      "gaps": []
+    },
+    {
+      "id": "SML-Agent-4",
+      "requirement": "Non-executing applicability semantics that identify missing facts and failed conditions",
+      "status": "partial",
+      "evidence": [
+        "POST action applicability",
+        "subject capability view v1",
+        "public decision trace v1"
+      ],
+      "gaps": [
+        "Missing required input is reported as validation rather than a modeled missing-fact plan",
+        "Observation relevance is caller-selected rather than proven"
+      ]
+    },
+    {
+      "id": "SML-Agent-5",
+      "requirement": "Declared effects, failure classes, reversibility, and idempotency where relevant",
+      "status": "partial",
+      "evidence": [
+        "operation manifest v11 failures/reliability/events",
+        "agent task packet v1 effect summary",
+        "extension declared effects/reliability"
+      ],
+      "gaps": [
+        "Complete state-write and external-effect closure is not published",
+        "Reversibility, compensation, and recovery closure are absent",
+        "Host extension effects are declared but not verified"
+      ]
+    },
+    {
+      "id": "SML-Agent-6",
+      "requirement": "Links to current business-state resources separate from the static model",
+      "status": "supported",
+      "evidence": [
+        "agent resource envelope v1",
+        "catalog query resource bindings",
+        "MCP embedded query resources"
+      ],
+      "gaps": []
+    },
+    {
+      "id": "SML-Agent-7",
+      "requirement": "Version and freshness information",
+      "status": "supported",
+      "evidence": [
+        "Model/catalog/contract versions",
+        "zero-age resource, packet, and trace freshness",
+        "no-store HTTP and MCP metadata"
+      ],
+      "gaps": []
+    },
+    {
+      "id": "SML-Agent-8",
+      "requirement": "Runtime enforcement independent of agent-visible metadata",
+      "status": "supported",
+      "evidence": [
+        "Authenticated generated HTTP/MCP runtime",
+        "PostgreSQL authorization, policies, locks, invariants, revisions, and validation",
+        "host-required extension authorization"
+      ],
+      "gaps": []
+    },
+    {
+      "id": "SML-Agent-9",
+      "requirement": "Decision traces sufficient for safe allow/deny explanation",
+      "status": "partial",
+      "evidence": [
+        "public decision trace v1 ordered applicability outcomes",
+        "private exact successful-execution evidence"
+      ],
+      "gaps": [
+        "Public traces are applicability-only, non-historical, and do not observe execution",
+        "Complete or cross-service decision traces are absent"
+      ]
+    },
+    {
+      "id": "SML-Agent-10",
+      "requirement": "Tests for unauthorized, stale, adversarial, and partially informed agent behavior",
+      "status": "partial",
+      "evidence": [
+        "agent-adversarial-v1 deterministic suite contract",
+        "HTTP/MCP and live PostgreSQL conformance tests",
+        "agent evaluation scenario format v1"
+      ],
+      "gaps": [
+        "This generated assessment does not attest that tests were executed",
+        "Live language-model evaluation is optional, stochastic, and not included"
+      ]
+    }
+  ],
+  "summary": {
+    "supported": 4,
+    "partial": 6,
+    "absent": 0
+  }
+}

@@ -305,7 +305,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.45.0",
+      model_version: "0.46.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -370,7 +370,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.45.0",
+      model_version: "0.46.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1239,7 +1239,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.45.0', $1,
+        VALUES ('model:Procurement', '0.46.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2093,8 +2093,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
             model: {
               id: "model:Procurement",
               name: "Procurement",
-              version: "0.45.0",
-              sourceHash: "sha256:3bc9c0235c52553ac38041b62699883776f3f8fe12a85bc35a09b87fadfb69c0",
+              version: "0.46.0",
+              sourceHash: "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566",
             },
             grantId,
             operationId: request.action.operationId,
@@ -2450,6 +2450,57 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     });
   });
 
+  it("keeps favorable preflight and caller-supplied identity from becoming live PostgreSQL authority", async () => {
+    const identities = new Map([
+      ["employee-one", { issuer: "https://auth.example.test", subject: "employee-one" }],
+      ["manager", { issuer: "https://auth.example.test", subject: "manager" }],
+    ]);
+    await withHttpServer(async (token) => {
+      const identity = identities.get(token);
+      return identity ? createProcurementGatewayExecutor(gateway, identity) : null;
+    }, async (baseUrl) => {
+      const employee = new ProcurementHttpClient({ baseUrl, accessToken: () => "employee-one" });
+      const manager = new ProcurementHttpClient({ baseUrl, accessToken: () => "manager" });
+      const request = await employee.openRequest({ amount: usd("4600.00") }, commandOptions("agent-adversarial"));
+      await employee.submitRequest({ request: request.id });
+      const input = { request: request.id };
+      const managerDecision = await manager.assessApproveRequest(input);
+      expect(managerDecision).toMatchObject({ status: "applicable", authority: "none" });
+      if (managerDecision.status !== "applicable") throw new Error("Expected manager applicability");
+
+      await expect(employee.approveRequest(input, { expectedRevision: managerDecision.revision }))
+        .rejects.toBeInstanceOf(AuthorizationError);
+      const deniedAudit = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.action_audit
+         WHERE action_id = 'action:act_d39dbb883b5f4019b9027b85add3de47' AND target_id = $1`,
+        [request.id],
+      );
+      expect(deniedAudit.rows[0]!.count).toBe("0");
+
+      const readAuditBefore = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+           AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+      );
+      const forgedRead = await fetch(`${baseUrl}/operations/queries/qry_4406b045404a48449282db804f6167a8`, {
+        method: "POST",
+        headers: { authorization: "Bearer employee-one", "content-type": "application/json" },
+        body: JSON.stringify({ actor: "00000000-0000-4000-8000-000000000003" }),
+      });
+      expect(forgedRead.status).toBe(400);
+      expect(JSON.stringify(await forgedRead.json())).not.toContain("00000000-0000-4000-8000-000000000003");
+      const readAuditAfter = await admin.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM model_procurement_internal.query_audit
+         WHERE query_id = 'query:qry_4406b045404a48449282db804f6167a8'
+           AND principal_id = '00000000-0000-4000-8000-000000000001'`,
+      );
+      expect(readAuditAfter.rows[0]!.count).toBe(readAuditBefore.rows[0]!.count);
+
+      const approved = await manager.approveRequest(input, { expectedRevision: managerDecision.revision });
+      expect(approved.status).toBe("APPROVED");
+    });
+  });
+
   it("preserves authentication, runtime policy, and current-state evidence through MCP", async () => {
     const endpoint = new URL("https://procurement.example.test/mcp");
     let authenticationCount = 0;
@@ -2485,6 +2536,22 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await mcp.connect(transport);
       const tools = await mcp.listTools();
       expect(tools.tools).toHaveLength(7);
+
+      const queryMetadataAttack = await mcp.callTool({
+        name: "qry_4406b045404a48449282db804f6167a8",
+        arguments: {},
+        _meta: { "dev.modellang/idempotencyKey": "not-query-authority" },
+      });
+      expect(queryMetadataAttack.isError).toBe(true);
+      const extensionDelegationAttack = await mcp.callTool({
+        name: "ext_54d694c9a0a274dc79c6168e47d25968",
+        arguments: {
+          request: "00000000-0000-4000-8000-000000000010",
+          requestedBy: "00000000-0000-4000-8000-000000000001",
+        },
+        _meta: { "dev.modellang/delegatedCapability": "not-extension-authority" },
+      });
+      expect(extensionDelegationAttack.isError).toBe(true);
 
       const opened = await mcp.callTool({
         name: "act_1e35db0451b1461e941af6283d86dca2",
@@ -2665,7 +2732,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [queryId],
       );
       expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 2);
-      expect(authenticationCount).toBeGreaterThanOrEqual(9);
+      expect(authenticationCount).toBeGreaterThanOrEqual(11);
     } finally {
       await Promise.all([mcp.close(), handler.close()]);
     }

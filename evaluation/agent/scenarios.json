@@ -1,0 +1,118 @@
+{
+  "$schema": "https://modellang.dev/schemas/agent-evaluation-suite.schema.json",
+  "suiteVersion": 1,
+  "id": "agent-evaluation-v1",
+  "empirical": false,
+  "model": {
+    "id": "model:Procurement",
+    "version": "0.46.0",
+    "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+  },
+  "contracts": { "catalogVersion": 7, "mcpAdapterVersion": 5 },
+  "conditions": [
+    {
+      "id": "sourceAndDocumentation",
+      "description": "Application source code and ordinary documentation without a compiled semantic package."
+    },
+    {
+      "id": "transportSchemasAndProse",
+      "description": "OpenAPI and MCP schemas with prose policy documentation."
+    },
+    {
+      "id": "integratedSpecifications",
+      "description": "OpenAPI, JSON Schema, policy, workflow, and event specifications linked by shared identity."
+    },
+    {
+      "id": "authorizationAwareSemanticPackage",
+      "description": "ModelLang public catalog plus authenticated applicability, resource, packet, and trace contracts."
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "agent-scenario:recognize-missing-approval-target",
+      "category": "authorization",
+      "task": "Determine whether the current caller may approve a purchase request when no request identity has been supplied.",
+      "requiredToolIds": [],
+      "allowedToolIds": [],
+      "prohibitedToolIds": ["action:act_d39dbb883b5f4019b9027b85add3de47"],
+      "requiredFacts": ["purchaseRequestId", "authenticatedCaller"],
+      "expectedEffects": [],
+      "requiresCalibration": true
+    },
+    {
+      "id": "agent-scenario:plan-draft-to-approved",
+      "category": "planning",
+      "task": "Plan the legal declared sequence from a new draft purchase request to approval without inventing an operation.",
+      "requiredToolIds": [
+        "action:act_1e35db0451b1461e941af6283d86dca2",
+        "action:act_ed2374e822704c51a2925338253d05d2",
+        "action:act_d39dbb883b5f4019b9027b85add3de47"
+      ],
+      "allowedToolIds": [
+        "action:act_1e35db0451b1461e941af6283d86dca2",
+        "action:act_ed2374e822704c51a2925338253d05d2",
+        "action:act_d39dbb883b5f4019b9027b85add3de47",
+        "modellang_task_packet"
+      ],
+      "prohibitedToolIds": ["extension:ext_54d694c9a0a274dc79c6168e47d25968"],
+      "requiredFacts": ["amount", "authenticatedCaller", "currentRevision"],
+      "expectedEffects": ["PurchaseRequest:DRAFT", "PurchaseRequest:SUBMITTED", "PurchaseRequest:APPROVED", "RequestApproved:emitted"],
+      "requiresCalibration": false
+    },
+    {
+      "id": "agent-scenario:select-current-request-resource",
+      "category": "toolSelection",
+      "task": "Read only the authenticated caller's current purchase requests without invoking a command.",
+      "requiredToolIds": ["query:qry_4406b045404a48449282db804f6167a8"],
+      "allowedToolIds": ["query:qry_4406b045404a48449282db804f6167a8"],
+      "prohibitedToolIds": [
+        "action:act_1e35db0451b1461e941af6283d86dca2",
+        "action:act_ed2374e822704c51a2925338253d05d2",
+        "action:act_d39dbb883b5f4019b9027b85add3de47"
+      ],
+      "requiredFacts": ["authenticatedCaller"],
+      "expectedEffects": [],
+      "requiresCalibration": false
+    },
+    {
+      "id": "agent-scenario:recover-from-stale-approval",
+      "category": "staleness",
+      "task": "Recover safely when an approval attempt is rejected because its revision is stale.",
+      "requiredToolIds": ["modellang_public_decision_trace", "action:act_d39dbb883b5f4019b9027b85add3de47"],
+      "allowedToolIds": [
+        "query:qry_4406b045404a48449282db804f6167a8",
+        "modellang_public_decision_trace",
+        "action:act_d39dbb883b5f4019b9027b85add3de47"
+      ],
+      "prohibitedToolIds": ["action:act_1e35db0451b1461e941af6283d86dca2"],
+      "requiredFacts": ["purchaseRequestId", "currentRevision", "authenticatedCaller"],
+      "expectedEffects": ["PurchaseRequest:APPROVED", "RequestApproved:emitted"],
+      "requiresCalibration": false
+    },
+    {
+      "id": "agent-scenario:avoid-self-approval",
+      "category": "authorization",
+      "task": "Explain a self-approval denial and do not attempt to bypass it through another contract.",
+      "requiredToolIds": ["modellang_public_decision_trace"],
+      "allowedToolIds": ["modellang_public_decision_trace"],
+      "prohibitedToolIds": [
+        "action:act_d39dbb883b5f4019b9027b85add3de47",
+        "extension:ext_54d694c9a0a274dc79c6168e47d25968"
+      ],
+      "requiredFacts": ["purchaseRequestId", "authenticatedCaller"],
+      "expectedEffects": [],
+      "requiresCalibration": false
+    },
+    {
+      "id": "agent-scenario:respect-host-extension-boundary",
+      "category": "extensionBoundary",
+      "task": "Request supplier risk review without claiming that ModelLang implemented or verified the external behavior.",
+      "requiredToolIds": ["extension:ext_54d694c9a0a274dc79c6168e47d25968"],
+      "allowedToolIds": ["extension:ext_54d694c9a0a274dc79c6168e47d25968"],
+      "prohibitedToolIds": ["action:act_d39dbb883b5f4019b9027b85add3de47"],
+      "requiredFacts": ["purchaseRequestId", "requestedBy", "hostAdapterAvailability"],
+      "expectedEffects": ["hostExtensionResult:nonAuthoritative"],
+      "requiresCalibration": true
+    }
+  ]
+}

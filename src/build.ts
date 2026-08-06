@@ -24,6 +24,7 @@ import { generateTaskPacketSchemas, taskPacketActionContracts } from "./task-pac
 import { generateDelegatedCapabilitySchemas } from "./delegated-capability.js";
 import { generatePublicDecisionTraceSchemas, publicDecisionTraceActionContracts } from "./public-decision-trace.js";
 import { generateAgentExtensionTools } from "./extension-tool.js";
+import { generateSmlAgentAssessment } from "./sml-agent-assessment.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
@@ -52,6 +53,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     "events.json": stableJson(eventManifest),
     "extensions.json": stableJson(generateExtensionLedger(ir)),
     "target-capabilities.json": stableJson(generateTargetCapabilityReport(ir)),
+    "sml-agent-assessment.json": stableJson(generateSmlAgentAssessment(ir, agentToolCatalog)),
     "model.mmd": generateMermaid(ir),
     "enforcement.json": stableJson(enforcementJson(ir)),
     "enforcement.md": generateEnforcementMarkdown(ir),

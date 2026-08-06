@@ -1,6 +1,6 @@
 {
   "name": "modellang-poc",
-  "version": "0.45.0",
+  "version": "0.46.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -10,12 +10,13 @@
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "deadcode": "knip",
-    "health": "npm run build && npm run lint && npm run deadcode && npm test",
+    "health": "npm run build && npm run lint && npm run deadcode && npm run agent:evaluate -- --check && npm test",
     "test": "vitest run",
     "test:unit": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "vitest run tests/integration",
     "model:check": "tsx scripts/check-models.ts",
     "model:generate": "tsx scripts/generate-models.ts",
+    "agent:evaluate": "tsx scripts/evaluate-agents.ts",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down -v",
     "demo": "tsx scripts/demo.ts",

@@ -85,8 +85,8 @@ BEGIN
     END;
 
     IF v_cursor_json ->> 'modelId' IS DISTINCT FROM 'model:Reservations'
-      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.45.0'
-      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499'
+      OR v_cursor_json ->> 'modelVersion' IS DISTINCT FROM '0.46.0'
+      OR v_cursor_json ->> 'sourceHash' IS DISTINCT FROM 'sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69'
       OR v_cursor_json ->> 'queryId' IS DISTINCT FROM 'query:qry_94d8a56f4c2640fab58a4c2190c35c69'
       OR v_cursor_json ->> 'revision' IS DISTINCT FROM 'sha256:23312df0fdb9b20a5017fc04c6d33d8c36a15cba50996185e419265746099d9a'
       OR v_cursor_json ->> 'orderFieldId' IS DISTINCT FROM (CASE WHEN v_sort_profile = 'default' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'latestFirst' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'endingSoonest' THEN 'field:fld_fd818707952f4b388baea4c3132bce63' END)
@@ -117,7 +117,7 @@ BEGIN
       FROM visible_rows
     ), '[]'::jsonb),
     'nextCursor', CASE WHEN (SELECT pg_catalog.count(*) FROM page_rows) > 2 THEN (
-      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.45.0', 'sourceHash', 'sha256:5debacf51df6a907423f7978dda56df35ba89fb7f985d1af897654521a03c499', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:23312df0fdb9b20a5017fc04c6d33d8c36a15cba50996185e419265746099d9a', 'orderFieldId', (CASE WHEN v_sort_profile = 'default' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'latestFirst' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'endingSoonest' THEN 'field:fld_fd818707952f4b388baea4c3132bce63' END), 'direction', (CASE WHEN v_sort_profile = 'default' THEN 'asc' WHEN v_sort_profile = 'latestFirst' THEN 'desc' WHEN v_sort_profile = 'endingSoonest' THEN 'asc' END), 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
+      SELECT pg_catalog.rtrim(pg_catalog.translate(pg_catalog.replace(pg_catalog.encode(pg_catalog.convert_to((pg_catalog.jsonb_build_object('v', 1, 'modelId', 'model:Reservations', 'modelVersion', '0.46.0', 'sourceHash', 'sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69', 'queryId', 'query:qry_94d8a56f4c2640fab58a4c2190c35c69', 'revision', 'sha256:23312df0fdb9b20a5017fc04c6d33d8c36a15cba50996185e419265746099d9a', 'orderFieldId', (CASE WHEN v_sort_profile = 'default' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'latestFirst' THEN 'field:fld_59e1f90fae57481f921c5a81dfd3a234' WHEN v_sort_profile = 'endingSoonest' THEN 'field:fld_fd818707952f4b388baea4c3132bce63' END), 'direction', (CASE WHEN v_sort_profile = 'default' THEN 'asc' WHEN v_sort_profile = 'latestFirst' THEN 'desc' WHEN v_sort_profile = 'endingSoonest' THEN 'asc' END), 'inputHash', v_input_hash, 'sort', ("sort_value")::text, 'identity', ("identity")::text))::text, 'UTF8'), 'base64'), E'\n', ''), '+/', '-_'), '=')
       FROM visible_rows
       ORDER BY CASE WHEN v_sort_profile = 'default' THEN visible_rows."sort_value"::timestamptz END DESC, CASE WHEN v_sort_profile = 'latestFirst' THEN visible_rows."sort_value"::timestamptz END ASC, CASE WHEN v_sort_profile = 'endingSoonest' THEN visible_rows."sort_value"::timestamptz END DESC, visible_rows."identity" DESC
       LIMIT 1

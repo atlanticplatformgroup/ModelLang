@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
+  "title": "ModelLang SML-Agent assessment",
+  "type": "object",
+  "required": [
+    "$schema", "assessmentVersion", "compilerVersion", "profile", "profileDefinition", "scope",
+    "model", "overall", "authority", "claims", "evaluation", "criteria", "summary"
+  ],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/sml-agent-assessment.schema.json" },
+    "assessmentVersion": { "const": 1 },
+    "compilerVersion": { "type": "string", "minLength": 1 },
+    "profile": { "const": "SML-Agent" },
+    "profileDefinition": { "const": "docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md#b2-agent-profile-sml-agent" },
+    "scope": { "const": "generatedModelAdapter" },
+    "model": {
+      "type": "object",
+      "required": ["id", "name", "version", "sourceHash"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^model:" },
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "overall": { "const": "partial" },
+    "authority": { "const": "none" },
+    "claims": {
+      "const": {
+        "completeConformance": false,
+        "agentCompetence": false,
+        "testExecutionAttested": false
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "required": ["deterministicAdversarialSuite", "scenarioFormatVersion", "liveModelRunsRequiredForConformance", "liveModelResultsIncluded"],
+      "properties": {
+        "deterministicAdversarialSuite": { "const": "agent-adversarial-v1" },
+        "scenarioFormatVersion": { "const": 1 },
+        "liveModelRunsRequiredForConformance": { "const": false },
+        "liveModelResultsIncluded": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "criteria": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "requirement", "status", "evidence", "gaps"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^SML-Agent-(?:[1-9]|10)$" },
+          "requirement": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["supported", "partial", "absent"] },
+          "evidence": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+          "gaps": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["supported", "partial", "absent"],
+      "properties": {
+        "supported": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "partial": { "type": "integer", "minimum": 0, "maximum": 10 },
+        "absent": { "type": "integer", "minimum": 0, "maximum": 10 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

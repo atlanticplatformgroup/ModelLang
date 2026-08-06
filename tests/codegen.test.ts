@@ -403,7 +403,13 @@ describe("backends", () => {
     const provenanceSchema = JSON.parse(await readFile("schemas/artifact-provenance.schema.json", "utf8")) as object;
     const validateProvenance = new Ajv2020({ allErrors: true, strict: true }).compile(provenanceSchema);
     expect(validateProvenance(provenance), JSON.stringify(validateProvenance.errors)).toBe(true);
-    expect(provenance).toMatchObject({ provenanceVersion: 2, compilerVersion: packageInfo.version, irVersion: 1, targetProfile: "target:postgresql-http-ui-extension-tools/9" });
+    expect(provenance).toMatchObject({
+      provenanceVersion: 2,
+      compilerVersion: packageInfo.version,
+      generatorProfile: "postgresql-http-ui-agent-assurance/30",
+      irVersion: 1,
+      targetProfile: "target:postgresql-http-ui-extension-tools/9",
+    });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);
     const operation = provenance.artifacts.find((artifact) => artifact.path === "operations.json")!;
     expect(operation.role).toBe("contract");
@@ -413,6 +419,7 @@ describe("backends", () => {
     expect(provenance.artifacts.find((artifact) => artifact.path === "mcp.json")?.role).toBe("contract");
     expect(provenance.artifacts.find((artifact) => artifact.path === "extensions.json")?.role).toBe("assurance");
     expect(provenance.artifacts.find((artifact) => artifact.path === "target-capabilities.json")?.role).toBe("assurance");
+    expect(provenance.artifacts.find((artifact) => artifact.path === "sml-agent-assessment.json")?.role).toBe("assurance");
     expect(operation.sha256).toBe(`sha256:${createHash("sha256").update(output["operations.json"]!, "utf8").digest("hex")}`);
   });
 
@@ -1406,7 +1413,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.45.0'");
+    expect(sql).toContain("'modelVersion', '0.46.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1569,7 +1576,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.45.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.46.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

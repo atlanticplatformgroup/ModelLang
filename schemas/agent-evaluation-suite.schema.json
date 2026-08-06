@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://modellang.dev/schemas/agent-evaluation-suite.schema.json",
+  "title": "ModelLang agent evaluation suite",
+  "type": "object",
+  "required": ["$schema", "suiteVersion", "id", "empirical", "model", "contracts", "conditions", "scenarios"],
+  "properties": {
+    "$schema": { "const": "https://modellang.dev/schemas/agent-evaluation-suite.schema.json" },
+    "suiteVersion": { "const": 1 },
+    "id": { "const": "agent-evaluation-v1" },
+    "empirical": { "const": false },
+    "model": {
+      "type": "object",
+      "required": ["id", "version", "sourceHash"],
+      "properties": {
+        "id": { "const": "model:Procurement" },
+        "version": { "type": "string", "minLength": 1 },
+        "sourceHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+      },
+      "additionalProperties": false
+    },
+    "contracts": {
+      "const": { "catalogVersion": 7, "mcpAdapterVersion": 5 }
+    },
+    "conditions": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["id", "description"],
+        "properties": {
+          "id": { "$ref": "#/$defs/condition" },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/scenario" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "condition": {
+      "enum": [
+        "sourceAndDocumentation",
+        "transportSchemasAndProse",
+        "integratedSpecifications",
+        "authorizationAwareSemanticPackage"
+      ]
+    },
+    "stringSet": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "scenario": {
+      "type": "object",
+      "required": [
+        "id", "category", "task", "requiredToolIds", "allowedToolIds", "prohibitedToolIds",
+        "requiredFacts", "expectedEffects", "requiresCalibration"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^agent-scenario:[a-z0-9-]+$" },
+        "category": { "enum": ["authorization", "planning", "toolSelection", "staleness", "effects", "extensionBoundary"] },
+        "task": { "type": "string", "minLength": 1 },
+        "requiredToolIds": { "$ref": "#/$defs/stringSet" },
+        "allowedToolIds": { "$ref": "#/$defs/stringSet" },
+        "prohibitedToolIds": { "$ref": "#/$defs/stringSet" },
+        "requiredFacts": { "$ref": "#/$defs/stringSet" },
+        "expectedEffects": { "$ref": "#/$defs/stringSet" },
+        "requiresCalibration": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}
