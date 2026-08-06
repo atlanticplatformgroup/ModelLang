@@ -42,11 +42,15 @@ describe("backends", () => {
   });
 
   it("matches every committed golden artifact byte-for-byte", async () => {
-    const output = generateAll(await procurement());
+    const output = generateAll(await procurement(), {
+      agentPlugin: { endpointUrl: "https://procurement.example.com/mcp" },
+    });
     for (const [path, expected] of Object.entries(output)) {
       expect(await readFile(`generated/procurement/${path}`, "utf8"), path).toBe(expected);
     }
-    const reservationOutput = generateAll(await reservations());
+    const reservationOutput = generateAll(await reservations(), {
+      agentPlugin: { endpointUrl: "https://reservations.example.com/mcp" },
+    });
     for (const [path, expected] of Object.entries(reservationOutput)) {
       expect(await readFile(`generated/reservations/${path}`, "utf8"), `reservations/${path}`).toBe(expected);
     }
@@ -406,7 +410,7 @@ describe("backends", () => {
     expect(provenance).toMatchObject({
       provenanceVersion: 2,
       compilerVersion: packageInfo.version,
-      generatorProfile: "postgresql-http-ui-mcp-discovery-cache/31",
+      generatorProfile: "postgresql-http-ui-agent-plugin/32",
       irVersion: 1,
       targetProfile: "target:postgresql-http-ui-extension-tools/9",
     });
@@ -1437,7 +1441,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.47.0'");
+    expect(sql).toContain("'modelVersion', '0.48.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1600,7 +1604,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.47.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.48.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

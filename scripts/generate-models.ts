@@ -5,7 +5,14 @@ import { writeGeneratedModelsAtomically } from "../src/build.js";
 async function main(): Promise<void> {
   const procurement = await compileFile(resolve("examples/procurement.model"));
   const reservations = await compileFile(resolve("examples/reservations.model"));
-  await writeGeneratedModelsAtomically({ procurement, reservations }, resolve("generated"));
+  await writeGeneratedModelsAtomically(
+    { procurement, reservations },
+    resolve("generated"),
+    {
+      procurement: { agentPlugin: { endpointUrl: "https://procurement.example.com/mcp" } },
+      reservations: { agentPlugin: { endpointUrl: "https://reservations.example.com/mcp" } },
+    },
+  );
   process.stdout.write("Generated Procurement and Reservations into generated/.\n");
 }
 

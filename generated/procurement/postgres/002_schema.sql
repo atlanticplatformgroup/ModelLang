@@ -1,4 +1,4 @@
--- source sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e
+-- source sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54
 CREATE SCHEMA "model_procurement" AUTHORIZATION modellang_owner;
 CREATE SCHEMA "model_procurement_internal" AUTHORIZATION modellang_owner;
 SET ROLE modellang_owner;
@@ -1089,6 +1089,6 @@ CREATE TABLE "model_procurement_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_procurement_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Procurement', '0.47.0', 'sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e', 'installation');
+VALUES ('model:Procurement', '0.48.0', 'sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54', 'installation');
 RESET ROLE;
 

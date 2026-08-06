@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Client as McpClient, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
@@ -305,7 +306,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.47.0",
+      model_version: "0.48.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -370,7 +371,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.47.0",
+      model_version: "0.48.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1239,7 +1240,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.47.0', $1,
+        VALUES ('model:Procurement', '0.48.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2093,8 +2094,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
             model: {
               id: "model:Procurement",
               name: "Procurement",
-              version: "0.47.0",
-              sourceHash: "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e",
+              version: "0.48.0",
+              sourceHash: "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54",
             },
             grantId,
             operationId: request.action.operationId,
@@ -2502,7 +2503,12 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
   });
 
   it("preserves authentication, runtime policy, and current-state evidence through MCP", async () => {
-    const endpoint = new URL("https://procurement.example.test/mcp");
+    const pluginMcp = JSON.parse(await readFile("generated/procurement/agent-plugin/mcp.json", "utf8")) as {
+      mcpServers: Record<string, { type: string; url: string; headers?: Record<string, string> }>;
+    };
+    const packagedServer = pluginMcp.mcpServers["modellang.procurement"]!;
+    expect(packagedServer).toEqual({ type: "streamable-http", url: "https://procurement.example.com/mcp" });
+    const endpoint = new URL(packagedServer.url);
     let authenticationCount = 0;
     let unexpectedError: Error | undefined;
     const observedCache = new Map<string, Headers>();

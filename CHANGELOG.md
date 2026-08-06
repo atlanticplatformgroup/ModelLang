@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.48.0
+
+- Added opt-in Agent Plugins 1.0.0 packaging for deployed generated applications through `modelc build --agent-plugin-url`, with an optional conforming package-name override.
+- Emits an isolated `agent-plugin/` package root containing schema-valid portable `plugin.json` identity metadata and a connection-only `mcp.json` with exactly one Streamable HTTP server.
+- Keeps deployment endpoints and package metadata outside ModelLang source and canonical IR1; ordinary IR-only generation remains unchanged when packaging is not requested.
+- Rejects non-HTTP(S), user-information-bearing, fragment-bearing, and insecure non-loopback endpoints, and never generates secret headers or portable authentication claims. The caller-supplied URL is visible package data and must not contain secrets; authentication remains client-managed and every server request retains authoritative ModelLang runtime enforcement.
+- Pinned local copies of the official Agent Plugins 1.0.0 manifest and MCP schemas for deterministic generated-package validation while retaining their canonical external identifiers in emitted documents.
+- Records generated plugin documents as deployment contracts in deterministic provenance without changing the model source hash, MCP adapter revision, or domain semantics.
+- Added package schema, naming, endpoint-safety, optional-generation, provenance, golden-artifact, and live-boundary coverage plus specification, implementation plan, README, and whitepaper updates.
+- Advanced compiler/examples to 0.48.0 and generator profile to `postgresql-http-ui-agent-plugin/32`; canonical IR1, MCP adapter v6, catalog v7, target profile v9 and target `/9`, assessment/evaluation formats, and runtime envelope versions remain unchanged.
+
 ## 0.47.0
 
 - Added deployment-configurable private caching for static MCP `server/discover` and `tools/list` results through generated `discoveryCacheTtlMs`, with a conservative zero default and no ModelLang-specific maximum below the protocol's non-negative safe-integer limit.

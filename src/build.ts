@@ -25,12 +25,17 @@ import { generateDelegatedCapabilitySchemas } from "./delegated-capability.js";
 import { generatePublicDecisionTraceSchemas, publicDecisionTraceActionContracts } from "./public-decision-trace.js";
 import { generateAgentExtensionTools } from "./extension-tool.js";
 import { generateSmlAgentAssessment } from "./sml-agent-assessment.js";
+import { generateAgentPluginPackage, type AgentPluginGenerationOptions } from "./agent-plugin.js";
 
 export interface GeneratedFiles {
   [path: string]: string;
 }
 
-export function generateAll(ir: ModelIR): GeneratedFiles {
+export interface GenerationOptions {
+  readonly agentPlugin?: AgentPluginGenerationOptions;
+}
+
+export function generateAll(ir: ModelIR, options: GenerationOptions = {}): GeneratedFiles {
   const operationManifest = generateOperationManifest(ir);
   const decisionPlan = generateDecisionPlan(ir);
   const capabilityManifest = generateCapabilityManifest(operationManifest, decisionPlan);
@@ -72,6 +77,7 @@ export function generateAll(ir: ModelIR): GeneratedFiles {
     extensionTools,
   ));
   Object.assign(files, generateUi(operationManifest, uiManifest));
+  if (options.agentPlugin) Object.assign(files, generateAgentPluginPackage(ir, options.agentPlugin));
   files["provenance.json"] = stableJson(generateArtifactProvenance(ir, files));
   return files;
 }
@@ -108,15 +114,19 @@ async function writeFilesAtomically(files: GeneratedFiles, outputDirectory: stri
   }
 }
 
-export async function writeGeneratedAtomically(ir: ModelIR, outputDirectory: string): Promise<void> {
-  await writeFilesAtomically(generateAll(ir), outputDirectory);
+export async function writeGeneratedAtomically(ir: ModelIR, outputDirectory: string, options: GenerationOptions = {}): Promise<void> {
+  await writeFilesAtomically(generateAll(ir, options), outputDirectory);
 }
 
-export async function writeGeneratedModelsAtomically(models: Readonly<Record<string, ModelIR>>, outputDirectory: string): Promise<void> {
+export async function writeGeneratedModelsAtomically(
+  models: Readonly<Record<string, ModelIR>>,
+  outputDirectory: string,
+  options: Readonly<Record<string, GenerationOptions>> = {},
+): Promise<void> {
   const files: GeneratedFiles = {};
   for (const [modelName, ir] of Object.entries(models)) {
     if (!/^[a-z][a-z0-9_-]*$/.test(modelName)) throw new Error(`E5002 Invalid generated model directory '${modelName}'.`);
-    for (const [path, content] of Object.entries(generateAll(ir))) files[`${modelName}/${path}`] = content;
+    for (const [path, content] of Object.entries(generateAll(ir, options[modelName]))) files[`${modelName}/${path}`] = content;
   }
   await writeFilesAtomically(files, outputDirectory);
 }

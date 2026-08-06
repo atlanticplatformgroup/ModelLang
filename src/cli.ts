@@ -15,7 +15,8 @@ import { parseReviewedMigrationPlan, planReviewedMigration } from "./reviewed-mi
 
 function usage(): never {
   process.stderr.write(`Usage:
-  modelc <check|build|print-ir|explain> <file> [--out <directory>] [--debug]
+  modelc <check|print-ir|explain> <file> [--debug]
+  modelc build <file> --out <directory> [--agent-plugin-url <url>] [--agent-plugin-name <name>] [--debug]
   modelc assign-ids <file>
   modelc migration <previous-ir.json> <current.model> --out <migration.sql>
   modelc reviewed-migration <previous-ir.json> <current.model> --plan <reviewed-plan.json> --out <migration.sql>
@@ -80,8 +81,17 @@ async function main(): Promise<void> {
   const outIndex = rest.indexOf("--out");
   if (outIndex < 0 || !rest[outIndex + 1]) usage();
   const out = resolve(rest[outIndex + 1]!);
-  await writeGeneratedAtomically(ir, out);
-  process.stdout.write(`Generated ${ir.model.name} into ${out}\n`);
+  const pluginUrlIndex = rest.indexOf("--agent-plugin-url");
+  const pluginNameIndex = rest.indexOf("--agent-plugin-name");
+  if (pluginNameIndex >= 0 && pluginUrlIndex < 0) {
+    throw new Error("--agent-plugin-name requires --agent-plugin-url");
+  }
+  const agentPlugin = pluginUrlIndex < 0 ? undefined : {
+    endpointUrl: rest[pluginUrlIndex + 1] ?? usage(),
+    ...(pluginNameIndex < 0 ? {} : { pluginName: rest[pluginNameIndex + 1] ?? usage() }),
+  };
+  await writeGeneratedAtomically(ir, out, agentPlugin ? { agentPlugin } : {});
+  process.stdout.write(`Generated ${ir.model.name}${agentPlugin ? " with Agent Plugin package" : ""} into ${out}\n`);
 }
 
 main().catch(async (error: unknown) => {

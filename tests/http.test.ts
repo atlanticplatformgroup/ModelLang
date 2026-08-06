@@ -443,7 +443,7 @@ describe("generated HTTP boundary", () => {
     expect(resource).toMatchObject({
       resourceVersion: 1,
       catalogVersion: 7,
-      model: { id: "model:Procurement", version: "0.47.0" },
+      model: { id: "model:Procurement", version: "0.48.0" },
       operationId: "query:qry_4406b045404a48449282db804f6167a8",
       kind: "queryResult",
       authority: "none",
@@ -531,7 +531,7 @@ describe("generated HTTP boundary", () => {
       packetVersion: 1,
       catalogVersion: 7,
       resourceVersion: 1,
-      model: { id: "model:Procurement", version: "0.47.0" },
+      model: { id: "model:Procurement", version: "0.48.0" },
       kind: "boundedTaskContext",
       authority: "none",
       view: {
@@ -678,7 +678,7 @@ describe("generated HTTP boundary", () => {
     expect(applicable).toMatchObject({
       traceVersion: 1,
       catalogVersion: 7,
-      model: { id: "model:Procurement", version: "0.47.0" },
+      model: { id: "model:Procurement", version: "0.48.0" },
       kind: "applicabilityDecisionTrace",
       operationId,
       authority: "none",
@@ -984,7 +984,7 @@ describe("generated HTTP boundary", () => {
       $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
       extensionToolResultVersion: 1,
       catalogVersion: 7,
-      model: { id: "model:Procurement", name: "Procurement", version: "0.47.0" },
+      model: { id: "model:Procurement", name: "Procurement", version: "0.48.0" },
       extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968",
       contractRevision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       kind: "hostExtensionResult",

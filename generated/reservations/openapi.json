@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Reservations ModelLang API",
-    "version": "0.47.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf)."
+    "version": "0.48.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e)."
   },
   "paths": {
     "/operations/actions/act_508ad810a19d4b79a5009871de5cd26b": {
@@ -614,10 +614,10 @@
                           "const": "Reservations"
                         },
                         "version": {
-                          "const": "0.47.0"
+                          "const": "0.48.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+                          "const": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
                         }
                       }
                     },
@@ -2190,8 +2190,8 @@
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.47.0",
-              "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+              "version": "0.48.0",
+              "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
             }
           },
           "packetId": {
@@ -2646,8 +2646,8 @@
                           "const": {
                             "id": "model:Reservations",
                             "name": "Reservations",
-                            "version": "0.47.0",
-                            "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+                            "version": "0.48.0",
+                            "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
                           }
                         },
                         "operationId": {
@@ -2811,8 +2811,8 @@
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.47.0",
-              "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+              "version": "0.48.0",
+              "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
             }
           },
           "grantId": {
@@ -2939,8 +2939,8 @@
                 "const": {
                   "id": "model:Reservations",
                   "name": "Reservations",
-                  "version": "0.47.0",
-                  "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+                  "version": "0.48.0",
+                  "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
                 }
               },
               "traceId": {
@@ -3395,10 +3395,10 @@
                 "const": "Reservations"
               },
               "version": {
-                "const": "0.47.0"
+                "const": "0.48.0"
               },
               "sourceHash": {
-                "const": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
+                "const": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
               }
             }
           },

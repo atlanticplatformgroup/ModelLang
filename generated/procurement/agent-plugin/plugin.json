@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "modellang.procurement",
+  "version": "0.48.0",
+  "description": "Generated ModelLang application plugin for Procurement. Runtime authentication and authorization remain authoritative.",
+  "keywords": [
+    "modellang",
+    "mcp",
+    "semantic-model"
+  ]
+}
