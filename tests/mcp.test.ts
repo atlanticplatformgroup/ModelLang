@@ -72,6 +72,7 @@ describe("generated MCP adapter", () => {
     expect(capabilities).not.toHaveProperty("prompts");
     expect(capabilities).not.toHaveProperty("tasks");
     const result = await client.listTools();
+    expect(result).toMatchObject({ ttlMs: 0, cacheScope: "private" });
     const manifest = JSON.parse(await readFile("generated/procurement/mcp.json", "utf8")) as {
       taskPacket: { name: string; inputSchema: object; outputSchema: object };
       publicDecisionTrace: { name: string; inputSchema: object; outputSchema: object };
@@ -153,6 +154,58 @@ describe("generated MCP adapter", () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it("applies a private revision-bound TTL only to static MCP discovery", async () => {
+    const execute = vi.fn(async () => []);
+    const handler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute, assess: vi.fn() },
+    }), {
+      resourceServerUrl: endpoint.href,
+      discoveryCacheTtlMs: 65_000,
+      now: () => new Date(retrievedAt),
+    });
+    const observed = new Map<string, Headers>();
+    const { client, transport } = createClient(async (input, init) => {
+      const request = new Request(input, init);
+      const method = request.headers.get("mcp-method") ?? "unknown";
+      const response = await handler.fetch(request);
+      observed.set(method, new Headers(response.headers));
+      return response;
+    });
+    closeables.push(client, handler);
+    await client.connect(transport);
+    const listed = await client.listTools();
+    expect(listed).toMatchObject({ ttlMs: 65_000, cacheScope: "private" });
+
+    const manifest = JSON.parse(await readFile("generated/procurement/mcp.json", "utf8")) as {
+      discovery: { cache: { revision: string; variesBy: string[] } };
+    };
+    for (const method of ["server/discover", "tools/list"]) {
+      const headers = observed.get(method);
+      expect(headers?.get("cache-control")).toBe("private, max-age=65");
+      expect(headers?.get("etag")).toBe(`"${manifest.discovery.cache.revision}"`);
+      expect(headers?.get("vary")?.split(", ")).toEqual(manifest.discovery.cache.variesBy);
+    }
+
+    await client.callTool({ name: queryToolName, arguments: {} });
+    expect(observed.get("tools/call")?.get("cache-control")).toBe("no-store");
+    expect(observed.get("tools/call")?.get("etag")).toBeNull();
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    const createInvalid = (discoveryCacheTtlMs: number) => () => createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute: vi.fn(), assess: vi.fn() },
+    }), { resourceServerUrl: endpoint.href, discoveryCacheTtlMs });
+    expect(createInvalid(-1)).toThrow(RangeError);
+    expect(createInvalid(1.5)).toThrow(RangeError);
+    expect(createInvalid(Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError);
+    const maximumHandler = createProcurementMcpHandler(async () => ({
+      authInfo: authInfo(),
+      executor: { execute: vi.fn(), assess: vi.fn() },
+    }), { resourceServerUrl: endpoint.href, discoveryCacheTtlMs: Number.MAX_SAFE_INTEGER });
+    closeables.push(maximumHandler);
+  });
+
   it("executes query tools and returns a distinct zero-age embedded resource envelope", async () => {
     const data = [{
       id: "00000000-0000-4000-8000-000000000010",
@@ -192,7 +245,7 @@ describe("generated MCP adapter", () => {
     expect(envelope).toMatchObject({
       resourceVersion: 1,
       catalogVersion: 7,
-      model: { id: "model:Procurement", version: "0.46.0" },
+      model: { id: "model:Procurement", version: "0.47.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -444,8 +497,8 @@ describe("generated MCP adapter", () => {
       model: {
         id: "model:Procurement",
         name: "Procurement",
-        version: "0.46.0",
-        sourceHash: "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566",
+        version: "0.47.0",
+        sourceHash: "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e",
       },
       grantId,
       operationId: actionId,

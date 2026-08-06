@@ -305,7 +305,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const byTarget = new Map(evidence.rows.map((row) => [row.target_id, row]));
     expect(byTarget.get(low)).toMatchObject({
       model_id: "model:Procurement",
-      model_version: "0.46.0",
+      model_version: "0.47.0",
       authorization_rule_id: "authorize:action:act_d39dbb883b5f4019b9027b85add3de47",
       policy_id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
       authority_id: "policyBranch:pbr_0d694c9a0a274dc79c6168e47d259688",
@@ -370,7 +370,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       identity_issuer: null,
       identity_subject: null,
       model_id: "model:Procurement",
-      model_version: "0.46.0",
+      model_version: "0.47.0",
       source_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
       query_revision: descriptor.readEvidence!.revision,
       request_hash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
@@ -1239,7 +1239,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         INSERT INTO model_procurement_internal.event_outbox
           (model_id, model_version, source_hash, event_id, event_name, payload_entity_id,
            target_id, payload, correlation_id, ordinal)
-        VALUES ('model:Procurement', '0.46.0', $1,
+        VALUES ('model:Procurement', '0.47.0', $1,
                 'event:evt_50d694c9a0a274dc79c6168e47d25968', 'ApprovalObserved',
                 'entity:ent_9bc680209327484c8e98f5f740bcc702', $2, '{}'::jsonb, 'producer-check', 0)
       `, [envelope.sourceHash, request])).rejects.toMatchObject({ code: "23514" });
@@ -2093,8 +2093,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
             model: {
               id: "model:Procurement",
               name: "Procurement",
-              version: "0.46.0",
-              sourceHash: "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566",
+              version: "0.47.0",
+              sourceHash: "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e",
             },
             grantId,
             operationId: request.action.operationId,
@@ -2505,6 +2505,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
     const endpoint = new URL("https://procurement.example.test/mcp");
     let authenticationCount = 0;
     let unexpectedError: Error | undefined;
+    const observedCache = new Map<string, Headers>();
     const handler = createProcurementMcpHandler(async (token) => {
       authenticationCount += 1;
       if (token !== "employee-one") return null;
@@ -2522,10 +2523,20 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         }),
         extensions: liveSupplierRiskRuntime(true),
       };
-    }, { resourceServerUrl: endpoint.href, onerror: (error) => { unexpectedError = error; } });
+    }, {
+      resourceServerUrl: endpoint.href,
+      discoveryCacheTtlMs: 120_000,
+      onerror: (error) => { unexpectedError = error; },
+    });
     const transport = new StreamableHTTPClientTransport(endpoint, {
       requestInit: { headers: { authorization: "Bearer employee-one" } },
-      fetch: (input, init) => handler.fetch(new Request(input, init)),
+      fetch: async (input, init) => {
+        const request = new Request(input, init);
+        const method = request.headers.get("mcp-method") ?? "unknown";
+        const response = await handler.fetch(request);
+        observedCache.set(method, new Headers(response.headers));
+        return response;
+      },
     });
     const mcp = new McpClient(
       { name: "procurement-live-test", version: "1.0.0" },
@@ -2536,6 +2547,11 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
       await mcp.connect(transport);
       const tools = await mcp.listTools();
       expect(tools.tools).toHaveLength(7);
+      expect(tools).toMatchObject({ ttlMs: 120_000, cacheScope: "private" });
+      for (const method of ["server/discover", "tools/list"]) {
+        expect(observedCache.get(method)?.get("cache-control")).toBe("private, max-age=120");
+        expect(observedCache.get(method)?.get("etag")).toMatch(/^"sha256:[0-9a-f]{64}"$/);
+      }
 
       const queryMetadataAttack = await mcp.callTool({
         name: "qry_4406b045404a48449282db804f6167a8",
@@ -2732,6 +2748,8 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
         [queryId],
       );
       expect(Number(auditAfter.rows[0]!.count)).toBe(Number(auditBefore.rows[0]!.count) + 2);
+      expect(observedCache.get("tools/call")?.get("cache-control")).toBe("no-store");
+      expect(observedCache.get("tools/call")?.get("etag")).toBeNull();
       expect(authenticationCount).toBeGreaterThanOrEqual(11);
     } finally {
       await Promise.all([mcp.close(), handler.close()]);

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.47.0
+
+- Added deployment-configurable private caching for static MCP `server/discover` and `tools/list` results through generated `discoveryCacheTtlMs`, with a conservative zero default and no ModelLang-specific maximum below the protocol's non-negative safe-integer limit.
+- Added deterministic SHA-256 discovery revisions over the exact generated catalog and related discovery schemas, recorded in MCP adapter v6 and exposed as strong `ETag` response metadata.
+- Added response-kind-specific cache headers: successful positive-TTL discovery receives private `max-age` and complete authorization/protocol/routing variation, while zero-TTL discovery and every execution, current-state, packet, trace, delegation, extension, authentication-error, and protocol-error response remain `no-store`.
+- Kept cached discovery non-authoritative: every request still authenticates independently and every operation re-enters current runtime authorization, policy, row visibility, validation, revision, and evidence enforcement.
+- Added adapter-schema validation, deterministic revision coverage, invalid-TTL startup failures, unit response-header checks, and live PostgreSQL/MCP coverage proving discovery caching composes with zero-age execution and resource semantics.
+- Advanced compiler/examples to 0.47.0, MCP adapter to v6, and generator profile to `postgresql-http-ui-mcp-discovery-cache/31`; canonical IR1, catalog v7, target profile v9 and target `/9`, assessment/evaluation formats, and all runtime envelope versions remain unchanged.
+
 ## 0.46.0
 
 - Added generated SML-Agent assessment v1 as a conservative assurance artifact mapping all ten whitepaper criteria to supported, partial, or absent status with evidence and explicit gaps.

@@ -428,8 +428,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.46.0",
-          "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
+          "version": "0.47.0",
+          "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
         }
       },
       "packetId": {
@@ -884,8 +884,8 @@ const taskPacketDefinition = {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.46.0",
-                        "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
+                        "version": "0.47.0",
+                        "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
                       }
                     },
                     "operationId": {
@@ -1158,8 +1158,8 @@ const delegatedCapabilityDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.46.0",
-          "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
+          "version": "0.47.0",
+          "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
         }
       },
       "grantId": {
@@ -1379,8 +1379,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.46.0",
-              "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
+              "version": "0.47.0",
+              "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
             }
           },
           "traceId": {
@@ -1814,6 +1814,25 @@ const publicDecisionTraceDefinition = {
     "grantsAuthority": false
   }
 } as const;
+const discoveryCacheDefinition = {
+  "methods": [
+    "server/discover",
+    "tools/list"
+  ],
+  "revision": "sha256:103eb99d161fa87d24de7d1875b9977ce332cd60c26594b6163e6f1210c9ab13",
+  "revisionHeader": "ETag",
+  "ttlUnit": "milliseconds",
+  "defaultTtlMs": 0,
+  "cacheScope": "private",
+  "runtimeConfigurable": true,
+  "responseKindSpecific": true,
+  "variesBy": [
+    "Authorization",
+    "MCP-Protocol-Version",
+    "Mcp-Method",
+    "Mcp-Name"
+  ]
+} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -1837,8 +1856,67 @@ export type ReservationsMcpAuthenticator = (
 export interface ReservationsMcpHandlerOptions {
   readonly resourceServerUrl: string;
   readonly resourceMetadataUrl?: string;
+  readonly discoveryCacheTtlMs?: number;
   readonly now?: () => Date;
   readonly onerror?: (error: Error) => void;
+}
+
+interface McpDiscoveryCachePolicy {
+  readonly ttlMs: number;
+  readonly cacheScope: "private";
+  readonly revision: string;
+}
+
+function discoveryCachePolicy(ttlMs: number = discoveryCacheDefinition.defaultTtlMs): McpDiscoveryCachePolicy {
+  if (!Number.isSafeInteger(ttlMs) || ttlMs < 0) {
+    throw new RangeError("MCP discoveryCacheTtlMs must be a non-negative safe integer");
+  }
+  return {
+    ttlMs,
+    cacheScope: discoveryCacheDefinition.cacheScope,
+    revision: discoveryCacheDefinition.revision,
+  };
+}
+
+async function applyMcpResponseCachePolicy(
+  request: Request,
+  response: Response,
+  discoveryCache: McpDiscoveryCachePolicy,
+): Promise<Response> {
+  const headers = new Headers(response.headers);
+  const method = request.headers.get("mcp-method");
+  const discoveryMethod = method === "server/discover" || method === "tools/list";
+  let successfulResult = false;
+  if (discoveryMethod && response.ok && (response.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      const payload = await response.clone().json() as Record<string, unknown>;
+      successfulResult = typeof payload === "object" && payload !== null
+        && Object.hasOwn(payload, "result") && !Object.hasOwn(payload, "error");
+    } catch {
+      successfulResult = false;
+    }
+  }
+  const cacheableDiscovery = discoveryMethod && successfulResult;
+  if (!cacheableDiscovery || discoveryCache.ttlMs === 0) {
+    headers.set("cache-control", "no-store");
+  } else {
+    const maxAgeSeconds = Math.floor(discoveryCache.ttlMs / 1000);
+    headers.set("cache-control", `private, max-age=${maxAgeSeconds}${maxAgeSeconds === 0 ? ", must-revalidate" : ""}`);
+  }
+  if (cacheableDiscovery) {
+    headers.set("etag", `"${discoveryCache.revision}"`);
+    const vary = new Map<string, string>();
+    for (const name of (headers.get("vary") ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
+      vary.set(name.toLowerCase(), name);
+    }
+    for (const name of discoveryCacheDefinition.variesBy) vary.set(name.toLowerCase(), name);
+    headers.set("vary", [...vary.values()].join(", "));
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function metadataString(meta: Readonly<Record<string, unknown>> | undefined, key: string): string | undefined {
@@ -1885,7 +1963,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.46.0","sourceHash":"sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.47.0","sourceHash":"sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -1930,15 +2008,17 @@ function buildReservationsMcpServer(
   delegation: ReservationsDelegationRuntime | undefined,
   extensions: ReservationsExtensionRuntime | undefined,
   delegationAudience: string,
+  discoveryCache: McpDiscoveryCachePolicy,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.46.0" },
+    { name: "Reservations-ModelLang", version: "0.47.0" },
     {
       instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
-        "tools/list": { ttlMs: 0, cacheScope: "private" },
+        "server/discover": discoveryCache,
+        "tools/list": discoveryCache,
       },
     },
   );
@@ -2258,6 +2338,7 @@ export function createReservationsMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
+  const discoveryCache = discoveryCachePolicy(options.discoveryCacheTtlMs);
   const contexts = new WeakMap<AuthInfo, { executor: ReservationsOperationExecutor; delegation?: ReservationsDelegationRuntime; extensions?: ReservationsExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
@@ -2269,6 +2350,7 @@ export function createReservationsMcpHandler(
         authenticated.delegation,
         authenticated.extensions,
         resourceServerUrl.href,
+        discoveryCache,
         now,
         options.onerror,
       );
@@ -2312,13 +2394,7 @@ export function createReservationsMcpHandler(
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
-        const headers = new Headers(response.headers);
-        headers.set("cache-control", "no-store");
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers,
-        });
+        return await applyMcpResponseCachePolicy(request, response, discoveryCache);
       } finally {
         contexts.delete(authInfo);
       }

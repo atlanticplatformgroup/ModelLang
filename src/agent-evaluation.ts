@@ -25,7 +25,7 @@ export interface AgentEvaluationSuite {
   id: "agent-evaluation-v1";
   empirical: false;
   model: { id: string; version: string; sourceHash: string };
-  contracts: { catalogVersion: 7; mcpAdapterVersion: 5 };
+  contracts: { catalogVersion: 7; mcpAdapterVersion: 6 };
   conditions: { id: AgentEvaluationCondition; description: string }[];
   scenarios: AgentEvaluationScenario[];
 }

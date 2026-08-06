@@ -1,15 +1,15 @@
 {
   "$schema": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
   "assessmentVersion": 1,
-  "compilerVersion": "0.46.0",
+  "compilerVersion": "0.47.0",
   "profile": "SML-Agent",
   "profileDefinition": "docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md#b2-agent-profile-sml-agent",
   "scope": "generatedModelAdapter",
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.46.0",
-    "sourceHash": "sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69"
+    "version": "0.47.0",
+    "sourceHash": "sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf"
   },
   "overall": "partial",
   "authority": "none",
@@ -113,7 +113,7 @@
       "evidence": [
         "Model/catalog/contract versions",
         "zero-age resource, packet, and trace freshness",
-        "no-store HTTP and MCP metadata"
+        "no-store current-state and execution HTTP/MCP metadata"
       ],
       "gaps": []
     },

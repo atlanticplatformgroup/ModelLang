@@ -1,6 +1,6 @@
 # Reservations enforcement map
 
-Source hash: `sha256:c689a78580be5be667408b717f2605c40b65af4a0af0923d77830e9f3a53ee69`
+Source hash: `sha256:66af910115ff8ee8c835dae6144c9ae34e0c3a4cffa7a3699225032995030edf`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|

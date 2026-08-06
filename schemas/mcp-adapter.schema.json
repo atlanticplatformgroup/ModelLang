@@ -10,7 +10,7 @@
   ],
   "properties": {
     "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
-    "adapterVersion": { "const": 5 },
+    "adapterVersion": { "const": 6 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },
     "catalogVersion": { "const": 7 },
@@ -49,12 +49,48 @@
     },
     "discovery": {
       "type": "object",
-      "required": ["static", "authorizationFiltered", "grantsAuthority", "runtimeAuthorizationRequired"],
+      "required": ["static", "authorizationFiltered", "grantsAuthority", "runtimeAuthorizationRequired", "cache"],
       "properties": {
         "static": { "const": true },
         "authorizationFiltered": { "const": false },
         "grantsAuthority": { "const": false },
-        "runtimeAuthorizationRequired": { "const": true }
+        "runtimeAuthorizationRequired": { "const": true },
+        "cache": {
+          "type": "object",
+          "required": [
+            "methods", "revision", "revisionHeader", "ttlUnit", "defaultTtlMs", "cacheScope",
+            "runtimeConfigurable", "responseKindSpecific", "variesBy"
+          ],
+          "properties": {
+            "methods": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [{ "const": "server/discover" }, { "const": "tools/list" }],
+              "items": false
+            },
+            "revision": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+            "revisionHeader": { "const": "ETag" },
+            "ttlUnit": { "const": "milliseconds" },
+            "defaultTtlMs": { "const": 0 },
+            "cacheScope": { "const": "private" },
+            "runtimeConfigurable": { "const": true },
+            "responseKindSpecific": { "const": true },
+            "variesBy": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "prefixItems": [
+                { "const": "Authorization" },
+                { "const": "MCP-Protocol-Version" },
+                { "const": "Mcp-Method" },
+                { "const": "Mcp-Name" }
+              ],
+              "items": false
+            }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },

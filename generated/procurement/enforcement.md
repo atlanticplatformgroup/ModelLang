@@ -1,6 +1,6 @@
 # Procurement enforcement map
 
-Source hash: `sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566`
+Source hash: `sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e`
 
 | Rule or mechanism | Purpose | Layer | Generated enforcement | Source |
 |---|---|---|---|---|

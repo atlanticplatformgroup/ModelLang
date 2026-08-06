@@ -20,7 +20,7 @@
       "additionalProperties": false
     },
     "contracts": {
-      "const": { "catalogVersion": 7, "mcpAdapterVersion": 5 }
+      "const": { "catalogVersion": 7, "mcpAdapterVersion": 6 }
     },
     "conditions": {
       "type": "array",

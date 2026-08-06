@@ -581,8 +581,8 @@ const extensionToolDefinitions = [
           "const": {
             "id": "model:Procurement",
             "name": "Procurement",
-            "version": "0.46.0",
-            "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+            "version": "0.47.0",
+            "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
           }
         },
         "extensionId": {
@@ -830,8 +830,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Procurement",
           "name": "Procurement",
-          "version": "0.46.0",
-          "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+          "version": "0.47.0",
+          "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
         }
       },
       "packetId": {
@@ -2041,8 +2041,8 @@ const taskPacketDefinition = {
                       "const": {
                         "id": "model:Procurement",
                         "name": "Procurement",
-                        "version": "0.46.0",
-                        "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+                        "version": "0.47.0",
+                        "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
                       }
                     },
                     "operationId": {
@@ -2387,8 +2387,8 @@ const delegatedCapabilityDefinition = {
         "const": {
           "id": "model:Procurement",
           "name": "Procurement",
-          "version": "0.46.0",
-          "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+          "version": "0.47.0",
+          "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
         }
       },
       "grantId": {
@@ -2676,8 +2676,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.46.0",
-              "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+              "version": "0.47.0",
+              "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
             }
           },
           "traceId": {
@@ -3122,8 +3122,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.46.0",
-              "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+              "version": "0.47.0",
+              "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
             }
           },
           "traceId": {
@@ -3568,8 +3568,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.46.0",
-              "sourceHash": "sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"
+              "version": "0.47.0",
+              "sourceHash": "sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"
             }
           },
           "traceId": {
@@ -4003,6 +4003,25 @@ const publicDecisionTraceDefinition = {
     "grantsAuthority": false
   }
 } as const;
+const discoveryCacheDefinition = {
+  "methods": [
+    "server/discover",
+    "tools/list"
+  ],
+  "revision": "sha256:b89e45fff6ffa91e8470744dc385ee1f1a16fb8fea7954c671e7f7256548d387",
+  "revisionHeader": "ETag",
+  "ttlUnit": "milliseconds",
+  "defaultTtlMs": 0,
+  "cacheScope": "private",
+  "runtimeConfigurable": true,
+  "responseKindSpecific": true,
+  "variesBy": [
+    "Authorization",
+    "MCP-Protocol-Version",
+    "Mcp-Method",
+    "Mcp-Name"
+  ]
+} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -4026,8 +4045,67 @@ export type ProcurementMcpAuthenticator = (
 export interface ProcurementMcpHandlerOptions {
   readonly resourceServerUrl: string;
   readonly resourceMetadataUrl?: string;
+  readonly discoveryCacheTtlMs?: number;
   readonly now?: () => Date;
   readonly onerror?: (error: Error) => void;
+}
+
+interface McpDiscoveryCachePolicy {
+  readonly ttlMs: number;
+  readonly cacheScope: "private";
+  readonly revision: string;
+}
+
+function discoveryCachePolicy(ttlMs: number = discoveryCacheDefinition.defaultTtlMs): McpDiscoveryCachePolicy {
+  if (!Number.isSafeInteger(ttlMs) || ttlMs < 0) {
+    throw new RangeError("MCP discoveryCacheTtlMs must be a non-negative safe integer");
+  }
+  return {
+    ttlMs,
+    cacheScope: discoveryCacheDefinition.cacheScope,
+    revision: discoveryCacheDefinition.revision,
+  };
+}
+
+async function applyMcpResponseCachePolicy(
+  request: Request,
+  response: Response,
+  discoveryCache: McpDiscoveryCachePolicy,
+): Promise<Response> {
+  const headers = new Headers(response.headers);
+  const method = request.headers.get("mcp-method");
+  const discoveryMethod = method === "server/discover" || method === "tools/list";
+  let successfulResult = false;
+  if (discoveryMethod && response.ok && (response.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      const payload = await response.clone().json() as Record<string, unknown>;
+      successfulResult = typeof payload === "object" && payload !== null
+        && Object.hasOwn(payload, "result") && !Object.hasOwn(payload, "error");
+    } catch {
+      successfulResult = false;
+    }
+  }
+  const cacheableDiscovery = discoveryMethod && successfulResult;
+  if (!cacheableDiscovery || discoveryCache.ttlMs === 0) {
+    headers.set("cache-control", "no-store");
+  } else {
+    const maxAgeSeconds = Math.floor(discoveryCache.ttlMs / 1000);
+    headers.set("cache-control", `private, max-age=${maxAgeSeconds}${maxAgeSeconds === 0 ? ", must-revalidate" : ""}`);
+  }
+  if (cacheableDiscovery) {
+    headers.set("etag", `"${discoveryCache.revision}"`);
+    const vary = new Map<string, string>();
+    for (const name of (headers.get("vary") ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
+      vary.set(name.toLowerCase(), name);
+    }
+    for (const name of discoveryCacheDefinition.variesBy) vary.set(name.toLowerCase(), name);
+    headers.set("vary", [...vary.values()].join(", "));
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function metadataString(meta: Readonly<Record<string, unknown>> | undefined, key: string): string | undefined {
@@ -4074,7 +4152,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Procurement","name":"Procurement","version":"0.46.0","sourceHash":"sha256:1b947d47c0886b1b8dc73183da3118d7c1e5a9aa52d5506fdb3ae89208b98566"},
+    model: {"id":"model:Procurement","name":"Procurement","version":"0.47.0","sourceHash":"sha256:3a8297616e7a73b4f126ca2802e087ab034e2dff549e5f4913fc754c3634938e"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -4119,15 +4197,17 @@ function buildProcurementMcpServer(
   delegation: ProcurementDelegationRuntime | undefined,
   extensions: ProcurementExtensionRuntime | undefined,
   delegationAudience: string,
+  discoveryCache: McpDiscoveryCachePolicy,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Procurement-ModelLang", version: "0.46.0" },
+    { name: "Procurement-ModelLang", version: "0.47.0" },
     {
       instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
-        "tools/list": { ttlMs: 0, cacheScope: "private" },
+        "server/discover": discoveryCache,
+        "tools/list": discoveryCache,
       },
     },
   );
@@ -4447,6 +4527,7 @@ export function createProcurementMcpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
+  const discoveryCache = discoveryCachePolicy(options.discoveryCacheTtlMs);
   const contexts = new WeakMap<AuthInfo, { executor: ProcurementOperationExecutor; delegation?: ProcurementDelegationRuntime; extensions?: ProcurementExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
@@ -4458,6 +4539,7 @@ export function createProcurementMcpHandler(
         authenticated.delegation,
         authenticated.extensions,
         resourceServerUrl.href,
+        discoveryCache,
         now,
         options.onerror,
       );
@@ -4501,13 +4583,7 @@ export function createProcurementMcpHandler(
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
-        const headers = new Headers(response.headers);
-        headers.set("cache-control", "no-store");
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers,
-        });
+        return await applyMcpResponseCachePolicy(request, response, discoveryCache);
       } finally {
         contexts.delete(authInfo);
       }

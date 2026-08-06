@@ -100,7 +100,7 @@ export function generateSmlAgentAssessment(
       "SML-Agent-7",
       "Version and freshness information",
       "supported",
-      ["Model/catalog/contract versions", "zero-age resource, packet, and trace freshness", "no-store HTTP and MCP metadata"],
+      ["Model/catalog/contract versions", "zero-age resource, packet, and trace freshness", "no-store current-state and execution HTTP/MCP metadata"],
       [],
     ),
     criterion(

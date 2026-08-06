@@ -406,7 +406,7 @@ describe("backends", () => {
     expect(provenance).toMatchObject({
       provenanceVersion: 2,
       compilerVersion: packageInfo.version,
-      generatorProfile: "postgresql-http-ui-agent-assurance/30",
+      generatorProfile: "postgresql-http-ui-mcp-discovery-cache/31",
       irVersion: 1,
       targetProfile: "target:postgresql-http-ui-extension-tools/9",
     });
@@ -687,7 +687,13 @@ describe("backends", () => {
       extensionToolResultVersion: number;
       transport: { kind: string; stateless: boolean };
       authentication: Record<string, unknown>;
-      discovery: Record<string, unknown>;
+      discovery: {
+        static: boolean;
+        authorizationFiltered: boolean;
+        grantsAuthority: boolean;
+        runtimeAuthorizationRequired: boolean;
+        cache: Record<string, unknown> & { revision: string };
+      };
       capabilities: { embeddedResources: Record<string, unknown>; taskPackets: Record<string, unknown>; delegatedCapabilities: Record<string, unknown>; publicDecisionTraces: Record<string, unknown>; extensionTools: Record<string, unknown>; prompts: boolean; tasks: boolean };
       taskPacket: { name: string; inputSchema: object; outputSchema: object; resource: Record<string, unknown> };
       delegatedCapabilities: { issueInputSchema: object; issueOutputSchema: object; revokeOutputSchema: object } & Record<string, unknown>;
@@ -716,7 +722,7 @@ describe("backends", () => {
     const validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     expect(validate(manifest), JSON.stringify(validate.errors)).toBe(true);
     expect(manifest).toMatchObject({
-      adapterVersion: 5,
+      adapterVersion: 6,
       protocolVersion: "2026-07-28",
       catalogVersion: 7,
       taskPacketVersion: 1,
@@ -737,6 +743,17 @@ describe("backends", () => {
         authorizationFiltered: false,
         grantsAuthority: false,
         runtimeAuthorizationRequired: true,
+        cache: {
+          methods: ["server/discover", "tools/list"],
+          revision: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+          revisionHeader: "ETag",
+          ttlUnit: "milliseconds",
+          defaultTtlMs: 0,
+          cacheScope: "private",
+          runtimeConfigurable: true,
+          responseKindSpecific: true,
+          variesBy: ["Authorization", "MCP-Protocol-Version", "Mcp-Method", "Mcp-Name"],
+        },
       },
       capabilities: {
         embeddedResources: { delivery: "embeddedToolResult", templates: false, subscriptions: false },
@@ -767,6 +784,13 @@ describe("backends", () => {
         tasks: false,
       },
     });
+    expect(manifest.discovery.cache.revision).toBe(
+      (JSON.parse(generateAll(await procurement())["mcp.json"]!) as typeof manifest).discovery.cache.revision,
+    );
+    const changedIr = structuredClone(await procurement());
+    changedIr.model.sourceHash = `sha256:${"0".repeat(64)}`;
+    const changedManifest = JSON.parse(generateAll(changedIr)["mcp.json"]!) as typeof manifest;
+    expect(changedManifest.discovery.cache.revision).not.toBe(manifest.discovery.cache.revision);
     expect(manifest.taskPacket).toMatchObject({
       name: "modellang_task_packet",
       resource: {
@@ -1413,7 +1437,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const sql = output["postgres/003_queries.sql"];
     expect(sql).toContain('"reservations_for_resource"("p_resource" uuid, "p_starts_at_or_after" timestamptz, p_sort text DEFAULT NULL, p_cursor text DEFAULT NULL)');
     expect(sql).toContain('("p_starts_at_or_after" IS NULL) OR (v_row."starts_at" >= "p_starts_at_or_after")');
-    expect(sql).toContain("'modelVersion', '0.46.0'");
+    expect(sql).toContain("'modelVersion', '0.47.0'");
     expect(sql).toContain("'sourceHash'");
     expect(sql).toContain("'queryId'");
     expect(sql).toContain("'revision'");
@@ -1576,7 +1600,7 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(schema).toContain('"migration_kind" text NOT NULL');
     expect(schema).toContain('"plan_hash" text');
     expect(schema).toContain("'installation'");
-    expect(schema).toContain("VALUES ('model:Procurement', '0.46.0'");
+    expect(schema).toContain("VALUES ('model:Procurement', '0.47.0'");
     expect(schema).toContain("IF TG_OP = 'INSERT' THEN");
     expect(schema).toContain("ML_WORKFLOW:workflow:wfl_96a1115ba9bf42f2a206374822eeaa87");
     expect(schema).toContain('AFTER INSERT ON "model_procurement"."purchase_request"');

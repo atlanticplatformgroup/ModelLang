@@ -1,8 +1,10 @@
+import { createHash } from "node:crypto";
 import type { AgentToolCatalog } from "./agent-tool-catalog.js";
 import type { GeneratedFiles } from "./build.js";
 import type { TaskPacketSchemas } from "./task-packet.js";
 import type { DelegatedCapabilitySchemas } from "./delegated-capability.js";
 import type { PublicDecisionTraceSchemas } from "./public-decision-trace.js";
+import { stableJson } from "./ir.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
 
 type JsonSchema = Record<string, unknown>;
@@ -66,7 +68,7 @@ interface McpExtensionToolBinding {
 
 export interface McpAdapterManifest {
   $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
-  adapterVersion: 5;
+  adapterVersion: 6;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
   catalogVersion: 7;
@@ -95,6 +97,17 @@ export interface McpAdapterManifest {
     authorizationFiltered: false;
     grantsAuthority: false;
     runtimeAuthorizationRequired: true;
+    cache: {
+      methods: ["server/discover", "tools/list"];
+      revision: string;
+      revisionHeader: "ETag";
+      ttlUnit: "milliseconds";
+      defaultTtlMs: 0;
+      cacheScope: "private";
+      runtimeConfigurable: true;
+      responseKindSpecific: true;
+      variesBy: ["Authorization", "MCP-Protocol-Version", "Mcp-Method", "Mcp-Name"];
+    };
   };
   capabilities: {
     tools: { listChanged: false; exactCatalogSchemas: true };
@@ -203,15 +216,32 @@ function stableMcpName(operationId: string): string {
   return name;
 }
 
+function mcpDiscoveryRevision(
+  catalog: AgentToolCatalog,
+  taskPacketSchemas: TaskPacketSchemas,
+  publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
+): string {
+  const contract = stableJson({
+    adapterVersion: 6,
+    compilerVersion: MODELLANG_COMPILER_VERSION,
+    protocolVersion: "2026-07-28",
+    catalog,
+    taskPacketSchemas,
+    publicDecisionTraceSchemas,
+  });
+  return `sha256:${createHash("sha256").update(contract, "utf8").digest("hex")}`;
+}
+
 export function generateMcpAdapterManifest(
   catalog: AgentToolCatalog,
   taskPacketSchemas: TaskPacketSchemas,
   delegatedCapabilitySchemas: DelegatedCapabilitySchemas,
   publicDecisionTraceSchemas: PublicDecisionTraceSchemas,
 ): McpAdapterManifest {
+  const discoveryRevision = mcpDiscoveryRevision(catalog, taskPacketSchemas, publicDecisionTraceSchemas);
   return {
     $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
-    adapterVersion: 5,
+    adapterVersion: 6,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
     catalogVersion: catalog.catalogVersion,
@@ -240,6 +270,17 @@ export function generateMcpAdapterManifest(
       authorizationFiltered: false,
       grantsAuthority: false,
       runtimeAuthorizationRequired: true,
+      cache: {
+        methods: ["server/discover", "tools/list"],
+        revision: discoveryRevision,
+        revisionHeader: "ETag",
+        ttlUnit: "milliseconds",
+        defaultTtlMs: 0,
+        cacheScope: "private",
+        runtimeConfigurable: true,
+        responseKindSpecific: true,
+        variesBy: ["Authorization", "MCP-Protocol-Version", "Mcp-Method", "Mcp-Name"],
+      },
     },
     capabilities: {
       tools: { listChanged: false, exactCatalogSchemas: true },
@@ -462,6 +503,7 @@ const extensionToolDefinitions = ${JSON.stringify(manifest.extensionTools, null,
 const taskPacketDefinition = ${JSON.stringify(manifest.taskPacket, null, 2)} as const;
 const delegatedCapabilityDefinition = ${JSON.stringify(manifest.delegatedCapabilities, null, 2)} as const;
 const publicDecisionTraceDefinition = ${JSON.stringify(manifest.publicDecisionTrace, null, 2)} as const;
+const discoveryCacheDefinition = ${JSON.stringify(manifest.discovery.cache, null, 2)} as const;
 
 const expectedRevisionKey = "dev.modellang/expectedRevision";
 const idempotencyKeyKey = "dev.modellang/idempotencyKey";
@@ -485,8 +527,67 @@ export type ${modelName}McpAuthenticator = (
 export interface ${modelName}McpHandlerOptions {
   readonly resourceServerUrl: string;
   readonly resourceMetadataUrl?: string;
+  readonly discoveryCacheTtlMs?: number;
   readonly now?: () => Date;
   readonly onerror?: (error: Error) => void;
+}
+
+interface McpDiscoveryCachePolicy {
+  readonly ttlMs: number;
+  readonly cacheScope: "private";
+  readonly revision: string;
+}
+
+function discoveryCachePolicy(ttlMs: number = discoveryCacheDefinition.defaultTtlMs): McpDiscoveryCachePolicy {
+  if (!Number.isSafeInteger(ttlMs) || ttlMs < 0) {
+    throw new RangeError("MCP discoveryCacheTtlMs must be a non-negative safe integer");
+  }
+  return {
+    ttlMs,
+    cacheScope: discoveryCacheDefinition.cacheScope,
+    revision: discoveryCacheDefinition.revision,
+  };
+}
+
+async function applyMcpResponseCachePolicy(
+  request: Request,
+  response: Response,
+  discoveryCache: McpDiscoveryCachePolicy,
+): Promise<Response> {
+  const headers = new Headers(response.headers);
+  const method = request.headers.get("mcp-method");
+  const discoveryMethod = method === "server/discover" || method === "tools/list";
+  let successfulResult = false;
+  if (discoveryMethod && response.ok && (response.headers.get("content-type") ?? "").includes("application/json")) {
+    try {
+      const payload = await response.clone().json() as Record<string, unknown>;
+      successfulResult = typeof payload === "object" && payload !== null
+        && Object.hasOwn(payload, "result") && !Object.hasOwn(payload, "error");
+    } catch {
+      successfulResult = false;
+    }
+  }
+  const cacheableDiscovery = discoveryMethod && successfulResult;
+  if (!cacheableDiscovery || discoveryCache.ttlMs === 0) {
+    headers.set("cache-control", "no-store");
+  } else {
+    const maxAgeSeconds = Math.floor(discoveryCache.ttlMs / 1000);
+    headers.set("cache-control", \`private, max-age=\${maxAgeSeconds}\${maxAgeSeconds === 0 ? ", must-revalidate" : ""}\`);
+  }
+  if (cacheableDiscovery) {
+    headers.set("etag", \`"\${discoveryCache.revision}"\`);
+    const vary = new Map<string, string>();
+    for (const name of (headers.get("vary") ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
+      vary.set(name.toLowerCase(), name);
+    }
+    for (const name of discoveryCacheDefinition.variesBy) vary.set(name.toLowerCase(), name);
+    headers.set("vary", [...vary.values()].join(", "));
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function metadataString(meta: Readonly<Record<string, unknown>> | undefined, key: string): string | undefined {
@@ -578,6 +679,7 @@ function build${modelName}McpServer(
   delegation: ${modelName}DelegationRuntime | undefined,
   extensions: ${modelName}ExtensionRuntime | undefined,
   delegationAudience: string,
+  discoveryCache: McpDiscoveryCachePolicy,
   now: () => Date,
   onerror?: (error: Error) => void,
 ): McpServer {
@@ -586,7 +688,8 @@ function build${modelName}McpServer(
     {
       instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {
-        "tools/list": { ttlMs: 0, cacheScope: "private" },
+        "server/discover": discoveryCache,
+        "tools/list": discoveryCache,
       },
     },
   );
@@ -906,6 +1009,7 @@ export function create${modelName}McpHandler(
     throw new Error("MCP resourceMetadataUrl must be HTTP(S)");
   }
   const now = options.now ?? (() => new Date());
+  const discoveryCache = discoveryCachePolicy(options.discoveryCacheTtlMs);
   const contexts = new WeakMap<AuthInfo, { executor: ${modelName}OperationExecutor; delegation?: ${modelName}DelegationRuntime; extensions?: ${modelName}ExtensionRuntime }>();
   const handler = createMcpHandler(
     (ctx: McpRequestContext) => {
@@ -917,6 +1021,7 @@ export function create${modelName}McpHandler(
         authenticated.delegation,
         authenticated.extensions,
         resourceServerUrl.href,
+        discoveryCache,
         now,
         options.onerror,
       );
@@ -960,13 +1065,7 @@ export function create${modelName}McpHandler(
       });
       try {
         const response = await handler.fetch(request, { ...requestOptions, authInfo });
-        const headers = new Headers(response.headers);
-        headers.set("cache-control", "no-store");
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers,
-        });
+        return await applyMcpResponseCachePolicy(request, response, discoveryCache);
       } finally {
         contexts.delete(authInfo);
       }
