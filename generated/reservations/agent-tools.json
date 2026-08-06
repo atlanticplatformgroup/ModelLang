@@ -1,14 +1,14 @@
 {
   "$schema": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
   "catalogVersion": 7,
-  "compilerVersion": "0.48.0",
+  "compilerVersion": "0.49.0",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.48.0",
-    "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+    "version": "0.49.0",
+    "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
   },
   "view": {
     "audience": "agent",

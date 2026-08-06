@@ -1,15 +1,15 @@
 {
   "$schema": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
   "assessmentVersion": 1,
-  "compilerVersion": "0.48.0",
+  "compilerVersion": "0.49.0",
   "profile": "SML-Agent",
   "profileDefinition": "docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md#b2-agent-profile-sml-agent",
   "scope": "generatedModelAdapter",
   "model": {
     "id": "model:Procurement",
     "name": "Procurement",
-    "version": "0.48.0",
-    "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+    "version": "0.49.0",
+    "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
   },
   "overall": "partial",
   "authority": "none",

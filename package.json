@@ -1,22 +1,43 @@
 {
-  "name": "modellang-poc",
-  "version": "0.48.0",
-  "private": true,
+  "name": "modellang",
+  "version": "0.49.0",
+  "description": "ModelLang reference compiler and modelc CLI for semantic application models",
+  "license": "Apache-2.0",
+  "author": "Nick Scipione",
+  "keywords": [
+    "semantic-model",
+    "compiler",
+    "postgresql",
+    "mcp",
+    "agent-tools"
+  ],
   "type": "module",
   "bin": {
     "modelc": "./dist/src/cli.js"
+  },
+  "files": [
+    "dist/src",
+    "schemas",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "deadcode": "knip",
-    "health": "npm run build && npm run lint && npm run deadcode && npm run agent:evaluate -- --check && npm test",
+    "health": "npm run build && npm run lint && npm run deadcode && npm run agent:evaluate -- --check && npm run package:check && npm test",
     "test": "vitest run",
     "test:unit": "vitest run --exclude 'tests/integration/**'",
     "test:integration": "vitest run tests/integration",
     "model:check": "tsx scripts/check-models.ts",
     "model:generate": "tsx scripts/generate-models.ts",
     "agent:evaluate": "tsx scripts/evaluate-agents.ts",
+    "package:check": "tsx scripts/check-package.ts",
+    "prepack": "npm run build",
     "db:up": "docker compose up -d --wait db",
     "db:down": "docker compose down -v",
     "demo": "tsx scripts/demo.ts",

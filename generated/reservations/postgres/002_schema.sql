@@ -1,4 +1,4 @@
--- source sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e
+-- source sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 CREATE SCHEMA "model_reservations" AUTHORIZATION modellang_owner;
@@ -1054,6 +1054,6 @@ CREATE TABLE "model_reservations_internal"."schema_migrations" (
   "applied_at" timestamptz NOT NULL DEFAULT pg_catalog.transaction_timestamp()
 );
 INSERT INTO "model_reservations_internal"."schema_migrations" ("model_id", "version", "source_hash", "migration_kind")
-VALUES ('model:Reservations', '0.48.0', 'sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e', 'installation');
+VALUES ('model:Reservations', '0.49.0', 'sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4', 'installation');
 RESET ROLE;
 

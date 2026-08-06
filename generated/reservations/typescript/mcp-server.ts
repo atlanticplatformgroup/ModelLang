@@ -428,8 +428,8 @@ const taskPacketDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.48.0",
-          "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+          "version": "0.49.0",
+          "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
         }
       },
       "packetId": {
@@ -884,8 +884,8 @@ const taskPacketDefinition = {
                       "const": {
                         "id": "model:Reservations",
                         "name": "Reservations",
-                        "version": "0.48.0",
-                        "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+                        "version": "0.49.0",
+                        "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
                       }
                     },
                     "operationId": {
@@ -1158,8 +1158,8 @@ const delegatedCapabilityDefinition = {
         "const": {
           "id": "model:Reservations",
           "name": "Reservations",
-          "version": "0.48.0",
-          "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+          "version": "0.49.0",
+          "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
         }
       },
       "grantId": {
@@ -1379,8 +1379,8 @@ const publicDecisionTraceDefinition = {
             "const": {
               "id": "model:Reservations",
               "name": "Reservations",
-              "version": "0.48.0",
-              "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+              "version": "0.49.0",
+              "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
             }
           },
           "traceId": {
@@ -1819,7 +1819,7 @@ const discoveryCacheDefinition = {
     "server/discover",
     "tools/list"
   ],
-  "revision": "sha256:afa2bad217743345f0d5369ff778cb4c07040f2a7a39abba1a6a1acdaf3e96bb",
+  "revision": "sha256:09478dc95793ac56b112b8970f53524e5a134d8bc43b7b9248f5ed21d88e588a",
   "revisionHeader": "ETag",
   "ttlUnit": "milliseconds",
   "defaultTtlMs": 0,
@@ -1963,7 +1963,7 @@ function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retr
     $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
-    model: {"id":"model:Reservations","name":"Reservations","version":"0.48.0","sourceHash":"sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"},
+    model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},
     operationId: definition.operationId,
     kind: "queryResult" as const,
     authority: "none" as const,
@@ -2013,7 +2013,7 @@ function buildReservationsMcpServer(
   onerror?: (error: Error) => void,
 ): McpServer {
   const server = new McpServer(
-    { name: "Reservations-ModelLang", version: "0.48.0" },
+    { name: "Reservations-ModelLang", version: "0.49.0" },
     {
       instructions: "Tool discovery, task packets, public applicability traces, and extension metadata grant no authority. Extension tools require an explicitly registered host adapter and host authorization on every invocation; ModelLang generates no extension implementation and does not verify its tests or effects. Public traces are zero-age current evaluations, not execution evidence or complete decision traces. Delegated invocation requires a separately issued exact-input credential plus authenticated delegate identity; every call revalidates current runtime authorization.",
       cacheHints: {

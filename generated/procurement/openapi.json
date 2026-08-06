@@ -3,8 +3,8 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "info": {
     "title": "Procurement ModelLang API",
-    "version": "0.48.0",
-    "description": "Generated from ModelLang operation manifest v11 (sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54)."
+    "version": "0.49.0",
+    "description": "Generated from ModelLang operation manifest v11 (sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45)."
   },
   "paths": {
     "/operations/actions/act_1e35db0451b1461e941af6283d86dca2": {
@@ -1106,10 +1106,10 @@
                           "const": "Procurement"
                         },
                         "version": {
-                          "const": "0.48.0"
+                          "const": "0.49.0"
                         },
                         "sourceHash": {
-                          "const": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                          "const": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                         }
                       }
                     },
@@ -2536,8 +2536,8 @@
                       "const": {
                         "id": "model:Procurement",
                         "name": "Procurement",
-                        "version": "0.48.0",
-                        "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                        "version": "0.49.0",
+                        "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                       }
                     },
                     "extensionId": {
@@ -3174,8 +3174,8 @@
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.48.0",
-              "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+              "version": "0.49.0",
+              "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
             }
           },
           "packetId": {
@@ -4385,8 +4385,8 @@
                           "const": {
                             "id": "model:Procurement",
                             "name": "Procurement",
-                            "version": "0.48.0",
-                            "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                            "version": "0.49.0",
+                            "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                           }
                         },
                         "operationId": {
@@ -4564,8 +4564,8 @@
             "const": {
               "id": "model:Procurement",
               "name": "Procurement",
-              "version": "0.48.0",
-              "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+              "version": "0.49.0",
+              "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
             }
           },
           "grantId": {
@@ -4694,8 +4694,8 @@
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.48.0",
-                  "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                  "version": "0.49.0",
+                  "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                 }
               },
               "traceId": {
@@ -5140,8 +5140,8 @@
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.48.0",
-                  "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                  "version": "0.49.0",
+                  "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                 }
               },
               "traceId": {
@@ -5586,8 +5586,8 @@
                 "const": {
                   "id": "model:Procurement",
                   "name": "Procurement",
-                  "version": "0.48.0",
-                  "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                  "version": "0.49.0",
+                  "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
                 }
               },
               "traceId": {
@@ -6042,10 +6042,10 @@
                 "const": "Procurement"
               },
               "version": {
-                "const": "0.48.0"
+                "const": "0.49.0"
               },
               "sourceHash": {
-                "const": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54"
+                "const": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"
               }
             }
           },

@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
   "adapterVersion": 6,
-  "compilerVersion": "0.48.0",
+  "compilerVersion": "0.49.0",
   "protocolVersion": "2026-07-28",
   "catalogVersion": 7,
   "resourceEnvelopeVersion": 1,
@@ -12,8 +12,8 @@
   "model": {
     "id": "model:Reservations",
     "name": "Reservations",
-    "version": "0.48.0",
-    "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+    "version": "0.49.0",
+    "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
   },
   "transport": {
     "kind": "streamableHttp",
@@ -39,7 +39,7 @@
         "server/discover",
         "tools/list"
       ],
-      "revision": "sha256:afa2bad217743345f0d5369ff778cb4c07040f2a7a39abba1a6a1acdaf3e96bb",
+      "revision": "sha256:09478dc95793ac56b112b8970f53524e5a134d8bc43b7b9248f5ed21d88e588a",
       "revisionHeader": "ETag",
       "ttlUnit": "milliseconds",
       "defaultTtlMs": 0,
@@ -266,8 +266,8 @@
           "const": {
             "id": "model:Reservations",
             "name": "Reservations",
-            "version": "0.48.0",
-            "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+            "version": "0.49.0",
+            "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
           }
         },
         "packetId": {
@@ -722,8 +722,8 @@
                         "const": {
                           "id": "model:Reservations",
                           "name": "Reservations",
-                          "version": "0.48.0",
-                          "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+                          "version": "0.49.0",
+                          "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
                         }
                       },
                       "operationId": {
@@ -996,8 +996,8 @@
           "const": {
             "id": "model:Reservations",
             "name": "Reservations",
-            "version": "0.48.0",
-            "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+            "version": "0.49.0",
+            "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
           }
         },
         "grantId": {
@@ -1217,8 +1217,8 @@
               "const": {
                 "id": "model:Reservations",
                 "name": "Reservations",
-                "version": "0.48.0",
-                "sourceHash": "sha256:8247e8c00da867ca2bba6e77232d69f7a13798190c3f7e657aa8f3745526d09e"
+                "version": "0.49.0",
+                "sourceHash": "sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"
               }
             },
             "traceId": {

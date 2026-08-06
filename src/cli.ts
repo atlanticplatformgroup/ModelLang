@@ -13,20 +13,23 @@ import { planMigration } from "./migrations.js";
 import { semanticDiff } from "./semantic-diff.js";
 import { parseReviewedMigrationPlan, planReviewedMigration } from "./reviewed-migrations.js";
 
-function usage(): never {
-  process.stderr.write(`Usage:
+const USAGE = `Usage:
   modelc <check|print-ir|explain> <file> [--debug]
   modelc build <file> --out <directory> [--agent-plugin-url <url>] [--agent-plugin-name <name>] [--debug]
   modelc assign-ids <file>
   modelc migration <previous-ir.json> <current.model> --out <migration.sql>
   modelc reviewed-migration <previous-ir.json> <current.model> --plan <reviewed-plan.json> --out <migration.sql>
   modelc semantic-diff <previous-ir.json> <current.model> --out <semantic-diff.json>
-`);
-  process.exit(2);
+`;
+
+function usage(exitCode = 2): never {
+  (exitCode === 0 ? process.stdout : process.stderr).write(USAGE);
+  process.exit(exitCode);
 }
 
 async function main(): Promise<void> {
   const [command, fileArg, ...rest] = process.argv.slice(2);
+  if (command === "--help" || command === "-h") usage(0);
   if (!command || !fileArg) usage();
   if (command === "assign-ids") {
     const file = resolve(fileArg);

@@ -285,7 +285,7 @@ export interface ProcurementSupplierRiskReviewExtensionResult {
   readonly $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json";
   readonly extensionToolResultVersion: 1;
   readonly catalogVersion: 7;
-  readonly model: { readonly "id": "model:Procurement"; readonly "name": "Procurement"; readonly "version": "0.48.0"; readonly "sourceHash": "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54" };
+  readonly model: { readonly "id": "model:Procurement"; readonly "name": "Procurement"; readonly "version": "0.49.0"; readonly "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45" };
   readonly extensionId: "extension:ext_54d694c9a0a274dc79c6168e47d25968";
   readonly contractRevision: "sha256:2865191d2d20c64024b9f30ab13557eee224265b74de53c4e16957f016f91099";
   readonly kind: "hostExtensionResult";

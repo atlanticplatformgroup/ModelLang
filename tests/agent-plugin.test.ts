@@ -27,7 +27,7 @@ describe("Agent Plugins packaging", () => {
     expect(plugin).toMatchObject({
       $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
       name: "modellang.procurement",
-      version: "0.48.0",
+      version: "0.49.0",
     });
     expect(mcp).toEqual({
       $schema: "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.49.0
+
+- Renamed the public package from private `modellang-poc` to Apache-2.0 `modellang`, retained the `modelc` executable, declared Node.js 20+, and limited the npm tarball to compiled compiler modules, schemas, and release documentation.
+- Added a package-closure gate that creates the real tarball, rejects repository-only contents, installs it into an empty consumer, resolves the canonical IR schema from the installed package, runs `modelc check` and `modelc build`, and verifies Agent Plugin generation.
+- Added Node 20/22 CI with deterministic generation drift detection, build, lint, dead-code, evaluation, package, and unit gates plus a separate live PostgreSQL 16 integration job.
+- Added tag/version-checked npm release automation for hosted runners and documented the external first-publish, source-repository, and trusted-publisher setup without committing credentials or fabricating a repository URL.
+- Added Apache-2.0 licensing, contribution guidance, private vulnerability-reporting policy, release checklist, and an install-to-Agent-Plugin public preview guide.
+- Kept public package installation non-authoritative: package, CI, provenance, Agent Plugin, and MCP discovery metadata never replace application authentication or runtime enforcement.
+- Added the 0.49 plan and normative distribution/conformance contracts plus README and whitepaper status updates.
+- Advanced compiler, npm package, and examples to 0.49.0; canonical IR1, generator profile `postgresql-http-ui-agent-plugin/32`, MCP adapter v6, catalog v7, target profile v9 and target `/9`, Agent Plugins 1.0.0, assessment/evaluation formats, and runtime envelope versions remain unchanged.
+
 ## 0.48.0
 
 - Added opt-in Agent Plugins 1.0.0 packaging for deployed generated applications through `modelc build --agent-plugin-url`, with an optional conforming package-name override.

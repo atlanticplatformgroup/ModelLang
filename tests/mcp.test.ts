@@ -245,7 +245,7 @@ describe("generated MCP adapter", () => {
     expect(envelope).toMatchObject({
       resourceVersion: 1,
       catalogVersion: 7,
-      model: { id: "model:Procurement", version: "0.48.0" },
+      model: { id: "model:Procurement", version: "0.49.0" },
       operationId: queryId,
       kind: "queryResult",
       authority: "none",
@@ -497,8 +497,8 @@ describe("generated MCP adapter", () => {
       model: {
         id: "model:Procurement",
         name: "Procurement",
-        version: "0.48.0",
-        sourceHash: "sha256:376adbaa8d064194ffa8c604fcb274d288bfe3e75aa0a8693437668f78dd1c54",
+        version: "0.49.0",
+        sourceHash: "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45",
       },
       grantId,
       operationId: actionId,
