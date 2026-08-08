@@ -3,23 +3,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { parsePackResult } from "./npm-pack-result.js";
 
 const execute = promisify(execFile);
-
-interface PackResult {
-  filename: string;
-  name: string;
-  version: string;
-  files: { path: string }[];
-}
-
-function parsePackResult(stdout: string): PackResult {
-  const jsonStart = stdout.indexOf("[");
-  if (jsonStart < 0) throw new Error("npm pack did not return JSON metadata");
-  const value = JSON.parse(stdout.slice(jsonStart)) as PackResult[];
-  if (value.length !== 1 || !value[0]) throw new Error("npm pack did not return exactly one package");
-  return value[0];
-}
 
 async function main(): Promise<void> {
   const repository = resolve(".");
