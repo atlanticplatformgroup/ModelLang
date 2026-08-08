@@ -102,11 +102,11 @@ async function main(): Promise<void> {
     if (!checked.stdout.includes("OK Procurement 0.49.0")) throw new Error("Installed modelc check did not compile the preview model");
     const atomicSourceFile = join(consumer, "atomic.model");
     await writeFile(atomicSourceFile, `model Atomic version "0.50.0";
-entity User { id: UUID @id @generated(uuid); }
+entity User { id: UUID @id @generated(uuid); canApprove: Boolean; }
 entity Request { id: UUID @id @generated(uuid); approved: Boolean; }
 entity Approval { id: UUID @id @generated(uuid); request: Request @unique; actor: User; }
 action approve(caller actor: User, request: Request) -> Approval {
-  authorize true;
+  authorize actor.canApprove;
   require pending: request.approved == false;
   update request { approved = true; }
   create Approval { request = request; actor = actor; }
