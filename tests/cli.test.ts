@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -15,6 +15,46 @@ describe("modelc deployment packaging", () => {
     expect(result.stdout).toContain("Usage:");
     expect(result.stdout).toContain("modelc build <file>");
     expect(result.stderr).toBe("");
+  });
+
+  it("assigns nested projection IDs through the CLI, checks the result, and is idempotent", async () => {
+    const temporary = await mkdtemp(join(tmpdir(), "modellang-assign-nested-"));
+    const model = join(temporary, "nested.model");
+    const source = `model NestedProjectionIds version "1";
+entity A { id: UUID @id; }
+entity B { id: UUID @id; a: A; }
+projection ASummary from A { id; }
+projection BSummary from B { a: ASummary; }
+query bs(caller actor: A) returns BSummary from B as b {
+  authorize true;
+  where true;
+  orderBy b.id asc;
+  limit 10;
+}
+`;
+    try {
+      await writeFile(model, source, "utf8");
+      const first = await execute(process.execPath, ["--import", "tsx", "src/cli.ts", "assign-ids", model], { cwd: resolve(".") });
+      expect(first.stdout).toMatch(/Assigned \d+ stable IDs/);
+      const assigned = await readFile(model, "utf8");
+      const nested = /a: ASummary @stableId\("(pfd_[0-9a-f]{32})"\);/.exec(assigned);
+      expect(nested).not.toBeNull();
+      expect(assigned).not.toMatch(/a @stableId\("pfd_[0-9a-f]{32}"\): ASummary/);
+      expect(assigned).toMatch(/projection ASummary[^}]+\{ id @stableId\("pfd_[0-9a-f]{32}"\); \}/);
+
+      const checked = await execute(process.execPath, ["--import", "tsx", "src/cli.ts", "check", model], { cwd: resolve(".") });
+      expect(checked.stdout).toContain("OK NestedProjectionIds 1");
+      const printed = await execute(process.execPath, ["--import", "tsx", "src/cli.ts", "print-ir", model], { cwd: resolve(".") });
+      const ir = JSON.parse(printed.stdout) as { projections: { name: string; fields: { id: string; name: string }[] }[] };
+      expect(ir.projections.find((projection) => projection.name === "BSummary")?.fields)
+        .toContainEqual(expect.objectContaining({ id: `projectionField:${nested![1]}`, name: "a" }));
+
+      const second = await execute(process.execPath, ["--import", "tsx", "src/cli.ts", "assign-ids", model], { cwd: resolve(".") });
+      expect(second.stdout).toContain("All stable IDs already assigned");
+      expect(await readFile(model, "utf8")).toBe(assigned);
+    } finally {
+      await rm(temporary, { recursive: true, force: true });
+    }
   });
 
   it("writes an installable Agent Plugin package only when the build supplies an endpoint", async () => {

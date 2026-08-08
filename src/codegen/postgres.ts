@@ -4,6 +4,8 @@ import { quoteIdent, snakeCase } from "../naming.js";
 import { decisionAction, decisionFunctionName, generateDecisionPlan, type ActionDecisionPlan, type DecisionPlan } from "../decision-plan.js";
 import {
   generateConsumerRoleStatements,
+  generateBoundaryRoleRevokes,
+  generateConditionalRoleRevokes,
   generateDispatcherRoleStatements,
   generateFailureAcknowledgerRoleStatements,
   generateFailureClaimantRoleStatements,
@@ -360,7 +362,7 @@ $modellang$;
 
 ALTER ROLE modellang_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
 ALTER ROLE modellang_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE INHERIT;
-REVOKE modellang_owner FROM modellang_app;
+${generateConditionalRoleRevokes([["modellang_owner", "modellang_app"]])}
 
 ${generateGatewayRoleStatements()}
 
@@ -2733,23 +2735,7 @@ function generateGrants(ir: ModelIR): string {
     "",
     "ALTER DEFAULT PRIVILEGES FOR ROLE modellang_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;",
     "ALTER DEFAULT PRIVILEGES FOR ROLE modellang_owner REVOKE ALL ON TABLES FROM PUBLIC;",
-    `REVOKE modellang_owner FROM modellang_app;`,
-    `REVOKE modellang_owner FROM modellang_gateway;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway FROM modellang_dispatcher;`,
-    `REVOKE modellang_dispatcher FROM modellang_owner, modellang_app, modellang_gateway;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher FROM modellang_consumer;`,
-    `REVOKE modellang_consumer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer FROM modellang_recovery;`,
-    `REVOKE modellang_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery FROM modellang_publication_recovery;`,
-    `REVOKE modellang_publication_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery FROM modellang_failure_observer;`,
-    `REVOKE modellang_failure_observer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer FROM modellang_failure_acknowledger;`,
-    `REVOKE modellang_failure_acknowledger FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer;`,
-    `REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger FROM modellang_failure_claimant;`,
-    `REVOKE modellang_failure_claimant FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger;`,
-    `REVOKE modellang_gateway FROM modellang_app;`,
+    generateBoundaryRoleRevokes(),
     `GRANT modellang_app TO modellang_gateway;`,
     "",
   );

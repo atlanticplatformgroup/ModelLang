@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
   "assessmentVersion": 1,
-  "compilerVersion": "0.49.0",
+  "compilerVersion": "0.49.1",
   "profile": "SML-Agent",
   "profileDefinition": "docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md#b2-agent-profile-sml-agent",
   "scope": "generatedModelAdapter",

@@ -12,12 +12,12 @@ Two canonical applications drive the language:
 Install the Apache-2.0 `modellang` package on Node.js 20 or newer:
 
 ```bash
-npm install --save-dev modellang@0.49.0
+npm install --save-dev modellang@0.49.1
 npx modelc check app.model
 npx modelc build app.model --out generated/app
 ```
 
-The npm artifact contains the compiled `modelc` CLI and the schemas it needs at runtime. See the [public preview guide](./docs/PUBLIC_PREVIEW.md) for the install-to-Agent-Plugin evaluation path.
+The npm artifact contains the compiled `modelc` CLI, the schemas it needs at runtime, and a [runnable host/bootstrap guide](./docs/HOST_BOOTSTRAP.md). See the [public preview guide](./docs/PUBLIC_PREVIEW.md) for the install-to-Agent-Plugin evaluation path.
 
 ## Source checkout
 

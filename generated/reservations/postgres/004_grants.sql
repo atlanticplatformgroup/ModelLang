@@ -44,22 +44,110 @@ GRANT EXECUTE ON FUNCTION "model_reservations_internal"."consume_index_reservati
 
 ALTER DEFAULT PRIVILEGES FOR ROLE modellang_owner REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES FOR ROLE modellang_owner REVOKE ALL ON TABLES FROM PUBLIC;
-REVOKE modellang_owner FROM modellang_app;
-REVOKE modellang_owner FROM modellang_gateway;
-REVOKE modellang_owner, modellang_app, modellang_gateway FROM modellang_dispatcher;
-REVOKE modellang_dispatcher FROM modellang_owner, modellang_app, modellang_gateway;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher FROM modellang_consumer;
-REVOKE modellang_consumer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer FROM modellang_recovery;
-REVOKE modellang_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery FROM modellang_publication_recovery;
-REVOKE modellang_publication_recovery FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery FROM modellang_failure_observer;
-REVOKE modellang_failure_observer FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer FROM modellang_failure_acknowledger;
-REVOKE modellang_failure_acknowledger FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer;
-REVOKE modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger FROM modellang_failure_claimant;
-REVOKE modellang_failure_claimant FROM modellang_owner, modellang_app, modellang_gateway, modellang_dispatcher, modellang_consumer, modellang_recovery, modellang_publication_recovery, modellang_failure_observer, modellang_failure_acknowledger;
-REVOKE modellang_gateway FROM modellang_app;
+DO $modellang$
+DECLARE
+  v_granted_role text;
+  v_member_role text;
+BEGIN
+  FOR v_granted_role, v_member_role IN
+    SELECT granted_role.rolname::text, member_role.rolname::text
+    FROM (VALUES
+      ('modellang_owner', 'modellang_app'),
+      ('modellang_owner', 'modellang_gateway'),
+      ('modellang_gateway', 'modellang_app'),
+      ('modellang_owner', 'modellang_dispatcher'),
+      ('modellang_app', 'modellang_dispatcher'),
+      ('modellang_gateway', 'modellang_dispatcher'),
+      ('modellang_dispatcher', 'modellang_owner'),
+      ('modellang_dispatcher', 'modellang_app'),
+      ('modellang_dispatcher', 'modellang_gateway'),
+      ('modellang_owner', 'modellang_consumer'),
+      ('modellang_app', 'modellang_consumer'),
+      ('modellang_gateway', 'modellang_consumer'),
+      ('modellang_dispatcher', 'modellang_consumer'),
+      ('modellang_consumer', 'modellang_owner'),
+      ('modellang_consumer', 'modellang_app'),
+      ('modellang_consumer', 'modellang_gateway'),
+      ('modellang_consumer', 'modellang_dispatcher'),
+      ('modellang_owner', 'modellang_recovery'),
+      ('modellang_app', 'modellang_recovery'),
+      ('modellang_gateway', 'modellang_recovery'),
+      ('modellang_dispatcher', 'modellang_recovery'),
+      ('modellang_consumer', 'modellang_recovery'),
+      ('modellang_recovery', 'modellang_owner'),
+      ('modellang_recovery', 'modellang_app'),
+      ('modellang_recovery', 'modellang_gateway'),
+      ('modellang_recovery', 'modellang_dispatcher'),
+      ('modellang_recovery', 'modellang_consumer'),
+      ('modellang_owner', 'modellang_publication_recovery'),
+      ('modellang_app', 'modellang_publication_recovery'),
+      ('modellang_gateway', 'modellang_publication_recovery'),
+      ('modellang_dispatcher', 'modellang_publication_recovery'),
+      ('modellang_consumer', 'modellang_publication_recovery'),
+      ('modellang_recovery', 'modellang_publication_recovery'),
+      ('modellang_publication_recovery', 'modellang_owner'),
+      ('modellang_publication_recovery', 'modellang_app'),
+      ('modellang_publication_recovery', 'modellang_gateway'),
+      ('modellang_publication_recovery', 'modellang_dispatcher'),
+      ('modellang_publication_recovery', 'modellang_consumer'),
+      ('modellang_publication_recovery', 'modellang_recovery'),
+      ('modellang_owner', 'modellang_failure_observer'),
+      ('modellang_app', 'modellang_failure_observer'),
+      ('modellang_gateway', 'modellang_failure_observer'),
+      ('modellang_dispatcher', 'modellang_failure_observer'),
+      ('modellang_consumer', 'modellang_failure_observer'),
+      ('modellang_recovery', 'modellang_failure_observer'),
+      ('modellang_publication_recovery', 'modellang_failure_observer'),
+      ('modellang_failure_observer', 'modellang_owner'),
+      ('modellang_failure_observer', 'modellang_app'),
+      ('modellang_failure_observer', 'modellang_gateway'),
+      ('modellang_failure_observer', 'modellang_dispatcher'),
+      ('modellang_failure_observer', 'modellang_consumer'),
+      ('modellang_failure_observer', 'modellang_recovery'),
+      ('modellang_failure_observer', 'modellang_publication_recovery'),
+      ('modellang_owner', 'modellang_failure_acknowledger'),
+      ('modellang_app', 'modellang_failure_acknowledger'),
+      ('modellang_gateway', 'modellang_failure_acknowledger'),
+      ('modellang_dispatcher', 'modellang_failure_acknowledger'),
+      ('modellang_consumer', 'modellang_failure_acknowledger'),
+      ('modellang_recovery', 'modellang_failure_acknowledger'),
+      ('modellang_publication_recovery', 'modellang_failure_acknowledger'),
+      ('modellang_failure_observer', 'modellang_failure_acknowledger'),
+      ('modellang_failure_acknowledger', 'modellang_owner'),
+      ('modellang_failure_acknowledger', 'modellang_app'),
+      ('modellang_failure_acknowledger', 'modellang_gateway'),
+      ('modellang_failure_acknowledger', 'modellang_dispatcher'),
+      ('modellang_failure_acknowledger', 'modellang_consumer'),
+      ('modellang_failure_acknowledger', 'modellang_recovery'),
+      ('modellang_failure_acknowledger', 'modellang_publication_recovery'),
+      ('modellang_failure_acknowledger', 'modellang_failure_observer'),
+      ('modellang_owner', 'modellang_failure_claimant'),
+      ('modellang_app', 'modellang_failure_claimant'),
+      ('modellang_gateway', 'modellang_failure_claimant'),
+      ('modellang_dispatcher', 'modellang_failure_claimant'),
+      ('modellang_consumer', 'modellang_failure_claimant'),
+      ('modellang_recovery', 'modellang_failure_claimant'),
+      ('modellang_publication_recovery', 'modellang_failure_claimant'),
+      ('modellang_failure_observer', 'modellang_failure_claimant'),
+      ('modellang_failure_acknowledger', 'modellang_failure_claimant'),
+      ('modellang_failure_claimant', 'modellang_owner'),
+      ('modellang_failure_claimant', 'modellang_app'),
+      ('modellang_failure_claimant', 'modellang_gateway'),
+      ('modellang_failure_claimant', 'modellang_dispatcher'),
+      ('modellang_failure_claimant', 'modellang_consumer'),
+      ('modellang_failure_claimant', 'modellang_recovery'),
+      ('modellang_failure_claimant', 'modellang_publication_recovery'),
+      ('modellang_failure_claimant', 'modellang_failure_observer'),
+      ('modellang_failure_claimant', 'modellang_failure_acknowledger')
+    ) AS candidate(granted_role, member_role)
+    JOIN pg_catalog.pg_roles AS granted_role ON granted_role.rolname = candidate.granted_role
+    JOIN pg_catalog.pg_roles AS member_role ON member_role.rolname = candidate.member_role
+    JOIN pg_catalog.pg_auth_members AS membership
+      ON membership.roleid = granted_role.oid AND membership.member = member_role.oid
+  LOOP
+    EXECUTE pg_catalog.format('REVOKE %I FROM %I', v_granted_role, v_member_role);
+  END LOOP;
+END
+$modellang$;
 GRANT modellang_app TO modellang_gateway;
 

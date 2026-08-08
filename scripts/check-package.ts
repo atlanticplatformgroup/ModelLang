@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       maxBuffer: 10 * 1024 * 1024,
     });
     const result = parsePackResult(packed.stdout);
-    if (result.name !== "modellang" || result.version !== "0.49.0") {
+    if (result.name !== "modellang" || result.version !== "0.49.1") {
       throw new Error(`Unexpected package identity ${result.name}@${result.version}`);
     }
     const paths = new Set(result.files.map((file) => file.path));
@@ -43,6 +43,7 @@ async function main(): Promise<void> {
       "README.md",
       "CHANGELOG.md",
       "LICENSE",
+      "docs/HOST_BOOTSTRAP.md",
       "dist/src/cli.js",
       "dist/src/compiler.js",
       "dist/src/build.js",
@@ -57,7 +58,7 @@ async function main(): Promise<void> {
       || path.startsWith("scripts/")
       || path.startsWith("generated/")
       || path.startsWith("examples/")
-      || path.startsWith("docs/")
+      || (path.startsWith("docs/") && path !== "docs/HOST_BOOTSTRAP.md")
       || path.startsWith("spec/")
       || path.endsWith(".DS_Store"));
     if (forbidden.length > 0) throw new Error(`Packed artifact contains development-only files: ${forbidden.join(", ")}`);
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
       private?: boolean;
       license?: string;
     };
-    if (installedPackage.name !== "modellang" || installedPackage.version !== "0.49.0"
+    if (installedPackage.name !== "modellang" || installedPackage.version !== "0.49.1"
       || installedPackage.private === true || installedPackage.license !== "Apache-2.0") {
       throw new Error("Installed package metadata does not match the public preview contract");
     }

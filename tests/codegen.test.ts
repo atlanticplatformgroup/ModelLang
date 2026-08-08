@@ -1321,6 +1321,9 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     const gateway = output["typescript/gateway.ts"];
     expect(roles).toContain("CREATE ROLE modellang_gateway NOLOGIN");
     expect(roles).toContain("GRANT modellang_app TO modellang_gateway");
+    expect(roles).toContain("FROM (VALUES");
+    expect(roles).toContain("JOIN pg_catalog.pg_auth_members AS membership");
+    expect(roles).not.toMatch(/^REVOKE modellang_\w+ FROM modellang_\w+;/m);
     expect(schema).toContain('CREATE TABLE IF NOT EXISTS "model_procurement_internal"."gateway_principal_binding"');
     expect(schema).toContain('"issuer" text NOT NULL');
     expect(schema).toContain('"subject" text NOT NULL');
@@ -1330,6 +1333,8 @@ query active(caller actor: User) returns RecordSummary from Record as row {
     expect(grants).toContain('GRANT EXECUTE ON FUNCTION "model_procurement_internal"."bind_gateway_identity"(text, text) TO modellang_gateway');
     expect(grants).toContain('REVOKE ALL ON ALL TABLES IN SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway');
     expect(grants).toContain('REVOKE ALL ON ALL FUNCTIONS IN SCHEMA "model_procurement_internal" FROM PUBLIC, modellang_app, modellang_gateway');
+    expect(grants).toContain("JOIN pg_catalog.pg_auth_members AS membership");
+    expect(grants).not.toMatch(/^REVOKE modellang_\w+(?:, modellang_\w+)* FROM modellang_\w+(?:, modellang_\w+)*;/m);
     expect(gateway).toContain('await connection.query("BEGIN")');
     expect(gateway).toContain('await connection.query("COMMIT")');
     expect(gateway).toContain('connection.query("ROLLBACK")');

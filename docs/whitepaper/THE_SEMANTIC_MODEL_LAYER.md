@@ -52,8 +52,8 @@ The implementation has several independent version axes:
 
 | Axis | Current value | Meaning |
 |---|---|---|
-| Compiler release | 0.49.0 | Toolchain and generated-artifact release |
-| npm distribution | `modellang@0.49.0` | Apache-2.0 public-preview package with `modelc`, compiled compiler modules, schemas, and release documentation |
+| Compiler release | 0.49.1 | Compatible patch to the toolchain and public developer experience |
+| npm distribution | `modellang@0.49.1` | Apache-2.0 public-preview package with `modelc`, compiled compiler modules, schemas, and release documentation |
 | Canonical IR | IR1 | Current pre-release typed backend boundary; evolution input must use this exact format and no historical IR normalization is provided |
 | Example source models | Procurement 0.49.0; Reservations 0.49.0 | Domain-model evolution versions, independent of compiler release |
 | Operation manifest | v11 | Static transport-neutral public operation, private read-evidence profile, null-redaction, optional query-input, closed sort-profile, array/page result, and transitive reachable-projection contract |

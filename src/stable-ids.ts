@@ -91,7 +91,11 @@ export function assignStableIds(
       for (const field of declaration.fields) {
         if (field.stableId) continue;
         edits.push({
-          offset: field.nameSpan.end.offset,
+          // Scalar projection fields take the annotation after the field name,
+          // while nested fields take it after the projection type:
+          //   id @stableId("pfd_...");
+          //   owner: UserSummary @stableId("pfd_...");
+          offset: field.nestedProjectionType?.span.end.offset ?? field.nameSpan.end.offset,
           text: ` @stableId("${createId("projectionField")}")`,
         });
       }
@@ -118,6 +122,12 @@ export function assignStableIds(
   let result = source;
   for (const edit of edits.sort((left, right) => right.offset - left.offset)) {
     result = `${result.slice(0, edit.offset)}${edit.text}${result.slice(edit.offset)}`;
+  }
+  try {
+    parse(result, file);
+  } catch (error) {
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new Error(`assign-ids generated invalid ModelLang source; the source file was not written (${detail})`, { cause: error });
   }
   return { source: result, assigned: edits.length };
 }

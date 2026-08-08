@@ -7,12 +7,12 @@ ModelLang 0.49 is a pre-1.0 public preview of the reference compiler. It is suit
 Install Node.js 20 or newer, then install the compiler:
 
 ```bash
-npm install --save-dev modellang@0.49.0
+npm install --save-dev modellang@0.49.1
 npx modelc check app.model
 npx modelc print-ir app.model > model.ir.json
 ```
 
-During development, `npx modellang@0.49.0 check app.model` also resolves the package's single `modelc` executable.
+During development, `npx modellang@0.49.1 check app.model` also resolves the package's single `modelc` executable.
 
 ## Generate an application boundary
 
@@ -23,6 +23,8 @@ npx modelc build app.model --out generated/app
 The output includes canonical IR, contract and assurance manifests, PostgreSQL installation SQL, TypeScript clients and server adapters, OpenAPI, UI metadata, provenance, and the generated MCP server handler. Generated artifacts are replaced atomically and should be regenerated rather than edited.
 
 ModelLang generates a server handler, not deployment infrastructure. The host must provide PostgreSQL connectivity, audience-bound authentication, secrets, extension implementations, delegated-capability storage, monitoring, and a public HTTP endpoint.
+
+The [runnable host/bootstrap guide](./HOST_BOOTSTRAP.md) provides a copyable PostgreSQL installation order, least-privilege gateway provisioning, production-shaped JWT verification, Node HTTP bridging, shared HTTP/MCP subject binding, reconnect-isolation smoke test, and clean shutdown path. It uses only an installed package and generated application; callers never submit ModelLang principal IDs and discovery never grants authority.
 
 ## Package a deployed application for agent clients
 

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.49.1
+
+- Fixed `modelc assign-ids` so nested projection fields emit `field: Projection @stableId(...)`, validate before source is written, compile into canonical IR1, and remain idempotent on repeated assignment.
+- Replaced defensive missing-membership `REVOKE` statements with catalog-checked revocation blocks, retaining deny-by-default role isolation without the harmless PostgreSQL warning wall.
+- Added a runnable installed-package PostgreSQL, gateway identity, authenticated HTTP, and stateless MCP host/bootstrap guide based on the external ToolShare pilot.
+- Retained the complete 0.49.0 language, canonical IR1, example-model versions, generated contract versions, authority semantics, and compatibility claims.
+
 ## 0.49.0
 
 - Renamed the public package from private `modellang-poc` to Apache-2.0 `modellang`, retained the `modelc` executable, declared Node.js 20+, and limited the npm tarball to compiled compiler modules, schemas, and release documentation.

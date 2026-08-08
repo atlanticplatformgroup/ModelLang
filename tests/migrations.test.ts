@@ -191,6 +191,14 @@ action make(caller actor: User, id: UUID) -> User {
     });
   });
 
+  it("fails explicitly before returning invalid rewritten source", () => {
+    const source = `model InvalidRewrite version "1";
+entity User { id: UUID @id; }
+action touch(caller actor: User) -> User { authorize true; update actor { } }`;
+    expect(() => assignStableIds(source, "invalid-rewrite.model", () => 'bad")'))
+      .toThrow(/assign-ids generated invalid ModelLang source; the source file was not written/);
+  });
+
   it("assigns stable IDs to workflows and their transitions", () => {
     const source = `model WorkflowIds version "0.9.0";
 enum State { DRAFT, SUBMITTED }

@@ -4,13 +4,13 @@
 
 The public preview package name is `modellang`, its executable name is `modelc`, and its license identifier is `Apache-2.0`. The package requires Node.js 20 or newer and uses public npm visibility.
 
-The package version, compiler version, and current example-model versions are 0.49.0. Package identity does not alter canonical IR, source semantics, generated authority, or runtime behavior.
+The package and compiler patch version is 0.49.1; the current example-model versions remain 0.49.0 because the patch changes no model semantics. Package identity does not alter canonical IR, source semantics, generated authority, or runtime behavior.
 
 ## Artifact closure
 
 The npm tarball MUST contain:
 
-- the package manifest, README, changelog, and Apache-2.0 license;
+- the package manifest, README, changelog, Apache-2.0 license, and runnable host/bootstrap guide;
 - compiled JavaScript, declarations, and source maps under `dist/src`;
 - the complete `schemas` tree, including the runtime canonical IR schema and pinned external Agent Plugins schemas; and
 - the `modelc` executable binding to `dist/src/cli.js`.
