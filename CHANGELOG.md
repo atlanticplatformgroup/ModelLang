@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.50.0
+
+- Added source-compatible ordered multi-entity effects to actions. A command can now update existing records and create its returned record in one PostgreSQL transaction.
+- Advanced canonical IR to IR2: actions expose a non-empty ordered `effects` array with deterministic effect IDs and ordinals. The final effect produces the action result; repeated updates to one target are rejected.
+- Extended lock planning, workflow validation, semantic diff, diagrams, enforcement coverage, and PostgreSQL generation across the complete effect list.
+- Added private `action_effect_audit` evidence for every affected record while retaining the existing public action result, event payload, HTTP, MCP, operation-manifest, and capability shapes.
+- Advanced the engineering semantic manifest to v19/profile `/19`, semantic diff to v20, and generator profile to `postgresql-http-ui-agent-plugin-atomic-effects/33`.
+- Added ToolShare-driven rollback and concurrency proofs plus a live idempotent-replay proof: a later-effect constraint failure rolls back an earlier workflow transition, concurrent approvals serialize to one committed loan, and replay does not repeat any effect.
+
 ## 0.49.1
 
 - Fixed `modelc assign-ids` so nested projection fields emit `field: Projection @stableId(...)`, validate before source is written, compile into canonical IR1, and remain idempotent on repeated assignment.

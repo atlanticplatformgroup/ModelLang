@@ -166,6 +166,8 @@ export interface IRLock {
 }
 
 export interface IREffect {
+  id: string;
+  order: number;
   kind: "create" | "update";
   target: string;
   entityId: string;
@@ -188,7 +190,7 @@ export interface IRAction {
     replay: "storedResult";
     fingerprint: "canonicalSha256";
   };
-  effect: IREffect;
+  effects: IREffect[];
   emittedEventIds: string[];
   lockPlan: IRLock[];
   span: IRSpan;
@@ -357,7 +359,7 @@ export interface EnforcementEntry {
 }
 
 export interface ModelIR {
-  irVersion: 1;
+  irVersion: 2;
   model: {
     id: string;
     name: string;

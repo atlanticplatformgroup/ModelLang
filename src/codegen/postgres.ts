@@ -1524,6 +1524,19 @@ function generateSchema(ir: ModelIR): string {
     `  ${quoteIdent("occurred_at")} timestamptz NOT NULL DEFAULT transaction_timestamp()`,
     ");",
     "",
+    `CREATE TABLE ${qname(internal, "action_effect_audit")} (`,
+    `  ${quoteIdent("action_audit_id")} bigint NOT NULL REFERENCES ${qname(internal, "action_audit")} (${quoteIdent("id")}) ON DELETE CASCADE,`,
+    `  ${quoteIdent("effect_id")} text NOT NULL,`,
+    `  ${quoteIdent("effect_ordinal")} integer NOT NULL,`,
+    `  ${quoteIdent("effect_kind")} text NOT NULL,`,
+    `  ${quoteIdent("entity_id")} text NOT NULL,`,
+    `  ${quoteIdent("target_id")} uuid NOT NULL,`,
+    `  CONSTRAINT ${quoteIdent("pk_action_effect_audit")} PRIMARY KEY (${quoteIdent("action_audit_id")}, ${quoteIdent("effect_ordinal")}),`,
+    `  CONSTRAINT ${quoteIdent("uq_action_effect_audit_id")} UNIQUE (${quoteIdent("action_audit_id")}, ${quoteIdent("effect_id")}),`,
+    `  CONSTRAINT ${quoteIdent("ck_action_effect_audit_ordinal")} CHECK (${quoteIdent("effect_ordinal")} >= 0),`,
+    `  CONSTRAINT ${quoteIdent("ck_action_effect_audit_kind")} CHECK (${quoteIdent("effect_kind")} IN ('create', 'update'))`,
+    ");",
+    "",
     ...generateGatewayInfrastructureStatements(ir),
     ...generateQueryAuditInfrastructureStatements(ir),
     ...generateDecisionEvidenceInfrastructureStatements(ir),
@@ -1762,6 +1775,7 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     "  v_authority_id text;",
     `  v_result ${qname(schema, returnEntity.naming.sqlTable)}%ROWTYPE;`,
   ];
+  for (const effect of action.effects) declarations.push(`  v_effect_target_${effect.order} uuid;`);
   for (const parameter of action.parameters.filter((candidate) => candidate.type.startsWith("entity:"))) {
     const entity = entityById(ir, parameter.type);
     declarations.push(`  ${recordNames.get(parameter.id)} ${qname(schema, entity.naming.sqlTable)}%ROWTYPE;`);
@@ -1905,35 +1919,40 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
       "",
     );
   }
-  const effectEntity = entityById(ir, action.effect.entityId);
-  if (action.effect.kind === "create") {
-    const fields = action.effect.assignments.map((assignment) => fieldById(ir, assignment.fieldId).field);
-    if (fields.length === 0) {
-      body.push(
-        `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} DEFAULT VALUES`,
-        "  RETURNING * INTO v_result;",
-        "",
-      );
+  for (const effect of action.effects) {
+    const effectEntity = entityById(ir, effect.entityId);
+    const returnsResult = effect.order === action.effects.length - 1;
+    const returning = returnsResult
+      ? "  RETURNING * INTO v_result;"
+      : `  RETURNING ${quoteIdent("id")} INTO v_effect_target_${effect.order};`;
+    if (effect.kind === "create") {
+      const fields = effect.assignments.map((assignment) => fieldById(ir, assignment.fieldId).field);
+      if (fields.length === 0) {
+        body.push(
+          `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} DEFAULT VALUES`,
+          returning,
+        );
+      } else {
+        body.push(
+          `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} (${fields.map((field) => quoteIdent(field.naming.sqlColumn)).join(", ")})`,
+          `  VALUES (${effect.assignments.map((assignment) => lowerExpression(assignment.expression, context)).join(", ")})`,
+          returning,
+        );
+      }
     } else {
+      const targetParameter = action.parameters.find((parameter) => parameter.name === effect.target)!;
       body.push(
-        `  INSERT INTO ${qname(schema, effectEntity.naming.sqlTable)} (${fields.map((field) => quoteIdent(field.naming.sqlColumn)).join(", ")})`,
-        `  VALUES (${action.effect.assignments.map((assignment) => lowerExpression(assignment.expression, context)).join(", ")})`,
-        "  RETURNING * INTO v_result;",
-        "",
+        `  UPDATE ${qname(schema, effectEntity.naming.sqlTable)}`,
+        `  SET ${effect.assignments.map((assignment) => {
+          const field = fieldById(ir, assignment.fieldId).field;
+          return `${quoteIdent(field.naming.sqlColumn)} = ${lowerExpression(assignment.expression, context)}`;
+        }).join(",\n      ")}`,
+        `  WHERE ${quoteIdent("id")} = ${recordNames.get(targetParameter.id)}.${quoteIdent("id")}`,
+        returning,
       );
     }
-  } else {
-    const targetParameter = action.parameters.find((parameter) => parameter.name === action.effect.target)!;
-    body.push(
-      `  UPDATE ${qname(schema, effectEntity.naming.sqlTable)}`,
-      `  SET ${action.effect.assignments.map((assignment) => {
-        const field = fieldById(ir, assignment.fieldId).field;
-        return `${quoteIdent(field.naming.sqlColumn)} = ${lowerExpression(assignment.expression, context)}`;
-      }).join(",\n      ")}`,
-      `  WHERE ${quoteIdent("id")} = ${recordNames.get(targetParameter.id)}.${quoteIdent("id")}`,
-      "  RETURNING * INTO v_result;",
-      "",
-    );
+    if (returnsResult) body.push(`  v_effect_target_${effect.order} := v_result.${quoteIdent("id")};`);
+    body.push("");
   }
   body.push(
     `  v_response := ${rowJson(returnEntity, "v_result")};`,
@@ -1942,6 +1961,13 @@ function generateAction(ir: ModelIR, action: IRAction, decision: ActionDecisionP
     `  RETURNING ${quoteIdent("id")} INTO v_action_audit_id;`,
     "",
   );
+  for (const effect of action.effects) {
+    body.push(
+      `  INSERT INTO ${qname(internal, "action_effect_audit")} (${quoteIdent("action_audit_id")}, ${quoteIdent("effect_id")}, ${quoteIdent("effect_ordinal")}, ${quoteIdent("effect_kind")}, ${quoteIdent("entity_id")}, ${quoteIdent("target_id")})`,
+      `  VALUES (v_action_audit_id, '${effect.id.replaceAll("'", "''")}', ${effect.order}, '${effect.kind}', '${effect.entityId.replaceAll("'", "''")}', v_effect_target_${effect.order});`,
+      "",
+    );
+  }
   action.emittedEventIds.forEach((emittedEventId, ordinal) => {
     const event = ir.events.find((candidate) => candidate.id === emittedEventId);
     if (!event) throw new Error(`E4013 Missing emitted event ${emittedEventId}`);

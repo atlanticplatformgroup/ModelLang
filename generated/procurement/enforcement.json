@@ -761,8 +761,8 @@
       }
     },
     {
-      "id": "effect:action:act_1e35db0451b1461e941af6283d86dca2",
-      "purpose": "create entity:ent_9bc680209327484c8e98f5f740bcc702.",
+      "id": "effect:action:act_1e35db0451b1461e941af6283d86dca2.0",
+      "purpose": "create entity:ent_9bc680209327484c8e98f5f740bcc702 as ordered effect 0.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.open_request",
@@ -873,8 +873,8 @@
       }
     },
     {
-      "id": "effect:action:act_ed2374e822704c51a2925338253d05d2",
-      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
+      "id": "effect:action:act_ed2374e822704c51a2925338253d05d2.0",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702 as ordered effect 0.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.submit_request",
@@ -992,8 +992,8 @@
       }
     },
     {
-      "id": "effect:action:act_d39dbb883b5f4019b9027b85add3de47",
-      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702.",
+      "id": "effect:action:act_d39dbb883b5f4019b9027b85add3de47.0",
+      "purpose": "update entity:ent_9bc680209327484c8e98f5f740bcc702 as ordered effect 0.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_procurement.approve_request",

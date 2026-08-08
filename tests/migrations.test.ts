@@ -280,7 +280,7 @@ query bookings(caller actor: User) returns BookingSummary from Booking as bookin
     expect(new Set(seen)).toEqual(new Set<StableIdKind>([
       "enum", "enumMember", "entity", "field", "projection", "projectionField", "event", "invariant", "exclusion", "action", "consumer", "query",
     ]));
-    expect(compileText(assigned.source, "complete.model").irVersion).toBe(1);
+    expect(compileText(assigned.source, "complete.model").irVersion).toBe(2);
     expect(assignStableIds(assigned.source, "complete.model").assigned).toBe(0);
   });
 
@@ -379,8 +379,14 @@ query users @stableId("qry_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")(caller actor: User
 
   it("rejects evolution input from a non-current canonical IR format", () => {
     const incompatible = structuredClone(compileText(renameModel({ version: "1" }))) as unknown as { irVersion: number };
-    incompatible.irVersion = 2;
+    incompatible.irVersion = 1;
     expect(error(() => validateIR(incompatible as never)).code).toBe("E3002");
+  });
+
+  it("rejects externally supplied IR2 with non-canonical action effect identity or order", () => {
+    const malformed = structuredClone(compileText(renameModel({ version: "1" })));
+    malformed.actions[0]!.effects[0]!.order = 1;
+    expect(error(() => validateIR(malformed)).code).toBe("E3002");
   });
 });
 

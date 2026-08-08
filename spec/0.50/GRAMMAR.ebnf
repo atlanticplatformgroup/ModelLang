@@ -1,0 +1,4 @@
+(* ModelLang 0.50 retains the complete ModelLang 0.49 grammar except that an action body contains one or more ordered effects. *)
+
+action-body = authorize-clause, require-clause*, idempotency-clause?, effect, effect*, emit-clause* ;
+effect = ("create" | "update"), identifier, "{", assignment*, "}" ;

@@ -279,12 +279,15 @@ function manifestWorkflows(ir: ModelIR): ManifestWorkflow[] {
     initialMemberId: workflow.initialMemberId,
     transitions: workflow.transitions.map((transition) => {
       const action = ir.actions.find((candidate) => candidate.id === transition.actionId);
-      if (!action || action.effect.kind !== "update") {
+      const effect = action?.effects.find((candidate) => candidate.kind === "update"
+        && candidate.entityId === workflow.entityId
+        && candidate.assignments.some((assignment) => assignment.fieldId === workflow.fieldId));
+      if (!action || !effect) {
         throw new Error(`E6003 Workflow transition '${transition.id}' has no update action '${transition.actionId}'.`);
       }
-      const parameter = action.parameters.find((candidate) => candidate.name === action.effect.target);
+      const parameter = action.parameters.find((candidate) => candidate.name === effect.target);
       if (!parameter) {
-        throw new Error(`E6004 Workflow action '${action.id}' has no target parameter '${action.effect.target}'.`);
+        throw new Error(`E6004 Workflow action '${action.id}' has no target parameter '${effect.target}'.`);
       }
       if (parameter.caller || !action.callableParameters.includes(parameter.id)) {
         throw new Error(`E6005 Workflow target '${parameter.id}' is not callable input.`);

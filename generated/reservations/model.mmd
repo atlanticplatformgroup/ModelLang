@@ -14,7 +14,7 @@ flowchart LR
   event_evt_60d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_ba2d028e915841d1ab90adfa40d38404
   action_act_508ad810a19d4b79a5009871de5cd26b["Action: reserve"]
   principal -->|authenticated caller| action_act_508ad810a19d4b79a5009871de5cd26b
-  action_act_508ad810a19d4b79a5009871de5cd26b -->|creates| entity_ent_ba2d028e915841d1ab90adfa40d38404
+  action_act_508ad810a19d4b79a5009871de5cd26b -->|0: creates| entity_ent_ba2d028e915841d1ab90adfa40d38404
   authorize_action_act_508ad810a19d4b79a5009871de5cd26b["Authorize"] -->|guards| action_act_508ad810a19d4b79a5009871de5cd26b
   require_action_act_508ad810a19d4b79a5009871de5cd26b_valid_interval["Require: valid_interval"] -->|guards| action_act_508ad810a19d4b79a5009871de5cd26b
   action_act_508ad810a19d4b79a5009871de5cd26b -->|locks share| entity_ent_7cb2307972954d83a6f344764faaae39

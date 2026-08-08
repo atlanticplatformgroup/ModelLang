@@ -35,23 +35,30 @@ function checkAction(ir: ModelIR, action: IRAction): void {
   }
   requireEntry(ir, action.authorization.id, action.authorization.span);
   for (const precondition of action.preconditions) requireEntry(ir, precondition.id, precondition.span);
-  requireEntry(ir, `effect:${action.id}`, action.span);
-  const effectEntity = ir.entities.find((entity) => entity.id === action.effect.entityId);
-  if (!effectEntity) fail(ir, `Action '${action.name}' has an unknown effect entity.`, action.span);
-  for (const assignment of action.effect.assignments) {
-    const field = effectEntity.fields.find((candidate) => candidate.id === assignment.fieldId);
-    if (!field) fail(ir, `Action '${action.name}' assigns an unknown field.`, action.span);
-    if (field.generation) fail(ir, `Action '${action.name}' assigns database-generated field '${field.name}'.`, action.span);
-    if (action.effect.kind === "update" && field.mutability === "immutable") {
-      fail(ir, `Action '${action.name}' updates immutable field '${field.name}'.`, action.span);
+  if (action.effects.length === 0) fail(ir, `Action '${action.name}' has no effects.`, action.span);
+  if (action.effects.at(-1)?.entityId !== action.returnEntityId) fail(ir, `Action '${action.name}' final effect does not produce its return entity.`, action.span);
+  const updateTargets = new Set<string>();
+  for (const effect of action.effects) {
+    requireEntry(ir, effect.id, action.span);
+    const effectEntity = ir.entities.find((entity) => entity.id === effect.entityId);
+    if (!effectEntity) fail(ir, `Action '${action.name}' has an unknown effect entity.`, action.span);
+    for (const assignment of effect.assignments) {
+      const field = effectEntity.fields.find((candidate) => candidate.id === assignment.fieldId);
+      if (!field) fail(ir, `Action '${action.name}' assigns an unknown field.`, action.span);
+      if (field.generation) fail(ir, `Action '${action.name}' assigns database-generated field '${field.name}'.`, action.span);
+      if (effect.kind === "update" && field.mutability === "immutable") {
+        fail(ir, `Action '${action.name}' updates immutable field '${field.name}'.`, action.span);
+      }
+    }
+    if (effect.kind === "update") {
+      const target = action.parameters.find((parameter) => parameter.name === effect.target);
+      if (!target || updateTargets.has(target.id)) fail(ir, `Update target '${effect.target}' is invalid or repeated.`, action.span);
+      updateTargets.add(target.id);
+      const targetLock = action.lockPlan.find((lock) => lock.parameterId === target.id);
+      if (!targetLock || targetLock.mode !== "update") fail(ir, `Update target '${effect.target}' lacks a FOR UPDATE lock plan entry.`, action.span);
     }
   }
   for (const lock of action.lockPlan) requireEntry(ir, lock.id);
-  if (action.effect.kind === "update") {
-    const target = action.parameters.find((parameter) => parameter.name === action.effect.target);
-    const targetLock = action.lockPlan.find((lock) => lock.parameterId === target?.id);
-    if (!targetLock || targetLock.mode !== "update") fail(ir, `Update target '${action.effect.target}' lacks a FOR UPDATE lock plan entry.`, action.span);
-  }
 }
 
 function checkQuery(ir: ModelIR, query: IRQuery): void {

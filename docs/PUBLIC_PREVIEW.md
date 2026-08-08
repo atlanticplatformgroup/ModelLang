@@ -1,18 +1,18 @@
 # ModelLang public preview
 
-ModelLang 0.49 is a pre-1.0 public preview of the reference compiler. It is suitable for evaluating the language, deterministic artifacts, PostgreSQL enforcement, generated HTTP/MCP boundaries, and Agent Plugin packaging. It is not a production-support commitment or a claim of complete SML-Agent or SML-Federation conformance.
+ModelLang 0.50 is a pre-1.0 public preview of the reference compiler. It is suitable for evaluating the language, deterministic artifacts, PostgreSQL enforcement, generated HTTP/MCP boundaries, and Agent Plugin packaging. It is not a production-support commitment or a claim of complete SML-Agent or SML-Federation conformance.
 
 ## Install and inspect a model
 
 Install Node.js 20 or newer, then install the compiler:
 
 ```bash
-npm install --save-dev modellang@0.49.1
+npm install --save-dev modellang@0.50.0
 npx modelc check app.model
 npx modelc print-ir app.model > model.ir.json
 ```
 
-During development, `npx modellang@0.49.1 check app.model` also resolves the package's single `modelc` executable.
+During development, `npx modellang@0.50.0 check app.model` also resolves the package's single `modelc` executable.
 
 ## Generate an application boundary
 
@@ -56,7 +56,7 @@ The full gate includes a clean-install test of the packed npm artifact plus live
 
 ## Preview compatibility policy
 
-- Canonical IR is exactly IR1; historical IR normalization is not provided.
+- Canonical IR is exactly IR2; historical IR normalization is not provided.
 - Pre-1.0 minor releases may make breaking language or generated-contract changes documented in the changelog and semantic diff.
 - Patch releases preserve the current minor's language and generated contract versions except for compatible fixes.
 - Only the latest minor receives security fixes during the preview.

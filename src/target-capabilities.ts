@@ -9,7 +9,7 @@ export interface TargetCapabilityReport {
   compilerVersion: string;
   generatorProfile: string;
   targetProfile: "target:postgresql-http-ui-extension-tools/9";
-  irVersion: 1;
+  irVersion: 2;
   model: { id: string; version: string; sourceHash: string };
   conformance: "complete" | "requiresExternalImplementations";
   authority: "none";

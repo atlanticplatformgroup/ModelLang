@@ -23,7 +23,9 @@ export function generateMermaid(ir: ModelIR): string {
   for (const action of ir.actions) {
     lines.push(`  ${safe(action.id)}["Action: ${action.name}"]`);
     lines.push(`  principal -->|authenticated caller| ${safe(action.id)}`);
-    lines.push(`  ${safe(action.id)} -->|${action.effect.kind === "create" ? "creates" : "updates"}| ${safe(action.effect.entityId)}`);
+    for (const effect of action.effects) {
+      lines.push(`  ${safe(action.id)} -->|${effect.order}: ${effect.kind === "create" ? "creates" : "updates"}| ${safe(effect.entityId)}`);
+    }
     lines.push(`  ${safe(action.authorization.id)}["Authorize"] -->|guards| ${safe(action.id)}`);
     for (const precondition of action.preconditions) lines.push(`  ${safe(precondition.id)}["Require: ${precondition.name}"] -->|guards| ${safe(action.id)}`);
     for (const lock of action.lockPlan) lines.push(`  ${safe(action.id)} -->|locks ${lock.mode}| ${safe(lock.entityId)}`);

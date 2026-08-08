@@ -194,7 +194,7 @@ export interface ActionDecl {
   authorize: Expression;
   requires: RequireDecl[];
   idempotency?: { mode: "required"; span: Span };
-  effect: Effect;
+  effects: Effect[];
   emits: { eventName: string; span: Span }[];
   span: Span;
 }

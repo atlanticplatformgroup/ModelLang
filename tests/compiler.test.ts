@@ -43,6 +43,59 @@ describe("lexer and parser", () => {
 });
 
 describe("semantic analysis", () => {
+  it("lowers ordered multi-entity action effects into canonical IR2 with a complete lock plan", () => {
+    const ir = compileText(`model ToolShare version "0.50.0";
+enum ReservationState { PENDING, APPROVED }
+entity User { id: UUID @id @generated(uuid); }
+entity Reservation { id: UUID @id @generated(uuid); state: ReservationState = ReservationState.PENDING; }
+entity Loan { id: UUID @id @generated(uuid); reservation: Reservation; borrower: User; active: Boolean; }
+action approve(caller actor: User, reservation: Reservation) -> Loan {
+  authorize true;
+  require pending: reservation.state == ReservationState.PENDING;
+  update reservation { state = ReservationState.APPROVED; }
+  create Loan { reservation = reservation; borrower = actor; active = true; }
+}
+workflow ReservationLifecycle for Reservation.state {
+  initial ReservationState.PENDING;
+  transition approve: ReservationState.PENDING -> ReservationState.APPROVED by approve;
+}`);
+    const action = ir.actions[0]!;
+    expect(ir.irVersion).toBe(2);
+    expect(action.effects).toEqual([
+      expect.objectContaining({ id: "effect:action:approve.0", order: 0, kind: "update", target: "reservation", entityId: "entity:Reservation" }),
+      expect.objectContaining({ id: "effect:action:approve.1", order: 1, kind: "create", target: "Loan", entityId: "entity:Loan" }),
+    ]);
+    expect(action.returnEntityId).toBe("entity:Loan");
+    expect(ir.workflows[0]!.transitions[0]!.actionId).toBe("action:approve");
+    expect(action.lockPlan).toEqual(expect.arrayContaining([
+      expect.objectContaining({ parameterId: "parameter:action:approve.reservation", mode: "update" }),
+      expect.objectContaining({ parameterId: "parameter:action:approve.actor", mode: "share" }),
+    ]));
+    expect(ir.enforcement).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "effect:action:approve.0" }),
+      expect.objectContaining({ id: "effect:action:approve.1" }),
+    ]));
+  });
+
+  it("rejects repeated update targets and requires the final effect to produce the return entity", () => {
+    const base = `model ToolShare version "0.50.0";
+enum ReservationState { PENDING, APPROVED }
+entity User { id: UUID @id @generated(uuid); }
+entity Reservation { id: UUID @id @generated(uuid); state: ReservationState; }
+entity Loan { id: UUID @id @generated(uuid); reservation: Reservation; }
+`;
+    expect(failure(`${base} action approve(caller actor: User, reservation: Reservation) -> Reservation {
+      authorize true;
+      update reservation { state = ReservationState.APPROVED; }
+      update reservation { state = ReservationState.APPROVED; }
+    }`).code).toBe("E2318");
+    expect(failure(`${base} action approve(caller actor: User, reservation: Reservation) -> Loan {
+      authorize true;
+      create Loan { reservation = reservation; }
+      update reservation { state = ReservationState.APPROVED; }
+    }`).code).toBe("E2311");
+  });
+
   it("lowers typed external extension obligations without generating executable authority", () => {
     const ir = compileText(minimal(`action touch(caller actor: User, item: Item) -> Item {
         authorize true;
@@ -125,7 +178,7 @@ describe("semantic analysis", () => {
         authorize true;
         update item { optionalFlag = false; }
       }`));
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.consumers).toEqual([expect.objectContaining({
       id: "consumer:observeItem",
       sourceEventId: "event:ItemChanged",
@@ -252,7 +305,7 @@ describe("semantic analysis", () => {
         require still_allowed: MayManage(actor, item);
         update item { value = 2; }
       }`, "policy.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.policies).toEqual([
       expect.objectContaining({
         id: "policy:MayManage",
@@ -314,7 +367,7 @@ describe("semantic analysis", () => {
         create Record { name = name; }
       }`);
     const record = ir.entities.find((entity) => entity.name === "Record")!;
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(record.fields.find((field) => field.name === "id")).toMatchObject({
       generation: { strategy: "uuid", authority: "database" },
       mutability: "immutable",
@@ -324,7 +377,7 @@ describe("semantic analysis", () => {
       mutability: "immutable",
     });
     expect(ir.actions[0]!.callableParameters).toEqual(["parameter:action:make.name"]);
-    expect(ir.actions[0]!.effect.assignments.map((assignment) => assignment.fieldName)).toEqual(["name"]);
+    expect(ir.actions[0]!.effects[0]!.assignments.map((assignment) => assignment.fieldName)).toEqual(["name"]);
     expect(ir.enforcement.map((entry) => entry.id)).toEqual(expect.arrayContaining([
       "generated:field:Record.id",
       "immutable:field:Record.id",
@@ -434,7 +487,7 @@ describe("ModelLang exact money", () => {
   it("preserves currency, precision, scale, and exact literals in IR v8", () => {
     const ir = compileText(moneyModel("amount <= USD 10000.25"), "money.model");
     const amount = ir.entities.find((entity) => entity.name === "Invoice")!.fields.find((field) => field.name === "amount")!;
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(amount.type).toBe("money:USD:20:2");
     expect(amount.annotations).toContainEqual({ name: "minExclusive", value: "0" });
     expect(ir.actions[0]!.parameters.find((parameter) => parameter.name === "amount")!.type).toBe("money:USD:20:2");
@@ -504,7 +557,7 @@ describe("ModelLang temporal exclusions", () => {
 
   it("preserves half-open no-overlap rules in the current IR", () => {
     const ir = compileText(reservationSource("exclusion no_overlap: noOverlap(resource, startsAt, endsAt);"), "reservations.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.entities.find((entity) => entity.name === "Reservation")!.temporalExclusions).toEqual([
       expect.objectContaining({
         id: "exclusion:Reservation.no_overlap",
@@ -537,7 +590,7 @@ describe("ModelLang authenticated queries", () => {
       limit 25;
     }`), "query.model");
     const resolved = ir.queries[0]!;
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(resolved).toMatchObject({
       id: "query:owned",
       callerParameterId: "parameter:query:owned.actor",
@@ -917,7 +970,7 @@ describe("ModelLang 0.4 enum sets", () => {
       authorize Role.MANAGER in actor.roles;
       update record { rolesAtWrite = actor.roles; }
     }`), "sets.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.entities.find((entity) => entity.name === "User")!.fields.find((field) => field.name === "roles"))
       .toMatchObject({ type: "set:enum:Role", optional: false, storage: "ordinary" });
     expect(ir.entities.find((entity) => entity.name === "Record")!.fields.find((field) => field.name === "rolesAtWrite"))
@@ -996,7 +1049,7 @@ workflow TaskLifecycle for Task.state {
 describe("ModelLang 0.9 workflows", () => {
   it("lowers initial state, action-backed transitions, and enforcement targets into the current IR", () => {
     const ir = compileText(workflowModel, "workflow.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.workflows).toEqual([
       expect.objectContaining({
         id: "workflow:TaskLifecycle",
@@ -1094,7 +1147,7 @@ action make(caller actor: User) -> Record {
 
   it("preserves stable typed events and ordered action emissions in the current IR", () => {
     const ir = compileText(eventModel(), "events.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.events).toEqual([expect.objectContaining({
       id: "event:evt_11111111111111111111111111111111",
       name: "RecordChanged",
@@ -1191,7 +1244,7 @@ ${secondConsumer}`;
 
   it("preserves ordered consumer emissions in the current IR", () => {
     const ir = compileText(chainModel("emit RecordObserved;"), "chains.model");
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.consumers[0]!.emittedEventIds).toEqual([
       "event:evt_22222222222222222222222222222222",
     ]);
@@ -1228,7 +1281,7 @@ describe("ModelLang 0.24 consumer failure and recovery policies", () => {
 
   it("preserves bounded retry and terminal disposition policy in IR20", () => {
     const ir = compileText(source("retry maxAttempts 3;"));
-    expect(ir.irVersion).toBe(1);
+    expect(ir.irVersion).toBe(2);
     expect(ir.consumers[0]!.failurePolicy).toEqual({
       mode: "deadLetterAfterMaxAttempts",
       maxAttempts: 3,

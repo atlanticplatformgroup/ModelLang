@@ -27,6 +27,7 @@ DECLARE
   v_authority_policy_id text;
   v_authority_id text;
   v_result "model_reservations"."reservation"%ROWTYPE;
+  v_effect_target_0 uuid;
   v_actor "model_reservations"."user"%ROWTYPE;
   v_actor_xmin text;
   v_resource "model_reservations"."resource"%ROWTYPE;
@@ -128,11 +129,15 @@ BEGIN
   INSERT INTO "model_reservations"."reservation" ("resource_id", "reserved_by_id", "starts_at", "ends_at")
   VALUES (v_resource."id", v_actor."id", "p_starts_at", "p_ends_at")
   RETURNING * INTO v_result;
+  v_effect_target_0 := v_result."id";
 
   v_response := jsonb_build_object('id', v_result."id", 'createdAt', v_result."created_at", 'resource', v_result."resource_id", 'reservedBy', v_result."reserved_by_id", 'startsAt', v_result."starts_at", 'endsAt', v_result."ends_at", 'indexed', v_result."indexed");
   INSERT INTO "model_reservations_internal"."action_audit" ("action_id", "database_principal", "principal_id", "target_id", "identity_issuer", "identity_subject", "model_id", "model_version", "source_hash", "authorization_rule_id", "decision_outcome", "policy_id", "authority_id", "decision_evidence", "correlation_id", "causation_id", "command_receipt_id")
   VALUES ('action:act_508ad810a19d4b79a5009871de5cd26b', session_user, v_principal_id, v_result."id", v_identity_issuer, v_identity_subject, 'model:Reservations', '0.49.0', 'sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'executed', v_authority_policy_id, v_authority_id, pg_catalog.jsonb_build_object('version', 2, 'outcome', 'executed', 'model', pg_catalog.jsonb_build_object('id', 'model:Reservations', 'version', '0.49.0', 'sourceHash', 'sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4'), 'actionId', 'action:act_508ad810a19d4b79a5009871de5cd26b', 'command', pg_catalog.jsonb_build_object('correlationId', v_correlation_id, 'causationId', v_causation_id, 'receiptId', v_receipt_id), 'authorization', pg_catalog.jsonb_build_object('ruleId', 'authorize:action:act_508ad810a19d4b79a5009871de5cd26b', 'outcome', 'passed', 'policyId', v_authority_policy_id, 'authorityId', v_authority_id), 'requirements', pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object('ruleId', 'require:action:act_508ad810a19d4b79a5009871de5cd26b.valid_interval', 'outcome', 'passed', 'policyIds', pg_catalog.jsonb_build_array()))), v_correlation_id, v_causation_id, v_receipt_id)
   RETURNING "id" INTO v_action_audit_id;
+
+  INSERT INTO "model_reservations_internal"."action_effect_audit" ("action_audit_id", "effect_id", "effect_ordinal", "effect_kind", "entity_id", "target_id")
+  VALUES (v_action_audit_id, 'effect:action:act_508ad810a19d4b79a5009871de5cd26b.0', 0, 'create', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', v_effect_target_0);
 
   INSERT INTO "model_reservations_internal"."event_outbox" ("model_id", "model_version", "source_hash", "event_id", "event_name", "payload_entity_id", "action_id", "principal_id", "target_id", "payload", "correlation_id", "causation_id", "action_audit_id", "command_receipt_id", "ordinal", "publication_max_attempts", "publication_recovery_mode")
   VALUES ('model:Reservations', '0.49.0', 'sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4', 'event:evt_40d694c9a0a274dc79c6168e47d25968', 'ReservationCreated', 'entity:ent_ba2d028e915841d1ab90adfa40d38404', 'action:act_508ad810a19d4b79a5009871de5cd26b', v_principal_id, v_result."id", v_response, v_correlation_id, v_causation_id, v_action_audit_id, v_receipt_id, 0, 5, 'manual');

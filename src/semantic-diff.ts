@@ -44,9 +44,9 @@ export interface SemanticChange {
 
 export interface SemanticDiff {
   $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
-  diffVersion: 19;
+  diffVersion: 20;
   compilerVersion: string;
-  irVersion: 1;
+  irVersion: 2;
   previous: { modelId: string; version: string; sourceHash: string };
   current: { modelId: string; version: string; sourceHash: string };
   changes: SemanticChange[];
@@ -398,15 +398,15 @@ function compareActions(changes: SemanticChange[], previous: IRAction[], current
       persistenceRisk: true,
       explanation: "The action's durable externally delivered effects changed.",
     });
-    if (!same(pair.previous.effect, pair.current.effect)) addChange(changes, {
+    if (!same(pair.previous.effects, pair.current.effects)) addChange(changes, {
       kind: "effectChanged",
       area: "effect",
       classification: "review",
       subject: subject("action", pair.current),
-      before: text(pair.previous.effect),
-      after: text(pair.current.effect),
+      before: text(pair.previous.effects),
+      after: text(pair.current.effects),
       persistenceRisk: true,
-      explanation: "The action's target, effect kind, or assignments changed.",
+      explanation: "The action's ordered effect set, targets, effect kinds, or assignments changed.",
     });
   }
 }
@@ -764,7 +764,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   for (const change of changes) summary[change.classification] += 1;
   return {
     $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
-    diffVersion: 19,
+    diffVersion: 20,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,
     previous: {

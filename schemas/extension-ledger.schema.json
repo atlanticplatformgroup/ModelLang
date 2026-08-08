@@ -8,7 +8,7 @@
     "$schema": { "const": "https://modellang.dev/schemas/extension-ledger.schema.json" },
     "ledgerVersion": { "const": 1 },
     "compilerVersion": { "type": "string" },
-    "irVersion": { "const": 1 },
+    "irVersion": { "const": 2 },
     "audience": { "const": "engineering" },
     "public": { "const": false },
     "executable": { "const": false },

@@ -34,7 +34,7 @@ async function main(): Promise<void> {
       maxBuffer: 10 * 1024 * 1024,
     });
     const result = parsePackResult(packed.stdout);
-    if (result.name !== "modellang" || result.version !== "0.49.1") {
+    if (result.name !== "modellang" || result.version !== "0.50.0") {
       throw new Error(`Unexpected package identity ${result.name}@${result.version}`);
     }
     const paths = new Set(result.files.map((file) => file.path));
@@ -75,7 +75,7 @@ async function main(): Promise<void> {
       private?: boolean;
       license?: string;
     };
-    if (installedPackage.name !== "modellang" || installedPackage.version !== "0.49.1"
+    if (installedPackage.name !== "modellang" || installedPackage.version !== "0.50.0"
       || installedPackage.private === true || installedPackage.license !== "Apache-2.0") {
       throw new Error("Installed package metadata does not match the public preview contract");
     }
@@ -91,6 +91,19 @@ async function main(): Promise<void> {
     }
     const checked = await execute(cli, ["check", sourceFile], { cwd: consumer });
     if (!checked.stdout.includes("OK Procurement 0.49.0")) throw new Error("Installed modelc check did not compile the preview model");
+    const atomicSourceFile = join(consumer, "atomic.model");
+    await writeFile(atomicSourceFile, `model Atomic version "0.50.0";
+entity User { id: UUID @id @generated(uuid); }
+entity Request { id: UUID @id @generated(uuid); approved: Boolean; }
+entity Result { id: UUID @id @generated(uuid); request: Request @unique; actor: User; }
+action approve(caller actor: User, request: Request) -> Result {
+  authorize true;
+  require pending: request.approved == false;
+  update request { approved = true; }
+  create Result { request = request; actor = actor; }
+}
+`, "utf8");
+    await execute(cli, ["build", atomicSourceFile, "--out", join(consumer, "generated-atomic")], { cwd: consumer });
     await execute(cli, [
       "build", sourceFile, "--out", output,
       "--agent-plugin-url", "https://preview.example.com/mcp",
@@ -101,7 +114,7 @@ async function main(): Promise<void> {
     if (plugin.mcpServers["modellang.procurement"]?.url !== "https://preview.example.com/mcp") {
       throw new Error("Installed modelc did not generate the Agent Plugin connection contract");
     }
-    process.stdout.write(`OK ${result.name}@${result.version} (${paths.size} packed files; clean install, check, build, and Agent Plugin generation)\n`);
+    process.stdout.write(`OK ${result.name}@${result.version} (${paths.size} packed files; clean install, single- and multi-effect builds, and Agent Plugin generation)\n`);
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

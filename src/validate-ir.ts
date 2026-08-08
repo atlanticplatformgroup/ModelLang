@@ -19,4 +19,23 @@ export function validateIR(ir: ModelIR): void {
     const detail = validate.errors?.map((error: ErrorObject) => `${error.instancePath || "/"} ${error.message}`).join("; ") ?? "unknown schema failure";
     throw new ModelError("E3002", `Canonical IR failed model-ir.schema.json validation: ${detail}`, internalSpan(), sourceFile);
   }
+  for (const action of ir.actions) {
+    const updateTargets = new Set<string>();
+    action.effects.forEach((effect, index) => {
+      const expectedId = `effect:${action.id}.${index}`;
+      if (effect.order !== index || effect.id !== expectedId) {
+        throw new ModelError("E3002", `Canonical IR action '${action.id}' must use contiguous effect order and deterministic effect IDs; expected '${expectedId}' at order ${index}.`, internalSpan(), sourceFile);
+      }
+      if (effect.kind === "update") {
+        const target = action.parameters.find((parameter) => parameter.name === effect.target);
+        if (!target || target.caller || target.type !== effect.entityId || updateTargets.has(target.id)) {
+          throw new ModelError("E3002", `Canonical IR action '${action.id}' has an invalid or repeated update target '${effect.target}'.`, internalSpan(), sourceFile);
+        }
+        updateTargets.add(target.id);
+      }
+    });
+    if (action.effects.at(-1)?.entityId !== action.returnEntityId) {
+      throw new ModelError("E3002", `Canonical IR action '${action.id}' final effect must produce '${action.returnEntityId}'.`, internalSpan(), sourceFile);
+    }
+  }
 }

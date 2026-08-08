@@ -649,8 +649,8 @@
       }
     },
     {
-      "id": "effect:action:act_508ad810a19d4b79a5009871de5cd26b",
-      "purpose": "create entity:ent_ba2d028e915841d1ab90adfa40d38404.",
+      "id": "effect:action:act_508ad810a19d4b79a5009871de5cd26b.0",
+      "purpose": "create entity:ent_ba2d028e915841d1ab90adfa40d38404 as ordered effect 0.",
       "layer": "PostgreSQL action function",
       "artifact": "postgres/003_actions.sql",
       "objectName": "model_reservations.reserve",

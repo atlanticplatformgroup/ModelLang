@@ -1,7 +1,7 @@
 {
   "$schema": "https://modellang.dev/schemas/mcp-adapter.schema.json",
   "adapterVersion": 6,
-  "compilerVersion": "0.49.1",
+  "compilerVersion": "0.50.0",
   "protocolVersion": "2026-07-28",
   "catalogVersion": 7,
   "resourceEnvelopeVersion": 1,
@@ -39,7 +39,7 @@
         "server/discover",
         "tools/list"
       ],
-      "revision": "sha256:a967bea4bae8543c541e741fc862c4e4fb1e2ad4c41042f402cfac9f944979b8",
+      "revision": "sha256:3783c8de775eec60c6d308c6d977ce3689631acd9c20628f77763f8e29f04ae5",
       "revisionHeader": "ETag",
       "ttlUnit": "milliseconds",
       "defaultTtlMs": 0,

@@ -19,14 +19,14 @@ flowchart LR
   event_evt_50d694c9a0a274dc79c6168e47d25968 -->|payload| entity_ent_9bc680209327484c8e98f5f740bcc702
   action_act_1e35db0451b1461e941af6283d86dca2["Action: openRequest"]
   principal -->|authenticated caller| action_act_1e35db0451b1461e941af6283d86dca2
-  action_act_1e35db0451b1461e941af6283d86dca2 -->|creates| entity_ent_9bc680209327484c8e98f5f740bcc702
+  action_act_1e35db0451b1461e941af6283d86dca2 -->|0: creates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_action_act_1e35db0451b1461e941af6283d86dca2["Authorize"] -->|guards| action_act_1e35db0451b1461e941af6283d86dca2
   require_action_act_1e35db0451b1461e941af6283d86dca2_positive_amount["Require: positive_amount"] -->|guards| action_act_1e35db0451b1461e941af6283d86dca2
   action_act_1e35db0451b1461e941af6283d86dca2 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
   action_act_1e35db0451b1461e941af6283d86dca2 -->|emits atomically| event_evt_10d694c9a0a274dc79c6168e47d25968
   action_act_ed2374e822704c51a2925338253d05d2["Action: submitRequest"]
   principal -->|authenticated caller| action_act_ed2374e822704c51a2925338253d05d2
-  action_act_ed2374e822704c51a2925338253d05d2 -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
+  action_act_ed2374e822704c51a2925338253d05d2 -->|0: updates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_action_act_ed2374e822704c51a2925338253d05d2["Authorize"] -->|guards| action_act_ed2374e822704c51a2925338253d05d2
   require_action_act_ed2374e822704c51a2925338253d05d2_is_draft["Require: is_draft"] -->|guards| action_act_ed2374e822704c51a2925338253d05d2
   action_act_ed2374e822704c51a2925338253d05d2 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725
@@ -34,7 +34,7 @@ flowchart LR
   action_act_ed2374e822704c51a2925338253d05d2 -->|emits atomically| event_evt_20d694c9a0a274dc79c6168e47d25968
   action_act_d39dbb883b5f4019b9027b85add3de47["Action: approveRequest"]
   principal -->|authenticated caller| action_act_d39dbb883b5f4019b9027b85add3de47
-  action_act_d39dbb883b5f4019b9027b85add3de47 -->|updates| entity_ent_9bc680209327484c8e98f5f740bcc702
+  action_act_d39dbb883b5f4019b9027b85add3de47 -->|0: updates| entity_ent_9bc680209327484c8e98f5f740bcc702
   authorize_action_act_d39dbb883b5f4019b9027b85add3de47["Authorize"] -->|guards| action_act_d39dbb883b5f4019b9027b85add3de47
   require_action_act_d39dbb883b5f4019b9027b85add3de47_is_submitted["Require: is_submitted"] -->|guards| action_act_d39dbb883b5f4019b9027b85add3de47
   action_act_d39dbb883b5f4019b9027b85add3de47 -->|locks share| entity_ent_66c16684f17e4b4ca79eb7d916cbf725

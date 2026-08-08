@@ -8,9 +8,9 @@
     "$schema": { "const": "https://modellang.dev/schemas/target-capability-profile.schema.json" },
     "profileVersion": { "const": 9 },
     "compilerVersion": { "type": "string" },
-    "generatorProfile": { "const": "postgresql-http-ui-agent-plugin/32" },
+    "generatorProfile": { "const": "postgresql-http-ui-agent-plugin-atomic-effects/33" },
     "targetProfile": { "const": "target:postgresql-http-ui-extension-tools/9" },
-    "irVersion": { "const": 1 },
+    "irVersion": { "const": 2 },
     "model": {
       "type": "object",
       "required": ["id", "version", "sourceHash"],

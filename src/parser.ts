@@ -463,7 +463,9 @@ class Parser {
       idempotency = { mode: "required", span: this.span(idempotencyStart, idempotencyEnd) };
       if (this.atWord("idempotency")) this.fail("E1122", "An action may declare idempotency at most once.");
     }
-    const effect = this.parseEffect();
+    const effects: Effect[] = [];
+    while (this.atWord("create") || this.atWord("update")) effects.push(this.parseEffect());
+    if (effects.length === 0) this.fail("E1107", "Expected at least one create or update effect.");
     const emits: ActionDecl["emits"] = [];
     while (this.atWord("emit")) {
       const emitStart = this.take();
@@ -472,7 +474,7 @@ class Parser {
       emits.push({ eventName: eventName.text, span: this.span(emitStart, emitEnd) });
     }
     const end = this.expect("}");
-    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effect, emits, span: this.span(start, end) };
+    return { kind: "action", name: name.text, nameSpan: name.span, stableId, parameters, returnType, authorize, requires, idempotency, effects, emits, span: this.span(start, end) };
   }
 
   private parseConsumer(): ConsumerDecl {

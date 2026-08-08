@@ -44,8 +44,8 @@ export interface SemanticReadSet {
 
 export interface SemanticManifest {
   $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
-  manifestVersion: 18;
-  profile: "sml-transactional-core/18";
+  manifestVersion: 19;
+  profile: "sml-transactional-core/19";
   audience: "engineering";
   view: {
     authorizationFiltered: false;
@@ -54,7 +54,7 @@ export interface SemanticManifest {
   };
   provenance: {
     compilerVersion: string;
-    irVersion: 1;
+    irVersion: 2;
     generator: "semantic-manifest";
   };
   model: {
@@ -118,12 +118,14 @@ export interface SemanticAction {
     mode: "share" | "update";
     order: number;
   }[];
-  effect: {
+  effects: {
+    id: string;
+    order: number;
     kind: "create" | "update";
     entityId: string;
     targetParameterId?: string;
     assignments: { fieldId: string; expression: IRExpression }[];
-  };
+  }[];
   postconditions: {
     invariantIds: string[];
     temporalExclusionIds: string[];
@@ -331,11 +333,11 @@ function caller(
 function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction): SemanticAction {
   const operation = operationInput(manifest, action.id);
   if (operation.output.cardinality !== "one") throw new Error(`E6302 Action '${action.id}' has a non-singular output.`);
-  const entity = ir.entities.find((candidate) => candidate.id === action.effect.entityId);
-  if (!entity) throw new Error(`E6303 Action '${action.id}' affects unknown entity '${action.effect.entityId}'.`);
-  const target = action.effect.kind === "update"
-    ? action.parameters.find((parameter) => parameter.name === action.effect.target)
-    : undefined;
+  const effectEntities = action.effects.map((effect) => {
+    const entity = ir.entities.find((candidate) => candidate.id === effect.entityId);
+    if (!entity) throw new Error(`E6303 Action '${action.id}' affects unknown entity '${effect.entityId}'.`);
+    return entity;
+  });
   return {
     id: action.id,
     name: action.name,
@@ -345,7 +347,7 @@ function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction)
     output: { entityId: operation.output.entityId, cardinality: "one" },
     authorization: semanticRule(action.authorization),
     preconditions: action.preconditions.map(semanticRule),
-    readSet: readSet(ir, [action.authorization, ...action.preconditions], action.effect.assignments.map((assignment) => assignment.expression)),
+    readSet: readSet(ir, [action.authorization, ...action.preconditions], action.effects.flatMap((effect) => effect.assignments.map((assignment) => assignment.expression))),
     lockPlan: action.lockPlan.map((lock) => ({
       id: lock.id,
       entityId: lock.entityId,
@@ -353,18 +355,25 @@ function actionEntry(ir: ModelIR, manifest: OperationManifest, action: IRAction)
       mode: lock.mode,
       order: lock.order,
     })),
-    effect: {
-      kind: action.effect.kind,
-      entityId: action.effect.entityId,
-      ...(target ? { targetParameterId: target.id } : {}),
-      assignments: action.effect.assignments.map((assignment) => ({
-        fieldId: assignment.fieldId,
-        expression: assignment.expression,
-      })),
-    },
+    effects: action.effects.map((effect) => {
+      const target = effect.kind === "update"
+        ? action.parameters.find((parameter) => parameter.name === effect.target)
+        : undefined;
+      return {
+        id: effect.id,
+        order: effect.order,
+        kind: effect.kind,
+        entityId: effect.entityId,
+        ...(target ? { targetParameterId: target.id } : {}),
+        assignments: effect.assignments.map((assignment) => ({
+          fieldId: assignment.fieldId,
+          expression: assignment.expression,
+        })),
+      };
+    }),
     postconditions: {
-      invariantIds: entity.invariants.map((invariant) => invariant.id),
-      temporalExclusionIds: entity.temporalExclusions.map((exclusion) => exclusion.id),
+      invariantIds: [...new Set(effectEntities.flatMap((entity) => entity.invariants.map((invariant) => invariant.id)))].sort(),
+      temporalExclusionIds: [...new Set(effectEntities.flatMap((entity) => entity.temporalExclusions.map((exclusion) => exclusion.id)))].sort(),
     },
     workflowTransitionIds: ir.workflows.flatMap((workflow) => workflow.transitions)
       .filter((transition) => transition.actionId === action.id)
@@ -512,7 +521,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
   };
   return {
     $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
-    manifestVersion: 18,
+    manifestVersion: 19,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",
     view: {

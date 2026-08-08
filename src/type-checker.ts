@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ModelError, type Span } from "./diagnostics.js";
-import type { IRAction, IRConsumer, IREntity, IREnum, IREvent, IRExtension, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRProjection, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
+import type { IRAction, IRConsumer, IREffect, IREntity, IREnum, IREvent, IRExtension, IRExpression, IRField, IRIdentity, IRLock, IRParameter, IRPolicy, IRProjection, IRQuery, IRSpan, IRWorkflow, ModelIR, EnforcementEntry } from "./ir.js";
 import { isMoneyType, moneyProfile, moneyType, validateMoneyAmount } from "./money.js";
 import { snakeCase } from "./naming.js";
 import { decisionFunctionName, decisionRevisionRuleId } from "./decision-plan.js";
@@ -672,60 +672,79 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
   });
   const returnEntity = symbols.entities.get(action.returnType.name);
   if (!returnEntity) throw new ModelError("E2307", `Action return type '${action.returnType.name}' must be an entity.`, action.returnType.span, file);
-  let effectEntity: EntityDecl;
-  let targetParameter: IRParameter | undefined;
-  if (action.effect.kind === "create") {
-    const entity = symbols.entities.get(action.effect.target);
-    if (!entity) throw new ModelError("E2308", `Unknown create target entity '${action.effect.target}'.`, action.effect.span, file);
-    effectEntity = entity;
-  } else {
-    targetParameter = parameterMap.get(action.effect.target);
-    if (!targetParameter || !isEntityType(targetParameter.type)) throw new ModelError("E2309", `Update target '${action.effect.target}' must be an entity parameter.`, action.effect.span, file);
-    if (targetParameter.caller) throw new ModelError("E2310", "The caller parameter may not be an update target.", action.effect.span, file);
-    effectEntity = entityForType(symbols, targetParameter.type);
-  }
-  if (returnEntity.name !== effectEntity.name) throw new ModelError("E2311", "Action return type must match the created or updated entity.", action.returnType.span, file);
-  const effectFields = symbols.fields.get(effectEntity.name)!;
-  const assigned = new Set<string>();
-  const assignments = action.effect.assignments.map((assignment) => {
-    if (assigned.has(assignment.field)) throw new ModelError("E2312", `Field '${assignment.field}' is assigned more than once.`, assignment.span, file);
-    assigned.add(assignment.field);
-    const field = effectFields.get(assignment.field);
-    if (!field) throw new ModelError("E2313", `Unknown field '${effectEntity.name}.${assignment.field}'.`, assignment.span, file);
-    if (field.annotations.some((annotation) => annotation.name === "generated")) {
-      throw new ModelError("E2316", `Action effects may not assign database-generated field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+  const updateTargets = new Set<string>();
+  const targetParameters = new Map<string, IRParameter>();
+  const effects: IREffect[] = action.effects.map((effect, order) => {
+    let effectEntity: EntityDecl;
+    if (effect.kind === "create") {
+      const entity = symbols.entities.get(effect.target);
+      if (!entity) throw new ModelError("E2308", `Unknown create target entity '${effect.target}'.`, effect.span, file);
+      effectEntity = entity;
+    } else {
+      const targetParameter = parameterMap.get(effect.target);
+      if (!targetParameter || !isEntityType(targetParameter.type)) throw new ModelError("E2309", `Update target '${effect.target}' must be an entity parameter.`, effect.span, file);
+      if (targetParameter.caller) throw new ModelError("E2310", "The caller parameter may not be an update target.", effect.span, file);
+      if (updateTargets.has(targetParameter.id)) throw new ModelError("E2318", `Action '${action.name}' may update target '${effect.target}' at most once.`, effect.span, file);
+      updateTargets.add(targetParameter.id);
+      targetParameters.set(targetParameter.id, targetParameter);
+      effectEntity = entityForType(symbols, targetParameter.type);
     }
-    if (action.effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "immutable")) {
-      throw new ModelError("E2317", `An update may not change immutable field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
-    }
-    if (action.effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "id")) {
-      throw new ModelError("E2314", "An update may not change an @id field.", assignment.span, file);
-    }
-    const expression = typeExpression(assignment.expression, scope, symbols, file);
-    ensureAssignable(field, expression, symbols, assignment.expression.span, file);
-    if (field.annotations.some((annotation) => annotation.name === "snapshot")
-      && expression.kind !== "nullLiteral"
-      && expression.kind !== "fieldAccess") {
-      throw new ModelError("E2415", `@snapshot field '${field.name}' must be assigned null or a direct field value.`, assignment.expression.span, file);
-    }
-    return { fieldId: fieldId(effectEntity, field), fieldName: field.name, expression };
-  });
-  if (action.effect.kind === "create") {
-    for (const field of effectFields.values()) {
-      if (!field.optional && !field.default
-        && !field.annotations.some((annotation) => annotation.name === "generated")
-        && !assigned.has(field.name)) {
-        throw new ModelError("E2315", `Create effect must assign required field '${effectEntity.name}.${field.name}'.`, action.effect.span, file);
+    const effectFields = symbols.fields.get(effectEntity.name)!;
+    const assigned = new Set<string>();
+    const assignments = effect.assignments.map((assignment) => {
+      if (assigned.has(assignment.field)) throw new ModelError("E2312", `Field '${assignment.field}' is assigned more than once.`, assignment.span, file);
+      assigned.add(assignment.field);
+      const field = effectFields.get(assignment.field);
+      if (!field) throw new ModelError("E2313", `Unknown field '${effectEntity.name}.${assignment.field}'.`, assignment.span, file);
+      if (field.annotations.some((annotation) => annotation.name === "generated")) {
+        throw new ModelError("E2316", `Action effects may not assign database-generated field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+      }
+      if (effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "immutable")) {
+        throw new ModelError("E2317", `An update may not change immutable field '${effectEntity.name}.${field.name}'.`, assignment.span, file);
+      }
+      if (effect.kind === "update" && field.annotations.some((annotation) => annotation.name === "id")) {
+        throw new ModelError("E2314", "An update may not change an @id field.", assignment.span, file);
+      }
+      const expression = typeExpression(assignment.expression, scope, symbols, file);
+      ensureAssignable(field, expression, symbols, assignment.expression.span, file);
+      if (field.annotations.some((annotation) => annotation.name === "snapshot")
+        && expression.kind !== "nullLiteral"
+        && expression.kind !== "fieldAccess") {
+        throw new ModelError("E2415", `@snapshot field '${field.name}' must be assigned null or a direct field value.`, assignment.expression.span, file);
+      }
+      return { fieldId: fieldId(effectEntity, field), fieldName: field.name, expression };
+    });
+    if (effect.kind === "create") {
+      for (const field of effectFields.values()) {
+        if (!field.optional && !field.default
+          && !field.annotations.some((annotation) => annotation.name === "generated")
+          && !assigned.has(field.name)) {
+          throw new ModelError("E2315", `Create effect must assign required field '${effectEntity.name}.${field.name}'.`, effect.span, file);
+        }
       }
     }
+    return {
+      id: `effect:${semanticId}.${order}`,
+      order,
+      kind: effect.kind,
+      target: effect.target,
+      entityId: entityId(effectEntity),
+      assignments,
+    };
+  });
+  const resultEffect = effects.at(-1)!;
+  if (resultEffect.entityId !== entityId(returnEntity)) {
+    throw new ModelError("E2311", "Action return type must match the final created or updated entity.", action.returnType.span, file);
   }
 
   const usedParameters = new Set<string>();
   collectEntityParameters(authorization, usedParameters);
   for (const precondition of preconditions) collectEntityParameters(precondition.expression, usedParameters);
-  for (const assignment of assignments) collectEntityParameters(assignment.expression, usedParameters);
+  for (const effect of effects) {
+    for (const assignment of effect.assignments) collectEntityParameters(assignment.expression, usedParameters);
+  }
   const locks: Omit<IRLock, "order">[] = [];
-  if (targetParameter) {
+  for (const targetParameter of targetParameters.values()) {
     locks.push({ id: `lock:${semanticId}.${targetParameter.name}`, source: targetParameter.id, parameterId: targetParameter.id, entityId: targetParameter.type, mode: "update" });
     usedParameters.delete(targetParameter.id);
   }
@@ -747,7 +766,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
     if (!event) throw new ModelError("E3102", `Action '${action.name}' emits unknown event '${emission.eventName}'.`, emission.span, file);
     if (event.importedFrom) throw new ModelError("E3107", `Action '${action.name}' cannot emit imported event contract '${event.name}'.`, emission.span, file);
     const payload = symbols.entities.get(event.payloadType.name);
-    if (!payload || entityId(payload) !== entityId(effectEntity)) {
+    if (!payload || entityId(payload) !== entityId(returnEntity)) {
       throw new ModelError("E3103", `Event '${event.name}' payload must match action '${action.name}' return entity '${returnEntity.name}'.`, emission.span, file);
     }
     const id = eventId(event);
@@ -773,7 +792,7 @@ function lowerAction(action: ActionDecl, symbols: Symbols, principalName: string
         fingerprint: "canonicalSha256" as const,
       },
     } : {}),
-    effect: { kind: action.effect.kind, target: action.effect.target, entityId: entityId(effectEntity), assignments },
+    effects,
     emittedEventIds,
     lockPlan,
     span: irSpan(action.span, file),
@@ -920,7 +939,7 @@ function lowerConsumer(consumer: ConsumerDecl, symbols: Symbols, file: string): 
           }
           return { mode: "unboundedRetry" as const };
         })(),
-    effect: { kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
+    effect: { id: `effect:${semanticId}.0`, order: 0, kind: consumer.effect.kind, target: consumer.effect.target, entityId: entityId(effectEntity), assignments },
     emittedEventIds,
     lockPlan: consumer.effect.kind === "update"
       ? [{ id: `lock:${semanticId}.${payloadParameter.name}`, source: payloadParameter.id, parameterId: payloadParameter.id, entityId: entityId(effectEntity), mode: "update", order: 0 }]
@@ -1377,18 +1396,21 @@ function lowerWorkflows(
         throw new ModelError("E3012", `Action '${action.name}' may implement only one transition in workflow '${workflow.name}'.`, transition.actionSpan, file);
       }
       transitionActions.add(action.id);
-      const assignment = action.effect.assignments.find((candidate) => candidate.fieldId === targetId);
-      if (action.effect.kind !== "update" || action.effect.entityId !== entity.id || !assignment) {
+      const workflowEffect = action.effects.find((effect) => effect.kind === "update"
+        && effect.entityId === entity.id
+        && effect.assignments.some((candidate) => candidate.fieldId === targetId));
+      const assignment = workflowEffect?.assignments.find((candidate) => candidate.fieldId === targetId);
+      if (!workflowEffect || !assignment) {
         throw new ModelError("E3013", `Transition action '${action.name}' must update '${entity.name}.${fieldDecl.name}'.`, transition.actionSpan, file);
       }
       if (assignment.expression.kind !== "enumLiteral" || assignment.expression.memberId !== to.id) {
         throw new ModelError("E3014", `Transition action '${action.name}' must assign destination state '${to.name}'.`, transition.actionSpan, file);
       }
-      const targetParameter = action.parameters.find((candidate) => candidate.name === action.effect.target);
+      const targetParameter = action.parameters.find((candidate) => candidate.name === workflowEffect.target);
       const guarded = Boolean(targetParameter && action.preconditions.some((precondition) =>
         isWorkflowSourceGuard(precondition.expression, targetParameter.id, targetId, from.id)));
       if (!guarded) {
-        throw new ModelError("E3015", `Transition action '${action.name}' must have a named require asserting '${action.effect.target}.${fieldDecl.name} == ${enumerationDecl.name}.${from.name}'.`, transition.actionSpan, file);
+        throw new ModelError("E3015", `Transition action '${action.name}' must have a named require asserting '${workflowEffect.target}.${fieldDecl.name} == ${enumerationDecl.name}.${from.name}'.`, transition.actionSpan, file);
       }
       return {
         id: transitionId(workflow, transition),
@@ -1402,14 +1424,15 @@ function lowerWorkflows(
     });
 
     for (const action of actions) {
-      if (action.effect.entityId !== entity.id) continue;
-      const assignment = action.effect.assignments.find((candidate) => candidate.fieldId === targetId);
-      if (action.effect.kind === "create") {
-        if (assignment && (assignment.expression.kind !== "enumLiteral" || assignment.expression.memberId !== initial.id)) {
-          throw new ModelError("E3016", `Create action '${action.name}' must initialize '${entity.name}.${fieldDecl.name}' to '${initial.name}'.`, symbols.actions.get(action.name)!.span, file);
+      for (const effect of action.effects.filter((candidate) => candidate.entityId === entity.id)) {
+        const assignment = effect.assignments.find((candidate) => candidate.fieldId === targetId);
+        if (effect.kind === "create") {
+          if (assignment && (assignment.expression.kind !== "enumLiteral" || assignment.expression.memberId !== initial.id)) {
+            throw new ModelError("E3016", `Create action '${action.name}' must initialize '${entity.name}.${fieldDecl.name}' to '${initial.name}'.`, symbols.actions.get(action.name)!.span, file);
+          }
+        } else if (assignment && !transitionActions.has(action.id)) {
+          throw new ModelError("E3017", `Action '${action.name}' changes workflow field '${entity.name}.${fieldDecl.name}' but is not declared as a transition.`, symbols.actions.get(action.name)!.span, file);
         }
-      } else if (assignment && !transitionActions.has(action.id)) {
-        throw new ModelError("E3017", `Action '${action.name}' changes workflow field '${entity.name}.${fieldDecl.name}' but is not declared as a transition.`, symbols.actions.get(action.name)!.span, file);
       }
     }
 
@@ -1966,7 +1989,7 @@ function buildEnforcement(
     entries.push({ id: decisionRevisionRuleId(action.id), purpose: "Compare an explicitly supplied opaque revision only after current authorization; a match grants no authority.", layer: "PostgreSQL action and applicability functions", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     entries.push({ id: action.authorization.id, purpose: action.authorization.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: action.authorization.span });
     for (const precondition of action.preconditions) entries.push({ id: precondition.id, purpose: precondition.sourceExpression, layer: "PostgreSQL action guard", artifact: "postgres/003_actions.sql", objectName: fn, source: precondition.span });
-    entries.push({ id: `effect:${action.id}`, purpose: `${action.effect.kind} ${action.effect.entityId}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
+    for (const effect of action.effects) entries.push({ id: effect.id, purpose: `${effect.kind} ${effect.entityId} as ordered effect ${effect.order}.`, layer: "PostgreSQL action function", artifact: "postgres/003_actions.sql", objectName: fn, source: action.span });
     for (const eventId of action.emittedEventIds) {
       const event = events.find((candidate) => candidate.id === eventId)!;
       entries.push({ id: `emit:${action.id}.${event.id}`, purpose: `Append ${event.name} with the committed post-effect entity payload.`, layer: "PostgreSQL transactional outbox", artifact: "postgres/003_actions.sql", objectName: `${internalSchema}.event_outbox`, source: action.span });

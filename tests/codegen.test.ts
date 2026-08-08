@@ -16,6 +16,32 @@ async function reservations() {
 }
 
 describe("backends", () => {
+  it("generates one audited transaction for ordered multi-entity effects", () => {
+    const ir = compileText(`model ToolShare version "0.50.0";
+enum ReservationState { PENDING, APPROVED }
+entity User { id: UUID @id @generated(uuid); }
+entity Reservation { id: UUID @id @generated(uuid); state: ReservationState; }
+entity Loan { id: UUID @id @generated(uuid); reservation: Reservation; borrower: User; }
+action approve(caller actor: User, reservation: Reservation) -> Loan {
+  authorize true;
+  require pending: reservation.state == ReservationState.PENDING;
+  update reservation { state = ReservationState.APPROVED; }
+  create Loan { reservation = reservation; borrower = actor; }
+}`);
+    const output = generateAll(ir);
+    const sql = output["postgres/003_actions.sql"]!;
+    expect(sql.indexOf('UPDATE "model_tool_share"."reservation"')).toBeLessThan(sql.indexOf('INSERT INTO "model_tool_share"."loan"'));
+    expect(sql).toContain('RETURNING "id" INTO v_effect_target_0');
+    expect(sql).toContain("v_effect_target_1 := v_result.\"id\"");
+    expect(sql.match(/INSERT INTO "model_tool_share_internal"\."action_effect_audit"/g)).toHaveLength(2);
+    expect(output["postgres/002_schema.sql"]).toContain('CREATE TABLE "model_tool_share_internal"."action_effect_audit"');
+    const semantic = JSON.parse(output["semantic.json"]!);
+    expect(semantic.actions[0].effects).toEqual([
+      expect.objectContaining({ order: 0, kind: "update", entityId: "entity:Reservation" }),
+      expect.objectContaining({ order: 1, kind: "create", entityId: "entity:Loan" }),
+    ]);
+  });
+
   it("generates deterministic output from IR only", async () => {
     const ir = await procurement();
     expect(generateAll(ir)).toEqual(generateAll(ir));
@@ -245,7 +271,7 @@ describe("backends", () => {
         reliability: { idempotency: string; durableReceipt: boolean };
         authorization: { id: string; dependencies: { kind: string; id: string }[] };
         readSet: { entityIds: string[]; fieldIds: string[] };
-        effect: { kind: string; assignments: { fieldId: string }[] };
+        effects: { kind: string; assignments: { fieldId: string }[] }[];
         postconditions: { invariantIds: string[] };
         workflowTransitionIds: string[];
       }[];
@@ -257,10 +283,10 @@ describe("backends", () => {
     const validateSemantic = new Ajv2020({ allErrors: true, strict: true }).compile(semanticSchema);
     expect(validateSemantic(semantic), JSON.stringify(validateSemantic.errors)).toBe(true);
     expect(semantic).toMatchObject({
-      manifestVersion: 18,
+      manifestVersion: 19,
       audience: "engineering",
       view: { authorizationFiltered: false, currentState: false, executable: false },
-      provenance: { compilerVersion: packageInfo.version, irVersion: 1 },
+      provenance: { compilerVersion: packageInfo.version, irVersion: 2 },
     });
     expect(semantic.policies).toEqual([expect.objectContaining({
       id: "policy:pol_a3a80ffeec774402be92cddaafd0f069",
@@ -281,8 +307,8 @@ describe("backends", () => {
       "field:fld_9810e7598584487ea4a883e3c1c3f8d1",
       "field:fld_b4b29a4d0d914ec0913e578da89e5dcb",
     ]));
-    expect(approve.effect).toMatchObject({ kind: "update" });
-    expect(approve.effect.assignments.map((assignment) => assignment.fieldId)).toEqual([
+    expect(approve.effects).toEqual([expect.objectContaining({ kind: "update" })]);
+    expect(approve.effects[0]!.assignments.map((assignment) => assignment.fieldId)).toEqual([
       "field:fld_afb1dee14dfa48c98961fdb40e2b0be2",
       "field:fld_5da56f04460f4deba9ccda4f552c2b97",
       "field:fld_577b4c94c9cd4b469aded37614712fba",
@@ -410,8 +436,8 @@ describe("backends", () => {
     expect(provenance).toMatchObject({
       provenanceVersion: 2,
       compilerVersion: packageInfo.version,
-      generatorProfile: "postgresql-http-ui-agent-plugin/32",
-      irVersion: 1,
+      generatorProfile: "postgresql-http-ui-agent-plugin-atomic-effects/33",
+      irVersion: 2,
       targetProfile: "target:postgresql-http-ui-extension-tools/9",
     });
     expect(provenance.artifacts.some((artifact) => artifact.path === "provenance.json")).toBe(false);

@@ -52,6 +52,19 @@ CREATE TABLE "model_reservations_internal"."action_audit" (
   "occurred_at" timestamptz NOT NULL DEFAULT transaction_timestamp()
 );
 
+CREATE TABLE "model_reservations_internal"."action_effect_audit" (
+  "action_audit_id" bigint NOT NULL REFERENCES "model_reservations_internal"."action_audit" ("id") ON DELETE CASCADE,
+  "effect_id" text NOT NULL,
+  "effect_ordinal" integer NOT NULL,
+  "effect_kind" text NOT NULL,
+  "entity_id" text NOT NULL,
+  "target_id" uuid NOT NULL,
+  CONSTRAINT "pk_action_effect_audit" PRIMARY KEY ("action_audit_id", "effect_ordinal"),
+  CONSTRAINT "uq_action_effect_audit_id" UNIQUE ("action_audit_id", "effect_id"),
+  CONSTRAINT "ck_action_effect_audit_ordinal" CHECK ("effect_ordinal" >= 0),
+  CONSTRAINT "ck_action_effect_audit_kind" CHECK ("effect_kind" IN ('create', 'update'))
+);
+
 CREATE TABLE IF NOT EXISTS "model_reservations_internal"."gateway_principal_binding" (
   "issuer" text NOT NULL,
   "subject" text NOT NULL,
