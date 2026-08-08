@@ -45,7 +45,7 @@ export interface ActionDecisionPlan {
 }
 
 export interface DecisionPlan {
-  $schema: "https://modellang.dev/schemas/decision-plan.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/decision-plan.schema.json";
   planVersion: 2;
   audience: "enforcement";
   public: false;
@@ -80,7 +80,7 @@ export function generateDecisionPlan(ir: ModelIR): DecisionPlan {
     return [...found].sort();
   };
   return {
-    $schema: "https://modellang.dev/schemas/decision-plan.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/decision-plan.schema.json",
     planVersion: 2,
     audience: "enforcement",
     public: false,

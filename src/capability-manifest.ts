@@ -12,7 +12,7 @@ function actionEventIds(operations: OperationManifest, operationId: string): str
 }
 
 export interface CapabilityManifest {
-  $schema: "https://modellang.dev/schemas/capability-manifest.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/capability-manifest.schema.json";
   capabilityManifestVersion: 10;
   operationManifestVersion: 11;
   model: { id: string; name: string; version: string; sourceHash: string };
@@ -53,7 +53,7 @@ export function generateCapabilityManifest(
   decisions: DecisionPlan,
 ): CapabilityManifest {
   return {
-    $schema: "https://modellang.dev/schemas/capability-manifest.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/capability-manifest.schema.json",
     capabilityManifestVersion: 10,
     operationManifestVersion: operations.manifestVersion,
     model: { ...operations.model },

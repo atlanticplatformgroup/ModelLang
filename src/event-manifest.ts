@@ -1,7 +1,7 @@
 import type { ModelIR } from "./ir.js";
 
 export interface EventManifest {
-  $schema: "https://modellang.dev/schemas/event-manifest.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/event-manifest.schema.json";
   eventManifestVersion: 5;
   model: { id: string; name: string; version: string; sourceHash: string };
   delivery: { semantics: "atLeastOnce"; storage: "privateTransactionalOutbox"; ordering: "occurredAtThenProducerOrdinal"; acknowledgement: "leaseToken"; envelopeVersion: 2 };
@@ -18,7 +18,7 @@ export interface EventManifest {
 
 export function generateEventManifest(ir: ModelIR): EventManifest {
   return {
-    $schema: "https://modellang.dev/schemas/event-manifest.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/event-manifest.schema.json",
     eventManifestVersion: 5,
     model: { id: ir.model.id, name: ir.model.name, version: ir.model.version, sourceHash: ir.model.sourceHash },
     delivery: { semantics: "atLeastOnce", storage: "privateTransactionalOutbox", ordering: "occurredAtThenProducerOrdinal", acknowledgement: "leaseToken", envelopeVersion: 2 },

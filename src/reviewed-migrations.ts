@@ -27,7 +27,7 @@ import { semanticDiff, type SemanticChange, type SemanticDiff } from "./semantic
 import { decisionFunctionName } from "./decision-plan.js";
 import { MODELLANG_IR_VERSION } from "./version.js";
 
-export const REVIEWED_MIGRATION_SCHEMA = "https://modellang.dev/schemas/reviewed-migration-plan.schema.json" as const;
+export const REVIEWED_MIGRATION_SCHEMA = "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/reviewed-migration-plan.schema.json" as const;
 
 export type ReviewDisposition = "accepted" | "dataLossAccepted" | "transformed";
 

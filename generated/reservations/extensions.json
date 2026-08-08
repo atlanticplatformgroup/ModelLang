@@ -1,5 +1,5 @@
 {
-  "$schema": "https://modellang.dev/schemas/extension-ledger.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-ledger.schema.json",
   "ledgerVersion": 1,
   "compilerVersion": "0.50.0",
   "irVersion": 2,

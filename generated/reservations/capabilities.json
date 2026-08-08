@@ -1,5 +1,5 @@
 {
-  "$schema": "https://modellang.dev/schemas/capability-manifest.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/capability-manifest.schema.json",
   "capabilityManifestVersion": 10,
   "operationManifestVersion": 11,
   "model": {

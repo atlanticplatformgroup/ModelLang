@@ -1,5 +1,5 @@
 {
-  "$schema": "https://modellang.dev/schemas/agent-evaluation-suite.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-suite.schema.json",
   "suiteVersion": 1,
   "id": "agent-evaluation-v1",
   "empirical": false,

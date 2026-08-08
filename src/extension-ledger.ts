@@ -2,7 +2,7 @@ import type { IRExtension, ModelIR } from "./ir.js";
 import { MODELLANG_COMPILER_VERSION } from "./version.js";
 
 export interface ExtensionLedger {
-  $schema: "https://modellang.dev/schemas/extension-ledger.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-ledger.schema.json";
   ledgerVersion: 1;
   compilerVersion: string;
   irVersion: 2;
@@ -20,7 +20,7 @@ export interface ExtensionLedger {
 
 export function generateExtensionLedger(ir: ModelIR): ExtensionLedger {
   return {
-    $schema: "https://modellang.dev/schemas/extension-ledger.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-ledger.schema.json",
     ledgerVersion: 1,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: ir.irVersion,

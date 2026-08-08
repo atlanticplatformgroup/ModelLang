@@ -152,7 +152,7 @@ function outputSchema(ir: ModelIR, extension: IRExtension, revision: string): Js
       "contractRevision", "kind", "authority", "execution", "result",
     ],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/extension-tool-result.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json" },
       extensionToolResultVersion: { const: 1 },
       catalogVersion: { const: 7 },
       model: { const: { id: ir.model.id, name: ir.model.name, version: ir.model.version, sourceHash: ir.model.sourceHash } },

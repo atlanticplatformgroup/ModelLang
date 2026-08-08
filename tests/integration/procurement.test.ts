@@ -2088,7 +2088,7 @@ describe.sequential("PostgreSQL enforcement boundary", () => {
           const grantId = randomUUID();
           const credential = `delegation-${randomUUID()}-${randomUUID()}`;
           const claim: ProcurementDelegatedCapabilityClaim = {
-            $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+            $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
             delegatedCapabilityVersion: 1,
             catalogVersion: 7,
             model: {

@@ -146,7 +146,7 @@ function traceSchema(catalog: AgentToolCatalog, contract: PublicDecisionTraceAct
       "authority", "view", "freshness", "decision", "stages", "closure",
     ],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/public-decision-trace.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json" },
       traceVersion: { const: 1 },
       catalogVersion: { const: 7 },
       model: { const: catalog.model },

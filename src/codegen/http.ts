@@ -204,7 +204,7 @@ function agentResourceSchema(manifest: OperationManifest, operation: ManifestOpe
     additionalProperties: false,
     required: ["$schema", "resourceVersion", "catalogVersion", "model", "operationId", "kind", "authority", "view", "freshness", "data"],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/agent-resource.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" },
       resourceVersion: { const: 1 },
       catalogVersion: { const: 5 },
       model: {
@@ -752,7 +752,7 @@ export function generateOpenApi(
           additionalProperties: false,
           required: ["$schema", "viewVersion", "catalogVersion", "model", "view", "authentication", "available", "unavailable"],
           properties: {
-            $schema: { const: "https://modellang.dev/schemas/subject-capability-view.schema.json" },
+            $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json" },
             viewVersion: { const: 1 },
             catalogVersion: { const: 5 },
             model: {
@@ -986,7 +986,7 @@ function generateHttpClient(manifest: OperationManifest, extensionTools: readonl
     return `export type ${name}Input = ${schemaTypeScript(tool.inputSchema)};
 
 export interface ${name}Result {
-  readonly $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json";
   readonly extensionToolResultVersion: 1;
   readonly catalogVersion: 7;
   readonly model: ${schemaTypeScript({ type: "object", required: ["id", "name", "version", "sourceHash"], properties: {
@@ -1050,7 +1050,7 @@ export interface ${manifest.model.name}DelegationRequest {
 }
 
 export interface ${manifest.model.name}DelegatedCapability {
-  readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -1091,7 +1091,7 @@ export interface ${manifest.model.name}DelegationRevocation {
 }
 
 export interface ${manifest.model.name}PublicDecisionTrace {
-  readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -1137,7 +1137,7 @@ export interface ${manifest.model.name}PublicDecisionTrace {
 }
 
 export interface ${manifest.model.name}SubjectCapabilityView {
-  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -1178,7 +1178,7 @@ export interface ${manifest.model.name}SubjectCapabilityView {
 }
 
 export interface ${manifest.model.name}AgentResource<Data, OperationId extends string = string> {
-  readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -1209,7 +1209,7 @@ export type ${manifest.model.name}TaskPacketObservation =
 ${taskObservationResults || "  never"};
 
 export interface ${manifest.model.name}AgentTaskPacket {
-  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
   readonly catalogVersion: 7;
   readonly resourceVersion: 1;
@@ -2065,7 +2065,7 @@ function validateDelegatedClaim(
   const model = claim.model as Record<string, unknown> | undefined;
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
-    && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
+    && claim.$schema === "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json"
     && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === ${JSON.stringify(manifest.model.id)}
     && model?.name === ${JSON.stringify(manifest.model.name)}
@@ -2158,7 +2158,7 @@ export async function invoke${manifest.model.name}Extension(
   });
   validateExtensionResult(definition, result);
   return {
-    $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
     extensionToolResultVersion: 1,
     catalogVersion: 7,
     model: ${JSON.stringify(manifest.model)},
@@ -2179,7 +2179,7 @@ export async function invoke${manifest.model.name}Extension(
 
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
-    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
     model: ${JSON.stringify(manifest.model)},
@@ -2232,7 +2232,7 @@ export async function assemble${manifest.model.name}PublicDecisionTrace(
     }
   }
   return {
-    $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
     catalogVersion: 7,
     model: ${JSON.stringify(manifest.model)},
@@ -2303,7 +2303,7 @@ export async function assemble${manifest.model.name}TaskPacket(
     } as ${manifest.model.name}AgentTaskPacket["observations"][number]);
   }
   return {
-    $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
     catalogVersion: 7,
     resourceVersion: 1,
@@ -2508,7 +2508,7 @@ export function create${manifest.model.name}HttpHandler(
           throw new Error("Delegation authority returned an invalid credential");
         }
         const result: ${manifest.model.name}DelegatedCapability = {
-          $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
           catalogVersion: 7,
           model: ${JSON.stringify(manifest.model)},
@@ -2655,7 +2655,7 @@ export function create${manifest.model.name}HttpHandler(
           }
         }
         const view: ${manifest.model.name}SubjectCapabilityView = {
-          $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 7,
           model: ${JSON.stringify(manifest.model)},

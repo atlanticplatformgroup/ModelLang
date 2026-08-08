@@ -4,7 +4,35 @@ ModelLang 0.50 is a pre-1.0 public preview of the reference compiler. It is suit
 
 ## Install and inspect a model
 
-Install Node.js 20 or newer, then install the compiler:
+Install Node.js 20 or newer and create `app.model`:
+
+```modellang
+model ApprovalApp version "0.50.0";
+
+entity User {
+  id: UUID @id @generated(uuid);
+}
+
+entity Request {
+  id: UUID @id @generated(uuid);
+  approved: Boolean;
+}
+
+entity Approval {
+  id: UUID @id @generated(uuid);
+  request: Request @unique;
+  actor: User;
+}
+
+action approve(caller actor: User, request: Request) -> Approval {
+  authorize true;
+  require pending: request.approved == false;
+  update request { approved = true; }
+  create Approval { request = request; actor = actor; }
+}
+```
+
+Install and run the compiler:
 
 ```bash
 npm install --save-dev modellang@0.50.0

@@ -589,7 +589,7 @@
                   ],
                   "properties": {
                     "$schema": {
-                      "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                      "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json"
                     },
                     "resourceVersion": {
                       "const": 1
@@ -2175,7 +2175,7 @@
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/agent-task-packet.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json"
           },
           "packetVersion": {
             "const": 1
@@ -2634,7 +2634,7 @@
                       ],
                       "properties": {
                         "$schema": {
-                          "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                          "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json"
                         },
                         "resourceVersion": {
                           "const": 1
@@ -2799,7 +2799,7 @@
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json"
           },
           "delegatedCapabilityVersion": {
             "const": 1
@@ -2927,7 +2927,7 @@
             ],
             "properties": {
               "$schema": {
-                "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+                "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json"
               },
               "traceVersion": {
                 "const": 1
@@ -3370,7 +3370,7 @@
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/subject-capability-view.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json"
           },
           "viewVersion": {
             "const": 1

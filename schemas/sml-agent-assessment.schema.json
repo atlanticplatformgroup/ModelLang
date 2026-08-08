@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/sml-agent-assessment.schema.json",
   "title": "ModelLang SML-Agent assessment",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "model", "overall", "authority", "claims", "evaluation", "criteria", "summary"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/sml-agent-assessment.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/sml-agent-assessment.schema.json" },
     "assessmentVersion": { "const": 1 },
     "compilerVersion": { "type": "string", "minLength": 1 },
     "profile": { "const": "SML-Agent" },

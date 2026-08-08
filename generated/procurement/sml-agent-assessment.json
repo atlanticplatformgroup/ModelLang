@@ -1,5 +1,5 @@
 {
-  "$schema": "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/sml-agent-assessment.schema.json",
   "assessmentVersion": 1,
   "compilerVersion": "0.50.0",
   "profile": "SML-Agent",

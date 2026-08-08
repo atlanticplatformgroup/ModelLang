@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-tool-catalog.schema.json",
   "title": "ModelLang static agent tool catalog",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "capabilityManifestVersion", "model", "view", "adapter", "authentication", "subjectView", "taskPackets", "delegatedCapabilities", "publicDecisionTraces", "extensionToolAdapter", "tools", "extensionTools"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/agent-tool-catalog.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-tool-catalog.schema.json" },
     "catalogVersion": { "const": 7 },
     "compilerVersion": { "type": "string" },
     "operationManifestVersion": { "const": 11 },

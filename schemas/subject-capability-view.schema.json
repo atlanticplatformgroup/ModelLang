@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/subject-capability-view.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json",
   "title": "ModelLang authenticated subject capability view",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "authentication", "available", "unavailable"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/subject-capability-view.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json" },
     "viewVersion": { "const": 1 },
     "catalogVersion": { "const": 7 },
     "model": {

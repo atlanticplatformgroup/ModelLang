@@ -13,7 +13,7 @@ export interface SmlAgentAssessmentCriterion {
 }
 
 export interface SmlAgentAssessment {
-  $schema: "https://modellang.dev/schemas/sml-agent-assessment.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/sml-agent-assessment.schema.json";
   assessmentVersion: 1;
   compilerVersion: string;
   profile: "SML-Agent";
@@ -127,7 +127,7 @@ export function generateSmlAgentAssessment(
   ];
   const count = (status: SmlAgentCriterionStatus) => criteria.filter((item) => item.status === status).length;
   return {
-    $schema: "https://modellang.dev/schemas/sml-agent-assessment.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/sml-agent-assessment.schema.json",
     assessmentVersion: 1,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     profile: "SML-Agent",

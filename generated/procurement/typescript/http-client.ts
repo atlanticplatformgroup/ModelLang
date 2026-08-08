@@ -42,7 +42,7 @@ export interface ProcurementDelegationRequest {
 }
 
 export interface ProcurementDelegatedCapability {
-  readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -83,7 +83,7 @@ export interface ProcurementDelegationRevocation {
 }
 
 export interface ProcurementPublicDecisionTrace {
-  readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -129,7 +129,7 @@ export interface ProcurementPublicDecisionTrace {
 }
 
 export interface ProcurementSubjectCapabilityView {
-  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -170,7 +170,7 @@ export interface ProcurementSubjectCapabilityView {
 }
 
 export interface ProcurementAgentResource<Data, OperationId extends string = string> {
-  readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -201,7 +201,7 @@ export type ProcurementTaskPacketObservation =
   | { readonly binding: string; readonly operationId: "query:qry_4406b045404a48449282db804f6167a8"; readonly resource: ProcurementAgentResource<RequestSummary[], "query:qry_4406b045404a48449282db804f6167a8"> };
 
 export interface ProcurementAgentTaskPacket {
-  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
   readonly catalogVersion: 7;
   readonly resourceVersion: 1;
@@ -282,7 +282,7 @@ export interface ProcurementAgentTaskPacket {
 export type ProcurementSupplierRiskReviewExtensionInput = { readonly "request": string; readonly "requestedBy": string };
 
 export interface ProcurementSupplierRiskReviewExtensionResult {
-  readonly $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json";
   readonly extensionToolResultVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly "id": "model:Procurement"; readonly "name": "Procurement"; readonly "version": "0.49.0"; readonly "sourceHash": "sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45" };

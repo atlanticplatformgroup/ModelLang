@@ -43,7 +43,7 @@ export interface SemanticReadSet {
 }
 
 export interface SemanticManifest {
-  $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-manifest.schema.json";
   manifestVersion: 19;
   profile: "sml-transactional-core/19";
   audience: "engineering";
@@ -520,7 +520,7 @@ export function generateSemanticManifest(ir: ModelIR, operations: OperationManif
     return result;
   };
   return {
-    $schema: "https://modellang.dev/schemas/semantic-manifest.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-manifest.schema.json",
     manifestVersion: 19,
     profile: MODELLANG_SEMANTIC_PROFILE,
     audience: "engineering",

@@ -74,7 +74,7 @@ export function generateDelegatedCapabilitySchemas(
       "revision", "audience", "constraints", "view", "credential",
     ],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/delegated-capability.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json" },
       delegatedCapabilityVersion: { const: 1 },
       catalogVersion: { const: 7 },
       model: { const: catalog.model },

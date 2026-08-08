@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/delegated-capability.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
   "title": "ModelLang delegated capability issuance result",
   "type": "object",
   "required": [
@@ -9,7 +9,7 @@
     "revision", "audience", "constraints", "view", "credential"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/delegated-capability.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json" },
     "delegatedCapabilityVersion": { "const": 1 },
     "catalogVersion": { "const": 7 },
     "model": {

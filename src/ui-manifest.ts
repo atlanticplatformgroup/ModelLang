@@ -64,7 +64,7 @@ export interface UiWorkflow {
 }
 
 export interface UiManifest {
-  $schema: "https://modellang.dev/schemas/ui-manifest.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/ui-manifest.schema.json";
   uiManifestVersion: 11;
   operationManifestVersion: 11;
   model: {
@@ -213,7 +213,7 @@ export function generateUiManifest(manifest: OperationManifest): UiManifest {
     throw new Error(`E6201 UI generation requires operation manifest version 11, received '${manifest.manifestVersion}'.`);
   }
   return {
-    $schema: "https://modellang.dev/schemas/ui-manifest.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/ui-manifest.schema.json",
     uiManifestVersion: 11,
     operationManifestVersion: manifest.manifestVersion,
     model: {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/semantic-diff.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-diff.schema.json",
   "title": "ModelLang semantic diff",
   "$defs": {
     "model": {
@@ -23,7 +23,7 @@
     "changes", "summary", "migrationAuthority"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/semantic-diff.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-diff.schema.json" },
     "diffVersion": { "const": 20 },
     "compilerVersion": { "type": "string" },
     "irVersion": { "const": 2 },

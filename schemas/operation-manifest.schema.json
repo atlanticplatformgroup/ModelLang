@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/operation-manifest.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/operation-manifest.schema.json",
   "title": "ModelLang operation manifest",
   "$defs": {
     "valueType": {
@@ -289,7 +289,7 @@
     "workflows"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/operation-manifest.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/operation-manifest.schema.json" },
     "manifestVersion": { "const": 11 },
     "model": {
       "type": "object",

@@ -78,7 +78,7 @@ export type AgentTool =
     });
 
 export interface AgentToolCatalog {
-  $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-tool-catalog.schema.json";
   catalogVersion: 7;
   compilerVersion: string;
   operationManifestVersion: 11;
@@ -403,7 +403,7 @@ export function generateAgentToolCatalog(
     };
   });
   return {
-    $schema: "https://modellang.dev/schemas/agent-tool-catalog.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-tool-catalog.schema.json",
     catalogVersion: 7,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     operationManifestVersion: manifest.manifestVersion,

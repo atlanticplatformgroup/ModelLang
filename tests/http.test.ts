@@ -981,7 +981,7 @@ describe("generated HTTP boundary", () => {
 
     const result = await client.supplierRiskReviewExtension(input);
     expect(result).toMatchObject({
-      $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+      $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
       extensionToolResultVersion: 1,
       catalogVersion: 7,
       model: { id: "model:Procurement", name: "Procurement", version: "0.49.0" },

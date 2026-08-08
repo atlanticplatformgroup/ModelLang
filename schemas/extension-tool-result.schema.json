@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/extension-tool-result.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
   "title": "ModelLang host extension tool result",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "contractRevision", "kind", "authority", "execution", "result"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/extension-tool-result.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json" },
     "extensionToolResultVersion": { "const": 1 },
     "catalogVersion": { "const": 7 },
     "model": {

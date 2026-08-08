@@ -4,6 +4,8 @@
 
 ## 0.50.0
 
+- Completed public package metadata, packed both public guides, and made the install quickstart self-contained.
+- Pinned public ModelLang schema identifiers to immutable 0.50.0 source URLs so generated contracts do not depend on an unconfigured vanity domain.
 - Added source-compatible ordered multi-entity effects to actions. A command can now update existing records and create its returned record in one PostgreSQL transaction.
 - Advanced canonical IR to IR2: actions expose a non-empty ordered `effects` array with deterministic effect IDs and ordinals. The final effect produces the action result; repeated updates to one target are rejected.
 - Extended lock planning, workflow validation, semantic diff, diagrams, enforcement coverage, and PostgreSQL generation across the complete effect list.

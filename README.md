@@ -11,6 +11,36 @@ Two canonical applications drive the language:
 
 Install the Apache-2.0 `modellang` package on Node.js 20 or newer:
 
+Create `app.model`:
+
+```modellang
+model ApprovalApp version "0.50.0";
+
+entity User {
+  id: UUID @id @generated(uuid);
+}
+
+entity Request {
+  id: UUID @id @generated(uuid);
+  approved: Boolean;
+}
+
+entity Approval {
+  id: UUID @id @generated(uuid);
+  request: Request @unique;
+  actor: User;
+}
+
+action approve(caller actor: User, request: Request) -> Approval {
+  authorize true;
+  require pending: request.approved == false;
+  update request { approved = true; }
+  create Approval { request = request; actor = actor; }
+}
+```
+
+Then install and run the compiler:
+
 ```bash
 npm install --save-dev modellang@0.50.0
 npx modelc check app.model
@@ -619,4 +649,4 @@ The full suite validates the actual public npm tarball inventory, clean installa
 - Engineering semantic manifest v19 and extension ledger v1 remain trusted static artifacts. Target profile v9 reports the static catalog, bounded subject action view, query-backed current-state resources, direct MCP adapter, explicitly partial task packets, bounded delegated-capability adapter, public applicability traces, and extension-tool adapter as native. Host credential authorities and extension implementations remain required, ungenerated, and unattested. The ledger remains non-executable with zero generated implementations, and target gaps remain open. Assessment v1 remains partial and non-attesting. Automatic observation selection, complete effect/recovery closure, MCP resource templates and subscriptions, prompts, MCP Tasks, transferable or chained delegation, historical or complete public traces, delegated extension authority, empirical agent-quality claims, host implementation verification, alternate target generators, cross-target conformance, nonzero freshness lifetimes, read-evidence observation, and general recovery workflows remain future contracts.
 - Elevated PostgreSQL authorities can bypass the boundary and are intentionally out of scope.
 
-The normative 0.50 language is in [spec/0.50/LANGUAGE.md](./spec/0.50/LANGUAGE.md), with its [atomic-effect contract](./spec/0.50/ATOMIC_EFFECTS.md), [public preview distribution contract](./spec/0.50/PUBLIC_PREVIEW_DISTRIBUTION.md), [conformance requirements](./spec/0.50/CONFORMANCE.md), and [unstable boundaries](./spec/0.50/UNSTABLE.md). Earlier contracts remain normative where 0.50 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](./docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.
+The normative 0.50 language is in [the version-pinned specification](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/spec/0.50/LANGUAGE.md), with its [atomic-effect contract](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/spec/0.50/ATOMIC_EFFECTS.md), [public preview distribution contract](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/spec/0.50/PUBLIC_PREVIEW_DISTRIBUTION.md), [conformance requirements](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/spec/0.50/CONFORMANCE.md), and [unstable boundaries](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/spec/0.50/UNSTABLE.md). Earlier contracts remain normative where 0.50 does not replace them. The repository edition of [The Semantic Model Layer whitepaper](https://github.com/atlanticplatformgroup/ModelLang/blob/v0.50.0/docs/whitepaper/THE_SEMANTIC_MODEL_LAYER.md) records demonstrated, partial, and research-stage capabilities.

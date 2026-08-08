@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/reviewed-migration-plan.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/reviewed-migration-plan.schema.json",
   "title": "ModelLang reviewed migration plan",
   "type": "object",
   "additionalProperties": false,
@@ -9,7 +9,7 @@
     "acknowledgements", "fieldValues", "enumMappings"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/reviewed-migration-plan.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/reviewed-migration-plan.schema.json" },
     "planVersion": { "const": 1 },
     "strategy": { "const": "transactionalRebuild" },
     "description": { "type": "string", "minLength": 1 },

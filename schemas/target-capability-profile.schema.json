@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/target-capability-profile.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/target-capability-profile.schema.json",
   "title": "ModelLang target capability profile assessment",
   "type": "object",
   "required": ["$schema", "profileVersion", "compilerVersion", "generatorProfile", "targetProfile", "irVersion", "model", "conformance", "authority", "capabilities", "gaps"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/target-capability-profile.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/target-capability-profile.schema.json" },
     "profileVersion": { "const": 9 },
     "compilerVersion": { "type": "string" },
     "generatorProfile": { "const": "postgresql-http-ui-agent-plugin-atomic-effects/33" },

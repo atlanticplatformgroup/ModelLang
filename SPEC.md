@@ -1,11 +1,29 @@
 # ModelLang specifications
 
-The current normative specification is [ModelLang 0.41](./spec/0.41/LANGUAGE.md). It retains the complete 0.40 language and adds direct MCP adapter integration over the stable catalog and resource contracts.
+The current normative specification is [ModelLang 0.50](./spec/0.50/LANGUAGE.md). It retains the complete 0.49 language and adds ordered, atomic multi-entity action effects over canonical IR2.
 
-- [Direct MCP integration](./spec/0.41/MCP_INTEGRATION.md)
-- [0.41 grammar](./spec/0.41/GRAMMAR.ebnf)
-- [0.41 conformance requirements](./spec/0.41/CONFORMANCE.md)
-- [0.41 unstable boundaries](./spec/0.41/UNSTABLE.md)
+## Current release
+
+- [Atomic multi-entity action effects](./spec/0.50/ATOMIC_EFFECTS.md)
+- [0.50 grammar](./spec/0.50/GRAMMAR.ebnf)
+- [0.50 conformance requirements](./spec/0.50/CONFORMANCE.md)
+- [0.50 public preview distribution contract](./spec/0.50/PUBLIC_PREVIEW_DISTRIBUTION.md)
+- [0.50 unstable boundaries](./spec/0.50/UNSTABLE.md)
+
+## Recent releases
+
+- [0.49 public preview distribution](./spec/0.49/PUBLIC_PREVIEW_DISTRIBUTION.md)
+- [0.48 Agent Plugin packaging](./spec/0.48/AGENT_PLUGIN_PACKAGING.md)
+- [0.47 MCP discovery caching](./spec/0.47/MCP_DISCOVERY_CACHE.md)
+- [0.46 agent assurance and evaluation](./spec/0.46/AGENT_ASSURANCE.md)
+- [0.45 extension tools](./spec/0.45/EXTENSION_TOOLS.md)
+- [0.44 public decision traces](./spec/0.44/PUBLIC_DECISION_TRACES.md)
+- [0.43 delegated capabilities](./spec/0.43/DELEGATED_CAPABILITIES.md)
+- [0.42 agent task packets](./spec/0.42/AGENT_TASK_PACKETS.md)
+- [0.41 direct MCP integration](./spec/0.41/MCP_INTEGRATION.md)
+
+## Earlier milestones
+
 - [0.40 agent resource semantics](./spec/0.40/AGENT_RESOURCES.md)
 
 - [Subject capability view semantics](./spec/0.39/SUBJECT_CAPABILITY_VIEWS.md)

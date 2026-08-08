@@ -11,7 +11,7 @@ export type OperationValueType =
   | { kind: "money"; currency: string; precision: number; scale: number };
 
 export interface OperationManifest {
-  $schema: "https://modellang.dev/schemas/operation-manifest.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/operation-manifest.schema.json";
   manifestVersion: 11;
   model: {
     id: string;
@@ -317,7 +317,7 @@ export function generateOperationManifest(ir: ModelIR): OperationManifest {
   };
   for (const query of ir.queries) visitProjection(query.returnProjectionId);
   return {
-    $schema: "https://modellang.dev/schemas/operation-manifest.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/operation-manifest.schema.json",
     manifestVersion: 11,
     model: {
       id: ir.model.id,

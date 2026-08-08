@@ -36,7 +36,7 @@ export interface ReservationsDelegationRequest {
 }
 
 export interface ReservationsDelegatedCapability {
-  readonly $schema: "https://modellang.dev/schemas/delegated-capability.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json";
   readonly delegatedCapabilityVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -77,7 +77,7 @@ export interface ReservationsDelegationRevocation {
 }
 
 export interface ReservationsPublicDecisionTrace {
-  readonly $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json";
   readonly traceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -123,7 +123,7 @@ export interface ReservationsPublicDecisionTrace {
 }
 
 export interface ReservationsSubjectCapabilityView {
-  readonly $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json";
   readonly viewVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -164,7 +164,7 @@ export interface ReservationsSubjectCapabilityView {
 }
 
 export interface ReservationsAgentResource<Data, OperationId extends string = string> {
-  readonly $schema: "https://modellang.dev/schemas/agent-resource.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json";
   readonly resourceVersion: 1;
   readonly catalogVersion: 7;
   readonly model: { readonly id: string; readonly name: string; readonly version: string; readonly sourceHash: string };
@@ -195,7 +195,7 @@ export type ReservationsTaskPacketObservation =
   | { readonly binding: string; readonly operationId: "query:qry_94d8a56f4c2640fab58a4c2190c35c69"; readonly resource: ReservationsAgentResource<CursorPage<ReservationSummary>, "query:qry_94d8a56f4c2640fab58a4c2190c35c69"> };
 
 export interface ReservationsAgentTaskPacket {
-  readonly $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json";
+  readonly $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json";
   readonly packetVersion: 1;
   readonly catalogVersion: 7;
   readonly resourceVersion: 1;

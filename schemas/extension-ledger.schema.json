@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/extension-ledger.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-ledger.schema.json",
   "title": "ModelLang external extension ledger",
   "type": "object",
   "required": ["$schema", "ledgerVersion", "compilerVersion", "irVersion", "audience", "public", "executable", "model", "extensions", "summary"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/extension-ledger.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-ledger.schema.json" },
     "ledgerVersion": { "const": 1 },
     "compilerVersion": { "type": "string" },
     "irVersion": { "const": 2 },

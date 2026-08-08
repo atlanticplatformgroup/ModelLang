@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/agent-evaluation-replay.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-replay.schema.json",
   "title": "ModelLang agent evaluation replay",
   "type": "object",
   "required": ["$schema", "replayVersion", "suiteId", "kind", "empiricalClaim", "model", "driver", "observations"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/agent-evaluation-replay.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-replay.schema.json" },
     "replayVersion": { "const": 1 },
     "suiteId": { "const": "agent-evaluation-v1" },
     "kind": { "enum": ["syntheticScoringFixture", "recordedAgentRun"] },

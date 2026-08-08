@@ -491,7 +491,7 @@ describe("generated MCP adapter", () => {
     const nowEpoch = Math.floor(new Date(retrievedAt).getTime() / 1000);
     const canonicalInput = JSON.stringify({ amount: { amount: "42.00", currency: "USD" } });
     const claim: ProcurementDelegatedCapabilityClaim = {
-      $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+      $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
       delegatedCapabilityVersion: 1,
       catalogVersion: 7,
       model: {
@@ -634,7 +634,7 @@ describe("generated MCP adapter", () => {
     const result = await client.callTool({ name: extensionToolName, arguments: input });
     expect(result.isError, JSON.stringify(result)).not.toBe(true);
     expect(result.structuredContent).toMatchObject({
-      $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+      $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
       extensionToolResultVersion: 1,
       catalogVersion: 7,
       extensionId,

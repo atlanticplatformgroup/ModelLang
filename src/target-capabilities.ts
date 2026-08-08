@@ -4,7 +4,7 @@ import { MODELLANG_COMPILER_VERSION, MODELLANG_GENERATOR_PROFILE, MODELLANG_TARG
 export type TargetCapabilitySupport = "native" | "externalImplementationRequired";
 
 export interface TargetCapabilityReport {
-  $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/target-capability-profile.schema.json";
   profileVersion: 9;
   compilerVersion: string;
   generatorProfile: string;
@@ -60,7 +60,7 @@ export function generateTargetCapabilityReport(ir: ModelIR): TargetCapabilityRep
     implementation: extension.implementation,
   }));
   return {
-    $schema: "https://modellang.dev/schemas/target-capability-profile.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/target-capability-profile.schema.json",
     profileVersion: 9,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     generatorProfile: MODELLANG_GENERATOR_PROFILE,

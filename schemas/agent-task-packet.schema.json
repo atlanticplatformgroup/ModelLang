@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/agent-task-packet.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json",
   "title": "ModelLang authenticated bounded task packet",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "kind", "authority", "view", "freshness", "snapshot", "closure", "actions", "observations"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/agent-task-packet.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json" },
     "packetVersion": { "const": 1 },
     "catalogVersion": { "const": 7 },
     "resourceVersion": { "const": 1 },
@@ -216,7 +216,7 @@
       "type": "object",
       "required": ["$schema", "resourceVersion", "catalogVersion", "model", "operationId", "kind", "authority", "view", "freshness", "data"],
       "properties": {
-        "$schema": { "const": "https://modellang.dev/schemas/agent-resource.schema.json" },
+        "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" },
         "resourceVersion": { "const": 1 },
         "catalogVersion": { "const": 7 },
         "model": { "$ref": "#/$defs/model" },

@@ -569,7 +569,7 @@ const extensionToolDefinitions = [
       ],
       "properties": {
         "$schema": {
-          "const": "https://modellang.dev/schemas/extension-tool-result.schema.json"
+          "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json"
         },
         "extensionToolResultVersion": {
           "const": 1
@@ -815,7 +815,7 @@ const taskPacketDefinition = {
     ],
     "properties": {
       "$schema": {
-        "const": "https://modellang.dev/schemas/agent-task-packet.schema.json"
+        "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json"
       },
       "packetVersion": {
         "const": 1
@@ -2029,7 +2029,7 @@ const taskPacketDefinition = {
                   ],
                   "properties": {
                     "$schema": {
-                      "const": "https://modellang.dev/schemas/agent-resource.schema.json"
+                      "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json"
                     },
                     "resourceVersion": {
                       "const": 1
@@ -2375,7 +2375,7 @@ const delegatedCapabilityDefinition = {
     ],
     "properties": {
       "$schema": {
-        "const": "https://modellang.dev/schemas/delegated-capability.schema.json"
+        "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json"
       },
       "delegatedCapabilityVersion": {
         "const": 1
@@ -2664,7 +2664,7 @@ const publicDecisionTraceDefinition = {
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json"
           },
           "traceVersion": {
             "const": 1
@@ -3110,7 +3110,7 @@ const publicDecisionTraceDefinition = {
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json"
           },
           "traceVersion": {
             "const": 1
@@ -3556,7 +3556,7 @@ const publicDecisionTraceDefinition = {
         ],
         "properties": {
           "$schema": {
-            "const": "https://modellang.dev/schemas/public-decision-trace.schema.json"
+            "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json"
           },
           "traceVersion": {
             "const": 1
@@ -4008,7 +4008,7 @@ const discoveryCacheDefinition = {
     "server/discover",
     "tools/list"
   ],
-  "revision": "sha256:335ec87282c19c466bbba84d4727aaf0e43ba0a45c4c519a3394a2f60dc8f569",
+  "revision": "sha256:2d6321d1587effee380a2dbfc3d8679c092eef8d5fca999dc74093f75c8af788",
   "revisionHeader": "ETag",
   "ttlUnit": "milliseconds",
   "defaultTtlMs": 0,
@@ -4149,7 +4149,7 @@ function resourceUri(operationId: string): string {
 
 function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retrievedAt: string) {
   return {
-    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
     model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},

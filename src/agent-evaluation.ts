@@ -20,7 +20,7 @@ export interface AgentEvaluationScenario {
 }
 
 export interface AgentEvaluationSuite {
-  $schema: "https://modellang.dev/schemas/agent-evaluation-suite.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-suite.schema.json";
   suiteVersion: 1;
   id: "agent-evaluation-v1";
   empirical: false;
@@ -45,7 +45,7 @@ export interface AgentEvaluationObservation {
 }
 
 export interface AgentEvaluationReplay {
-  $schema: "https://modellang.dev/schemas/agent-evaluation-replay.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-replay.schema.json";
   replayVersion: 1;
   suiteId: "agent-evaluation-v1";
   kind: "syntheticScoringFixture" | "recordedAgentRun";
@@ -221,7 +221,7 @@ export async function runAgentEvaluation(
     }
   }
   return {
-    $schema: "https://modellang.dev/schemas/agent-evaluation-replay.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-replay.schema.json",
     replayVersion: 1,
     suiteId: suite.id,
     kind: "recordedAgentRun",

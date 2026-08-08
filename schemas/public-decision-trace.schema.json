@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/public-decision-trace.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json",
   "title": "ModelLang bounded public decision trace",
   "type": "object",
   "required": [
@@ -8,7 +8,7 @@
     "authority", "view", "freshness", "decision", "stages", "closure"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/public-decision-trace.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json" },
     "traceVersion": { "const": 1 },
     "catalogVersion": { "const": 7 },
     "model": {

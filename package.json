@@ -4,6 +4,14 @@
   "description": "ModelLang reference compiler and modelc CLI for semantic application models",
   "license": "Apache-2.0",
   "author": "Nick Scipione",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atlanticplatformgroup/ModelLang.git"
+  },
+  "homepage": "https://github.com/atlanticplatformgroup/ModelLang#readme",
+  "bugs": {
+    "url": "https://github.com/atlanticplatformgroup/ModelLang/issues"
+  },
   "keywords": [
     "semantic-model",
     "compiler",
@@ -13,12 +21,13 @@
   ],
   "type": "module",
   "bin": {
-    "modelc": "./dist/src/cli.js"
+    "modelc": "dist/src/cli.js"
   },
   "files": [
     "dist/src",
     "schemas",
     "docs/HOST_BOOTSTRAP.md",
+    "docs/PUBLIC_PREVIEW.md",
     "CHANGELOG.md",
     "LICENSE",
     "README.md"

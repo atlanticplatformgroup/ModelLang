@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/event-manifest.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/event-manifest.schema.json",
   "title": "ModelLang event contract",
   "type": "object",
   "required": ["$schema", "eventManifestVersion", "model", "delivery", "events"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/event-manifest.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/event-manifest.schema.json" },
     "eventManifestVersion": { "const": 5 },
     "model": {
       "type": "object",

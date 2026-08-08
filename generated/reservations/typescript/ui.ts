@@ -5,7 +5,7 @@ import { ReservationsHttpClient } from "./http-client.js";
 
 /** Framework-neutral descriptors. Labels are generated defaults; stable IDs are binding keys. */
 export const ReservationsUiManifest = {
-  "$schema": "https://modellang.dev/schemas/ui-manifest.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/ui-manifest.schema.json",
   "uiManifestVersion": 11,
   "operationManifestVersion": 11,
   "model": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/ui-manifest.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/ui-manifest.schema.json",
   "title": "ModelLang UI manifest",
   "$defs": {
     "presentation": {
@@ -165,7 +165,7 @@
     "workflows"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/ui-manifest.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/ui-manifest.schema.json" },
     "uiManifestVersion": { "const": 11 },
     "operationManifestVersion": { "const": 11 },
     "model": {

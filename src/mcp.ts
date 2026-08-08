@@ -67,7 +67,7 @@ interface McpExtensionToolBinding {
 }
 
 export interface McpAdapterManifest {
-  $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/mcp-adapter.schema.json";
   adapterVersion: 6;
   compilerVersion: string;
   protocolVersion: "2026-07-28";
@@ -240,7 +240,7 @@ export function generateMcpAdapterManifest(
 ): McpAdapterManifest {
   const discoveryRevision = mcpDiscoveryRevision(catalog, taskPacketSchemas, publicDecisionTraceSchemas);
   return {
-    $schema: "https://modellang.dev/schemas/mcp-adapter.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/mcp-adapter.schema.json",
     adapterVersion: 6,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     protocolVersion: "2026-07-28",
@@ -631,7 +631,7 @@ function resourceUri(operationId: string): string {
 
 function currentStateEnvelope(definition: McpToolDefinition, data: unknown, retrievedAt: string) {
   return {
-    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
     model: ${JSON.stringify(manifest.model)},

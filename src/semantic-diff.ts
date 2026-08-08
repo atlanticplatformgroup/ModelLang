@@ -43,7 +43,7 @@ export interface SemanticChange {
 }
 
 export interface SemanticDiff {
-  $schema: "https://modellang.dev/schemas/semantic-diff.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-diff.schema.json";
   diffVersion: 20;
   compilerVersion: string;
   irVersion: 2;
@@ -763,7 +763,7 @@ export function semanticDiff(previous: ModelIR, current: ModelIR): SemanticDiff 
   };
   for (const change of changes) summary[change.classification] += 1;
   return {
-    $schema: "https://modellang.dev/schemas/semantic-diff.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/semantic-diff.schema.json",
     diffVersion: 20,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     irVersion: current.irVersion,

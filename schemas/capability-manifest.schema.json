@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/capability-manifest.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/capability-manifest.schema.json",
   "title": "ModelLang public capability contract",
   "type": "object",
   "additionalProperties": false,
   "required": ["$schema", "capabilityManifestVersion", "operationManifestVersion", "model", "view", "authentication", "actions"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/capability-manifest.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/capability-manifest.schema.json" },
     "capabilityManifestVersion": { "const": 10 },
     "operationManifestVersion": { "const": 11 },
     "model": {

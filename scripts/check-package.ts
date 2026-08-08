@@ -44,6 +44,7 @@ async function main(): Promise<void> {
       "CHANGELOG.md",
       "LICENSE",
       "docs/HOST_BOOTSTRAP.md",
+      "docs/PUBLIC_PREVIEW.md",
       "dist/src/cli.js",
       "dist/src/compiler.js",
       "dist/src/build.js",
@@ -58,7 +59,9 @@ async function main(): Promise<void> {
       || path.startsWith("scripts/")
       || path.startsWith("generated/")
       || path.startsWith("examples/")
-      || (path.startsWith("docs/") && path !== "docs/HOST_BOOTSTRAP.md")
+      || (path.startsWith("docs/")
+        && path !== "docs/HOST_BOOTSTRAP.md"
+        && path !== "docs/PUBLIC_PREVIEW.md")
       || path.startsWith("spec/")
       || path.endsWith(".DS_Store"));
     if (forbidden.length > 0) throw new Error(`Packed artifact contains development-only files: ${forbidden.join(", ")}`);
@@ -74,9 +77,15 @@ async function main(): Promise<void> {
       version: string;
       private?: boolean;
       license?: string;
+      repository?: { type?: string; url?: string };
+      homepage?: string;
+      bugs?: { url?: string };
     };
     if (installedPackage.name !== "modellang" || installedPackage.version !== "0.50.0"
-      || installedPackage.private === true || installedPackage.license !== "Apache-2.0") {
+      || installedPackage.private === true || installedPackage.license !== "Apache-2.0"
+      || installedPackage.repository?.url !== "git+https://github.com/atlanticplatformgroup/ModelLang.git"
+      || installedPackage.homepage !== "https://github.com/atlanticplatformgroup/ModelLang#readme"
+      || installedPackage.bugs?.url !== "https://github.com/atlanticplatformgroup/ModelLang/issues") {
       throw new Error("Installed package metadata does not match the public preview contract");
     }
 
@@ -95,12 +104,12 @@ async function main(): Promise<void> {
     await writeFile(atomicSourceFile, `model Atomic version "0.50.0";
 entity User { id: UUID @id @generated(uuid); }
 entity Request { id: UUID @id @generated(uuid); approved: Boolean; }
-entity Result { id: UUID @id @generated(uuid); request: Request @unique; actor: User; }
-action approve(caller actor: User, request: Request) -> Result {
+entity Approval { id: UUID @id @generated(uuid); request: Request @unique; actor: User; }
+action approve(caller actor: User, request: Request) -> Approval {
   authorize true;
   require pending: request.approved == false;
   update request { approved = true; }
-  create Result { request = request; actor = actor; }
+  create Approval { request = request; actor = actor; }
 }
 `, "utf8");
     await execute(cli, ["build", atomicSourceFile, "--out", join(consumer, "generated-atomic")], { cwd: consumer });

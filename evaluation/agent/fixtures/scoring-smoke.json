@@ -1,5 +1,5 @@
 {
-  "$schema": "https://modellang.dev/schemas/agent-evaluation-replay.schema.json",
+  "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-evaluation-replay.schema.json",
   "replayVersion": 1,
   "suiteId": "agent-evaluation-v1",
   "kind": "syntheticScoringFixture",

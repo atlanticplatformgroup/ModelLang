@@ -1446,7 +1446,7 @@ function validateDelegatedClaim(
   const model = claim.model as Record<string, unknown> | undefined;
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
-    && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
+    && claim.$schema === "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json"
     && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === "model:Procurement"
     && model?.name === "Procurement"
@@ -1539,7 +1539,7 @@ export async function invokeProcurementExtension(
   });
   validateExtensionResult(definition, result);
   return {
-    $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
     extensionToolResultVersion: 1,
     catalogVersion: 7,
     model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},
@@ -1560,7 +1560,7 @@ export async function invokeProcurementExtension(
 
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
-    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
     model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},
@@ -1613,7 +1613,7 @@ export async function assembleProcurementPublicDecisionTrace(
     }
   }
   return {
-    $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
     catalogVersion: 7,
     model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},
@@ -1684,7 +1684,7 @@ export async function assembleProcurementTaskPacket(
     } as ProcurementAgentTaskPacket["observations"][number]);
   }
   return {
-    $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
     catalogVersion: 7,
     resourceVersion: 1,
@@ -1889,7 +1889,7 @@ export function createProcurementHttpHandler(
           throw new Error("Delegation authority returned an invalid credential");
         }
         const result: ProcurementDelegatedCapability = {
-          $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
           catalogVersion: 7,
           model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},
@@ -2036,7 +2036,7 @@ export function createProcurementHttpHandler(
           }
         }
         const view: ProcurementSubjectCapabilityView = {
-          $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 7,
           model: {"id":"model:Procurement","name":"Procurement","version":"0.49.0","sourceHash":"sha256:ee3cd6ba9feeed6a8fb54e1427b43606fb25bd865bbc5b53c7d45f83b09f7a45"},

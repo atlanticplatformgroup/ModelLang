@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/mcp-adapter.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/mcp-adapter.schema.json",
   "title": "ModelLang MCP adapter manifest",
   "type": "object",
   "required": [
@@ -9,7 +9,7 @@
     "authentication", "discovery", "capabilities", "taskPacket", "delegatedCapabilities", "publicDecisionTrace", "tools", "extensionTools"
   ],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/mcp-adapter.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/mcp-adapter.schema.json" },
     "adapterVersion": { "const": 6 },
     "compilerVersion": { "type": "string" },
     "protocolVersion": { "const": "2026-07-28" },

@@ -1083,7 +1083,7 @@ function validateDelegatedClaim(
   const model = claim.model as Record<string, unknown> | undefined;
   const constraints = claim.constraints as Record<string, unknown> | undefined;
   const valid = Object.keys(claim).every((key) => allowed.has(key))
-    && claim.$schema === "https://modellang.dev/schemas/delegated-capability.schema.json"
+    && claim.$schema === "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json"
     && claim.delegatedCapabilityVersion === 1 && claim.catalogVersion === 7
     && model?.id === "model:Reservations"
     && model?.name === "Reservations"
@@ -1176,7 +1176,7 @@ export async function invokeReservationsExtension(
   });
   validateExtensionResult(definition, result);
   return {
-    $schema: "https://modellang.dev/schemas/extension-tool-result.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/extension-tool-result.schema.json",
     extensionToolResultVersion: 1,
     catalogVersion: 7,
     model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},
@@ -1197,7 +1197,7 @@ export async function invokeReservationsExtension(
 
 function currentStateResource(definition: OperationDefinition, data: unknown, retrievedAt: string) {
   return {
-    $schema: "https://modellang.dev/schemas/agent-resource.schema.json" as const,
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" as const,
     resourceVersion: 1 as const,
     catalogVersion: 7 as const,
     model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},
@@ -1250,7 +1250,7 @@ export async function assembleReservationsPublicDecisionTrace(
     }
   }
   return {
-    $schema: "https://modellang.dev/schemas/public-decision-trace.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/public-decision-trace.schema.json",
     traceVersion: 1,
     catalogVersion: 7,
     model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},
@@ -1321,7 +1321,7 @@ export async function assembleReservationsTaskPacket(
     } as ReservationsAgentTaskPacket["observations"][number]);
   }
   return {
-    $schema: "https://modellang.dev/schemas/agent-task-packet.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json",
     packetVersion: 1,
     catalogVersion: 7,
     resourceVersion: 1,
@@ -1526,7 +1526,7 @@ export function createReservationsHttpHandler(
           throw new Error("Delegation authority returned an invalid credential");
         }
         const result: ReservationsDelegatedCapability = {
-          $schema: "https://modellang.dev/schemas/delegated-capability.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/delegated-capability.schema.json",
           delegatedCapabilityVersion: 1,
           catalogVersion: 7,
           model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},
@@ -1673,7 +1673,7 @@ export function createReservationsHttpHandler(
           }
         }
         const view: ReservationsSubjectCapabilityView = {
-          $schema: "https://modellang.dev/schemas/subject-capability-view.schema.json",
+          $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/subject-capability-view.schema.json",
           viewVersion: 1,
           catalogVersion: 7,
           model: {"id":"model:Reservations","name":"Reservations","version":"0.49.0","sourceHash":"sha256:9f79a678a282076919e01cfdb1bd90759e4383aa53c1ac72343c40812cb66ef4"},

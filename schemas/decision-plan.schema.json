@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://modellang.dev/schemas/decision-plan.schema.json",
+  "$id": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/decision-plan.schema.json",
   "title": "ModelLang canonical decision plan",
   "type": "object",
   "additionalProperties": false,
   "required": ["$schema", "planVersion", "audience", "public", "compilerVersion", "irVersion", "model", "policies", "actions"],
   "properties": {
-    "$schema": { "const": "https://modellang.dev/schemas/decision-plan.schema.json" },
+    "$schema": { "const": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/decision-plan.schema.json" },
     "planVersion": { "const": 2 },
     "audience": { "const": "enforcement" },
     "public": { "const": false },

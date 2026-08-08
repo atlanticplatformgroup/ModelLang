@@ -167,7 +167,7 @@ function resourceSchema(catalog: AgentToolCatalog, tool: Extract<AgentTool, { ki
     additionalProperties: false,
     required: ["$schema", "resourceVersion", "catalogVersion", "model", "operationId", "kind", "authority", "view", "freshness", "data"],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/agent-resource.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-resource.schema.json" },
       resourceVersion: { const: 1 },
       catalogVersion: { const: 7 },
       model: { const: catalog.model },
@@ -306,7 +306,7 @@ export function generateTaskPacketSchemas(
       "kind", "authority", "view", "freshness", "snapshot", "closure", "actions", "observations",
     ],
     properties: {
-      $schema: { const: "https://modellang.dev/schemas/agent-task-packet.schema.json" },
+      $schema: { const: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-task-packet.schema.json" },
       packetVersion: { const: 1 },
       catalogVersion: { const: 7 },
       resourceVersion: { const: 1 },

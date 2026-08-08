@@ -7,7 +7,7 @@ import {
 } from "./version.js";
 
 export interface ArtifactProvenance {
-  $schema: "https://modellang.dev/schemas/artifact-provenance.schema.json";
+  $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/artifact-provenance.schema.json";
   provenanceVersion: 2;
   compilerVersion: string;
   generatorProfile: string;
@@ -42,7 +42,7 @@ export function generateArtifactProvenance(
   files: Readonly<Record<string, string>>,
 ): ArtifactProvenance {
   return {
-    $schema: "https://modellang.dev/schemas/artifact-provenance.schema.json",
+    $schema: "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/artifact-provenance.schema.json",
     provenanceVersion: 2,
     compilerVersion: MODELLANG_COMPILER_VERSION,
     generatorProfile: MODELLANG_GENERATOR_PROFILE,

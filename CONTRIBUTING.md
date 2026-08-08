@@ -6,7 +6,7 @@ ModelLang is a pre-1.0 reference compiler. Changes must preserve deterministic g
 
 Requirements:
 
-- Node.js 20 or 22;
+- Node.js 20 or newer;
 - npm 10 or newer; and
 - Docker with Compose for live PostgreSQL integration.
 
@@ -22,7 +22,7 @@ npm run health
 
 ## Change requirements
 
-- Keep canonical IR at IR1 unless a current semantic requirement genuinely needs a change.
+- Keep canonical IR at IR2 unless a current semantic requirement genuinely needs a change.
 - Advance compiler, generator, target, catalog, schema, and envelope versions independently and only when their contracts change.
 - Regenerate both committed examples with `npm run model:generate` and commit all intentional golden changes.
 - Add specification, schema, documentation, unit, and live coverage in proportion to the changed contract.
