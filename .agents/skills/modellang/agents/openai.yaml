@@ -1,0 +1,4 @@
+interface:
+  display_name: "ModelLang"
+  short_description: "Install, model, compile, and troubleshoot with ModelLang"
+  default_prompt: "Use $modellang to add or use ModelLang in this project."
