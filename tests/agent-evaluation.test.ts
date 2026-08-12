@@ -36,7 +36,7 @@ describe("agent evaluation assurance", () => {
     expect(replay).toMatchObject({ kind: "syntheticScoringFixture", empiricalClaim: false });
     expect(procurement).toMatchObject({
       assessmentVersion: 1,
-      compilerVersion: "0.50.1",
+      compilerVersion: "0.50.2",
       profile: "SML-Agent",
       overall: "partial",
       authority: "none",

@@ -1,6 +1,6 @@
 {
   "name": "@atlanticplatformgroup/modellang",
-  "version": "0.50.1",
+  "version": "0.50.2",
   "description": "ModelLang reference compiler and modelc CLI for semantic application models",
   "license": "Apache-2.0",
   "author": "Nick Scipione",
@@ -21,6 +21,7 @@
   ],
   "type": "module",
   "bin": {
+    "modellang": "dist/src/cli.js",
     "modelc": "dist/src/cli.js"
   },
   "files": [

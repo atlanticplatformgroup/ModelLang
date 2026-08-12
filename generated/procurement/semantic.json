@@ -9,7 +9,7 @@
     "executable": false
   },
   "provenance": {
-    "compilerVersion": "0.50.1",
+    "compilerVersion": "0.50.2",
     "irVersion": 2,
     "generator": "semantic-manifest"
   },

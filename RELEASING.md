@@ -1,6 +1,6 @@
 # Releasing ModelLang
 
-ModelLang releases are immutable npm packages and matching Git tags. The public package is `@atlanticplatformgroup/modellang`; its executable is `modelc`.
+ModelLang releases are immutable npm packages and matching Git tags. The public package is `@atlanticplatformgroup/modellang`; it exposes `modellang` for direct package execution and `modelc` as the compiler command.
 
 ## One-time repository setup
 
@@ -28,6 +28,6 @@ ModelLang releases are immutable npm packages and matching Git tags. The public 
 3. Confirm the worktree is clean and the release commit is on `main`.
 4. Create and push an annotated tag matching the package version, for example `v0.49.0`.
 5. The release workflow verifies the tag/version match, reruns the full live suite, and publishes through the configured npm credential path. Trusted publishing automatically records npm provenance for a public package from a public repository.
-6. Verify `npm view @atlanticplatformgroup/modellang version`, install the published version in an empty directory, and repeat the quickstart from [Public Preview](./docs/PUBLIC_PREVIEW.md).
+6. Verify `npm view @atlanticplatformgroup/modellang version`, run `npx @atlanticplatformgroup/modellang@<version> --help`, install the published version in an empty directory, and repeat the quickstart from [Public Preview](./docs/PUBLIC_PREVIEW.md).
 
 Publishing is intentionally separate from compiling or generating an Agent Plugin. Neither a package, Git tag, nor plugin installation grants application authority.

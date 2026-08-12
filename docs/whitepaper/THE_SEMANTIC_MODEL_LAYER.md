@@ -39,7 +39,7 @@ This repository edition distinguishes the architectural target from the released
 | Authenticated current-state agent resources | Implemented for declared queries over HTTP and as distinct embedded MCP resources with exact disclosure and zero-age point-in-time freshness |
 | Direct MCP server adapter | Implemented for stateless Streamable HTTP with per-request audience-bound authentication, exact catalog schemas, runtime enforcement, no authority grant, and deployment-configurable private caching limited to revision-bound static discovery |
 | Portable Agent Plugin packaging | Implemented as optional Agent Plugins 1.0.0 `plugin.json` plus connection-only `mcp.json` around a deployment-supplied Streamable HTTP endpoint; credentials, client installation, and runtime authority remain outside the package |
-| Public compiler distribution | Implemented as the Apache-2.0 `@atlanticplatformgroup/modellang` npm artifact with the `modelc` executable, runtime schemas, bounded contents, clean-install smoke proof, supported-Node CI, live PostgreSQL CI, and tag-checked release automation; registry publication and source hosting remain external owner operations |
+| Public compiler distribution | Implemented as the Apache-2.0 `@atlanticplatformgroup/modellang` npm artifact with `modellang` and `modelc` executables, runtime schemas, bounded contents, clean-install smoke proof, supported-Node CI, live PostgreSQL CI, and tag-checked release automation; registry publication and source hosting remain external owner operations |
 | Authenticated bounded agent task packets | Implemented as exact selected action contracts plus current applicability and caller-selected zero-age query observations; explicitly partial, non-authoritative, non-atomic across observations, and never action-executing |
 | Bounded delegated action capabilities | Implemented for one exact action/input, named authenticated delegate, audience, required revision, one use, and at most one hour; host-owned credential security, identity binding, revocation, and atomic consume-and-execute remain explicit conformance requirements |
 | Authenticated bounded public applicability traces | Implemented as zero-age ordered safe rule outcomes for one exact current action evaluation; no input or state values, identity, policy/authority IDs, private evidence, execution observation, authority grant, historical claim, or complete-trace claim |
@@ -53,8 +53,8 @@ The implementation has several independent version axes:
 
 | Axis | Current value | Meaning |
 |---|---|---|
-| Compiler release | 0.50.1 | Atomic multi-entity effects and canonical IR2; scoped npm distribution correction |
-| npm distribution | `@atlanticplatformgroup/modellang@0.50.1` | Apache-2.0 public-preview package with `modelc`, compiled compiler modules, schemas, and release documentation |
+| Compiler release | 0.50.2 | Atomic multi-entity effects and canonical IR2; scoped npm CLI correction |
+| npm distribution | `@atlanticplatformgroup/modellang@0.50.2` | Apache-2.0 public-preview package with `modellang` and `modelc`, compiled compiler modules, schemas, and release documentation |
 | Canonical IR | IR2 | Current pre-release typed backend boundary; evolution input must use this exact format and no historical IR normalization is provided |
 | Example source models | Procurement 0.49.0; Reservations 0.49.0 | Domain-model evolution versions, independent of compiler release |
 | Operation manifest | v11 | Static transport-neutral public operation, private read-evidence profile, null-redaction, optional query-input, closed sort-profile, array/page result, and transitive reachable-projection contract |

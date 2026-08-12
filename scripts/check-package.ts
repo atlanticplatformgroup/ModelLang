@@ -20,7 +20,7 @@ async function main(): Promise<void> {
       maxBuffer: 10 * 1024 * 1024,
     });
     const result = parsePackResult(packed.stdout);
-    if (result.name !== "@atlanticplatformgroup/modellang" || result.version !== "0.50.1") {
+    if (result.name !== "@atlanticplatformgroup/modellang" || result.version !== "0.50.2") {
       throw new Error(`Unexpected package identity ${result.name}@${result.version}`);
     }
     const paths = new Set(result.files.map((file) => file.path));
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
       homepage?: string;
       bugs?: { url?: string };
     };
-    if (installedPackage.name !== "@atlanticplatformgroup/modellang" || installedPackage.version !== "0.50.1"
+    if (installedPackage.name !== "@atlanticplatformgroup/modellang" || installedPackage.version !== "0.50.2"
       || installedPackage.private === true || installedPackage.license !== "Apache-2.0"
       || installedPackage.repository?.url !== "git+https://github.com/atlanticplatformgroup/ModelLang.git"
       || installedPackage.homepage !== "https://github.com/atlanticplatformgroup/ModelLang#readme"
@@ -83,9 +83,14 @@ async function main(): Promise<void> {
     const output = join(consumer, "generated");
     await writeFile(sourceFile, source, "utf8");
     const cli = join(consumer, "node_modules/.bin/modelc");
+    const packageCli = join(consumer, "node_modules/.bin/modellang");
     const help = await execute(cli, ["--help"], { cwd: consumer });
     if (!help.stdout.includes("Usage:") || !help.stdout.includes("modelc build <file>")) {
       throw new Error("Installed modelc --help did not expose the CLI usage contract");
+    }
+    const packageHelp = await execute(packageCli, ["--help"], { cwd: consumer });
+    if (!packageHelp.stdout.includes("Usage:") || !packageHelp.stdout.includes("modelc build <file>")) {
+      throw new Error("Installed modellang --help did not expose the CLI usage contract");
     }
     const checked = await execute(cli, ["check", sourceFile], { cwd: consumer });
     if (!checked.stdout.includes("OK Procurement 0.49.0")) throw new Error("Installed modelc check did not compile the preview model");

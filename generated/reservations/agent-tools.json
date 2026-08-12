@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/agent-tool-catalog.schema.json",
   "catalogVersion": 7,
-  "compilerVersion": "0.50.1",
+  "compilerVersion": "0.50.2",
   "operationManifestVersion": 11,
   "capabilityManifestVersion": 10,
   "model": {

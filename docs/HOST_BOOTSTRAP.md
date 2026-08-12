@@ -9,7 +9,7 @@ The examples use a model named `Workshop`, generated into `generated/workshop`. 
 ```bash
 mkdir workshop-host && cd workshop-host
 npm init -y
-npm install --save-dev @atlanticplatformgroup/modellang@0.50.1 tsx typescript @types/node @types/pg
+npm install --save-dev @atlanticplatformgroup/modellang@0.50.2 tsx typescript @types/node @types/pg
 npm install pg jose @modelcontextprotocol/client
 npx modelc check app.model
 npx modelc build app.model --out generated/workshop \

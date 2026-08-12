@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parsePackResult } from "../scripts/npm-pack-result.js";
 
 const packageMetadata = {
-  filename: "atlanticplatformgroup-modellang-0.50.1.tgz",
+  filename: "atlanticplatformgroup-modellang-0.50.2.tgz",
   name: "@atlanticplatformgroup/modellang",
-  version: "0.50.1",
+  version: "0.50.2",
   files: [{ path: "package.json" }],
 };
 

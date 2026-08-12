@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/target-capability-profile.schema.json",
   "profileVersion": 9,
-  "compilerVersion": "0.50.1",
+  "compilerVersion": "0.50.2",
   "generatorProfile": "postgresql-http-ui-agent-plugin-atomic-effects/33",
   "targetProfile": "target:postgresql-http-ui-extension-tools/9",
   "irVersion": 2,

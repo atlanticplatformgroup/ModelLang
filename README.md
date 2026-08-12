@@ -57,7 +57,7 @@ action approve(caller actor: User, request: Request) -> Approval {
 Install the compiler, check the model, and build it:
 
 ```bash
-npm install --save-dev @atlanticplatformgroup/modellang@0.50.1
+npm install --save-dev @atlanticplatformgroup/modellang@0.50.2
 npx modelc check app.model
 npx modelc build app.model --out generated/app
 ```
@@ -137,7 +137,7 @@ The generated package contains connection metadata, never credentials. Authentic
 
 ## Public preview status
 
-ModelLang is a pre-1.0 public preview. The current compiler release is `0.50.1`, uses the 0.50 language and canonical IR2, and targets PostgreSQL as its enforcement backend.
+ModelLang is a pre-1.0 public preview. The current compiler release is `0.50.2`, uses the 0.50 language and canonical IR2, and targets PostgreSQL as its enforcement backend.
 
 It is ready for language evaluation, reference applications, and integration experiments. It is not yet a production-support commitment, a general-purpose ORM, a hosted platform, or a complete implementation of the SML-Agent or SML-Federation proposals.
 

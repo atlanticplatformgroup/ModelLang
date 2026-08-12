@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.50.2
+
+- Added a `modellang` executable alias alongside `modelc`, so the package works both as an installed compiler and through the direct `npx @atlanticplatformgroup/modellang` command npm recommends for scoped CLI packages.
+- Extended the packed-package gate to verify both executable names without changing the 0.50 language, canonical IR2, generated contract versions, or immutable 0.50.0 schema URLs.
+
 ## 0.50.1
 
 - Published the compiler under the owned npm scope `@atlanticplatformgroup/modellang` after npm's name-similarity protection rejected the unscoped package name; the installed executable remains `modelc`.
