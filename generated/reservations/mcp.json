@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/atlanticplatformgroup/ModelLang/v0.50.0/schemas/mcp-adapter.schema.json",
   "adapterVersion": 6,
-  "compilerVersion": "0.50.0",
+  "compilerVersion": "0.50.1",
   "protocolVersion": "2026-07-28",
   "catalogVersion": 7,
   "resourceEnvelopeVersion": 1,
@@ -39,7 +39,7 @@
         "server/discover",
         "tools/list"
       ],
-      "revision": "sha256:7a515fdea60ca454b0c9f929af67933e55aacd8eadc711b3b462d2eeb7a9536e",
+      "revision": "sha256:474866f286a71e22298010772cb5743a6f6dedbc45c16650aca8e81e144dbbbe",
       "revisionHeader": "ETag",
       "ttlUnit": "milliseconds",
       "defaultTtlMs": 0,

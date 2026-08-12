@@ -9,7 +9,7 @@ Help users turn application rules into a checked ModelLang model and generated e
 
 ## Start by inspecting
 
-1. Identify the repository root, package manager, Node.js version, existing `*.model` files, and whether `modellang` is already installed.
+1. Identify the repository root, package manager, Node.js version, existing `*.model` files, and whether `@atlanticplatformgroup/modellang` is already installed.
 2. Run `node "${SKILL_DIR}/scripts/doctor.mjs"` from the target project when `SKILL_DIR` is available. Otherwise run the script using its resolved path.
 3. Determine the environment:
    - In the ModelLang source repository, use `npm ci`, `npm run build`, and `node dist/src/cli.js`.
@@ -23,16 +23,16 @@ Preserve the user's package manager and existing project conventions. Do not ove
 
 ModelLang requires Node.js 20 or newer.
 
-1. Verify registry availability with `npm view modellang version`.
+1. Verify registry availability with `npm view @atlanticplatformgroup/modellang version`.
 2. If it succeeds, install the requested version or the latest available version as a development dependency:
-   - npm: `npm install --save-dev modellang`
-   - pnpm: `pnpm add --save-dev modellang`
-   - yarn: `yarn add --dev modellang`
-   - bun: `bun add --dev modellang`
+   - npm: `npm install --save-dev @atlanticplatformgroup/modellang`
+   - pnpm: `pnpm add --save-dev @atlanticplatformgroup/modellang`
+   - yarn: `yarn add --dev @atlanticplatformgroup/modellang`
+   - bun: `bun add --dev @atlanticplatformgroup/modellang`
 3. Verify with the locally installed executable: `npx --no-install modelc --help`.
-4. If the registry returns `E404` or `E403`, explain that the unscoped package is not currently available. Do not substitute a similarly named package. Offer to work from the official source repository only if the user wants that development workflow.
+4. If the registry returns `E404` or `E403`, explain that the scoped package is not currently available or accessible. Do not substitute a similarly named package. Offer to work from the official source repository only if the user wants that development workflow.
 
-Never install `model-lang`, `@atlanticplatformgroup/modellang`, or another package as a substitute for `modellang` unless the user explicitly requests it.
+Never install unscoped `modellang`, `model-lang`, or another package as a substitute for `@atlanticplatformgroup/modellang`.
 
 ## Create or edit a model
 

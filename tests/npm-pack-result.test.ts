@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parsePackResult } from "../scripts/npm-pack-result.js";
 
 const packageMetadata = {
-  filename: "modellang-0.50.0.tgz",
-  name: "modellang",
-  version: "0.50.0",
+  filename: "atlanticplatformgroup-modellang-0.50.1.tgz",
+  name: "@atlanticplatformgroup/modellang",
+  version: "0.50.1",
   files: [{ path: "package.json" }],
 };
 
@@ -14,7 +14,8 @@ describe("npm pack result parsing", () => {
   });
 
   it("accepts the npm 12 package-keyed object format", () => {
-    expect(parsePackResult(JSON.stringify({ modellang: packageMetadata }))).toEqual(packageMetadata);
+    expect(parsePackResult(JSON.stringify({ "@atlanticplatformgroup/modellang": packageMetadata })))
+      .toEqual(packageMetadata);
   });
 
   it("rejects malformed or multi-package output", () => {

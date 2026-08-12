@@ -1819,7 +1819,7 @@ const discoveryCacheDefinition = {
     "server/discover",
     "tools/list"
   ],
-  "revision": "sha256:7a515fdea60ca454b0c9f929af67933e55aacd8eadc711b3b462d2eeb7a9536e",
+  "revision": "sha256:474866f286a71e22298010772cb5743a6f6dedbc45c16650aca8e81e144dbbbe",
   "revisionHeader": "ETag",
   "ttlUnit": "milliseconds",
   "defaultTtlMs": 0,

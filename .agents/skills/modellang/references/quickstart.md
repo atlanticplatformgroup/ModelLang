@@ -5,13 +5,13 @@ Use this reference when installing ModelLang or creating a first model. Prefer t
 ## Requirements
 
 - Node.js 20 or newer
-- The `modellang` development dependency
+- The `@atlanticplatformgroup/modellang` development dependency
 - The package's `modelc` executable
 
 ## Minimal workflow
 
 ```bash
-npm install --save-dev modellang
+npm install --save-dev @atlanticplatformgroup/modellang
 npx --no-install modelc check app.model
 npx --no-install modelc build app.model --out generated/app
 ```

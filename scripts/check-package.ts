@@ -20,7 +20,7 @@ async function main(): Promise<void> {
       maxBuffer: 10 * 1024 * 1024,
     });
     const result = parsePackResult(packed.stdout);
-    if (result.name !== "modellang" || result.version !== "0.50.0") {
+    if (result.name !== "@atlanticplatformgroup/modellang" || result.version !== "0.50.1") {
       throw new Error(`Unexpected package identity ${result.name}@${result.version}`);
     }
     const paths = new Set(result.files.map((file) => file.path));
@@ -58,7 +58,10 @@ async function main(): Promise<void> {
       env: { ...process.env, npm_config_loglevel: "silent" },
       maxBuffer: 10 * 1024 * 1024,
     });
-    const installedPackage = JSON.parse(await readFile(join(consumer, "node_modules/modellang/package.json"), "utf8")) as {
+    const installedPackage = JSON.parse(await readFile(
+      join(consumer, "node_modules/@atlanticplatformgroup/modellang/package.json"),
+      "utf8",
+    )) as {
       name: string;
       version: string;
       private?: boolean;
@@ -67,7 +70,7 @@ async function main(): Promise<void> {
       homepage?: string;
       bugs?: { url?: string };
     };
-    if (installedPackage.name !== "modellang" || installedPackage.version !== "0.50.0"
+    if (installedPackage.name !== "@atlanticplatformgroup/modellang" || installedPackage.version !== "0.50.1"
       || installedPackage.private === true || installedPackage.license !== "Apache-2.0"
       || installedPackage.repository?.url !== "git+https://github.com/atlanticplatformgroup/ModelLang.git"
       || installedPackage.homepage !== "https://github.com/atlanticplatformgroup/ModelLang#readme"

@@ -3,7 +3,7 @@
   "planVersion": 2,
   "audience": "enforcement",
   "public": false,
-  "compilerVersion": "0.50.0",
+  "compilerVersion": "0.50.1",
   "irVersion": 2,
   "model": {
     "id": "model:Procurement",

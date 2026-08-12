@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.50.1
+
+- Published the compiler under the owned npm scope `@atlanticplatformgroup/modellang` after npm's name-similarity protection rejected the unscoped package name; the installed executable remains `modelc`.
+- Updated the clean-install package gate, public guides, release instructions, whitepaper, and ModelLang Agent Skill for the scoped package without changing the 0.50 language, canonical IR2, generated contract versions, or immutable 0.50.0 schema URLs.
+
 ## 0.50.0
 
 - Completed public package metadata, packed both public guides, and made the install quickstart self-contained.

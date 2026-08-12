@@ -1,12 +1,12 @@
 # ModelLang troubleshooting
 
-## `npm view modellang version` returns E404 or E403
+## `npm view @atlanticplatformgroup/modellang version` returns E404 or E403
 
-The unscoped npm package is not available from the current registry. Confirm the active registry with `npm config get registry` and authentication with `npm whoami`, but do not install a similarly named package. If npm reports name similarity, only the package owner and npm Support can resolve it.
+The scoped npm package is not available or the current account cannot access it. Confirm the active registry with `npm config get registry`, authentication with `npm whoami`, and membership in the `atlanticplatformgroup` npm organization. Do not install a similarly named package.
 
 ## `modelc` is not found
 
-Confirm that `modellang` is in the target project's development dependencies and use its local binary:
+Confirm that `@atlanticplatformgroup/modellang` is in the target project's development dependencies and use its local binary:
 
 ```bash
 npx --no-install modelc --help

@@ -35,12 +35,12 @@ action approve(caller actor: User, request: Request) -> Approval {
 Install and run the compiler:
 
 ```bash
-npm install --save-dev modellang@0.50.0
+npm install --save-dev @atlanticplatformgroup/modellang@0.50.1
 npx modelc check app.model
 npx modelc print-ir app.model > model.ir.json
 ```
 
-During development, `npx modellang@0.50.0 check app.model` also resolves the package's single `modelc` executable.
+Without installing first, `npx --package=@atlanticplatformgroup/modellang@0.50.1 modelc check app.model` resolves the package's `modelc` executable temporarily.
 
 ## Generate an application boundary
 

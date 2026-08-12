@@ -37,7 +37,7 @@ if (existsSync(packageJsonPath)) {
 }
 
 const sourceCheckout =
-  projectPackage?.name === "modellang" &&
+  projectPackage?.name === "@atlanticplatformgroup/modellang" &&
   existsSync(join(cwd, "src", "cli.ts")) &&
   existsSync(join(cwd, "tsconfig.json"));
 
@@ -47,7 +47,7 @@ if (sourceCheckout) {
   console.log(`Compiler build: ${existsSync(builtCli) ? builtCli : "missing; run npm run build"}`);
 } else {
   try {
-    const installedPackage = require.resolve("modellang/package.json");
+    const installedPackage = require.resolve("@atlanticplatformgroup/modellang/package.json");
     const installed = JSON.parse(readFileSync(installedPackage, "utf8"));
     console.log(`ModelLang package: ${installed.version} (${installedPackage})`);
   } catch {
@@ -60,16 +60,16 @@ const localBin = resolve(cwd, "node_modules", ".bin", binName);
 console.log(`Local modelc: ${existsSync(localBin) ? localBin : "not found"}`);
 
 if (process.argv.includes("--registry")) {
-  const result = spawnSync("npm", ["view", "modellang", "version"], {
+  const result = spawnSync("npm", ["view", "@atlanticplatformgroup/modellang", "version"], {
     cwd,
     encoding: "utf8",
     shell: process.platform === "win32",
   });
   if (result.status === 0) {
-    console.log(`npm registry: modellang@${result.stdout.trim()} available`);
+    console.log(`npm registry: @atlanticplatformgroup/modellang@${result.stdout.trim()} available`);
   } else {
     const detail = (result.stderr || result.stdout).trim().split("\n").slice(-4).join("\n");
-    console.log("npm registry: modellang unavailable or inaccessible");
+    console.log("npm registry: @atlanticplatformgroup/modellang unavailable or inaccessible");
     if (detail) console.log(detail);
   }
 }
